@@ -1,47 +1,44 @@
 import React from "react";
-import { View, StyleSheet, ScrollView } from "react-native";
-import CardComponent from "@/components/CardComponent";
-import FilterCarousel from "@/components/FilterCarousel";
+import { View, StyleSheet, ScrollView, SafeAreaView } from "react-native";
 import Header from "@/components/HeaderComponent";
+import Footer from "@/components/FooterComponent";
+import FilterCarousel from "@/components/FilterCarousel";
+import CardComponent from "@/components/CardComponent";
 
 export default function MenuScreen() {
   const fiestaTipos = ["Rave", "Techno", "House", "LGBT", "Pop", "Electrónica"];
 
-  return (
-    <View style={styles.mainContainer}>
-      <Header></Header>
-    <ScrollView >
-      <FilterCarousel filtros={fiestaTipos} />
+  const handleFilterPress = (filtro = "") => {
+    console.log("Filtro seleccionado:", filtro);
+  };
 
-      <View style={styles.container}>
-        <CardComponent
-          title="Fiesta en casa"
-          text="Preparense para una fiesta divertida en casa"
-          foto="https://picsum.photos/700"
+  const handleCardPress = (title = "") => {
+    console.log("Card seleccionada:", title);
+  };
+
+  return (
+    <SafeAreaView style={styles.mainContainer}>
+      <Header />
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <FilterCarousel
+          filtros={fiestaTipos}
+          onFilterPress={handleFilterPress}
         />
-        <CardComponent
-          title="Fiesta en casa"
-          text="Preparense para una fiesta divertida en casa"
-          foto="https://picsum.photos/701"
-        />
-        <CardComponent
-          title="Fiesta en casa"
-          text="Preparense para una fiesta divertida en casa"
-          foto="https://picsum.photos/702"
-        />
-        <CardComponent
-          title="Fiesta en casa"
-          text="Preparense para una fiesta divertida en casa"
-          foto="https://picsum.photos/703"
-        />
-        <CardComponent
-          title="Fiesta en casa"
-          text="Preparense para una fiesta divertida en casa"
-          foto="https://picsum.photos/704"
-        />
-      </View>
-    </ScrollView>
-    </View>
+
+        <View style={styles.containerCards}>
+          {[...Array(5)].map((_, index) => (
+            <CardComponent
+              key={index}
+              title={`Fiesta ${index + 1}`}
+              text="Diviértete con amigos"
+              foto={`https://picsum.photos/70${index}`}
+              onPress={handleCardPress}
+            />
+          ))}
+        </View>
+      </ScrollView>
+      <Footer />
+    </SafeAreaView>
   );
 }
 
@@ -49,9 +46,8 @@ const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
   },
-  container: {
+  containerCards: {
     flex: 1,
-    justifyContent: "center",
     marginTop: 10,
   },
 });
