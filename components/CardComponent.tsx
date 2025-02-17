@@ -1,8 +1,7 @@
-import * as React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Card, Paragraph } from 'react-native-paper';
-import TitlePers from './TitleComponent';
-
+import * as React from "react";
+import { StyleSheet, View } from "react-native";
+import { Card, Paragraph } from "react-native-paper";
+import TitlePers from "./TitleComponent";
 
 const CardComponent = ({ title = "", text = "", foto = "" }) => (
   <View style={styles.container}>
@@ -18,19 +17,19 @@ const CardComponent = ({ title = "", text = "", foto = "" }) => (
 
 const styles = StyleSheet.create({
   container: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   card: {
     marginTop: 10,
     marginBottom: 15,
-    width: '100%',
+    width: "100%",
   },
   cardContent: {
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginTop: 10,
     marginBottom: 15,
-    width: '100%',
+    width: "100%",
   },
 });
 

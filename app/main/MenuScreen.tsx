@@ -2,13 +2,15 @@ import React from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
 import CardComponent from "@/components/CardComponent";
 import FilterCarousel from "@/components/FilterCarousel";
+import Header from "@/components/HeaderComponent";
 
 export default function MenuScreen() {
-  // Tipos de fiesta que se mostrarán en el carrusel
   const fiestaTipos = ["Rave", "Techno", "House", "LGBT", "Pop", "Electrónica"];
 
   return (
-    <ScrollView style={styles.mainContainer}>
+    <View style={styles.mainContainer}>
+      <Header></Header>
+    <ScrollView >
       <FilterCarousel filtros={fiestaTipos} />
 
       <View style={styles.container}>
@@ -39,6 +41,7 @@ export default function MenuScreen() {
         />
       </View>
     </ScrollView>
+    </View>
   );
 }
 

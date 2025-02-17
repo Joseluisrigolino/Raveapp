@@ -1,9 +1,8 @@
-import * as React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import * as React from "react";
+import { StyleSheet, View } from "react-native";
+import { Text } from "react-native-paper";
 
-const TitlePers = ({ text = ""}) => {
-
+const TitlePers = ({ text = "" }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{text}</Text>
@@ -13,15 +12,14 @@ const TitlePers = ({ text = ""}) => {
 
 const styles = StyleSheet.create({
   container: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 10,
   },
   title: {
-    fontWeight: 'bold',
+    fontWeight: "bold",
     fontSize: 22,
-  }
-
+  },
 });
 
 export default TitlePers;

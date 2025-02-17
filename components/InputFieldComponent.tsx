@@ -1,6 +1,6 @@
-import * as React from 'react';
-import { StyleSheet, View } from 'react-native';
-import { TextInput } from 'react-native-paper';
+import * as React from "react";
+import { StyleSheet, View } from "react-native";
+import { TextInput } from "react-native-paper";
 
 const InputField = ({ label = "", secureTextEntry = false }) => {
   const [text, setText] = React.useState("");
@@ -20,8 +20,8 @@ const InputField = ({ label = "", secureTextEntry = false }) => {
 
 const styles = StyleSheet.create({
   container: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 10,
   },
   input: {
