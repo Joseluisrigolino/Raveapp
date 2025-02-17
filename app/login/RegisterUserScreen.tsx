@@ -1,7 +1,7 @@
-import ButtonInApp from '@/components/ButtonComponent';
-import InputField from '@/components/InputFieldComponent';
-import TitlePers from '@/components/TitleComponent';
-import { View, StyleSheet } from 'react-native';
+import ButtonInApp from "@/components/ButtonComponent";
+import InputField from "@/components/InputFieldComponent";
+import TitlePers from "@/components/TitleComponent";
+import { View, StyleSheet } from "react-native";
 
 export default function RegisterUserScreen() {
   return (
@@ -9,24 +9,24 @@ export default function RegisterUserScreen() {
       <TitlePers text="Registrate en Raveapp"></TitlePers>
       <InputField label="Nombre" />
       <InputField label="Apellido" />
-      <InputField label="Fecha de nacimiento DD/MM/AAAA"  />
-      <InputField label="Dni/pasaporte"  />
+      <InputField label="Fecha de nacimiento DD/MM/AAAA" />
+      <InputField label="Dni/pasaporte" />
       <InputField label="Correo electrónico" />
-      <InputField label="Usuario"/>
-      <InputField label="Contraseña" secureTextEntry={true} />
-      <ButtonInApp 
-        icon="" 
-        text="Registrar cuenta" 
-        width="75%" 
-        height={50} 
-        onPress={() => console.log('Crear cuenta')} 
+      <InputField label="Usuario" />
+      <InputField label="Contraseña" />
+      <ButtonInApp
+        icon=""
+        text="Registrar cuenta"
+        width="75%"
+        height={50}
+        onPress={() => console.log("Crear cuenta")}
       />
-      <ButtonInApp 
-        icon="google" 
-        text="Registrarse con google" 
-        width="75%" 
-        height={50} 
-        onPress={() => console.log('Crear cuenta con google')} 
+      <ButtonInApp
+        icon="google"
+        text="Registrarse con google"
+        width="75%"
+        height={50}
+        onPress={() => console.log("Crear cuenta con google")}
       />
     </View>
   );
@@ -35,6 +35,6 @@ export default function RegisterUserScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center'
-  }
+    justifyContent: "center",
+  },
 });
