@@ -8,8 +8,8 @@ import {
 } from "react-native";
 import Header from "@/components/HeaderComponent";
 import Footer from "@/components/FooterComponent";
-import TitlePers from "@/components/TitleComponent";
 import { Button, Text, Title } from "react-native-paper";
+import BuyTicket from "@/components/BuyTicketsComponent";
 
 export default function EventScreen() {
   return (
@@ -30,6 +30,7 @@ export default function EventScreen() {
         </Button>
         <Text style={styles.description}>Lorem ipsum dolor sit amet consectetur adipiscing elit sem, venenatis pretium ante malesuada mollis mattis sociis ac blandit, justo nostra auctor tincidunt ullamcorper feugiat praesent. Tortor hendrerit leo nullam blandit nostra consequat lacinia auctor, sapien sociosqu torquent dictum laoreet integer per magnis, convallis non ridiculus dignissim sagittis ante augue. Non cursus iaculis erat maecenas vehicula himenaeos, tincidunt dis imperdiet habitant sapien cubilia at, scelerisque hac sollicitudin tristique metus.</Text>
         </View>
+        <BuyTicket></BuyTicket>
       </ScrollView>
       <Footer />
     </SafeAreaView>
