@@ -27,16 +27,16 @@ const BuyTicket = () => {
             <View style={styles.counterContainer}>
               <TouchableOpacity
                 onPress={decreaseQuantity}
-                style={styles.button}
+                style={styles.buttonQuantity}
               >
-                <Text style={styles.buttonText}>-</Text>
+                <Text style={styles.buttonQuantityText}>-</Text>
               </TouchableOpacity>
               <Text style={styles.quantityText}>{quantity}</Text>
               <TouchableOpacity
                 onPress={increaseQuantity}
-                style={styles.button}
+                style={styles.buttonQuantity}
               >
-                <Text style={styles.buttonText}>+</Text>
+                <Text style={styles.buttonQuantityText}>+</Text>
               </TouchableOpacity>
             </View>
           </DataTable.Cell>
@@ -60,13 +60,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginLeft: 95,
   },
-  button: {
+  buttonQuantity: {
     backgroundColor: "#000000",
     padding: 5,
     borderRadius: 5,
     marginHorizontal: 10,
   },
-  buttonText: {
+  buttonQuantityText: {
     fontSize: 18,
     color: "white",
     fontWeight: "bold",
