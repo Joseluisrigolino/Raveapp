@@ -3,8 +3,8 @@ import { StyleSheet, View } from "react-native";
 import { Card, Paragraph, TouchableRipple } from "react-native-paper";
 import TitlePers from "./TitleComponent";
 
-const CardComponent = ({ title = "", text = "", foto = "", onPress }) => (
-  <TouchableRipple onPress={() => onPress(title)} borderless>
+const CardComponent = ({ title = "", text = "", foto = "", onPress = () => {} }) => (
+  <TouchableRipple onPress={() => onPress()} borderless>
     <Card style={styles.card}>
       <Card.Content>
         <TitlePers text={title} />
