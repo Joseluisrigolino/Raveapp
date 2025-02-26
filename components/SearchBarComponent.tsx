@@ -1,43 +1,35 @@
-import React from 'react';
-import { View, TextInput, StyleSheet } from 'react-native';
-import { IconButton } from 'react-native-paper';
+// components/SearchBarComponent.tsx
+import React from "react";
+import { StyleSheet, View } from "react-native";
+import { TextInput } from "react-native-paper";
+import { SearchBarProps } from "@/interfaces/SearchBarProps";
 
-const SearchBarComponent = () => {
+const SearchBar: React.FC<SearchBarProps> = ({
+  value,
+  onChangeText,
+  placeholder = "Buscar...", // Valor por defecto, pero se puede sobrescribir
+}) => {
   return (
-    <View style={styles.searchBarContainer}>
-      <IconButton
-        icon="magnify"
-        size={30}
-        onPress={() => console.log('Buscar presionado')}
-        style={styles.searchIcon}
-      />
+    <View style={styles.container}>
       <TextInput
-        style={styles.searchInput}
-        placeholder="Buscar..."
+        mode="outlined"
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        left={<TextInput.Icon icon="magnify" color="#000" size={24} />}
+        style={styles.input}
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  searchBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    padding: 10,
-    borderRadius: 5,
+  container: {
+    margin: 10,
   },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    height: 40,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingLeft: 10,
+  input: {
+    backgroundColor: "#fff", // Asegura que el fondo sea blanco para contraste
   },
 });
 
-export default SearchBarComponent;
+export default SearchBar;

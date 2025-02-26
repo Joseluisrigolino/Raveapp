@@ -1,8 +1,9 @@
-// components/ArtistCard.js
+// components/ArtistCard.tsx
 import React from "react";
 import { View, Text, Image, StyleSheet } from "react-native";
+import { ArtistCardProps } from "../interfaces/ArtistCardProps";
 
-const ArtistCard = ({ artistName, artistImage }) => {
+const ArtistCard: React.FC<ArtistCardProps> = ({ artistName, artistImage }) => {
   return (
     <View style={styles.cardContainer}>
       <Image source={{ uri: artistImage }} style={styles.artistImage} />
@@ -13,7 +14,7 @@ const ArtistCard = ({ artistName, artistImage }) => {
 
 const styles = StyleSheet.create({
   cardContainer: {
-    width: '30%', // Tres cards por fila
+    width: '30%',
     margin: 5,
     alignItems: 'center',
   },
