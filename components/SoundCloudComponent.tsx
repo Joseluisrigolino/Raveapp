@@ -2,7 +2,7 @@ import React from "react";
 import { View, StyleSheet } from "react-native";
 import { WebView } from "react-native-webview";
 
-const SoundCloud = ({ trackUrl }) => {
+const SoundCloud = ({ trackUrl = "" }) => {
   const embedUrl = `https://w.soundcloud.com/player/?url=${encodeURIComponent(trackUrl)}&color=%23ff5500&auto_play=false&hide_related=false&show_comments=true&show_user=true&show_reposts=false&show_teaser=true&visual=true`;
 
   return (

@@ -17,6 +17,9 @@ export default function RootLayout() {
       <Stack.Screen name="RegisterUserScreen" />
       <Stack.Screen name="MenuScreen" />
       <Stack.Screen name="EventScreen" />
+      <Stack.Screen name="FavEventScreen" />
+      <Stack.Screen name="ArtistsScreen" />
+      <Stack.Screen name="ArtistScreen" />
     </Stack>
   );
 }

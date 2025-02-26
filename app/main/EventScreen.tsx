@@ -13,6 +13,7 @@ import Header from "@/components/HeaderComponent";
 import Footer from "@/components/FooterComponent";
 import BuyTicket from "@/components/BuyTicketsComponent";
 import SoundCloud from "@/components/SoundCloudComponent";
+import Review from "@/components/ReviewComponent";
 
 const openMap = () => {
   const address = encodeURIComponent("tandil 4341, Villa Ballester");
@@ -63,7 +64,8 @@ export default function EventScreen() {
             <Text style={styles.btnBuyTxt}>Comprar</Text>
           </TouchableOpacity>
         </View>
-        <SoundCloud trackUrl="https://soundcloud.com/skrillex/sets/skrillex-remixes" />
+        {/* <SoundCloud trackUrl="https://soundcloud.com/skrillex/sets/skrillex-remixes" /> */}
+        <Review></Review>
       </ScrollView>
       <Footer />
     </SafeAreaView>
