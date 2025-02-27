@@ -9,7 +9,14 @@ import CardComponent from "@/components/CardComponent";
 export default function FavEventScreen() {
   const fiestaTipos = ["Rave", "Techno", "House", "LGBT", "Pop", "Electrónica"];
   const [favorites, setFavorites] = useState(
-    Array(5).fill(true).map((_, index) => ({ id: index, title: `Fiesta ${index + 1}`, text: "Diviértete con amigos", foto: `https://picsum.photos/70${index}` }))
+    Array(5)
+      .fill(true)
+      .map((_, index) => ({
+        id: index,
+        title: `Fiesta ${index + 1}`,
+        text: "Diviértete con amigos",
+        foto: `https://picsum.photos/70${index}`,
+      }))
   );
 
   const handleFilterPress = (filtro = "") => {
@@ -29,7 +36,10 @@ export default function FavEventScreen() {
       <Header />
       <Text style={styles.screenTitle}>Eventos favoritos</Text>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <FilterCarousel filtros={fiestaTipos} onFilterPress={handleFilterPress} />
+        <FilterCarousel
+          filtros={fiestaTipos}
+          onFilterPress={handleFilterPress}
+        />
 
         <View style={styles.containerCards}>
           {favorites.length > 0 ? (
@@ -51,7 +61,9 @@ export default function FavEventScreen() {
               </View>
             ))
           ) : (
-            <Text style={styles.noFavoritesText}>No tiene ningún evento guardado en favorito</Text>
+            <Text style={styles.noFavoritesText}>
+              No tiene ningún evento guardado en favorito
+            </Text>
           )}
         </View>
       </ScrollView>

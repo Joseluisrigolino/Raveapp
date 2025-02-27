@@ -8,9 +8,32 @@ import SearchBar from "@/components/SearchBarComponent";
 import { Artist } from "@/interfaces/Artist";
 
 type Alphabet =
-  | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J"
-  | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T"
-  | "U" | "V" | "W" | "X" | "Y" | "Z";
+  | "A"
+  | "B"
+  | "C"
+  | "D"
+  | "E"
+  | "F"
+  | "G"
+  | "H"
+  | "I"
+  | "J"
+  | "K"
+  | "L"
+  | "M"
+  | "N"
+  | "O"
+  | "P"
+  | "Q"
+  | "R"
+  | "S"
+  | "T"
+  | "U"
+  | "V"
+  | "W"
+  | "X"
+  | "Y"
+  | "Z";
 
 const artistData: Record<Alphabet, string[]> = {
   A: ["Ariana Grande", "Alicia Keys", "Adele"],

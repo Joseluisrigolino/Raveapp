@@ -16,10 +16,18 @@ import SoundCloud from "@/components/SoundCloudComponent";
 import Review from "@/components/ReviewComponent";
 
 const openMap = () => {
-  const address = encodeURIComponent("tandil 4341, Villa Ballester");
+  const address = encodeURIComponent("tandil 4341, villa ballester");
   const url = `https://www.google.com/maps/search/?api=1&query=${address}`;
   Linking.openURL(url);
 };
+
+/* const openMap = () => {
+  const latitude = -34.603722;
+  const longitude = -58.381592;
+  // Formato: lat,long (sin espacios)
+  const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+  Linking.openURL(url);
+}; */
 
 export default function EventScreen() {
   const [isFavorite, setIsFavorite] = useState(false);

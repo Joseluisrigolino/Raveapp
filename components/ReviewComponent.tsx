@@ -30,7 +30,9 @@ const ReviewComponent = () => {
         <View key={index}>
           <Text style={styles.username}>{review.user}</Text>
           <View style={styles.reviewInfo}>
-            <View style={styles.starsContainer}>{renderStars(review.rating)}</View>
+            <View style={styles.starsContainer}>
+              {renderStars(review.rating)}
+            </View>
             <Text style={styles.daysAgo}>{review.daysAgo} días</Text>
           </View>
           <Text style={styles.comment}>&quot;{review.comment}&quot;</Text>

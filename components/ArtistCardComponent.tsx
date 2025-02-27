@@ -14,19 +14,19 @@ const ArtistCard: React.FC<ArtistCardProps> = ({ artistName, artistImage }) => {
 
 const styles = StyleSheet.create({
   cardContainer: {
-    width: '30%',
+    width: "30%",
     margin: 5,
-    alignItems: 'center',
+    alignItems: "center",
   },
   artistImage: {
     width: 70,
     height: 70,
     borderRadius: 35,
     borderWidth: 2,
-    borderColor: 'black',
+    borderColor: "black",
   },
   artistName: {
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 5,
   },
 });
