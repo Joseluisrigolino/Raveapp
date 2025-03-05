@@ -92,9 +92,7 @@ export default function ArtistScreen() {
           {/* Muestra la cantidad de "bombers les gusta" */}
           <Text style={styles.likesText}>{likes} bombers les gusta</Text>
 
-          {description && (
-            <Text style={styles.description}>{description}</Text>
-          )}
+          {description && <Text style={styles.description}>{description}</Text>}
         </ScrollView>
       </View>
 

@@ -20,6 +20,13 @@ export default function RootLayout() {
       <Stack.Screen name="FavEventScreen" />
       <Stack.Screen name="ArtistsScreen" />
       <Stack.Screen name="ArtistScreen" />
+      <Stack.Screen name="NewsScreen" />
+      <Stack.Screen name="NewScreen" />
+      <Stack.Screen name="TicketFinalizedScreen" />
+      <Stack.Screen name="TicketsPurchasedMenu" />
+      <Stack.Screen name="BuyTicketScreen" />
+      <Stack.Screen name="UserProfileEditScreen" />
+      <Stack.Screen name="CreateEventScreen" />
     </Stack>
   );
 }

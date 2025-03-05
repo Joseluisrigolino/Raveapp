@@ -13,21 +13,35 @@ import Header from "@/components/HeaderComponent";
 import Footer from "@/components/FooterComponent";
 import BuyTicket from "@/components/BuyTicketsComponent";
 import SoundCloud from "@/components/SoundCloudComponent";
-import Review from "@/components/ReviewComponent";
+
+// NUEVO: importamos ReviewComponent
+import ReviewComponent from "@/components/ReviewComponent";
+import { ReviewItem } from "@/interfaces/ReviewProps";
+
+// Ejemplo de reseñas
+const mockReviews: ReviewItem[] = [
+  {
+    id: 1,
+    user: "Usuario99",
+    comment: "Me gustó mucho la fiesta. Gente muy agradable. Volvería a ir.",
+    rating: 5,
+    daysAgo: 6,
+  },
+  {
+    id: 2,
+    user: "Usuario27",
+    comment:
+      "Me gustó mucho la fiesta. La única crítica es que esperé 15 minutos en la fila para ingresar.",
+    rating: 4,
+    daysAgo: 6,
+  },
+];
 
 const openMap = () => {
   const address = encodeURIComponent("tandil 4341, villa ballester");
   const url = `https://www.google.com/maps/search/?api=1&query=${address}`;
   Linking.openURL(url);
 };
-
-/* const openMap = () => {
-  const latitude = -34.603722;
-  const longitude = -58.381592;
-  // Formato: lat,long (sin espacios)
-  const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
-  Linking.openURL(url);
-}; */
 
 export default function EventScreen() {
   const [isFavorite, setIsFavorite] = useState(false);
@@ -50,6 +64,7 @@ export default function EventScreen() {
             onPress={() => setIsFavorite(!isFavorite)}
           />
         </View>
+
         <Title style={styles.title}>Fiesta 1</Title>
         <View style={styles.info}>
           <Button icon="calendar">
@@ -73,7 +88,9 @@ export default function EventScreen() {
           </TouchableOpacity>
         </View>
         {/* <SoundCloud trackUrl="https://soundcloud.com/skrillex/sets/skrillex-remixes" /> */}
-        <Review></Review>
+
+        {/* NUEVO: Sección de reseñas con la nueva UI */}
+        <ReviewComponent reviews={mockReviews} />
       </ScrollView>
       <Footer />
     </SafeAreaView>
@@ -85,7 +102,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   imageContainer: {
-    position: "relative", // Necesario para posicionar el corazón
+    position: "relative",
   },
   img: {
     width: "100%",
@@ -96,8 +113,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 10,
     right: 10,
-    backgroundColor: "white", // Fondo blanco para que resalte
-    borderRadius: 20, // Hace que el fondo sea circular
+    backgroundColor: "white",
+    borderRadius: 20,
   },
   title: {
     fontWeight: "bold",
