@@ -69,11 +69,21 @@ export default function CreateEventScreen() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Handlers parte “No logueado”
-  const handleLogin = () => { console.log("Iniciar sesión presionado"); };
-  const handleRegister = () => { console.log("Registrarme presionado"); };
-  const handleGoogleLogin = () => { console.log("Login with Google presionado"); };
-  const simulateLogin = () => { setIsLoggedIn(true); };
-  const handleLogout = () => { setIsLoggedIn(false); };
+  const handleLogin = () => {
+    console.log("Iniciar sesión presionado");
+  };
+  const handleRegister = () => {
+    console.log("Registrarme presionado");
+  };
+  const handleGoogleLogin = () => {
+    console.log("Login with Google presionado");
+  };
+  const simulateLogin = () => {
+    setIsLoggedIn(true);
+  };
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+  };
 
   // Campos del formulario
   const [eventName, setEventName] = useState("");
@@ -113,7 +123,9 @@ export default function CreateEventScreen() {
   const [startSaleDateTime, setStartSaleDateTime] = useState<Date>(new Date());
   const [earlyBirdsStock, setEarlyBirdsStock] = useState(false);
   const [useEarlyBirdsDate, setUseEarlyBirdsDate] = useState(false);
-  const [earlyBirdsUntilDateTime, setEarlyBirdsUntilDateTime] = useState<Date>(new Date());
+  const [earlyBirdsUntilDateTime, setEarlyBirdsUntilDateTime] = useState<Date>(
+    new Date()
+  );
 
   // Radio: Tipo de evento
   const handleEventTypeChange = (value: "1d" | "2d" | "3d") => {
@@ -150,7 +162,12 @@ export default function CreateEventScreen() {
   };
 
   // Calcular total de entradas en tiempo real
-  const totalTickets = calcTotalTickets(genEarlyQty, vipEarlyQty, genQty, vipQty);
+  const totalTickets = calcTotalTickets(
+    genEarlyQty,
+    vipEarlyQty,
+    genQty,
+    vipQty
+  );
 
   // Al enviar
   const handleSubmit = () => {
@@ -496,7 +513,9 @@ export default function CreateEventScreen() {
 
             {/* Entradas VIP Early Birds */}
             <View style={styles.ticketRow}>
-              <Text style={styles.ticketLabel}>Entradas VIP - Early Birds:</Text>
+              <Text style={styles.ticketLabel}>
+                Entradas VIP - Early Birds:
+              </Text>
               <View style={styles.ticketInputs}>
                 <Text>Cantidad:</Text>
                 <TextInput
@@ -603,7 +622,10 @@ export default function CreateEventScreen() {
             )}
 
             {/* BOTÓN FINAL (centrado) */}
-            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={handleSubmit}
+            >
               <Text style={styles.submitButtonText}>Crear Evento</Text>
             </TouchableOpacity>
           </View>
@@ -617,8 +639,8 @@ export default function CreateEventScreen() {
 
 // Estilos
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1 
+  container: {
+    flex: 1,
   },
   scrollContent: {
     padding: 16,
@@ -687,8 +709,8 @@ const styles = StyleSheet.create({
     width: 300,
   },
   input: {
-    backgroundColor: "#FFF",       // Fondo blanco
-    borderWidth: 1,               // Borde sutil
+    backgroundColor: "#FFF", // Fondo blanco
+    borderWidth: 1, // Borde sutil
     borderColor: "#ccc",
     borderRadius: 4,
     paddingHorizontal: 8,
@@ -832,7 +854,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   smallInput: {
-    backgroundColor: "#FFF", 
+    backgroundColor: "#FFF",
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 4,
