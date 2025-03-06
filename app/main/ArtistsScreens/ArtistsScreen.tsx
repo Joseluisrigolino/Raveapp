@@ -1,12 +1,16 @@
-// screens/ArtistsScreen.tsx
 import React, { useState, useMemo } from "react";
 import { View, StyleSheet, ScrollView, SafeAreaView, Text } from "react-native";
+import { useRouter } from "expo-router";
+
 import Header from "@/components/HeaderComponent";
 import Footer from "@/components/FooterComponent";
-import ArtistCard from "@/components/ArtistCardComponent";
+import ArtistCard from "@/components/ArtistsComponents/ArtistCardComponent";
 import SearchBar from "@/components/SearchBarComponent";
+import TabMenuComponent from "@/components/TabMenuComponent";
+
 import { Artist } from "@/interfaces/Artist";
 
+// Simulados
 type Alphabet =
   | "A"
   | "B"
@@ -79,47 +83,64 @@ const generateArtists = (): Artist[] => {
 };
 
 export default function ArtistsScreen() {
-  const [searchText, setSearchText] = useState<string>("");
+  const router = useRouter();
+  const [searchText, setSearchText] = useState("");
   const [artists] = useState<Artist[]>(() => generateArtists());
 
-  // Se filtra usando startsWith para que el nombre inicie con el texto ingresado.
+  // Filtra
   const filteredArtists = useMemo(() => {
-    return artists.filter((artist: Artist) =>
+    return artists.filter((artist) =>
       artist.name.toLowerCase().startsWith(searchText.toLowerCase())
     );
   }, [artists, searchText]);
 
-  // Agrupa los artistas filtrados por la primera letra de su nombre.
-  const getLetterGroup = (letter: string): Artist[] => {
+  const getLetterGroup = (letter: string) => {
     return filteredArtists.filter(
-      (artist: Artist) => artist.name[0].toLowerCase() === letter.toLowerCase()
+      (artist) => artist.name[0].toLowerCase() === letter.toLowerCase()
     );
   };
 
-  const alphabet: string[] = "abcdefghijklmnopqrstuvwxyz".split("");
+  const alphabet = "abcdefghijklmnopqrstuvwxyz".split("");
+
+  // Al tocar un artista, navegamos a /main/ArtistScreen con ?name=...
+  const handleArtistPress = (artist: Artist) => {
+    router.push(`/main/ArtistScreen?name=${encodeURIComponent(artist.name)}`);
+  };
 
   return (
     <SafeAreaView style={styles.mainContainer}>
       <Header />
-      {/* Se pasa el placeholder personalizado */}
+
+      {/* Submenú */}
+      <TabMenuComponent
+        tabs={[
+          { label: "Noticias", route: "/main/NewsScreen", isActive: false },
+          { label: "Artistas", route: "/main/ArtistsScreen", isActive: true },
+        ]}
+      />
+
       <SearchBar
         value={searchText}
         onChangeText={setSearchText}
         placeholder="Buscar artista"
       />
+
       <ScrollView showsVerticalScrollIndicator={false}>
-        {alphabet.map((letter: string) => {
+        {alphabet.map((letter) => {
           const group = getLetterGroup(letter);
           if (group.length === 0) return null;
+
           return (
             <View key={letter} style={styles.letterGroup}>
               <Text style={styles.letterTitle}>{letter.toUpperCase()}</Text>
               <View style={styles.artistCardsRow}>
-                {group.map((artist: Artist, index: number) => (
+                {group.map((artist, index) => (
                   <ArtistCard
                     key={index}
                     artistName={artist.name}
                     artistImage={artist.image}
+                    // Al tocar, navega
+                    onPress={() => handleArtistPress(artist)}
                   />
                 ))}
               </View>
@@ -127,6 +148,7 @@ export default function ArtistsScreen() {
           );
         })}
       </ScrollView>
+
       <Footer />
     </SafeAreaView>
   );

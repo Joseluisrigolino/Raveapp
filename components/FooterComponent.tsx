@@ -1,37 +1,43 @@
 import React from "react";
-import { View, StyleSheet, ScrollView } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { IconButton } from "react-native-paper";
+// Importa el hook useRouter
+import { useRouter } from "expo-router";
 
-const Footer = () => {
+export default function Footer() {
+  // Obtienes el router para navegar
+  const router = useRouter();
+
   return (
     <View style={styles.container}>
       <IconButton
         icon="home"
         size={24}
         iconColor="white"
-        onPress={() => console.log("Inicio presionado")}
+        // Llama a router.push("MenuScreen") o "/MenuScreen"
+        onPress={() => router.push("/main/MenuScreen")}
       />
       <IconButton
         icon="newspaper"
         size={24}
         iconColor="white"
-        onPress={() => console.log("Noticas presionado")}
+        onPress={() => router.push("/main/NewsScreen")}
       />
       <IconButton
         icon="calendar-plus"
         size={24}
         iconColor="white"
-        onPress={() => console.log("Agregar evento presionado")}
+        onPress={() => router.push("/main/CreateEventScreen")}
       />
       <IconButton
         icon="account"
         size={24}
         iconColor="white"
-        onPress={() => console.log("Ir a perfil presionado")}
+        onPress={() => router.push("/main/UserProfileEditScreen")}
       />
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -44,5 +50,3 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 });
-
-export default Footer;

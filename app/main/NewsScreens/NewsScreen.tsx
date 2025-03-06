@@ -8,11 +8,11 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from "react-native";
-import { NewsItem } from "@/interfaces/NewsProps";
 import Header from "@/components/HeaderComponent";
 import Footer from "@/components/FooterComponent";
+import { NewsItem } from "@/interfaces/NewsProps";
+import TabMenuComponent from "@/components/TabMenuComponent";
 
-// Datos de ejemplo
 const newsData: NewsItem[] = [
   {
     id: 1,
@@ -33,14 +33,20 @@ const newsData: NewsItem[] = [
 
 export default function NewsScreen() {
   const handlePress = (item: NewsItem) => {
-    // Aquí puedes poner la acción que desees
-    // Por ahora, solo mostramos por consola:
     console.log("Novedad presionada:", item.title);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
+
+      {/* Submenú reutilizable (dos pestañas) */}
+      <TabMenuComponent
+        tabs={[
+          { label: "Noticias", route: "main/NewsScreen", isActive: true },
+          { label: "Artistas", route: "main/ArtistsScreens/ArtistsScreen", isActive: false },
+        ]}
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {newsData.map((item) => (
