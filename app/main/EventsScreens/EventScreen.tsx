@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -9,16 +9,18 @@ import {
   Linking,
 } from "react-native";
 import { Button, Text, Title, IconButton } from "react-native-paper";
+import { useLocalSearchParams } from "expo-router";
+
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
 import BuyTicket from "@/components/BuyTicketsComponent";
 import SoundCloud from "@/components/SocialMediaComponents/SoundCloudComponent";
-
-// NUEVO: importamos ReviewComponent
 import ReviewComponent from "@/components/ReviewComponent";
 import { ReviewItem } from "@/interfaces/ReviewProps";
 
-// Ejemplo de reseñas
+import { getEventById } from "@/utils/eventHelpers";
+import { EventItem } from "@/interfaces/EventProps";
+
 const mockReviews: ReviewItem[] = [
   {
     id: 1,
@@ -37,25 +39,48 @@ const mockReviews: ReviewItem[] = [
   },
 ];
 
-const openMap = () => {
-  const address = encodeURIComponent("tandil 4341, villa ballester");
-  const url = `https://www.google.com/maps/search/?api=1&query=${address}`;
-  Linking.openURL(url);
-};
-
 export default function EventScreen() {
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const [eventData, setEventData] = useState<EventItem | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      const found = getEventById(Number(id));
+      setEventData(found);
+    }
+  }, [id]);
+
+  // Si no se encontró el evento, mostrar mensaje
+  if (!eventData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header />
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Text>Evento no encontrado.</Text>
+        </View>
+        <Footer />
+      </SafeAreaView>
+    );
+  }
+
+  // openMap con la dirección real
+  const openMap = () => {
+    const address = encodeURIComponent(eventData.address);
+    const url = `https://www.google.com/maps/search/?api=1&query=${address}`;
+    Linking.openURL(url);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Imagen principal */}
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: "https://picsum.photos/700" }}
+            source={{ uri: eventData.imageUrl }}
             style={styles.img}
           />
-          {/* Botón de corazón en la esquina inferior derecha de la imagen */}
           <IconButton
             icon={isFavorite ? "heart" : "heart-outline"}
             iconColor={isFavorite ? "red" : "black"}
@@ -65,31 +90,31 @@ export default function EventScreen() {
           />
         </View>
 
-        <Title style={styles.title}>Fiesta 1</Title>
+        {/* Título y info */}
+        <Title style={styles.title}>{eventData.title}</Title>
         <View style={styles.info}>
           <Button icon="calendar">
-            <Text>18/06/2025 de 10hs a 15hs</Text>
+            <Text>{eventData.date} de {eventData.timeRange}</Text>
           </Button>
           <Button icon="map-marker" onPress={openMap}>
             <Text style={{ color: "blue", textDecorationLine: "underline" }}>
-              Tandil 4341, Villa Ballester
+              {eventData.address}
             </Text>
           </Button>
-          <Text style={styles.description}>
-            Lorem ipsum dolor sit amet consectetur adipiscing elit sem,
-            venenatis pretium ante malesuada mollis mattis sociis ac blandit,
-            justo nostra auctor tincidunt ullamcorper feugiat praesent...
-          </Text>
+          <Text style={styles.description}>{eventData.description}</Text>
         </View>
+
         <BuyTicket />
         <View style={styles.btnBuyView}>
           <TouchableOpacity style={styles.btnBuy}>
             <Text style={styles.btnBuyTxt}>Comprar</Text>
           </TouchableOpacity>
         </View>
+
+        {/* SoundCloud si quieres */}
         {/* <SoundCloud trackUrl="https://soundcloud.com/skrillex/sets/skrillex-remixes" /> */}
 
-        {/* NUEVO: Sección de reseñas con la nueva UI */}
+        {/* Reseñas */}
         <ReviewComponent reviews={mockReviews} />
       </ScrollView>
       <Footer />

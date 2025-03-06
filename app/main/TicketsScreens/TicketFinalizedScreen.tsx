@@ -1,34 +1,26 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   ScrollView,
-  View,
-  StyleSheet,
   Image,
   Text,
+  StyleSheet,
   TouchableOpacity,
+  View,
   TextInput,
 } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons"; // o "react-native-vector-icons/MaterialCommunityIcons"
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useLocalSearchParams } from "expo-router";
+
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
-import { TicketPurchased } from "@/interfaces/TicketPurchasedProps";
 import ReviewComponent from "@/components/ReviewComponent";
 import { ReviewItem } from "@/interfaces/ReviewProps";
+import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
+// Este helper podría tener un mock o un fetch a tu API
+import { getTicketMenuById } from "@/utils/ticketMenuHelpers";
 
-const mockTicketData: TicketPurchased = {
-  ticketId: "ABC123XYZ",
-  eventName: "Nombre del evento",
-  ticketType: "Entrada General",
-  ticketPrice: 3000,
-  date: "09/12/2024",
-  timeRange: "23:50hs a 07:00hs",
-  address: "Av. Cnel. Niceto Vega 6599 - Capital Federal",
-  eventImageUrl: "https://picsum.photos/800/400",
-  description:
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus in suscipit quam. Sed lacinia, tortor a tincidunt efficitur, dui erat facilisis leo, et aliquam magna turpis vel nisl.",
-};
-
+/** Reseñas de ejemplo (luego podrías traerlas de tu API) */
 const mockReviews: ReviewItem[] = [
   {
     id: 1,
@@ -47,25 +39,46 @@ const mockReviews: ReviewItem[] = [
 ];
 
 export default function TicketFinalizedScreen() {
-  const {
-    ticketId,
-    eventName,
-    ticketType,
-    ticketPrice,
-    date,
-    timeRange,
-    address,
-    eventImageUrl,
-    description,
-  } = mockTicketData;
+  // 1. Leemos el param "id"
+  const { id } = useLocalSearchParams<{ id?: string }>();
 
+  // 2. Estado para guardar la data del ticket
+  const [ticketData, setTicketData] = useState<TicketPurchasedMenuItem | null>(null);
+
+  // 3. Estados para la reseña del usuario
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
 
+  // 4. Al montar o cambiar "id", buscamos el ticket en el helper (o API)
+  useEffect(() => {
+    if (id) {
+      const found = getTicketMenuById(Number(id));
+      if (found) {
+        setTicketData(found);
+      }
+    }
+  }, [id]);
+
+  // 5. Si no se encontró el ticket, mostrar un mensaje
+  if (!ticketData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header />
+        <View style={styles.contentWrapper}>
+          <Text>Ticket no encontrado.</Text>
+        </View>
+        <Footer />
+      </SafeAreaView>
+    );
+  }
+
+  // Manejo de estrellas
   const handleStarPress = (starValue: number) => setRating(starValue);
 
+  // Al enviar reseña
   const handleSendReview = () => {
     console.log("Review enviada:", { rating, comment });
+    // Aquí podrías hacer un POST a tu API
     setRating(0);
     setComment("");
   };
@@ -75,27 +88,25 @@ export default function TicketFinalizedScreen() {
       <Header />
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Image source={{ uri: eventImageUrl }} style={styles.eventImage} />
-        <Text style={styles.eventTitle}>Entrada a: {eventName}</Text>
+        {/* Imagen del evento (ejemplo) */}
+        <Image source={{ uri: ticketData.imageUrl }} style={styles.eventImage} />
+        <Text style={styles.eventTitle}>Entrada a: {ticketData.eventName}</Text>
 
         <Text style={styles.finalizedLabel}>Evento finalizado</Text>
 
+        {/* Info del ticket */}
         <View style={styles.ticketContainer}>
           <View style={styles.infoContainer}>
-            {/* numberOfLines={0} para permitir varias líneas */}
             <Text style={styles.ticketInfo} numberOfLines={0}>
-              Ticket: {ticketType}
+              Ticket: Entrada General
+              {"\n"}Valor: $3000
               {"\n"}
-              Valor: ${ticketPrice}
+              {ticketData.date}
               {"\n"}
-              {date}
-              {"\n"}
-              {timeRange}
+              23:50hs a 07:00hs
             </Text>
-
-            {/* También numberOfLines={0} y flexWrap si fuera necesario */}
             <Text style={styles.address} numberOfLines={0}>
-              {address}
+              Dirección de ejemplo
             </Text>
           </View>
         </View>
@@ -109,12 +120,14 @@ export default function TicketFinalizedScreen() {
         <View style={styles.descriptionContainer}>
           <Text style={styles.descriptionTitle}>Descripción del evento</Text>
           <Text style={styles.descriptionText} numberOfLines={0}>
-            {description}
+            Aquí iría la descripción real...
           </Text>
         </View>
 
+        {/* Reseñas existentes */}
         <ReviewComponent reviews={mockReviews} />
 
+        {/* Formulario para dejar una nueva reseña */}
         <View style={styles.addReviewContainer}>
           <Text style={styles.addReviewTitle}>
             Comenta qué te pareció la fiesta:
@@ -164,10 +177,16 @@ export default function TicketFinalizedScreen() {
   );
 }
 
+// Estilos
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  contentWrapper: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   scrollContainer: {
     padding: 16,
@@ -195,21 +214,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
-  // Ojo con alignItems: "center" en el contenedor,
-  // a veces reduce el ancho real para el texto.
   infoContainer: {
     backgroundColor: "#F3F3F3",
     padding: 16,
     borderRadius: 8,
-    width: "100%", // se expande al ancho total
-    // alignItems: "center", // si quitas esto, el texto usará todo el ancho
+    width: "100%",
   },
   ticketInfo: {
     fontSize: 15,
     textAlign: "center",
     marginBottom: 8,
-    // flexWrap: "wrap", // se activa si se necesita
-    // width: "100%", // a veces innecesario
   },
   address: {
     fontSize: 13,

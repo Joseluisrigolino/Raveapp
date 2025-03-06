@@ -1,56 +1,27 @@
 import React from "react";
 import { SafeAreaView, FlatList, StyleSheet } from "react-native";
+import { useRouter } from "expo-router";
+
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
 import TicketCardComponent from "@/components/TicketCardComponent";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
+import { getAllPurchasedTickets } from "@/utils/ticketMenuHelpers"; // o tu array local
 
 export default function TicketsPurchasedMenu() {
-  // Datos de ejemplo (luego vendrán de tu API)
-  const mockData: TicketPurchasedMenuItem[] = [
-    {
-      id: 1,
-      imageUrl: "https://picsum.photos/200?random=1",
-      eventName: "Nombre del evento 1",
-      date: "Fecha del evento 1",
-      isFinished: false,
-    },
-    {
-      id: 2,
-      imageUrl: "https://picsum.photos/200?random=2",
-      eventName: "Nombre del evento 2",
-      date: "Fecha del evento 2",
-      isFinished: true,
-    },
-    {
-      id: 3,
-      imageUrl: "https://picsum.photos/200?random=3",
-      eventName: "Nombre del evento 3",
-      date: "Fecha del evento 3",
-      isFinished: false,
-    },
-    {
-      id: 4,
-      imageUrl: "https://picsum.photos/200?random=4",
-      eventName: "Nombre del evento 4",
-      date: "Fecha del evento 4",
-      isFinished: false,
-    },
-    {
-      id: 5,
-      imageUrl: "https://picsum.photos/200?random=5",
-      eventName: "Nombre del evento 5",
-      date: "Fecha del evento 5",
-      isFinished: true,
-    },
-    {
-      id: 6,
-      imageUrl: "https://picsum.photos/200?random=6",
-      eventName: "Nombre del evento 6",
-      date: "Fecha del evento 6",
-      isFinished: false,
-    },
-  ];
+  const router = useRouter();
+
+  // Datos de ejemplo (luego vendrán de tu API o un helper)
+  const mockData: TicketPurchasedMenuItem[] = getAllPurchasedTickets();
+
+  // Al pulsar una tarjeta de ticket, si isFinished => FinalizedScreen; si no => PurchasedScreen
+  const handleTicketPress = (item: TicketPurchasedMenuItem) => {
+    if (item.isFinished) {
+      router.push(`/main/TicketsScreens/TicketFinalizedScreen?id=${item.id}`);
+    } else {
+      router.push(`/main/TicketsScreens/TicketPurchasedScreen?id=${item.id}`);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -59,9 +30,14 @@ export default function TicketsPurchasedMenu() {
       <FlatList
         data={mockData}
         keyExtractor={(item) => item.id.toString()}
-        numColumns={2} // Aquí definimos cuántas columnas queremos
+        numColumns={2}
         contentContainerStyle={styles.flatListContent}
-        renderItem={({ item }) => <TicketCardComponent item={item} />}
+        renderItem={({ item }) => (
+          <TicketCardComponent
+            item={item}
+            onPress={() => handleTicketPress(item)}
+          />
+        )}
       />
 
       <Footer />

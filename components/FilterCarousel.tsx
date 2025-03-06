@@ -2,22 +2,34 @@ import React from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
 
-const FilterCarousel = ({ filtros, onFilterPress }) => {
+interface FilterCarouselProps {
+  filtros: string[];
+  onFilterPress: (filtro: string) => void;
+  selectedFilter: string; // <-- NUEVO
+}
+
+const FilterCarousel = ({ filtros, onFilterPress, selectedFilter }: FilterCarouselProps) => {
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       style={styles.carousel}
     >
-      {filtros.map((filtro = "", index = "") => (
-        <TouchableRipple
-          key={index}
-          onPress={() => onFilterPress(filtro)}
-          style={styles.filterItem}
-        >
-          <Text style={styles.filterText}>{filtro}</Text>
-        </TouchableRipple>
-      ))}
+      {filtros.map((filtro, index) => {
+        const isActive = (filtro === selectedFilter);
+
+        return (
+          <TouchableRipple
+            key={index}
+            onPress={() => onFilterPress(filtro)}
+            style={[styles.filterItem, isActive && styles.activeFilterItem]}
+          >
+            <Text style={[styles.filterText, isActive && styles.activeFilterText]}>
+              {filtro}
+            </Text>
+          </TouchableRipple>
+        );
+      })}
     </ScrollView>
   );
 };
@@ -32,7 +44,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
     paddingVertical: 10,
     paddingHorizontal: 20,
-    backgroundColor: "#000000",
+    backgroundColor: "#000",
     borderRadius: 25,
     justifyContent: "center",
     alignItems: "center",
@@ -40,6 +52,15 @@ const styles = StyleSheet.create({
   filterText: {
     color: "white",
     fontWeight: "bold",
+  },
+  // Estilo cuando está activo
+  activeFilterItem: {
+    backgroundColor: "#fff",
+    borderWidth: 2,
+    borderColor: "#000",
+  },
+  activeFilterText: {
+    color: "#000",
   },
 });
 

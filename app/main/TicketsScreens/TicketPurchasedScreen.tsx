@@ -1,98 +1,83 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
-  View,
-  StyleSheet,
+  ScrollView,
   Image,
   Text,
+  StyleSheet,
   TouchableOpacity,
-  ScrollView,
+  View,
 } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
-import { TicketPurchased } from "@/interfaces/TicketPurchasedProps";
 import QRCode from "react-native-qrcode-svg";
 
-// Importamos el nuevo ReviewComponent y la interfaz ReviewItem
-import ReviewComponent from "@/components/ReviewComponent";
-import { ReviewItem } from "@/interfaces/ReviewProps";
-
-// Datos estáticos de ejemplo para el ticket (simulando que vendrán de una API)
-const mockTicketData: TicketPurchased = {
-  ticketId: "ABC123XYZ",
-  eventName: "Nombre del evento",
-  ticketType: "Entrada General",
-  ticketPrice: 3000,
-  date: "29/2/2024",
-  timeRange: "23:50hs a 07:00hs",
-  address: "Av. Cnel. Niceto Vega 6599 - Capital Federal",
-  eventImageUrl: "https://picsum.photos/800/400",
-  description:
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus in suscipit quam. Sed lacinia, tortor a tincidunt efficitur, dui erat facilisis leo, et aliquam magna turpis vel nisl.",
-};
-
-// Datos estáticos de ejemplo para reseñas
-const mockReviews: ReviewItem[] = [
-  {
-    id: 1,
-    user: "Carlos",
-    comment: "Estuvo increíble, volvería a comprar.",
-    rating: 5,
-    daysAgo: 2,
-  },
-  {
-    id: 2,
-    user: "Ana",
-    comment: "Buena organización, pero faltó variedad de comida.",
-    rating: 4,
-    daysAgo: 3,
-  },
-];
+import { getTicketMenuById } from "@/utils/ticketMenuHelpers";
+import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
 
 export default function TicketPurchasedScreen() {
-  const {
-    ticketId,
-    eventName,
-    ticketType,
-    ticketPrice,
-    date,
-    timeRange,
-    address,
-    eventImageUrl,
-    description,
-  } = mockTicketData;
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const [ticketData, setTicketData] = useState<TicketPurchasedMenuItem | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (id) {
+      const found = getTicketMenuById(Number(id));
+      if (found) {
+        setTicketData(found);
+      }
+    }
+  }, [id]);
+
+  if (!ticketData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header />
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Text>Ticket no encontrado.</Text>
+        </View>
+        <Footer />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
-
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Imagen principal del evento */}
-        <Image source={{ uri: eventImageUrl }} style={styles.eventImage} />
+        <Image
+          source={{ uri: ticketData.imageUrl }}
+          style={styles.eventImage}
+        />
 
-        <Text style={styles.eventTitle}>Entrada a: {eventName}</Text>
+        <Text style={styles.eventTitle}>
+          Entrada a: {ticketData.eventName}
+        </Text>
 
         {/* Sección QR e info de la entrada */}
         <View style={styles.ticketContainer}>
           <View style={styles.qrContainer}>
             <QRCode
-              value={`TicketID:${ticketId} - Event:${eventName}`}
+              value={`TicketID:${ticketData.id} - Event:${ticketData.eventName}`}
               size={120}
               color="black"
               backgroundColor="white"
             />
 
             <Text style={styles.ticketInfo}>
-              Ticket: {ticketType}
+              Ticket: Entrada General
               {"\n"}
-              Valor: ${ticketPrice}
+              Valor: $3000
               {"\n"}
-              {date}
+              {ticketData.date}
               {"\n"}
-              {timeRange}
+              23:50hs a 07:00hs
             </Text>
 
-            <Text style={styles.address}>{address}</Text>
+            <Text style={styles.address}>Dirección de ejemplo</Text>
 
             <View style={styles.buttonsRow}>
               <TouchableOpacity style={styles.button}>
@@ -106,19 +91,18 @@ export default function TicketPurchasedScreen() {
         </View>
 
         <Text style={styles.reviewNote}>
-          * Una vez finalizado el evento, podrás dejar tu reseña.{"\n"}
-          [Sólo aplica para eventos de boliches, no se pueden dejar reseñas de
-          visitas puntuales de djs]
+          * Una vez finalizado el evento, podrás dejar tu reseña...
         </Text>
 
         {/* Descripción del evento */}
         <View style={styles.descriptionContainer}>
           <Text style={styles.descriptionTitle}>Descripción del evento</Text>
-          <Text style={styles.descriptionText}>{description}</Text>
+          <Text style={styles.descriptionText}>
+            Aquí iría la descripción real...
+          </Text>
         </View>
 
-        {/* NUEVO: Sección de reseñas con la nueva UI (estrellas, promedio, etc.) */}
-        <ReviewComponent reviews={mockReviews} />
+        {/* Reseñas, etc... */}
       </ScrollView>
 
       <Footer />
@@ -127,13 +111,8 @@ export default function TicketPurchasedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  scrollContainer: {
-    padding: 16,
-  },
+  container: { flex: 1, backgroundColor: "#fff" },
+  scrollContainer: { padding: 16 },
   eventImage: {
     width: "100%",
     height: 200,
