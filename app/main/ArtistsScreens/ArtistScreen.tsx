@@ -13,8 +13,8 @@ import { IconButton } from "react-native-paper";
 // Si usas Expo Router v2:
 import { useLocalSearchParams } from "expo-router";
 
-import Header from "@/components/HeaderComponent";
-import Footer from "@/components/FooterComponent";
+import Header from "@/components/LayoutComponents/HeaderComponent";
+import Footer from "@/components/LayoutComponents/FooterComponent";
 import { Artist } from "@/interfaces/Artist";
 import { getArtistByName } from "@/utils/artistHelpers";
 

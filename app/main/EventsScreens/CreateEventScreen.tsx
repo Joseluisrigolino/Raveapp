@@ -10,8 +10,8 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import Header from "@/components/HeaderComponent";
-import Footer from "@/components/FooterComponent";
+import Header from "@/components/LayoutComponents/HeaderComponent";
+import Footer from "@/components/LayoutComponents/FooterComponent";
 import TitlePers from "@/components/TitleComponent";
 import { Artist } from "@/interfaces/Artist";
 

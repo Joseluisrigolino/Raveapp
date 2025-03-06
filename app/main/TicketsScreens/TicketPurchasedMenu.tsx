@@ -1,7 +1,7 @@
 import React from "react";
 import { SafeAreaView, FlatList, StyleSheet } from "react-native";
-import Header from "@/components/HeaderComponent";
-import Footer from "@/components/FooterComponent";
+import Header from "@/components/LayoutComponents/HeaderComponent";
+import Footer from "@/components/LayoutComponents/FooterComponent";
 import TicketCardComponent from "@/components/TicketCardComponent";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
 

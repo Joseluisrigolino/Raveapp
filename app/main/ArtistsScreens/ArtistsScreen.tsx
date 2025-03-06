@@ -2,8 +2,8 @@ import React, { useState, useMemo } from "react";
 import { View, StyleSheet, ScrollView, SafeAreaView, Text } from "react-native";
 import { useRouter } from "expo-router";
 
-import Header from "@/components/HeaderComponent";
-import Footer from "@/components/FooterComponent";
+import Header from "@/components/LayoutComponents/HeaderComponent";
+import Footer from "@/components/LayoutComponents/FooterComponent";
 import ArtistCard from "@/components/ArtistsComponents/ArtistCardComponent";
 import SearchBar from "@/components/SearchBarComponent";
 import TabMenuComponent from "@/components/TabMenuComponent";
@@ -114,8 +114,8 @@ export default function ArtistsScreen() {
       {/* Submenú */}
       <TabMenuComponent
         tabs={[
-          { label: "Noticias", route: "/main/NewsScreen", isActive: false },
-          { label: "Artistas", route: "/main/ArtistsScreen", isActive: true },
+          { label: "Noticias", route: "/main/NewsScreens/NewsScreen", isActive: false },
+          { label: "Artistas", route: "/main/ArtistsScreens/ArtistsScreen", isActive: true },
         ]}
       />
 

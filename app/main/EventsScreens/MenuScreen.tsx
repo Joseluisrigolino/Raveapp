@@ -1,7 +1,7 @@
 import React from "react";
 import { View, StyleSheet, ScrollView, SafeAreaView } from "react-native";
-import Header from "@/components/HeaderComponent";
-import Footer from "@/components/FooterComponent";
+import Header from "@/components/LayoutComponents/HeaderComponent";
+import Footer from "@/components/LayoutComponents/FooterComponent";
 import FilterCarousel from "@/components/FilterCarousel";
 import CardComponent from "@/components/CardComponent";
 

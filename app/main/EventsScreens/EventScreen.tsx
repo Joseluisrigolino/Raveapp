@@ -9,8 +9,8 @@ import {
   Linking,
 } from "react-native";
 import { Button, Text, Title, IconButton } from "react-native-paper";
-import Header from "@/components/HeaderComponent";
-import Footer from "@/components/FooterComponent";
+import Header from "@/components/LayoutComponents/HeaderComponent";
+import Footer from "@/components/LayoutComponents/FooterComponent";
 import BuyTicket from "@/components/BuyTicketsComponent";
 import SoundCloud from "@/components/SocialMediaComponents/SoundCloudComponent";
 

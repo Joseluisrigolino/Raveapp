@@ -13,8 +13,8 @@ import {
 // import { MaterialIcons } from "@expo/vector-icons";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
-import Header from "@/components/HeaderComponent";
-import Footer from "@/components/FooterComponent";
+import Header from "@/components/LayoutComponents/HeaderComponent";
+import Footer from "@/components/LayoutComponents/FooterComponent";
 import { UserProfile } from "@/interfaces/UserProfileProps";
 
 // Datos iniciales (ejemplo). En la práctica vendrían de tu API.

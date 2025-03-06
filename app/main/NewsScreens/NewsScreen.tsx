@@ -8,11 +8,14 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from "react-native";
-import Header from "@/components/HeaderComponent";
-import Footer from "@/components/FooterComponent";
-import { NewsItem } from "@/interfaces/NewsProps";
-import TabMenuComponent from "@/components/TabMenuComponent";
+import { useRouter } from "expo-router";
 
+import Header from "@/components/LayoutComponents/HeaderComponent";
+import Footer from "@/components/LayoutComponents/FooterComponent";
+import TabMenuComponent from "@/components/TabMenuComponent";
+import { NewsItem } from "@/interfaces/NewsProps";
+
+// Ejemplo local (puedes traerlo de un helper o inline):
 const newsData: NewsItem[] = [
   {
     id: 1,
@@ -32,8 +35,11 @@ const newsData: NewsItem[] = [
 ];
 
 export default function NewsScreen() {
+  const router = useRouter();
+
+  // Al presionar una noticia, navegamos a /main/NewScreen?id=...
   const handlePress = (item: NewsItem) => {
-    console.log("Novedad presionada:", item.title);
+    router.push(`/main/NewsScreens/NewScreen?id=${item.id}`);
   };
 
   return (
@@ -43,8 +49,8 @@ export default function NewsScreen() {
       {/* Submenú reutilizable (dos pestañas) */}
       <TabMenuComponent
         tabs={[
-          { label: "Noticias", route: "main/NewsScreen", isActive: true },
-          { label: "Artistas", route: "main/ArtistsScreens/ArtistsScreen", isActive: false },
+          { label: "Noticias", route: "/main/NewsScreen", isActive: true },
+          { label: "Artistas", route: "/main/ArtistsScreens/ArtistsScreen", isActive: false },
         ]}
       />
 

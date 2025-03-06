@@ -8,8 +8,8 @@ import {
   TouchableOpacity,
   ScrollView,
 } from "react-native";
-import Header from "@/components/HeaderComponent";
-import Footer from "@/components/FooterComponent";
+import Header from "@/components/LayoutComponents/HeaderComponent";
+import Footer from "@/components/LayoutComponents/FooterComponent";
 import { TicketPurchased } from "@/interfaces/TicketPurchasedProps";
 import QRCode from "react-native-qrcode-svg";
 

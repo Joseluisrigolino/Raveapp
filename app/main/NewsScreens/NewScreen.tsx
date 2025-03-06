@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -8,33 +8,53 @@ import {
   StyleSheet,
   Linking,
 } from "react-native";
-import Header from "@/components/HeaderComponent";
-import Footer from "@/components/FooterComponent";
-import TitlePers from "@/components/TitleComponent"; // Ajusta la ruta según tu proyecto
+import { useLocalSearchParams } from "expo-router";
+
+import Header from "@/components/LayoutComponents/HeaderComponent";
+import Footer from "@/components/LayoutComponents/FooterComponent";
+import TitlePers from "@/components/TitleComponent"; 
+import { NewsItem } from "@/interfaces/NewsProps";
+import { getNewsById } from "@/utils/newsHelpers";
 
 export default function NewScreen() {
-  const imageUrl = "https://picsum.photos/800/600";
-  const newsTitle = "¡Novedades del Fin de Semana!"; // Ajusta el título que necesites
-  const description = `Llegó el viernes y se viene finde largo, por lo tanto 🍻 más días para disfrutar de música nueva 🙏
+  // 1. Leemos el param "id" de la URL
+  const { id } = useLocalSearchParams<{ id?: string }>();
 
-Ideal para darle play a nuestra playlist de lanzamientos actualizada 🩷🫠😏
-https://open.spotify.com/playlist/3PanXbcy6jmHBtJh2dvFIB
-Visita también nuestro sitio: https://example.com
-`;
+  // 2. Estado local para la noticia
+  const [newsItem, setNewsItem] = useState<NewsItem | null>(null);
 
-  /**
-   * Función para detectar URLs en el texto y dividirlo en fragmentos.
-   * Cada URL se convierte en un <Text> clickeable.
-   */
+  // 3. Al montar o cambiar "id", buscamos la noticia
+  useEffect(() => {
+    if (id) {
+      const found = getNewsById(Number(id));
+      if (found) {
+        setNewsItem(found);
+      }
+    }
+  }, [id]);
+
+  // 4. Si no se encontró, mostramos un mensaje
+  if (!newsItem) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header />
+        <View style={styles.contentContainer}>
+          <Text style={{ textAlign: "center", marginTop: 50 }}>
+            Noticia no encontrada.
+          </Text>
+        </View>
+        <Footer />
+      </SafeAreaView>
+    );
+  }
+
+  // 5. Linkify la descripción
   const linkifyText = (text: string) => {
-    // Expresión regular que detecta URLs que empiecen con http:// o https://
     const urlRegex = /(https?:\/\/[^\s]+)/g;
-    // Separa el texto en fragmentos según la regex
     const tokens = text.split(urlRegex);
 
     return tokens.map((token, index) => {
       if (urlRegex.test(token)) {
-        // Si el token coincide con la regex, es una URL
         return (
           <Text
             key={index}
@@ -45,36 +65,35 @@ Visita también nuestro sitio: https://example.com
           </Text>
         );
       } else {
-        // De lo contrario, es un texto normal
         return token;
       }
     });
   };
 
+  // 6. Renderizar
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <Header />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.contentContainer}>
-          {/* Título de la noticia con tu componente personalizado */}
-          <TitlePers text={newsTitle} />
+          <TitlePers text={newsItem.title} />
 
-          {/* Imagen de la noticia */}
           <Image
-            source={{ uri: imageUrl }}
+            source={{ uri: newsItem.imageUrl }}
             style={styles.newsImage}
             resizeMode="cover"
           />
 
-          {/* Descripción que contiene URLs. 
-              Usamos linkifyText para convertir URLs en enlaces clickeables. */}
-          <Text style={styles.description}>{linkifyText(description)}</Text>
+          {/* Si la noticia tiene descripción, linkificamos */}
+          {newsItem.description && (
+            <Text style={styles.description}>
+              {linkifyText(newsItem.description)}
+            </Text>
+          )}
         </View>
       </ScrollView>
 
-      {/* Footer */}
       <Footer />
     </SafeAreaView>
   );
@@ -96,9 +115,9 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 300,
     borderRadius: 10,
+    marginBottom: 16,
   },
   description: {
-    marginTop: 16,
     fontSize: 16,
     textAlign: "left",
   },

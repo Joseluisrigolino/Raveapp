@@ -15,25 +15,25 @@ export default function Footer() {
         size={24}
         iconColor="white"
         // Llama a router.push("MenuScreen") o "/MenuScreen"
-        onPress={() => router.push("/main/MenuScreen")}
+        onPress={() => router.push("/main/EventsScreens/MenuScreen")}
       />
       <IconButton
         icon="newspaper"
         size={24}
         iconColor="white"
-        onPress={() => router.push("/main/NewsScreen")}
+        onPress={() => router.push("/main/NewsScreens/NewsScreen")}
       />
       <IconButton
         icon="calendar-plus"
         size={24}
         iconColor="white"
-        onPress={() => router.push("/main/CreateEventScreen")}
+        onPress={() => router.push("/main/EventsScreens/CreateEventScreen")}
       />
       <IconButton
         icon="account"
         size={24}
         iconColor="white"
-        onPress={() => router.push("/main/UserProfileEditScreen")}
+        onPress={() => router.push("/main/UserScreens/UserProfileEditScreen")}
       />
     </View>
   );

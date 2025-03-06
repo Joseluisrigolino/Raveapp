@@ -11,8 +11,8 @@ import {
 } from "react-native";
 
 // Reutilizamos tus componentes
-import Header from "@/components/HeaderComponent";
-import Footer from "@/components/FooterComponent";
+import Header from "@/components/LayoutComponents/HeaderComponent";
+import Footer from "@/components/LayoutComponents/FooterComponent";
 
 // Importamos las interfaces
 import { BuyTicketData, BuyerInfo } from "@/interfaces/BuyTicketProps";

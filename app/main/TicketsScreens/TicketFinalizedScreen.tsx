@@ -10,8 +10,8 @@ import {
   TextInput,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons"; // o "react-native-vector-icons/MaterialCommunityIcons"
-import Header from "@/components/HeaderComponent";
-import Footer from "@/components/FooterComponent";
+import Header from "@/components/LayoutComponents/HeaderComponent";
+import Footer from "@/components/LayoutComponents/FooterComponent";
 import { TicketPurchased } from "@/interfaces/TicketPurchasedProps";
 import ReviewComponent from "@/components/ReviewComponent";
 import { ReviewItem } from "@/interfaces/ReviewProps";
