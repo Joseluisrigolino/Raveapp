@@ -3,6 +3,9 @@ import { View, StyleSheet } from "react-native";
 import { IconButton } from "react-native-paper";
 import { useRouter } from "expo-router";
 
+// Importa tus estilos globales
+import globalStyles from "@/styles/globalStyles";
+
 export default function Footer() {
   const router = useRouter();
 
@@ -16,21 +19,19 @@ export default function Footer() {
         onPress={() => router.push("/main/EventsScreens/MenuScreen")}
       />
 
-      {/* Botón “Noticias + Artistas” (usamos newspaper-variant-multiple como un icono “combinado”) */}
+      {/* Botón “Noticias + Artistas” */}
       <IconButton
-        icon="newspaper-variant-multiple" 
+        icon="newspaper-variant-multiple"
         size={24}
         iconColor="white"
-        // Ajusta la ruta al destino real que combine ambas secciones
         onPress={() => router.push("/main/NewsScreens/NewsScreen")}
       />
 
-      {/* Nuevo botón con ícono de ticket */}
+      {/* Botón con ícono de ticket */}
       <IconButton
         icon="ticket"
         size={24}
         iconColor="white"
-        // Ajusta la ruta a donde quieras llevar para tickets
         onPress={() => router.push("/main/TicketsScreens/TicketPurchasedMenu")}
       />
 
@@ -58,7 +59,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    backgroundColor: "#000000",
+    // Usamos el color secundario (negro) para el fondo del footer
+    backgroundColor: globalStyles.COLORS.secondary,
     width: "100%",
     height: 55,
     marginTop: 10,

@@ -1,25 +1,20 @@
+// ButtonInApp.tsx
 import * as React from "react";
 import { StyleSheet, View } from "react-native";
 import { Button } from "react-native-paper";
+import globalStyles from "@/styles/globalStyles";
 
-// Definición de props sin interfaz (tipado directo)
 const ButtonInApp = ({
   icon = "google",
   text = "Default Text",
   width = "70%",
   height = 50,
-  onPress = () => console.log(""),
-}: {
-  icon?: string;
-  text?: string;
-  width?: string | number;
-  height?: string | number;
-  onPress?: () => void;
+  onPress = () => {},
 }) => {
   return (
     <View style={styles.container}>
       <Button
-        style={[styles.button, { width, height }]} // Aquí personalizamos el tamaño
+        style={[styles.button, { width, height }]}
         icon={icon}
         mode="contained"
         onPress={onPress}
@@ -39,7 +34,8 @@ const styles = StyleSheet.create({
   button: {
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#000222",
+    // Usamos el color primario en lugar de "#000222"
+    backgroundColor: globalStyles.COLORS.primary,
   },
 });
 

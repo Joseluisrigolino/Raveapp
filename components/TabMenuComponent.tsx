@@ -3,6 +3,9 @@ import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { TabMenuProps } from "@/interfaces/TabMenuProps";
 
+// Importamos globalStyles
+import globalStyles, { COLORS, FONT_SIZES } from "@/styles/globalStyles";
+
 /**
  * Un submenú reutilizable (pestañas) que recibe un array de tabs.
  * Cada tab tiene { label, route, isActive }.
@@ -35,7 +38,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
+    borderBottomColor: globalStyles.COLORS.borderInput, // Gris claro
     marginTop: 8,
   },
   tabButton: {
@@ -44,10 +47,11 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: "#000",
+    borderBottomColor: globalStyles.COLORS.textPrimary, // Gris oscuro
   },
   tabText: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.button,  // 16-18
     fontWeight: "600",
+    color: globalStyles.COLORS.textPrimary,
   },
 });

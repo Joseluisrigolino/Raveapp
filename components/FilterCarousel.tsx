@@ -1,11 +1,13 @@
 import React from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet } from "react-native";
 import { Text, TouchableRipple } from "react-native-paper";
+
+import globalStyles from "@/styles/globalStyles";
 
 interface FilterCarouselProps {
   filtros: string[];
   onFilterPress: (filtro: string) => void;
-  selectedFilter: string; // <-- NUEVO
+  selectedFilter: string;
 }
 
 const FilterCarousel = ({ filtros, onFilterPress, selectedFilter }: FilterCarouselProps) => {
@@ -44,23 +46,25 @@ const styles = StyleSheet.create({
     marginRight: 10,
     paddingVertical: 10,
     paddingHorizontal: 20,
-    backgroundColor: "#000",
+    backgroundColor: globalStyles.COLORS.secondary, // Negro (#121212)
     borderRadius: 25,
     justifyContent: "center",
     alignItems: "center",
   },
   filterText: {
-    color: "white",
+    color: globalStyles.COLORS.cardBg, // Blanco (#FFFFFF)
+    fontFamily: globalStyles.FONTS.titleBold, // Por ejemplo
+    fontSize: globalStyles.FONT_SIZES.button,  // 16
     fontWeight: "bold",
   },
   // Estilo cuando está activo
   activeFilterItem: {
-    backgroundColor: "#fff",
+    backgroundColor: globalStyles.COLORS.cardBg,    // Blanco (#FFFFFF)
     borderWidth: 2,
-    borderColor: "#000",
+    borderColor: globalStyles.COLORS.textPrimary,   // Gris oscuro
   },
   activeFilterText: {
-    color: "#000",
+    color: globalStyles.COLORS.textPrimary, // Gris oscuro
   },
 });
 

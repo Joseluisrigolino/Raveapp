@@ -6,15 +6,15 @@ import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
 import TicketCardComponent from "@/components/TicketCardComponent";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
-import { getAllPurchasedTickets } from "@/utils/ticketMenuHelpers"; // o tu array local
+import { getAllPurchasedTickets } from "@/utils/ticketMenuHelpers";
+
+import { COLORS } from "@/styles/globalStyles"; // Ajusta la ruta a tu gusto
 
 export default function TicketsPurchasedMenu() {
   const router = useRouter();
 
-  // Datos de ejemplo (luego vendrán de tu API o un helper)
   const mockData: TicketPurchasedMenuItem[] = getAllPurchasedTickets();
 
-  // Al pulsar una tarjeta de ticket, si isFinished => FinalizedScreen; si no => PurchasedScreen
   const handleTicketPress = (item: TicketPurchasedMenuItem) => {
     if (item.isFinished) {
       router.push(`/main/TicketsScreens/TicketFinalizedScreen?id=${item.id}`);
@@ -48,6 +48,7 @@ export default function TicketsPurchasedMenu() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: COLORS.backgroundLight, // en lugar de default
   },
   flatListContent: {
     paddingHorizontal: 8,

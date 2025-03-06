@@ -16,14 +16,13 @@ import TitlePers from "@/components/TitleComponent";
 import { NewsItem } from "@/interfaces/NewsProps";
 import { getNewsById } from "@/utils/newsHelpers";
 
-export default function NewScreen() {
-  // 1. Leemos el param "id" de la URL
-  const { id } = useLocalSearchParams<{ id?: string }>();
+// Importamos globalStyles y las constantes que necesitemos
+import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-  // 2. Estado local para la noticia
+export default function NewScreen() {
+  const { id } = useLocalSearchParams<{ id?: string }>();
   const [newsItem, setNewsItem] = useState<NewsItem | null>(null);
 
-  // 3. Al montar o cambiar "id", buscamos la noticia
   useEffect(() => {
     if (id) {
       const found = getNewsById(Number(id));
@@ -33,7 +32,6 @@ export default function NewScreen() {
     }
   }, [id]);
 
-  // 4. Si no se encontró, mostramos un mensaje
   if (!newsItem) {
     return (
       <SafeAreaView style={styles.container}>
@@ -48,7 +46,7 @@ export default function NewScreen() {
     );
   }
 
-  // 5. Linkify la descripción
+  // Convierten URLs en enlaces clickeables
   const linkifyText = (text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const tokens = text.split(urlRegex);
@@ -70,7 +68,6 @@ export default function NewScreen() {
     });
   };
 
-  // 6. Renderizar
   return (
     <SafeAreaView style={styles.container}>
       <Header />
@@ -85,7 +82,6 @@ export default function NewScreen() {
             resizeMode="cover"
           />
 
-          {/* Si la noticia tiene descripción, linkificamos */}
           {newsItem.description && (
             <Text style={styles.description}>
               {linkifyText(newsItem.description)}
@@ -99,10 +95,11 @@ export default function NewScreen() {
   );
 }
 
+// Definimos estilos locales, usando globalStyles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: globalStyles.COLORS.backgroundLight, // Gris claro principal
   },
   scrollContent: {
     paddingVertical: 16,
@@ -114,15 +111,20 @@ const styles = StyleSheet.create({
   newsImage: {
     width: "100%",
     height: 300,
-    borderRadius: 10,
+    borderRadius: globalStyles.RADIUS.card, // Bordes redondeados (10-15px)
     marginBottom: 16,
+    // Podrías aplicar sombra con SHADOWS.card
+    // shadowColor: "#000", shadowOpacity: 0.1, ...
   },
   description: {
-    fontSize: 16,
+    fontSize: globalStyles.FONT_SIZES.body, // 14-16px
+    color: globalStyles.COLORS.textPrimary, // Gris oscuro
     textAlign: "left",
   },
   link: {
-    color: "blue",
+    color: globalStyles.COLORS.info,       // Naranja informativo o
     textDecorationLine: "underline",
+    // o si prefieres azul para enlaces:
+    // color: "#1E88E5",
   },
 });

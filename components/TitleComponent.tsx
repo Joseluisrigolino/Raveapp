@@ -1,6 +1,7 @@
-import * as React from "react";
+import React from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "react-native-paper";
+import globalStyles from "@/styles/globalStyles";
 
 const TitlePers = ({ text = "" }) => {
   return (
@@ -17,8 +18,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   title: {
-    fontWeight: "bold",
-    fontSize: 22,
+    fontFamily: globalStyles.FONTS.titleBold,   // Poppins-Bold
+    fontSize: globalStyles.FONT_SIZES.titleMain, 
+    color: globalStyles.COLORS.textPrimary,
   },
 });
 

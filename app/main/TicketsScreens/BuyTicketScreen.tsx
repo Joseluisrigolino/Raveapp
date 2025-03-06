@@ -17,9 +17,11 @@ import Footer from "@/components/LayoutComponents/FooterComponent";
 // Importamos las interfaces
 import { BuyTicketData, BuyerInfo } from "@/interfaces/BuyTicketProps";
 
+// Importa tus estilos globales (ajusta la ruta según tu proyecto)
+import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+
 /**
  * Datos simulados del ticket a comprar (luego vendrán de tu API).
- * Ajusta "quantity" según prefieras que sea la inicial (p.ej. 1).
  */
 const mockTicketData: BuyTicketData = {
   eventId: 123,
@@ -32,42 +34,37 @@ const mockTicketData: BuyTicketData = {
 };
 
 export default function BuyTicketScreen() {
-  // Estados locales para el ticket y el comprador
   const [ticketData, setTicketData] = useState<BuyTicketData>(mockTicketData);
 
   // Datos del comprador
   const [buyerInfo, setBuyerInfo] = useState<BuyerInfo>({
     firstName: "",
     lastName: "",
-    idType: "DNI", // valor por defecto
+    idType: "DNI",
     idNumber: "",
     email: "",
     confirmEmail: "",
     phone: "",
   });
 
-  // Manejo de cambios en BuyerInfo
   const handleChangeBuyerInfo = (field: keyof BuyerInfo, value: string) => {
     setBuyerInfo({ ...buyerInfo, [field]: value });
   };
 
   // Subtotal = precio unitario * cantidad
   const subtotal = ticketData.price * ticketData.quantity;
-  // Cargo de servicio (estático en este ejemplo)
+  // Cargo de servicio
   const serviceFee = ticketData.serviceFee;
   // Total = subtotal + cargo
   const total = subtotal + serviceFee;
 
-  // Función para cambiar la cantidad
+  // Cambiar cantidad (mínimo 1)
   const handleQuantityChange = (newQuantity: number) => {
-    // Aseguramos que sea mínimo 1
     if (newQuantity < 1) return;
     setTicketData({ ...ticketData, quantity: newQuantity });
   };
 
-  // Función que se llama al pulsar "COMPRAR"
   const handleBuy = () => {
-    // Aquí podrías redireccionar a MercadoPago, etc.
     console.log("Comprando ticket...", {
       ticketData,
       buyerInfo,
@@ -152,7 +149,7 @@ export default function BuyTicketScreen() {
             </View>
           </View>
 
-          {/* Tipo de identificación */}
+          {/* Tipo y número de identificación */}
           <View style={styles.row}>
             <View style={styles.halfInputContainer}>
               <Text>Tipo de identificación:</Text>
@@ -243,29 +240,32 @@ export default function BuyTicketScreen() {
   );
 }
 
+// Estilos con globalStyles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: COLORS.backgroundLight,
   },
   scrollContent: {
     padding: 16,
   },
   sectionTitle: {
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: FONT_SIZES.subTitle, // 18-20
+    color: COLORS.textPrimary,
     marginBottom: 8,
   },
   ticketSummaryContainer: {
     flexDirection: "row",
-    backgroundColor: "#F3F3F3",
+    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
     padding: 10,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     alignItems: "center",
   },
   eventImage: {
     width: 80,
     height: 80,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     marginRight: 10,
   },
   ticketInfo: {
@@ -274,9 +274,11 @@ const styles = StyleSheet.create({
   ticketType: {
     fontWeight: "bold",
     marginBottom: 4,
+    color: COLORS.textPrimary,
   },
   ticketPrice: {
     marginBottom: 4,
+    color: COLORS.textSecondary,
   },
   row: {
     flexDirection: "row",
@@ -284,27 +286,29 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   qtyButton: {
-    backgroundColor: "#000",
-    borderRadius: 4,
+    backgroundColor: COLORS.textPrimary, // "#000"
+    borderRadius: RADIUS.card,
     paddingHorizontal: 8,
     paddingVertical: 4,
     marginHorizontal: 4,
   },
   qtyButtonText: {
-    color: "#fff",
+    color: COLORS.cardBg, // "#fff"
     fontWeight: "bold",
   },
   qtyNumber: {
     minWidth: 20,
     textAlign: "center",
+    color: COLORS.textPrimary,
   },
   subtotal: {
     fontStyle: "italic",
+    color: COLORS.textSecondary,
   },
   formContainer: {
-    backgroundColor: "#F3F3F3",
+    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
     padding: 10,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
   },
   halfInputContainer: {
     flex: 1,
@@ -314,48 +318,51 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   input: {
-    backgroundColor: "#fff",
-    borderRadius: 4,
+    backgroundColor: COLORS.cardBg, // "#fff"
+    borderRadius: RADIUS.card,
     paddingHorizontal: 8,
     paddingVertical: 4,
     marginTop: 4,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: COLORS.borderInput, // "#ccc"
+    color: COLORS.textPrimary,
   },
   priceContainer: {
     marginTop: 16,
     marginBottom: 8,
   },
   subtotalText: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
     marginBottom: 2,
   },
   serviceFeeText: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.body,
     marginBottom: 2,
-    color: "green",
+    color: COLORS.positive, // "green"
   },
   totalText: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.subTitle,
     fontWeight: "bold",
     marginTop: 4,
+    color: COLORS.textPrimary,
   },
   buyButton: {
-    backgroundColor: "#FF00B4",
+    backgroundColor: COLORS.primary, // "#FF00B4" => mapeado a color principal
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     alignItems: "center",
   },
   buyButtonText: {
-    color: "#fff",
-    fontSize: 16,
+    color: COLORS.cardBg, // "#fff"
+    fontSize: FONT_SIZES.button, // 16-18
     fontWeight: "bold",
   },
   notice: {
     marginTop: 10,
-    fontSize: 12,
-    color: "#666",
+    fontSize: FONT_SIZES.smallText, // 12
+    color: COLORS.textSecondary,     // "#666"
     textAlign: "center",
   },
 });

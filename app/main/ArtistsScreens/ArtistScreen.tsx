@@ -1,4 +1,3 @@
-// app/main/ArtistScreen.tsx
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -10,7 +9,6 @@ import {
   Linking,
 } from "react-native";
 import { IconButton } from "react-native-paper";
-// Si usas Expo Router v2:
 import { useLocalSearchParams } from "expo-router";
 
 import Header from "@/components/LayoutComponents/HeaderComponent";
@@ -18,23 +16,20 @@ import Footer from "@/components/LayoutComponents/FooterComponent";
 import { Artist } from "@/interfaces/Artist";
 import { getArtistByName } from "@/utils/artistHelpers";
 
-export default function ArtistScreen() {
-  // 1. Leer param "name" con useLocalSearchParams (versión v2).
-  // Si tu versión es v1, esta función no existe.
-  const { name } = useLocalSearchParams<{ name?: string }>();
+// Importa tus estilos globales
+import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-  // 2. Estado local
+export default function ArtistScreen() {
+  const { name } = useLocalSearchParams<{ name?: string }>();
   const [artist, setArtist] = useState<Artist | null>(null);
   const [isLiked, setIsLiked] = useState<boolean>(false);
   const [likeCount, setLikeCount] = useState<number>(0);
 
-  // 3. useEffect para buscar el artista cuando cambie `name`
   useEffect(() => {
     if (name) {
       const found = getArtistByName(name);
       if (found) {
         setArtist(found);
-        // Iniciamos el likeCount con found.likes, si existe
         setLikeCount(found.likes ?? 0);
       } else {
         setArtist(null);
@@ -42,7 +37,6 @@ export default function ArtistScreen() {
     }
   }, [name]);
 
-  // 4. Si no se encontró, mostrar mensaje
   if (!artist) {
     return (
       <SafeAreaView style={styles.container}>
@@ -57,7 +51,6 @@ export default function ArtistScreen() {
     );
   }
 
-  // 5. Renderizar la info del artista
   const handleSpotifyPress = () => {
     Linking.openURL("https://www.spotify.com");
   };
@@ -86,21 +79,22 @@ export default function ArtistScreen() {
               <IconButton
                 icon="spotify"
                 size={24}
-                iconColor="#000"
+                iconColor={COLORS.textPrimary}
                 onPress={handleSpotifyPress}
                 style={styles.icon}
               />
               <IconButton
                 icon="instagram"
                 size={24}
-                iconColor="#000"
+                iconColor={COLORS.textPrimary}
                 onPress={handleInstagramPress}
                 style={styles.icon}
               />
               <IconButton
                 icon={isLiked ? "heart" : "heart-outline"}
                 size={24}
-                iconColor={isLiked ? "red" : "#000"}
+                // Rojo si liked, gris oscuro si no
+                iconColor={isLiked ? COLORS.negative : COLORS.textPrimary}
                 onPress={handleFavoritesPress}
                 style={styles.icon}
               />
@@ -123,9 +117,16 @@ export default function ArtistScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  contentWrapper: { flex: 1 },
-  scrollContent: { padding: 20 },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.backgroundLight, // Fondo claro principal
+  },
+  contentWrapper: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+  },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -133,7 +134,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   artistTitle: {
-    fontSize: 24,
+    fontSize: FONT_SIZES.titleMain,       // Ej. 22-24 px
+    color: COLORS.textPrimary,            // Gris oscuro
     fontWeight: "bold",
     maxWidth: "70%",
   },
@@ -146,20 +148,21 @@ const styles = StyleSheet.create({
   artistImage: {
     width: 200,
     height: 200,
-    borderRadius: 100,
+    borderRadius: 100, // redondo
     alignSelf: "center",
     marginBottom: 10,
   },
   likesText: {
     textAlign: "center",
     marginTop: 5,
-    fontSize: 16,
-    color: "#333",
+    fontSize: FONT_SIZES.body,   // 14-16 px
+    color: COLORS.textPrimary,
   },
   description: {
     textAlign: "center",
     marginTop: 10,
-    fontSize: 16,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
     lineHeight: 22,
   },
 });

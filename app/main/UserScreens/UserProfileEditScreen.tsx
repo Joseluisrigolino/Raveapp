@@ -8,16 +8,16 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
-
-// Si usas Expo, cambia a:
-// import { MaterialIcons } from "@expo/vector-icons";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
 import { UserProfile } from "@/interfaces/UserProfileProps";
 
-// Datos iniciales (ejemplo). En la práctica vendrían de tu API.
+// Importa tus estilos globales
+import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+
+// Datos iniciales (ejemplo).
 const mockUserData: UserProfile = {
   firstName: "Juan",
   lastName: "Lopez",
@@ -36,12 +36,9 @@ const mockUserData: UserProfile = {
 };
 
 export default function UserProfileEditScreen() {
-  // "originalData": la última versión confirmada
   const [originalData, setOriginalData] = useState<UserProfile>(mockUserData);
-  // "userData": la versión editable en pantalla
   const [userData, setUserData] = useState<UserProfile>(mockUserData);
 
-  // Estado para habilitar/deshabilitar edición de cada campo
   const [editMode, setEditMode] = useState({
     firstName: false,
     lastName: false,
@@ -57,12 +54,10 @@ export default function UserProfileEditScreen() {
     "address.floorDept": false,
   });
 
-  // Manejo de cambios (campos principales)
   const handleChange = (field: keyof UserProfile, value: string) => {
     setUserData({ ...userData, [field]: value });
   };
 
-  // Manejo de cambios (campos de la dirección)
   const handleAddressChange = (
     field: keyof UserProfile["address"],
     value: string
@@ -76,12 +71,10 @@ export default function UserProfileEditScreen() {
     });
   };
 
-  // Alternar edición de un campo
   const handleToggleEdit = (fieldKey: string) => {
     setEditMode((prev) => ({ ...prev, [fieldKey]: !prev[fieldKey] }));
   };
 
-  // Reusable: resetea todos los campos en editMode a false
   const resetEditMode = () => {
     setEditMode({
       firstName: false,
@@ -99,20 +92,17 @@ export default function UserProfileEditScreen() {
     });
   };
 
-  // Al confirmar, guardamos lo editado como la nueva versión "original"
   const handleConfirm = () => {
     console.log("Datos confirmados:", userData);
     alert("Datos confirmados (ejemplo).");
-    // Aquí podrías llamar a tu API para guardar los cambios
-    setOriginalData(userData); // Actualizamos la versión confirmada
-    resetEditMode(); // Volvemos a deshabilitar todos los campos
+    setOriginalData(userData);
+    resetEditMode();
   };
 
-  // Al cancelar, descartamos lo editado y volvemos a la última versión confirmada
   const handleCancel = () => {
     console.log("Edición cancelada.");
-    setUserData(originalData); // Revertimos a la última versión confirmada
-    resetEditMode(); // Deshabilitamos todos los campos
+    setUserData(originalData);
+    resetEditMode();
   };
 
   return (
@@ -128,7 +118,11 @@ export default function UserProfileEditScreen() {
           <TextInput
             style={[
               styles.input,
-              { backgroundColor: editMode.firstName ? "#fff" : "#ddd" },
+              {
+                backgroundColor: editMode.firstName
+                  ? COLORS.cardBg
+                  : "#ddd",
+              },
             ]}
             value={userData.firstName}
             onChangeText={(val) => handleChange("firstName", val)}
@@ -138,7 +132,7 @@ export default function UserProfileEditScreen() {
             onPress={() => handleToggleEdit("firstName")}
             style={styles.iconButton}
           >
-            <MaterialIcons name="edit" size={20} color="#666" />
+            <MaterialIcons name="edit" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -148,7 +142,9 @@ export default function UserProfileEditScreen() {
           <TextInput
             style={[
               styles.input,
-              { backgroundColor: editMode.lastName ? "#fff" : "#ddd" },
+              {
+                backgroundColor: editMode.lastName ? COLORS.cardBg : "#ddd",
+              },
             ]}
             value={userData.lastName}
             onChangeText={(val) => handleChange("lastName", val)}
@@ -158,7 +154,7 @@ export default function UserProfileEditScreen() {
             onPress={() => handleToggleEdit("lastName")}
             style={styles.iconButton}
           >
-            <MaterialIcons name="edit" size={20} color="#666" />
+            <MaterialIcons name="edit" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -168,7 +164,9 @@ export default function UserProfileEditScreen() {
           <TextInput
             style={[
               styles.input,
-              { backgroundColor: editMode.dni ? "#fff" : "#ddd" },
+              {
+                backgroundColor: editMode.dni ? COLORS.cardBg : "#ddd",
+              },
             ]}
             value={userData.dni}
             onChangeText={(val) => handleChange("dni", val)}
@@ -179,7 +177,7 @@ export default function UserProfileEditScreen() {
             onPress={() => handleToggleEdit("dni")}
             style={styles.iconButton}
           >
-            <MaterialIcons name="edit" size={20} color="#666" />
+            <MaterialIcons name="edit" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -189,7 +187,9 @@ export default function UserProfileEditScreen() {
           <TextInput
             style={[
               styles.input,
-              { backgroundColor: editMode.phone ? "#fff" : "#ddd" },
+              {
+                backgroundColor: editMode.phone ? COLORS.cardBg : "#ddd",
+              },
             ]}
             value={userData.phone}
             onChangeText={(val) => handleChange("phone", val)}
@@ -200,7 +200,7 @@ export default function UserProfileEditScreen() {
             onPress={() => handleToggleEdit("phone")}
             style={styles.iconButton}
           >
-            <MaterialIcons name="edit" size={20} color="#666" />
+            <MaterialIcons name="edit" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -210,7 +210,9 @@ export default function UserProfileEditScreen() {
           <TextInput
             style={[
               styles.input,
-              { backgroundColor: editMode.email ? "#fff" : "#ddd" },
+              {
+                backgroundColor: editMode.email ? COLORS.cardBg : "#ddd",
+              },
             ]}
             value={userData.email}
             onChangeText={(val) => handleChange("email", val)}
@@ -221,7 +223,7 @@ export default function UserProfileEditScreen() {
             onPress={() => handleToggleEdit("email")}
             style={styles.iconButton}
           >
-            <MaterialIcons name="edit" size={20} color="#666" />
+            <MaterialIcons name="edit" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -231,7 +233,9 @@ export default function UserProfileEditScreen() {
           <TextInput
             style={[
               styles.input,
-              { backgroundColor: editMode.password ? "#fff" : "#ddd" },
+              {
+                backgroundColor: editMode.password ? COLORS.cardBg : "#ddd",
+              },
             ]}
             value={userData.password}
             onChangeText={(val) => handleChange("password", val)}
@@ -242,7 +246,7 @@ export default function UserProfileEditScreen() {
             onPress={() => handleToggleEdit("password")}
             style={styles.iconButton}
           >
-            <MaterialIcons name="edit" size={20} color="#666" />
+            <MaterialIcons name="edit" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -257,7 +261,7 @@ export default function UserProfileEditScreen() {
             style={[
               styles.input,
               {
-                backgroundColor: editMode["address.province"] ? "#fff" : "#ddd",
+                backgroundColor: editMode["address.province"] ? COLORS.cardBg : "#ddd",
               },
             ]}
             value={userData.address.province}
@@ -268,7 +272,7 @@ export default function UserProfileEditScreen() {
             onPress={() => handleToggleEdit("address.province")}
             style={styles.iconButton}
           >
-            <MaterialIcons name="edit" size={20} color="#666" />
+            <MaterialIcons name="edit" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -280,7 +284,7 @@ export default function UserProfileEditScreen() {
               styles.input,
               {
                 backgroundColor: editMode["address.municipality"]
-                  ? "#fff"
+                  ? COLORS.cardBg
                   : "#ddd",
               },
             ]}
@@ -292,7 +296,7 @@ export default function UserProfileEditScreen() {
             onPress={() => handleToggleEdit("address.municipality")}
             style={styles.iconButton}
           >
-            <MaterialIcons name="edit" size={20} color="#666" />
+            <MaterialIcons name="edit" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -303,7 +307,7 @@ export default function UserProfileEditScreen() {
             style={[
               styles.input,
               {
-                backgroundColor: editMode["address.locality"] ? "#fff" : "#ddd",
+                backgroundColor: editMode["address.locality"] ? COLORS.cardBg : "#ddd",
               },
             ]}
             value={userData.address.locality}
@@ -314,7 +318,7 @@ export default function UserProfileEditScreen() {
             onPress={() => handleToggleEdit("address.locality")}
             style={styles.iconButton}
           >
-            <MaterialIcons name="edit" size={20} color="#666" />
+            <MaterialIcons name="edit" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -325,7 +329,7 @@ export default function UserProfileEditScreen() {
             style={[
               styles.input,
               {
-                backgroundColor: editMode["address.street"] ? "#fff" : "#ddd",
+                backgroundColor: editMode["address.street"] ? COLORS.cardBg : "#ddd",
               },
             ]}
             value={userData.address.street}
@@ -336,7 +340,7 @@ export default function UserProfileEditScreen() {
             onPress={() => handleToggleEdit("address.street")}
             style={styles.iconButton}
           >
-            <MaterialIcons name="edit" size={20} color="#666" />
+            <MaterialIcons name="edit" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -347,7 +351,7 @@ export default function UserProfileEditScreen() {
             style={[
               styles.input,
               {
-                backgroundColor: editMode["address.number"] ? "#fff" : "#ddd",
+                backgroundColor: editMode["address.number"] ? COLORS.cardBg : "#ddd",
               },
             ]}
             value={userData.address.number}
@@ -359,7 +363,7 @@ export default function UserProfileEditScreen() {
             onPress={() => handleToggleEdit("address.number")}
             style={styles.iconButton}
           >
-            <MaterialIcons name="edit" size={20} color="#666" />
+            <MaterialIcons name="edit" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -371,7 +375,7 @@ export default function UserProfileEditScreen() {
               styles.input,
               {
                 backgroundColor: editMode["address.floorDept"]
-                  ? "#fff"
+                  ? COLORS.cardBg
                   : "#ddd",
               },
             ]}
@@ -383,7 +387,7 @@ export default function UserProfileEditScreen() {
             onPress={() => handleToggleEdit("address.floorDept")}
             style={styles.iconButton}
           >
-            <MaterialIcons name="edit" size={20} color="#666" />
+            <MaterialIcons name="edit" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -412,12 +416,14 @@ export default function UserProfileEditScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: COLORS.backgroundLight, // Gris claro principal
   },
   scrollContainer: {
     padding: 16,
   },
   title: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.subTitle,    // 18-20px
+    color: COLORS.textPrimary,
     fontWeight: "bold",
     marginBottom: 12,
   },
@@ -429,13 +435,18 @@ const styles = StyleSheet.create({
   label: {
     width: 120,
     fontWeight: "600",
+    color: COLORS.textPrimary,
+    fontSize: FONT_SIZES.body,       // 14-16
   },
   input: {
     flex: 1,
-    borderRadius: 4,
+    borderRadius: RADIUS.card,       // 10-15px
     paddingHorizontal: 8,
     paddingVertical: 4,
     marginRight: 8,
+    // Por defecto, backgroundColor se define dinámicamente según editMode
+    // color: COLORS.textPrimary, si deseas un color de texto
+    // borderWidth: 1, borderColor: COLORS.borderInput, etc. si quieres bordes
   },
   iconButton: {
     padding: 4,
@@ -446,19 +457,21 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   button: {
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     paddingVertical: 12,
     paddingHorizontal: 24,
     marginHorizontal: 8,
   },
   confirmButton: {
-    backgroundColor: "#008CBA", // azul
+    backgroundColor: COLORS.primary,  // Azul oscuro
   },
   cancelButton: {
-    backgroundColor: "#B80F0A", // rojo
+    backgroundColor: COLORS.negative, // Rojo
   },
   buttonText: {
-    color: "#fff",
+    color: COLORS.cardBg,   // Blanco
     fontWeight: "bold",
+    fontSize: FONT_SIZES.button,
+    textAlign: "center",
   },
 });

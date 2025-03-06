@@ -9,6 +9,9 @@ import CardComponent from "@/components/CardComponent";
 import { getAllEvents, getEventsByType } from "@/utils/eventHelpers";
 import { EventItem } from "@/interfaces/EventProps";
 
+// Importa tus estilos globales
+import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+
 export default function MenuScreen() {
   const router = useRouter();
 
@@ -24,15 +27,12 @@ export default function MenuScreen() {
   // Al iniciar o cambiar el filtro, actualizamos la lista
   useEffect(() => {
     if (!selectedFilter) {
-      // Si no hay filtro, mostramos todos
       setFilteredEvents(getAllEvents());
     } else {
-      // Si hay filtro, mostramos solo los que coincidan
       setFilteredEvents(getEventsByType(selectedFilter));
     }
   }, [selectedFilter]);
 
-  // Cuando pulsamos un filtro:
   const handleFilterPress = (filtro: string) => {
     // Si ya está seleccionado, lo des-seleccionamos
     if (filtro === selectedFilter) {
@@ -42,7 +42,6 @@ export default function MenuScreen() {
     }
   };
 
-  // Al tocar una tarjeta, navegamos a EventScreen
   const handleCardPress = (title = "", id?: number) => {
     if (id) {
       router.push(`/main/EventsScreens/EventScreen?id=${id}`);
@@ -54,7 +53,6 @@ export default function MenuScreen() {
       <Header />
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Pasamos selectedFilter para que el carrusel sepa cuál está activo */}
         <FilterCarousel
           filtros={fiestaTipos}
           onFilterPress={handleFilterPress}
@@ -82,9 +80,11 @@ export default function MenuScreen() {
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
+    backgroundColor: COLORS.backgroundLight, // Gris claro principal
   },
   containerCards: {
     flex: 1,
     marginTop: 10,
+    paddingHorizontal: 8, // Ejemplo de padding lateral
   },
 });

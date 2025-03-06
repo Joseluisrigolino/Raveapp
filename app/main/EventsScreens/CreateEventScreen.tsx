@@ -13,12 +13,32 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
 import TitlePers from "@/components/TitleComponent";
-import { Artist } from "@/interfaces/Artist";
-
-// Importamos el componente de fecha/hora (compatible con Expo)
 import DateTimeInputComponent from "@/components/DateTimeInputComponent";
 
-// Géneros simulados
+import { Artist } from "@/interfaces/Artist";
+
+// Importa tus estilos globales (ajusta la ruta según tu proyecto)
+import globalStyles, {
+  COLORS,
+  FONT_SIZES,
+  RADIUS,
+} from "@/styles/globalStyles";
+
+/** Función para calcular la suma total de entradas de las 4 categorías. */
+function calcTotalTickets(
+  genEarlyQty: string,
+  vipEarlyQty: string,
+  genQty: string,
+  vipQty: string
+): number {
+  const ge = parseInt(genEarlyQty, 10) || 0;
+  const ve = parseInt(vipEarlyQty, 10) || 0;
+  const g = parseInt(genQty, 10) || 0;
+  const v = parseInt(vipQty, 10) || 0;
+  return ge + ve + g + v;
+}
+
+// Datos simulados
 const mockGenres = [
   "Techno",
   "Hard Techno",
@@ -35,57 +55,28 @@ const mockGenres = [
   "Progressive",
 ];
 
-// Base de artistas simulada
 const fakeArtistDatabase: Artist[] = [
   { name: "Artista 1", image: "" },
   { name: "Artista 2", image: "" },
   { name: "Artista 3", image: "" },
 ];
 
-// Pickers manuales de provincia/municipio/localidad
 const mockProvinces = ["Buenos Aires", "Córdoba", "Mendoza"];
 const mockMunicipalities = ["Municipio 1", "Municipio 2"];
 const mockLocalities = ["Localidad 1", "Localidad 2"];
 
-/**
- * Función para calcular la suma total de entradas de las 4 categorías:
- * Generales Early, VIP Early, Generales, VIP.
- */
-function calcTotalTickets(
-  genEarlyQty: string,
-  vipEarlyQty: string,
-  genQty: string,
-  vipQty: string
-): number {
-  const ge = parseInt(genEarlyQty, 10) || 0;
-  const ve = parseInt(vipEarlyQty, 10) || 0;
-  const g = parseInt(genQty, 10) || 0;
-  const v = parseInt(vipQty, 10) || 0;
-  return ge + ve + g + v;
-}
-
 export default function CreateEventScreen() {
-  // Control de login (demo)
+  // Control login (demo)
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Handlers parte “No logueado”
-  const handleLogin = () => {
-    console.log("Iniciar sesión presionado");
-  };
-  const handleRegister = () => {
-    console.log("Registrarme presionado");
-  };
-  const handleGoogleLogin = () => {
-    console.log("Login with Google presionado");
-  };
-  const simulateLogin = () => {
-    setIsLoggedIn(true);
-  };
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-  };
+  const handleLogin = () => console.log("Iniciar sesión presionado");
+  const handleRegister = () => console.log("Registrarme presionado");
+  const handleGoogleLogin = () => console.log("Login with Google presionado");
+  const simulateLogin = () => setIsLoggedIn(true);
+  const handleLogout = () => setIsLoggedIn(false);
 
-  // Campos del formulario
+  // Campos formulario
   const [eventName, setEventName] = useState("");
   const [eventType, setEventType] = useState<"1d" | "2d" | "3d">("1d");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
@@ -104,17 +95,15 @@ export default function CreateEventScreen() {
   const [isLGBT, setIsLGBT] = useState(false);
   const [eventDescription, setEventDescription] = useState("");
 
-  // Fechas y configuración de entradas (usamos Date)
+  // Fechas y entradas
   const [startDateTime, setStartDateTime] = useState<Date>(new Date());
   const [endDateTime, setEndDateTime] = useState<Date>(new Date());
 
-  // Cuatro categorías de entradas
+  // Cuatro categorías
   const [genEarlyQty, setGenEarlyQty] = useState("");
   const [genEarlyPrice, setGenEarlyPrice] = useState("");
   const [vipEarlyQty, setVipEarlyQty] = useState("");
   const [vipEarlyPrice, setVipEarlyPrice] = useState("");
-
-  // NUEVAS: Entradas Generales y VIP (no early)
   const [genQty, setGenQty] = useState("");
   const [genPrice, setGenPrice] = useState("");
   const [vipQty, setVipQty] = useState("");
@@ -123,9 +112,8 @@ export default function CreateEventScreen() {
   const [startSaleDateTime, setStartSaleDateTime] = useState<Date>(new Date());
   const [earlyBirdsStock, setEarlyBirdsStock] = useState(false);
   const [useEarlyBirdsDate, setUseEarlyBirdsDate] = useState(false);
-  const [earlyBirdsUntilDateTime, setEarlyBirdsUntilDateTime] = useState<Date>(
-    new Date()
-  );
+  const [earlyBirdsUntilDateTime, setEarlyBirdsUntilDateTime] =
+    useState<Date>(new Date());
 
   // Radio: Tipo de evento
   const handleEventTypeChange = (value: "1d" | "2d" | "3d") => {
@@ -161,13 +149,8 @@ export default function CreateEventScreen() {
     setSelectedArtists(selectedArtists.filter((a) => a.name !== artistName));
   };
 
-  // Calcular total de entradas en tiempo real
-  const totalTickets = calcTotalTickets(
-    genEarlyQty,
-    vipEarlyQty,
-    genQty,
-    vipQty
-  );
+  // Calcular total de entradas
+  const totalTickets = calcTotalTickets(genEarlyQty, vipEarlyQty, genQty, vipQty);
 
   // Al enviar
   const handleSubmit = () => {
@@ -185,7 +168,6 @@ export default function CreateEventScreen() {
       eventDescription,
       startDateTime,
       endDateTime,
-      // 4 categorías
       genEarlyQty,
       genEarlyPrice,
       vipEarlyQty,
@@ -194,12 +176,10 @@ export default function CreateEventScreen() {
       genPrice,
       vipQty,
       vipPrice,
-      // Config entradas
       startSaleDateTime,
       earlyBirdsStock,
       useEarlyBirdsDate,
       earlyBirdsUntilDateTime,
-      // totalTickets calculado
       totalTickets,
     });
     alert("Evento creado (ejemplo)");
@@ -242,7 +222,7 @@ export default function CreateEventScreen() {
                 <MaterialCommunityIcons
                   name="google"
                   size={20}
-                  color="#4285F4"
+                  color={COLORS.info} // Reemplaza "#4285F4"
                   style={{ marginRight: 8 }}
                 />
                 <Text style={styles.googleButtonText}>Login with Google</Text>
@@ -263,7 +243,6 @@ export default function CreateEventScreen() {
               <Text style={styles.demoButtonText}>Cerrar sesión (demo)</Text>
             </TouchableOpacity>
 
-            {/* NOMBRE, TIPO, GÉNEROS, ARTISTAS */}
             <Text style={styles.label}>Nombre del evento:</Text>
             <TextInput
               style={styles.input}
@@ -351,7 +330,7 @@ export default function CreateEventScreen() {
               ))}
             </View>
 
-            {/* UBICACIÓN (pickers manuales) */}
+            {/* Ubicación (pickers manuales) */}
             <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
               Ubicación del evento:
             </Text>
@@ -486,7 +465,7 @@ export default function CreateEventScreen() {
               Cantidad total de entradas: {totalTickets}
             </Text>
 
-            {/* Entradas Generales Early Birds */}
+            {/* Generales Early Birds */}
             <View style={styles.ticketRow}>
               <Text style={styles.ticketLabel}>
                 Entradas generales - Early Birds:
@@ -511,7 +490,7 @@ export default function CreateEventScreen() {
               </View>
             </View>
 
-            {/* Entradas VIP Early Birds */}
+            {/* VIP Early Birds */}
             <View style={styles.ticketRow}>
               <Text style={styles.ticketLabel}>
                 Entradas VIP - Early Birds:
@@ -536,7 +515,7 @@ export default function CreateEventScreen() {
               </View>
             </View>
 
-            {/* NUEVAS: Entradas Generales (no early) */}
+            {/* Generales (no early) */}
             <View style={styles.ticketRow}>
               <Text style={styles.ticketLabel}>Entradas generales:</Text>
               <View style={styles.ticketInputs}>
@@ -559,7 +538,7 @@ export default function CreateEventScreen() {
               </View>
             </View>
 
-            {/* NUEVAS: Entradas VIP (no early) */}
+            {/* VIP (no early) */}
             <View style={styles.ticketRow}>
               <Text style={styles.ticketLabel}>Entradas VIP:</Text>
               <View style={styles.ticketInputs}>
@@ -622,10 +601,7 @@ export default function CreateEventScreen() {
             )}
 
             {/* BOTÓN FINAL (centrado) */}
-            <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleSubmit}
-            >
+            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
               <Text style={styles.submitButtonText}>Crear Evento</Text>
             </TouchableOpacity>
           </View>
@@ -637,10 +613,10 @@ export default function CreateEventScreen() {
   );
 }
 
-// Estilos
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: COLORS.backgroundLight, // Gris claro principal
   },
   scrollContent: {
     padding: 16,
@@ -652,67 +628,69 @@ const styles = StyleSheet.create({
   },
   divider: {
     borderBottomWidth: 1,
-    borderBottomColor: "#000",
+    borderBottomColor: COLORS.textPrimary, // en lugar de "#000"
     width: "100%",
     marginVertical: 8,
   },
   subtitle: {
-    fontSize: 14,
-    color: "#666",
+    fontSize: FONT_SIZES.body, // 14-16
+    color: COLORS.textSecondary, // "#666"
     textAlign: "center",
     marginVertical: 12,
   },
   button: {
     width: "70%",
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     alignItems: "center",
     marginVertical: 8,
   },
   loginButton: {
-    backgroundColor: "#4db6ac",
+    backgroundColor: COLORS.primary, // "#4db6ac"
   },
   registerButton: {
-    backgroundColor: "#ec407a",
+    backgroundColor: COLORS.negative, // "#ec407a" => un color "rojo" en la paleta
   },
   googleButton: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.cardBg, // "#fff"
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: COLORS.borderInput, // "#ccc"
   },
   googleButtonContent: {
     flexDirection: "row",
     alignItems: "center",
   },
   googleButtonText: {
-    color: "#000",
+    color: COLORS.textPrimary, // "#000"
     fontWeight: "bold",
   },
   buttonText: {
-    color: "#fff",
+    color: COLORS.cardBg, // "#fff"
     fontWeight: "bold",
   },
   demoButton: {
     marginTop: 16,
-    backgroundColor: "#ddd",
+    backgroundColor: COLORS.borderInput, // "#ddd"
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     alignSelf: "center",
   },
   demoButtonText: {
-    color: "#333",
+    color: COLORS.textSecondary, // "#333"
   },
   label: {
     marginTop: 12,
     fontWeight: "bold",
     width: 300,
+    color: COLORS.textPrimary,
+    fontSize: FONT_SIZES.body,
   },
   input: {
-    backgroundColor: "#FFF", // Fondo blanco
-    borderWidth: 1, // Borde sutil
-    borderColor: "#ccc",
-    borderRadius: 4,
+    backgroundColor: COLORS.cardBg, // "#FFF"
+    borderWidth: 1,
+    borderColor: COLORS.borderInput, // "#ccc"
+    borderRadius: RADIUS.card,
     paddingHorizontal: 8,
     paddingVertical: 6,
     marginTop: 4,
@@ -733,7 +711,7 @@ const styles = StyleSheet.create({
     width: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: "#000",
+    borderColor: COLORS.textPrimary, // "#000"
     marginRight: 8,
     justifyContent: "center",
     alignItems: "center",
@@ -742,7 +720,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#000",
+    backgroundColor: COLORS.textPrimary, // "#000"
   },
   checkboxContainer: {
     flexDirection: "row",
@@ -760,7 +738,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderWidth: 2,
-    borderColor: "#000",
+    borderColor: COLORS.textPrimary, // "#000"
     marginRight: 6,
     justifyContent: "center",
     alignItems: "center",
@@ -768,7 +746,7 @@ const styles = StyleSheet.create({
   checkboxSelected: {
     width: 12,
     height: 12,
-    backgroundColor: "#000",
+    backgroundColor: COLORS.textPrimary, // "#000"
   },
   artistInputRow: {
     flexDirection: "row",
@@ -776,7 +754,7 @@ const styles = StyleSheet.create({
     width: 300,
   },
   addArtistButton: {
-    backgroundColor: "#000",
+    backgroundColor: COLORS.textPrimary, // "#000"
     borderRadius: 4,
     marginLeft: 8,
     paddingHorizontal: 12,
@@ -785,7 +763,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   addArtistButtonText: {
-    color: "#fff",
+    color: COLORS.cardBg, // "#fff"
     fontSize: 18,
     fontWeight: "bold",
   },
@@ -798,7 +776,7 @@ const styles = StyleSheet.create({
   artistTag: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#eee",
+    backgroundColor: COLORS.borderInput, // "#eee"
     padding: 6,
     borderRadius: 4,
     marginRight: 8,
@@ -808,30 +786,31 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   removeArtist: {
-    color: "red",
+    color: COLORS.negative, // "red"
     fontWeight: "bold",
   },
   sectionTitle: {
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: FONT_SIZES.subTitle, // 16-18
     width: 300,
     marginTop: 12,
+    color: COLORS.textPrimary,
   },
   dropdownButton: {
     marginTop: 4,
     borderWidth: 1,
-    borderColor: "#000",
+    borderColor: COLORS.textPrimary, // "#000"
     borderRadius: 4,
-    backgroundColor: "#F3F3F3",
+    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
     paddingHorizontal: 8,
     paddingVertical: 8,
     width: 300,
   },
   dropdownContainer: {
     borderWidth: 1,
-    borderColor: "#000",
+    borderColor: COLORS.textPrimary, // "#000"
     borderRadius: 4,
-    backgroundColor: "#FFF",
+    backgroundColor: COLORS.cardBg,   // "#FFF"
     width: 300,
     marginBottom: 4,
   },
@@ -847,6 +826,7 @@ const styles = StyleSheet.create({
   ticketLabel: {
     fontWeight: "600",
     marginBottom: 4,
+    color: COLORS.textPrimary,
   },
   ticketInputs: {
     flexDirection: "row",
@@ -854,9 +834,9 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   smallInput: {
-    backgroundColor: "#FFF",
+    backgroundColor: COLORS.cardBg, // "#FFF"
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: COLORS.borderInput, // "#ccc"
     borderRadius: 4,
     marginHorizontal: 4,
     paddingHorizontal: 8,
@@ -865,16 +845,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   submitButton: {
-    backgroundColor: "#4db6ac",
+    backgroundColor: COLORS.primary, // "#4db6ac"
     marginTop: 20,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     alignItems: "center",
     width: 200,
     alignSelf: "center",
   },
   submitButtonText: {
-    color: "#fff",
+    color: COLORS.cardBg, // "#fff"
     fontWeight: "bold",
   },
 });

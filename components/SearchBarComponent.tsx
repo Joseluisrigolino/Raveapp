@@ -4,10 +4,12 @@ import { StyleSheet, View } from "react-native";
 import { TextInput } from "react-native-paper";
 import { SearchBarProps } from "@/interfaces/SearchBarProps";
 
+import globalStyles, { COLORS } from "@/styles/globalStyles";
+
 const SearchBar: React.FC<SearchBarProps> = ({
   value,
   onChangeText,
-  placeholder = "Buscar...", // Valor por defecto, pero se puede sobrescribir
+  placeholder = "Buscar...",
 }) => {
   return (
     <View style={styles.container}>
@@ -16,7 +18,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        left={<TextInput.Icon icon="magnify" color="#000" size={24} />}
+        left={<TextInput.Icon icon="magnify" color={COLORS.textPrimary} size={24} />}
         style={styles.input}
       />
     </View>
@@ -28,7 +30,7 @@ const styles = StyleSheet.create({
     margin: 10,
   },
   input: {
-    backgroundColor: "#fff", // Asegura que el fondo sea blanco para contraste
+    backgroundColor: globalStyles.COLORS.cardBg, // Blanco
   },
 });
 

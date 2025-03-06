@@ -1,7 +1,9 @@
-import * as React from "react";
-import { useState } from "react";
+import React, { useState } from "react";
 import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
 import { DataTable } from "react-native-paper";
+
+// Importa tus estilos
+import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 const BuyTicket = () => {
   const [quantity, setQuantity] = useState(1);
@@ -25,17 +27,11 @@ const BuyTicket = () => {
           <DataTable.Cell numeric>2000</DataTable.Cell>
           <DataTable.Cell numeric>
             <View style={styles.counterContainer}>
-              <TouchableOpacity
-                onPress={decreaseQuantity}
-                style={styles.buttonQuantity}
-              >
+              <TouchableOpacity onPress={decreaseQuantity} style={styles.buttonQuantity}>
                 <Text style={styles.buttonQuantityText}>-</Text>
               </TouchableOpacity>
               <Text style={styles.quantityText}>{quantity}</Text>
-              <TouchableOpacity
-                onPress={increaseQuantity}
-                style={styles.buttonQuantity}
-              >
+              <TouchableOpacity onPress={increaseQuantity} style={styles.buttonQuantity}>
                 <Text style={styles.buttonQuantityText}>+</Text>
               </TouchableOpacity>
             </View>
@@ -52,7 +48,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
     borderWidth: 1,
+    borderColor: COLORS.borderInput, // "#ccc"
     padding: 10,
+    backgroundColor: COLORS.cardBg,  // Blanco
+    borderRadius: RADIUS.card,
   },
   counterContainer: {
     flexDirection: "row",
@@ -61,19 +60,20 @@ const styles = StyleSheet.create({
     marginLeft: 95,
   },
   buttonQuantity: {
-    backgroundColor: "#000000",
+    backgroundColor: COLORS.textPrimary, // "#000"
     padding: 5,
-    borderRadius: 5,
+    borderRadius: RADIUS.card,
     marginHorizontal: 10,
   },
   buttonQuantityText: {
-    fontSize: 18,
-    color: "white",
+    fontSize: FONT_SIZES.button, // 16-18
+    color: COLORS.cardBg,        // "#fff"
     fontWeight: "bold",
   },
   quantityText: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.body,   // 14-16
     fontWeight: "bold",
+    color: COLORS.textPrimary,
   },
 });
 

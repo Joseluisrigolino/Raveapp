@@ -17,10 +17,12 @@ import Footer from "@/components/LayoutComponents/FooterComponent";
 import ReviewComponent from "@/components/ReviewComponent";
 import { ReviewItem } from "@/interfaces/ReviewProps";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
-// Este helper podría tener un mock o un fetch a tu API
 import { getTicketMenuById } from "@/utils/ticketMenuHelpers";
 
-/** Reseñas de ejemplo (luego podrías traerlas de tu API) */
+// Importa tus estilos globales
+import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+
+/** Reseñas de ejemplo */
 const mockReviews: ReviewItem[] = [
   {
     id: 1,
@@ -39,17 +41,14 @@ const mockReviews: ReviewItem[] = [
 ];
 
 export default function TicketFinalizedScreen() {
-  // 1. Leemos el param "id"
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const [ticketData, setTicketData] = useState<TicketPurchasedMenuItem | null>(
+    null
+  );
 
-  // 2. Estado para guardar la data del ticket
-  const [ticketData, setTicketData] = useState<TicketPurchasedMenuItem | null>(null);
-
-  // 3. Estados para la reseña del usuario
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
 
-  // 4. Al montar o cambiar "id", buscamos el ticket en el helper (o API)
   useEffect(() => {
     if (id) {
       const found = getTicketMenuById(Number(id));
@@ -59,7 +58,6 @@ export default function TicketFinalizedScreen() {
     }
   }, [id]);
 
-  // 5. Si no se encontró el ticket, mostrar un mensaje
   if (!ticketData) {
     return (
       <SafeAreaView style={styles.container}>
@@ -72,13 +70,10 @@ export default function TicketFinalizedScreen() {
     );
   }
 
-  // Manejo de estrellas
   const handleStarPress = (starValue: number) => setRating(starValue);
 
-  // Al enviar reseña
   const handleSendReview = () => {
     console.log("Review enviada:", { rating, comment });
-    // Aquí podrías hacer un POST a tu API
     setRating(0);
     setComment("");
   };
@@ -88,19 +83,15 @@ export default function TicketFinalizedScreen() {
       <Header />
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Imagen del evento (ejemplo) */}
         <Image source={{ uri: ticketData.imageUrl }} style={styles.eventImage} />
         <Text style={styles.eventTitle}>Entrada a: {ticketData.eventName}</Text>
 
         <Text style={styles.finalizedLabel}>Evento finalizado</Text>
 
-        {/* Info del ticket */}
         <View style={styles.ticketContainer}>
           <View style={styles.infoContainer}>
             <Text style={styles.ticketInfo} numberOfLines={0}>
-              Ticket: Entrada General
-              {"\n"}Valor: $3000
-              {"\n"}
+              Ticket: Entrada General{"\n"}Valor: $3000{"\n"}
               {ticketData.date}
               {"\n"}
               23:50hs a 07:00hs
@@ -113,8 +104,7 @@ export default function TicketFinalizedScreen() {
 
         <Text style={styles.reviewNote}>
           * Una vez finalizado el evento, podrás dejar tu reseña.{"\n"}
-          [Sólo aplica para eventos de boliches, no se pueden dejar reseñas de
-          visitas puntuales de djs]
+          [Sólo aplica para eventos de boliches...]
         </Text>
 
         <View style={styles.descriptionContainer}>
@@ -124,10 +114,8 @@ export default function TicketFinalizedScreen() {
           </Text>
         </View>
 
-        {/* Reseñas existentes */}
         <ReviewComponent reviews={mockReviews} />
 
-        {/* Formulario para dejar una nueva reseña */}
         <View style={styles.addReviewContainer}>
           <Text style={styles.addReviewTitle}>
             Comenta qué te pareció la fiesta:
@@ -138,14 +126,11 @@ export default function TicketFinalizedScreen() {
           </Text>
           <View style={styles.starRow}>
             {[1, 2, 3, 4, 5].map((value) => (
-              <TouchableOpacity
-                key={value}
-                onPress={() => handleStarPress(value)}
-              >
+              <TouchableOpacity key={value} onPress={() => handleStarPress(value)}>
                 <MaterialCommunityIcons
                   name={value <= rating ? "star" : "star-outline"}
                   size={24}
-                  color={value <= rating ? "#FFD700" : "#ccc"}
+                  color={value <= rating ? COLORS.starFilled : COLORS.starEmpty}
                   style={{ marginRight: 4 }}
                 />
               </TouchableOpacity>
@@ -163,10 +148,7 @@ export default function TicketFinalizedScreen() {
             />
           </View>
 
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleSendReview}
-          >
+          <TouchableOpacity style={styles.submitButton} onPress={handleSendReview}>
             <Text style={styles.submitButtonText}>Enviar reseña</Text>
           </TouchableOpacity>
         </View>
@@ -177,11 +159,10 @@ export default function TicketFinalizedScreen() {
   );
 }
 
-// Estilos
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.backgroundLight,
   },
   contentWrapper: {
     flex: 1,
@@ -195,19 +176,20 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 200,
     marginBottom: 12,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
   },
   eventTitle: {
-    fontSize: 18,
+    fontSize: FONT_SIZES.subTitle, // 18-20
     fontWeight: "bold",
     textAlign: "center",
+    color: COLORS.textPrimary,
   },
   finalizedLabel: {
     textAlign: "center",
     marginTop: 4,
     marginBottom: 12,
-    fontSize: 14,
-    color: "red",
+    fontSize: FONT_SIZES.smallText, // 14
+    color: COLORS.negative, // "red"
     fontWeight: "bold",
   },
   ticketContainer: {
@@ -215,84 +197,89 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   infoContainer: {
-    backgroundColor: "#F3F3F3",
+    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
     padding: 16,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     width: "100%",
   },
   ticketInfo: {
-    fontSize: 15,
+    fontSize: FONT_SIZES.body, // 14-16
     textAlign: "center",
     marginBottom: 8,
+    color: COLORS.textPrimary,
   },
   address: {
-    fontSize: 13,
-    color: "#555",
+    fontSize: FONT_SIZES.smallText, // 13-14
+    color: COLORS.textSecondary,     // "#555"
     marginBottom: 12,
     textAlign: "center",
   },
   reviewNote: {
-    fontSize: 12,
-    color: "#666",
+    fontSize: FONT_SIZES.smallText, // 12-14
+    color: COLORS.textSecondary,
     marginBottom: 16,
     textAlign: "center",
     lineHeight: 18,
   },
   descriptionContainer: {
-    backgroundColor: "#F3F3F3",
+    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
     padding: 16,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     marginBottom: 16,
   },
   descriptionTitle: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.body,
     fontWeight: "bold",
     marginBottom: 6,
+    color: COLORS.textPrimary,
   },
   descriptionText: {
-    fontSize: 14,
-    color: "#333",
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
   },
   addReviewContainer: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.cardBg, // "#fff"
     padding: 16,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: COLORS.borderInput, // "#ddd"
   },
   addReviewTitle: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.body,
     fontWeight: "bold",
     marginBottom: 12,
+    color: COLORS.textPrimary,
   },
   addReviewSubtitle: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.body,
     marginBottom: 4,
+    color: COLORS.textPrimary,
   },
   starRow: {
     flexDirection: "row",
     marginBottom: 12,
   },
   commentInputContainer: {
-    backgroundColor: "#F3F3F3",
-    borderRadius: 8,
+    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
+    borderRadius: RADIUS.card,
     marginBottom: 12,
   },
   commentInput: {
     minHeight: 60,
     padding: 8,
-    textAlignVertical: "top", // Para Android
+    textAlignVertical: "top",
+    color: COLORS.textPrimary,
   },
   submitButton: {
-    backgroundColor: "#000",
+    backgroundColor: COLORS.textPrimary, // "#000"
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     alignItems: "center",
   },
   submitButtonText: {
-    color: "#fff",
-    fontSize: 15,
+    color: COLORS.cardBg, // "#fff"
+    fontSize: FONT_SIZES.body, // 15
     fontWeight: "bold",
   },
 });

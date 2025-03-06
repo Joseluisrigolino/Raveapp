@@ -9,12 +9,15 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import Header from "@/components/LayoutComponents/HeaderComponent";
-import Footer from "@/components/LayoutComponents/FooterComponent";
 import QRCode from "react-native-qrcode-svg";
 
-import { getTicketMenuById } from "@/utils/ticketMenuHelpers";
+import Header from "@/components/LayoutComponents/HeaderComponent";
+import Footer from "@/components/LayoutComponents/FooterComponent";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
+import { getTicketMenuById } from "@/utils/ticketMenuHelpers";
+
+// Importa tus estilos globales
+import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function TicketPurchasedScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -35,7 +38,7 @@ export default function TicketPurchasedScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <Header />
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <View style={styles.notFoundContainer}>
           <Text>Ticket no encontrado.</Text>
         </View>
         <Footer />
@@ -46,18 +49,12 @@ export default function TicketPurchasedScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Header />
+
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Imagen principal del evento */}
-        <Image
-          source={{ uri: ticketData.imageUrl }}
-          style={styles.eventImage}
-        />
+        <Image source={{ uri: ticketData.imageUrl }} style={styles.eventImage} />
 
-        <Text style={styles.eventTitle}>
-          Entrada a: {ticketData.eventName}
-        </Text>
+        <Text style={styles.eventTitle}>Entrada a: {ticketData.eventName}</Text>
 
-        {/* Sección QR e info de la entrada */}
         <View style={styles.ticketContainer}>
           <View style={styles.qrContainer}>
             <QRCode
@@ -68,10 +65,8 @@ export default function TicketPurchasedScreen() {
             />
 
             <Text style={styles.ticketInfo}>
-              Ticket: Entrada General
-              {"\n"}
-              Valor: $3000
-              {"\n"}
+              Ticket: Entrada General{"\n"}
+              Valor: $3000{"\n"}
               {ticketData.date}
               {"\n"}
               23:50hs a 07:00hs
@@ -94,15 +89,12 @@ export default function TicketPurchasedScreen() {
           * Una vez finalizado el evento, podrás dejar tu reseña...
         </Text>
 
-        {/* Descripción del evento */}
         <View style={styles.descriptionContainer}>
           <Text style={styles.descriptionTitle}>Descripción del evento</Text>
           <Text style={styles.descriptionText}>
             Aquí iría la descripción real...
           </Text>
         </View>
-
-        {/* Reseñas, etc... */}
       </ScrollView>
 
       <Footer />
@@ -111,41 +103,53 @@ export default function TicketPurchasedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  scrollContainer: { padding: 16 },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.backgroundLight, // "#fff"
+  },
+  notFoundContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scrollContainer: {
+    padding: 16,
+  },
   eventImage: {
     width: "100%",
     height: 200,
     marginBottom: 12,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
   },
   eventTitle: {
-    fontSize: 18,
+    fontSize: FONT_SIZES.subTitle, // 18
     fontWeight: "bold",
     marginBottom: 12,
     textAlign: "center",
+    color: COLORS.textPrimary,
   },
   ticketContainer: {
     alignItems: "center",
     marginBottom: 16,
   },
   qrContainer: {
-    backgroundColor: "#F3F3F3",
+    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
     padding: 16,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     alignItems: "center",
     width: "100%",
   },
   ticketInfo: {
-    fontSize: 15,
+    fontSize: FONT_SIZES.body, // 15
     textAlign: "center",
     marginBottom: 8,
     flexWrap: "wrap",
     width: "100%",
+    color: COLORS.textPrimary,
   },
   address: {
-    fontSize: 13,
-    color: "#555",
+    fontSize: FONT_SIZES.smallText, // 13
+    color: COLORS.textSecondary,     // "#555"
     marginBottom: 12,
     textAlign: "center",
     flexWrap: "wrap",
@@ -158,36 +162,37 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   button: {
-    backgroundColor: "#000",
+    backgroundColor: COLORS.textPrimary, // "#000"
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     marginHorizontal: 4,
   },
   buttonText: {
-    color: "#fff",
-    fontSize: 14,
+    color: COLORS.cardBg, // "#fff"
+    fontSize: FONT_SIZES.smallText, // 14
   },
   reviewNote: {
-    fontSize: 12,
-    color: "#666",
+    fontSize: FONT_SIZES.smallText, // 12
+    color: COLORS.textSecondary,     // "#666"
     marginBottom: 16,
     textAlign: "center",
     lineHeight: 18,
   },
   descriptionContainer: {
-    backgroundColor: "#F3F3F3",
+    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
     padding: 16,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     marginBottom: 16,
   },
   descriptionTitle: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.body, // 16
     fontWeight: "bold",
     marginBottom: 6,
+    color: COLORS.textPrimary,
   },
   descriptionText: {
-    fontSize: 14,
-    color: "#333",
+    fontSize: FONT_SIZES.body, // 14
+    color: COLORS.textPrimary,
   },
 });

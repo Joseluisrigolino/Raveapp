@@ -1,10 +1,14 @@
 import React, { useState } from "react";
 import { View, StyleSheet, ScrollView, SafeAreaView, Text } from "react-native";
 import { IconButton } from "react-native-paper";
+
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
 import FilterCarousel from "@/components/FilterCarousel";
 import CardComponent from "@/components/CardComponent";
+
+// Importa tus estilos globales
+import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function FavEventScreen() {
   const fiestaTipos = ["Rave", "Techno", "House", "LGBT", "Pop", "Electrónica"];
@@ -27,19 +31,18 @@ export default function FavEventScreen() {
     console.log("Card seleccionada:", title);
   };
 
-  const toggleFavorite = (id) => {
+  const toggleFavorite = (id: number) => {
     setFavorites((prev) => prev.filter((event) => event.id !== id));
   };
 
   return (
     <SafeAreaView style={styles.mainContainer}>
       <Header />
+
       <Text style={styles.screenTitle}>Eventos favoritos</Text>
+
       <ScrollView showsVerticalScrollIndicator={false}>
-        <FilterCarousel
-          filtros={fiestaTipos}
-          onFilterPress={handleFilterPress}
-        />
+        <FilterCarousel filtros={fiestaTipos} onFilterPress={handleFilterPress} />
 
         <View style={styles.containerCards}>
           {favorites.length > 0 ? (
@@ -49,11 +52,11 @@ export default function FavEventScreen() {
                   title={event.title}
                   text={event.text}
                   foto={event.foto}
-                  onPress={handleCardPress}
+                  onPress={() => handleCardPress(event.title)}
                 />
                 <IconButton
                   icon="heart"
-                  iconColor="red"
+                  iconColor={COLORS.negative} // "red"
                   size={30}
                   style={styles.heartButton}
                   onPress={() => toggleFavorite(event.id)}
@@ -67,6 +70,7 @@ export default function FavEventScreen() {
           )}
         </View>
       </ScrollView>
+
       <Footer />
     </SafeAreaView>
   );
@@ -75,12 +79,14 @@ export default function FavEventScreen() {
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
+    backgroundColor: COLORS.backgroundLight,
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: FONT_SIZES.titleMain, // 22-24
     fontWeight: "bold",
     textAlign: "center",
     marginVertical: 10,
+    color: COLORS.textPrimary,
   },
   containerCards: {
     flex: 1,
@@ -96,13 +102,13 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 10,
     right: 10,
-    backgroundColor: "white",
+    backgroundColor: COLORS.cardBg, // Blanco
     borderRadius: 20,
   },
   noFavoritesText: {
-    fontSize: 18,
+    fontSize: FONT_SIZES.subTitle, // 18-20
     textAlign: "center",
     marginTop: 50,
-    color: "gray",
+    color: COLORS.textSecondary,
   },
 });

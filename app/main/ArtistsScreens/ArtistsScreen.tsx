@@ -9,6 +9,7 @@ import SearchBar from "@/components/SearchBarComponent";
 import TabMenuComponent from "@/components/TabMenuComponent";
 
 import { Artist } from "@/interfaces/Artist";
+import globalStyles, { COLORS, FONT_SIZES } from "@/styles/globalStyles";
 
 // Simulados
 type Alphabet =
@@ -111,7 +112,6 @@ export default function ArtistsScreen() {
     <SafeAreaView style={styles.mainContainer}>
       <Header />
 
-      {/* Submenú */}
       <TabMenuComponent
         tabs={[
           { label: "Noticias", route: "/main/NewsScreens/NewsScreen", isActive: false },
@@ -139,7 +139,6 @@ export default function ArtistsScreen() {
                     key={index}
                     artistName={artist.name}
                     artistImage={artist.image}
-                    // Al tocar, navega
                     onPress={() => handleArtistPress(artist)}
                   />
                 ))}
@@ -157,13 +156,15 @@ export default function ArtistsScreen() {
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
+    backgroundColor: globalStyles.COLORS.backgroundLight, // Gris claro principal
   },
   letterGroup: {
     marginTop: 20,
   },
   letterTitle: {
-    fontSize: 18,
+    fontSize: FONT_SIZES.subTitle,       // 18-20 px
     fontWeight: "bold",
+    color: globalStyles.COLORS.textPrimary,
     marginLeft: 10,
   },
   artistCardsRow: {

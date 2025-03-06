@@ -1,11 +1,12 @@
 // components/ArtistCardComponent.tsx
 import React from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import globalStyles, { FONT_SIZES, COLORS } from "@/styles/globalStyles";
 
 interface ArtistCardProps {
   artistName: string;
   artistImage: string;
-  onPress?: () => void; // <-- para manejar el toque
+  onPress?: () => void;
 }
 
 export default function ArtistCard({
@@ -26,6 +27,9 @@ const styles = StyleSheet.create({
     width: 120,
     alignItems: "center",
     margin: 8,
+    backgroundColor: globalStyles.COLORS.cardBg, // Blanco
+    borderRadius: 8, // Podrías usar globalStyles.RADIUS.card
+    padding: 8,
   },
   image: {
     width: 120,
@@ -34,7 +38,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   name: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.body,  // 14-16
+    color: COLORS.textPrimary,  // Gris oscuro
     fontWeight: "bold",
     textAlign: "center",
   },

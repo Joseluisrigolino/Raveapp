@@ -15,29 +15,18 @@ import Footer from "@/components/LayoutComponents/FooterComponent";
 import TabMenuComponent from "@/components/TabMenuComponent";
 import { NewsItem } from "@/interfaces/NewsProps";
 
-// Ejemplo local (puedes traerlo de un helper o inline):
+// Importa tus estilos globales (ajusta la ruta si difiere)
+import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+
 const newsData: NewsItem[] = [
-  {
-    id: 1,
-    title: "New Release 1",
-    imageUrl: "https://picsum.photos/700/400?random=1",
-  },
-  {
-    id: 2,
-    title: "New Release 2",
-    imageUrl: "https://picsum.photos/700/400?random=2",
-  },
-  {
-    id: 3,
-    title: "New Release 3",
-    imageUrl: "https://picsum.photos/700/400?random=3",
-  },
+  { id: 1, title: "New Release 1", imageUrl: "https://picsum.photos/700/400?random=1" },
+  { id: 2, title: "New Release 2", imageUrl: "https://picsum.photos/700/400?random=2" },
+  { id: 3, title: "New Release 3", imageUrl: "https://picsum.photos/700/400?random=3" },
 ];
 
 export default function NewsScreen() {
   const router = useRouter();
 
-  // Al presionar una noticia, navegamos a /main/NewScreen?id=...
   const handlePress = (item: NewsItem) => {
     router.push(`/main/NewsScreens/NewScreen?id=${item.id}`);
   };
@@ -46,7 +35,6 @@ export default function NewsScreen() {
     <SafeAreaView style={styles.container}>
       <Header />
 
-      {/* Submenú reutilizable (dos pestañas) */}
       <TabMenuComponent
         tabs={[
           { label: "Noticias", route: "/main/NewsScreen", isActive: true },
@@ -80,6 +68,7 @@ export default function NewsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: globalStyles.COLORS.backgroundLight, // Gris claro principal
   },
   scrollContent: {
     paddingVertical: 16,
@@ -87,15 +76,20 @@ const styles = StyleSheet.create({
   newsCard: {
     marginBottom: 20,
     alignItems: "center",
+    backgroundColor: globalStyles.COLORS.cardBg, // Blanco
+    borderRadius: RADIUS.card,                   // Borde redondeado (10-15px)
+    marginHorizontal: 16,
+    padding: 10,
   },
   newsImage: {
-    width: "90%",
+    width: "100%",
     height: 200,
-    borderRadius: 10,
+    borderRadius: RADIUS.card,
   },
   newsTitle: {
     marginTop: 10,
-    fontSize: 18,
+    fontSize: FONT_SIZES.subTitle,         // Por ejemplo 18-20px
+    color: globalStyles.COLORS.textPrimary,// Gris oscuro
     fontWeight: "bold",
   },
 });

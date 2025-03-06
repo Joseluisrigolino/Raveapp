@@ -1,23 +1,16 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
+import DateTimePicker from "@react-native-community/datetimepicker";
+
+import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 interface DateTimeInputProps {
   label: string;
-  /** Valor actual de la fecha/hora como Date */
   value: Date;
-  /** Lógica para actualizar la fecha/hora en el padre */
   onChange: (date: Date) => void;
-  /** Modo del picker: "date", "time" o "datetime". Por defecto "datetime". */
   mode?: "date" | "time" | "datetime";
 }
 
-/**
- * Componente para abrir un calendario/hora nativo (compatible con Expo).
- * Al presionar, abre un DateTimePicker y actualiza `value`.
- */
 export default function DateTimeInputComponent({
   label,
   value,
@@ -26,15 +19,13 @@ export default function DateTimeInputComponent({
 }: DateTimeInputProps) {
   const [showPicker, setShowPicker] = useState(false);
 
-  // Se llama cada vez que se elige la fecha/hora
-  const handleChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+  const handleChange = (event: any, selectedDate?: Date) => {
     setShowPicker(false);
     if (selectedDate) {
       onChange(selectedDate);
     }
   };
 
-  // Formatear la fecha/hora para mostrar en pantalla
   const formatDateTime = (date: Date) => {
     if (!date) return "Seleccionar fecha/hora";
     const day = String(date.getDate()).padStart(2, "0");
@@ -49,15 +40,14 @@ export default function DateTimeInputComponent({
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
 
-      {/* Al presionar, abrimos el picker */}
       <TouchableOpacity style={styles.fakeInput} onPress={() => setShowPicker(true)}>
-        <Text>{formatDateTime(value)}</Text>
+        <Text style={styles.dateText}>{formatDateTime(value)}</Text>
       </TouchableOpacity>
 
       {showPicker && (
         <DateTimePicker
           value={value}
-          mode={mode === "datetime" ? "date" : mode} 
+          mode={mode === "datetime" ? "date" : mode}
           is24Hour={true}
           display="default"
           onChange={handleChange}
@@ -75,11 +65,16 @@ const styles = StyleSheet.create({
   label: {
     fontWeight: "bold",
     marginBottom: 4,
+    color: COLORS.textPrimary,
+    fontSize: FONT_SIZES.body,
   },
   fakeInput: {
-    backgroundColor: "#F3F3F3",
-    borderRadius: 4,
+    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
+    borderRadius: RADIUS.card,
     paddingHorizontal: 8,
     paddingVertical: 6,
+  },
+  dateText: {
+    color: COLORS.textPrimary,
   },
 });

@@ -21,6 +21,9 @@ import { ReviewItem } from "@/interfaces/ReviewProps";
 import { getEventById } from "@/utils/eventHelpers";
 import { EventItem } from "@/interfaces/EventProps";
 
+// Importa tus estilos globales
+import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+
 const mockReviews: ReviewItem[] = [
   {
     id: 1,
@@ -51,12 +54,11 @@ export default function EventScreen() {
     }
   }, [id]);
 
-  // Si no se encontró el evento, mostrar mensaje
   if (!eventData) {
     return (
       <SafeAreaView style={styles.container}>
         <Header />
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <View style={styles.notFoundContainer}>
           <Text>Evento no encontrado.</Text>
         </View>
         <Footer />
@@ -75,43 +77,39 @@ export default function EventScreen() {
     <SafeAreaView style={styles.container}>
       <Header />
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Imagen principal */}
         <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: eventData.imageUrl }}
-            style={styles.img}
-          />
+          <Image source={{ uri: eventData.imageUrl }} style={styles.img} />
           <IconButton
             icon={isFavorite ? "heart" : "heart-outline"}
-            iconColor={isFavorite ? "red" : "black"}
+            iconColor={isFavorite ? COLORS.negative : COLORS.textPrimary}
             size={30}
             style={styles.heartButton}
             onPress={() => setIsFavorite(!isFavorite)}
           />
         </View>
 
-        {/* Título y info */}
         <Title style={styles.title}>{eventData.title}</Title>
         <View style={styles.info}>
-          <Button icon="calendar">
-            <Text>{eventData.date} de {eventData.timeRange}</Text>
-          </Button>
-          <Button icon="map-marker" onPress={openMap}>
-            <Text style={{ color: "blue", textDecorationLine: "underline" }}>
-              {eventData.address}
+          <Button icon="calendar" labelStyle={styles.iconLabel}>
+            <Text style={styles.buttonText}>
+              {eventData.date} de {eventData.timeRange}
             </Text>
+          </Button>
+          <Button icon="map-marker" labelStyle={styles.iconLabel} onPress={openMap}>
+            <Text style={styles.mapText}>{eventData.address}</Text>
           </Button>
           <Text style={styles.description}>{eventData.description}</Text>
         </View>
 
         <BuyTicket />
+
         <View style={styles.btnBuyView}>
           <TouchableOpacity style={styles.btnBuy}>
             <Text style={styles.btnBuyTxt}>Comprar</Text>
           </TouchableOpacity>
         </View>
 
-        {/* SoundCloud si quieres */}
+        {/* Ejemplo de SoundCloud (opcional) */}
         {/* <SoundCloud trackUrl="https://soundcloud.com/skrillex/sets/skrillex-remixes" /> */}
 
         {/* Reseñas */}
@@ -125,6 +123,12 @@ export default function EventScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: COLORS.backgroundLight, // Fondo claro principal
+  },
+  notFoundContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   imageContainer: {
     position: "relative",
@@ -138,34 +142,50 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 10,
     right: 10,
-    backgroundColor: "white",
+    backgroundColor: COLORS.cardBg, // Blanco
     borderRadius: 20,
   },
   title: {
     fontWeight: "bold",
     marginLeft: 8,
+    fontSize: FONT_SIZES.subTitle, // 18-20
+    color: COLORS.textPrimary,
   },
   info: {
     alignItems: "flex-start",
+    marginLeft: 8,
+    marginTop: 8,
+  },
+  iconLabel: {
+    color: COLORS.textPrimary,
+  },
+  buttonText: {
+    color: COLORS.textPrimary,
+  },
+  mapText: {
+    color: COLORS.info, // Un color "azul" o "naranja", como prefieras
+    textDecorationLine: "underline",
   },
   description: {
     margin: 10,
-    fontSize: 17,
+    fontSize: FONT_SIZES.body, // 14-16
+    color: COLORS.textPrimary,
   },
   btnBuyView: {
     alignItems: "flex-end",
     marginRight: 20,
   },
   btnBuy: {
-    backgroundColor: "#000000",
+    backgroundColor: COLORS.textPrimary, // "#000000"
     height: 50,
     width: 150,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 10,
+    borderRadius: RADIUS.card,
   },
   btnBuyTxt: {
-    color: "white",
-    fontSize: 20,
+    color: COLORS.cardBg, // Blanco
+    fontSize: FONT_SIZES.button, // 16-18
+    fontWeight: "bold",
   },
 });
