@@ -14,9 +14,6 @@ import {
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
 
-// Ejemplo: Podrías usar este si quieres un componente de título personalizado
-// import TitlePers from "@/components/TitleComponent";
-
 export default function CreateNewsScreen() {
   // Estados locales para manejar los inputs
   const [newsTitle, setNewsTitle] = useState("");
@@ -24,18 +21,12 @@ export default function CreateNewsScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
 
-  // Handlers (por ahora, sólo console.log o setState)
   const handleSelectImage = () => {
     console.log("Seleccionar imagen presionado");
-    // Aquí más adelante implementarás la lógica de imagen (ImagePicker, etc.)
-    // Por ejemplo:
-    // setSelectedImage("ruta-de-la-imagen.jpg");
   };
 
   const handleSelectEvent = () => {
     console.log("Seleccionar evento presionado");
-    // Lógica para mostrar lista de eventos, etc.
-    // setSelectedEvent("EventoX");
   };
 
   const handleCreateNews = () => {
@@ -46,7 +37,6 @@ export default function CreateNewsScreen() {
       image: selectedImage,
       event: selectedEvent,
     });
-    // Lógica para enviar la noticia a tu API
   };
 
   return (
@@ -55,7 +45,6 @@ export default function CreateNewsScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.contentWrapper}>
-          {/* Título principal de la pantalla */}
           <Text style={styles.mainTitle}>Crear Noticia</Text>
 
           {/* Campo: Título de la noticia */}
@@ -82,7 +71,6 @@ export default function CreateNewsScreen() {
           {/* Sección para asociar imagen */}
           <Text style={styles.label}>Asociar imagen:</Text>
           <View style={styles.imageRow}>
-            {/* Vista previa (si tuvieras la imagen) */}
             <View style={styles.imagePlaceholder}>
               {selectedImage ? (
                 <Image
@@ -94,7 +82,10 @@ export default function CreateNewsScreen() {
               )}
             </View>
 
-            <TouchableOpacity style={styles.selectImageButton} onPress={handleSelectImage}>
+            <TouchableOpacity
+              style={styles.selectImageButton}
+              onPress={handleSelectImage}
+            >
               <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
             </TouchableOpacity>
           </View>
@@ -105,7 +96,10 @@ export default function CreateNewsScreen() {
             <Text style={styles.eventPlaceholder}>
               {selectedEvent ? selectedEvent : "XXXXXXXXXXXXXXX"}
             </Text>
-            <TouchableOpacity style={styles.selectEventButton} onPress={handleSelectEvent}>
+            <TouchableOpacity
+              style={styles.selectEventButton}
+              onPress={handleSelectEvent}
+            >
               <Text style={styles.selectEventButtonText}>Seleccionar evento</Text>
             </TouchableOpacity>
           </View>
@@ -146,15 +140,20 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 12,
   },
+  // Ajuste para resaltar campos editables
   input: {
-    backgroundColor: "#F3F3F3",
+    backgroundColor: "#fff",       // Fondo blanco más claro
+    borderColor: "#ccc",          // Borde gris claro
+    borderWidth: 1,               // Grosor del borde
     borderRadius: 4,
     paddingHorizontal: 8,
     paddingVertical: 6,
     width: "100%",
   },
   textAreaContainer: {
-    backgroundColor: "#F3F3F3",
+    backgroundColor: "#fff",
+    borderColor: "#ccc",
+    borderWidth: 1,
     borderRadius: 4,
     width: "100%",
     minHeight: 100,
@@ -163,7 +162,7 @@ const styles = StyleSheet.create({
   textArea: {
     flex: 1,
     padding: 8,
-    textAlignVertical: "top", // para Android
+    textAlignVertical: "top",
   },
   imageRow: {
     flexDirection: "row",

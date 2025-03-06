@@ -109,7 +109,7 @@ export default function ArtistScreen() {
 
           <Image source={{ uri: artist.image }} style={styles.artistImage} />
 
-          <Text style={styles.likesText}>{likeCount} bombers les gusta</Text>
+          <Text style={styles.likesText}>{likeCount} usuarios les gusta</Text>
 
           {artist.description && (
             <Text style={styles.description}>{artist.description}</Text>

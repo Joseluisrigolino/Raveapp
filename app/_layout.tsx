@@ -28,7 +28,13 @@ export default function RootLayout() {
       <Stack.Screen name="UserProfileEditScreen" />
       <Stack.Screen name="CreateEventScreen" />
       <Stack.Screen name="CreateNewScreen" />
+      <Stack.Screen name="EditNewScreen" />
       <Stack.Screen name="ManageNewsScreen" />
+      <Stack.Screen name="NewArtistScreen" />
+      <Stack.Screen name="EditArtistScreen" />
+      <Stack.Screen name="ManageArtistsScreen" />
+      <Stack.Screen name="EventsToValidateScreen" />
+      <Stack.Screen name="ValidateEventScreen" />
     </Stack>
   );
 }

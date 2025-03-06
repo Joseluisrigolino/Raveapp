@@ -1,7 +1,6 @@
 // utils/newsHelpers.ts
 import { NewsItem } from "@/interfaces/NewsProps";
 
-// Mock local de noticias
 const mockNews: NewsItem[] = [
   {
     id: 1,
@@ -26,9 +25,12 @@ Visita nuestro sitio: https://example.com`,
   // Agrega las que necesites...
 ];
 
-/** 
- * Devuelve la noticia con ese ID o null si no existe 
- */
+/** Retorna todas las noticias (mock). */
+export function getAllNews(): NewsItem[] {
+  return mockNews;
+}
+
+/** Devuelve la noticia con ese ID o null si no existe. */
 export function getNewsById(id: number): NewsItem | null {
   const found = mockNews.find((news) => news.id === id);
   return found ?? null;

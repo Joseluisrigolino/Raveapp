@@ -104,7 +104,7 @@ export default function ArtistsScreen() {
 
   // Al tocar un artista, navegamos a /main/ArtistScreen con ?name=...
   const handleArtistPress = (artist: Artist) => {
-    router.push(`/main/ArtistScreen?name=${encodeURIComponent(artist.name)}`);
+    router.push(`/main/ArtistsScreens/ArtistScreen?name=${encodeURIComponent(artist.name)}`);
   };
 
   return (
