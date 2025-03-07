@@ -1,6 +1,5 @@
-// owner/ManageEventsScreen.tsx
 import React, { useState, useMemo } from "react";
-import { SafeAreaView, FlatList, StyleSheet, View } from "react-native";
+import { SafeAreaView, FlatList, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 
 import Header from "@/components/LayoutComponents/HeaderComponent";
@@ -17,22 +16,23 @@ export default function ManageEventsScreen() {
   const router = useRouter();
 
   // Filtros y búsqueda
-  const [filterStatus, setFilterStatus] = useState("todos");
-  const [orderBy, setOrderBy] = useState("asc");
+  const [filterStatus, setFilterStatus] = useState("todos"); // "todos" | "vigente" | "pendiente" | "finalizado"
+  const [orderBy, setOrderBy] = useState("asc"); // "asc" | "desc"
   const [searchText, setSearchText] = useState("");
 
+  // Obtenemos todos los eventos (mock)
   const allEvents = getOwnerEvents();
 
-  // Filtramos y ordenamos
+  // Filtrar y ordenar usando useMemo
   const filteredEvents = useMemo(() => {
     let events = [...allEvents];
 
-    // Filtro por estado
+    // 1. Filtro por estado
     if (filterStatus !== "todos") {
       events = events.filter((ev) => ev.status === filterStatus);
     }
 
-    // Búsqueda
+    // 2. Búsqueda por nombre
     if (searchText.trim().length > 0) {
       const lowerSearch = searchText.toLowerCase();
       events = events.filter((ev) =>
@@ -40,7 +40,7 @@ export default function ManageEventsScreen() {
       );
     }
 
-    // Ordenar (ejemplo asc/desc por fecha)
+    // 3. Ordenar asc/desc por fecha (dd/mm/yyyy)
     events.sort((a, b) => {
       const [dayA, monthA, yearA] = a.date.split("/").map(Number);
       const [dayB, monthB, yearB] = b.date.split("/").map(Number);
@@ -54,25 +54,29 @@ export default function ManageEventsScreen() {
     return events;
   }, [allEvents, filterStatus, orderBy, searchText]);
 
-  // Handlers para botones
+  // Handlers para los botones en la card
   const handleTicketsSold = (eventId: number) => {
     console.log("Ver entradas vendidas ID:", eventId);
-    // Podrías navegar a /owner/TicketsSoldScreen?id=eventId
+    // Navegar a la pantalla de entradas vendidas
+    router.push(`/owner/TicketSoldScreen?id=${eventId}`);
   };
+
   const handleModify = (eventId: number) => {
     console.log("Modificar evento ID:", eventId);
     // Podrías navegar a /owner/EditEventScreen?id=eventId
   };
+
   const handleCancel = (eventId: number) => {
     console.log("Cancelar evento ID:", eventId);
-    // Popup de confirmación, etc.
+    // Navegar a la pantalla de cancelación
+    router.push(`/owner/CancelEventScreen?id=${eventId}`);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
 
-      {/* Filtro, orden, búsqueda */}
+      {/* Barra de filtros (estado, orden, búsqueda) */}
       <FilterBar
         filterStatus={filterStatus}
         onFilterStatusChange={setFilterStatus}
@@ -82,6 +86,7 @@ export default function ManageEventsScreen() {
         onSearchTextChange={setSearchText}
       />
 
+      {/* Lista de eventos en tarjetas */}
       <FlatList
         data={filteredEvents}
         keyExtractor={(item) => item.id.toString()}
