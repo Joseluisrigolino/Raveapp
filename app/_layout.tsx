@@ -35,6 +35,7 @@ export default function RootLayout() {
       <Stack.Screen name="ManageArtistsScreen" />
       <Stack.Screen name="EventsToValidateScreen" />
       <Stack.Screen name="ValidateEventScreen" />
+      <Stack.Screen name="ManageEventsScreen" />
     </Stack>
   );
 }

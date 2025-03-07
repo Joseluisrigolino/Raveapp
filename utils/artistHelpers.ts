@@ -24,14 +24,6 @@ const mockArtists: Artist[] = [
     spotifyURL: "",
     creationDate: "10/03/2025",
   },
-  {
-    id: 3,
-    name: "David Guetta",
-    image: "https://picsum.photos/200?random=103",
-    description: "DJ francés reconocido a nivel mundial",
-    likes: 350,
-    creationDate: "15/04/2025",
-  },
   // ...
 ];
 
@@ -46,7 +38,16 @@ export function getArtistById(id: number): Artist | null {
   return found ?? null;
 }
 
-// (Opcional) Filtra artistas por nombre
+// NUEVO: Retorna un artista por nombre EXACTO (case-insensitive)
+export function getArtistByName(name: string): Artist | null {
+  const lowerName = name.toLowerCase();
+  const found = mockArtists.find(
+    (artist) => artist.name.toLowerCase() === lowerName
+  );
+  return found ?? null;
+}
+
+// Retorna un array de artistas cuyo nombre contenga `query`
 export function searchArtistsByName(query: string): Artist[] {
   const lowerQuery = query.toLowerCase();
   return mockArtists.filter((a) =>
