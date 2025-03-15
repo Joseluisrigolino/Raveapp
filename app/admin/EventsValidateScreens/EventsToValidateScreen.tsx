@@ -6,6 +6,7 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  TouchableOpacity,
 } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -13,6 +14,9 @@ import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
 import { getAllEventsToValidate } from "@/utils/validationEventHelpers";
 import { EventToValidate } from "@/interfaces/EventToValidateProps";
+
+// Importa tus estilos globales si deseas
+import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function EventsToValidateScreen() {
   const router = useRouter();
@@ -28,26 +32,42 @@ export default function EventsToValidateScreen() {
     router.push(`/admin/EventsValidateScreens/ValidateEventScreen?id=${id}`);
   };
 
+  // Renderizamos cada evento como una “card”
   const renderItem = ({ item }: { item: EventToValidate }) => (
-    <View style={styles.tableRow}>
-      <Text style={[styles.cell, styles.eventDateCell]}>{item.eventDate}</Text>
-      <Text style={[styles.cell, styles.creationDateCell]}>
+    <View style={styles.cardContainer}>
+      {/* Puedes mostrar la info en distintos Texts */}
+      <Text style={styles.eventDate}>
+        <Text style={styles.label}>Fecha del evento: </Text>
+        {item.eventDate}
+      </Text>
+
+      <Text style={styles.creationDate}>
+        <Text style={styles.label}>Fecha de creación: </Text>
         {item.creationDate}
       </Text>
-      <Text style={[styles.cell, styles.titleCell]} numberOfLines={1}>
+
+      <Text style={styles.titleText}>
+        <Text style={styles.label}>Nombre del evento: </Text>
         {item.title}
       </Text>
-      <Text style={[styles.cell, styles.typeCell]}>{item.type}</Text>
-      <Text style={[styles.cell, styles.ownerCell]}>{item.ownerUser}</Text>
 
-      <View style={[styles.cell, styles.actionCell]}>
-        <Text
-          style={styles.verifyButton}
-          onPress={() => handleVerify(item.id)}
-        >
-          Verificar
-        </Text>
-      </View>
+      <Text style={styles.typeText}>
+        <Text style={styles.label}>Género: </Text>
+        {item.type}
+      </Text>
+
+      <Text style={styles.ownerText}>
+        <Text style={styles.label}>Propietario: </Text>
+        {item.ownerUser}
+      </Text>
+
+      {/* Botón para verificar */}
+      <TouchableOpacity
+        style={styles.verifyButton}
+        onPress={() => handleVerify(item.id)}
+      >
+        <Text style={styles.verifyButtonText}>Verificar</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -56,29 +76,7 @@ export default function EventsToValidateScreen() {
       <Header />
 
       <View style={styles.content}>
-        <Text style={styles.title}>Eventos a validar:</Text>
-
-        {/* Cabecera de la tabla */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.headerCell, styles.eventDateCell]}>
-            Fecha del evento
-          </Text>
-          <Text style={[styles.headerCell, styles.creationDateCell]}>
-            Fecha de creación
-          </Text>
-          <Text style={[styles.headerCell, styles.titleCell]}>
-            Nombre del evento
-          </Text>
-          <Text style={[styles.headerCell, styles.typeCell]}>
-            Género
-          </Text>
-          <Text style={[styles.headerCell, styles.ownerCell]}>
-            Propietario
-          </Text>
-          <Text style={[styles.headerCell, styles.actionCell]}>
-            Acción
-          </Text>
-        </View>
+        <Text style={styles.screenTitle}>Eventos a validar:</Text>
 
         <FlatList
           data={events}
@@ -94,54 +92,75 @@ export default function EventsToValidateScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { flex: 1, padding: 16 },
-  title: {
-    fontSize: 18,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.backgroundLight, // Ej. "#F5F5F5"
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  screenTitle: {
+    fontSize: FONT_SIZES.subTitle, // 18-20
     fontWeight: "bold",
     marginBottom: 12,
-  },
-  tableHeader: {
-    flexDirection: "row",
-    borderBottomWidth: 2,
-    borderBottomColor: "#000",
-    paddingBottom: 8,
-    marginBottom: 8,
-  },
-  headerCell: {
-    fontWeight: "bold",
-    fontSize: 14,
-  },
-  tableRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
-    paddingVertical: 8,
-    alignItems: "center",
-  },
-  cell: {
-    fontSize: 14,
-  },
-  eventDateCell: { flex: 2 },
-  creationDateCell: { flex: 2 },
-  titleCell: { flex: 3 },
-  typeCell: { flex: 2 },
-  ownerCell: { flex: 2 },
-  actionCell: {
-    flex: 2,
-    alignItems: "center",
+    color: COLORS.textPrimary,
   },
   listContent: {
     paddingBottom: 20,
   },
-  verifyButton: {
-    backgroundColor: "#9c27b0",
-    color: "#fff",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    overflow: "hidden",
-    textAlign: "center",
+
+  // CARD
+  cardContainer: {
+    backgroundColor: COLORS.cardBg, // Ej. "#fff"
+    borderRadius: RADIUS.card,
+    padding: 12,
+    marginBottom: 12,
+
+    // Sombras suaves (opcional)
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+
+  label: {
     fontWeight: "bold",
+    color: COLORS.textPrimary,
+  },
+  eventDate: {
+    marginBottom: 4,
+    color: COLORS.textSecondary,
+  },
+  creationDate: {
+    marginBottom: 4,
+    color: COLORS.textSecondary,
+  },
+  titleText: {
+    marginBottom: 4,
+    color: COLORS.textPrimary,
+    fontWeight: "600",
+  },
+  typeText: {
+    marginBottom: 4,
+    color: COLORS.textPrimary,
+  },
+  ownerText: {
+    marginBottom: 8,
+    color: COLORS.textPrimary,
+  },
+
+  verifyButton: {
+    alignSelf: "flex-start",
+    backgroundColor: COLORS.alternative, // Ej. un color morado
+    borderRadius: RADIUS.card,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  verifyButtonText: {
+    color: COLORS.cardBg, // blanco
+    fontWeight: "bold",
+    fontSize: FONT_SIZES.body,
   },
 });

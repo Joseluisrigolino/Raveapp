@@ -16,6 +16,9 @@ import Footer from "@/components/LayoutComponents/FooterComponent";
 import { getAllNews } from "@/utils/newsHelpers";
 import { NewsItem } from "@/interfaces/NewsProps";
 
+// Importa tus estilos globales si deseas
+import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+
 export default function ManageNewsScreen() {
   const router = useRouter();
 
@@ -52,58 +55,53 @@ export default function ManageNewsScreen() {
     );
   };
 
-  const renderItem = ({ item }: { item: NewsItem }) => (
-    <View style={styles.tableRow}>
-      {/* Para demo, no tenemos fecha en NewsItem, 
-          podrías agregarla en la interfaz si quieres */}
-      <Text style={[styles.cell, styles.dateCell]}>23/02/2025</Text>
+  // Renderiza cada noticia como una “card”
+  const renderItem = ({ item }: { item: NewsItem }) => {
+    // Supongamos que no tenemos fecha en NewsItem,
+    // por demo usaremos un valor estático “23/02/2025”
+    const fakeDate = "23/02/2025";
 
-      {/* Título de la noticia */}
-      <Text style={[styles.cell, styles.titleCell]} numberOfLines={1}>
-        {item.title}
-      </Text>
+    return (
+      <View style={styles.cardContainer}>
+        {/* Fecha de creación (ficticia) */}
+        <Text style={styles.dateText}>
+          <Text style={styles.label}>Fecha de creación: </Text>
+          {fakeDate}
+        </Text>
 
-      {/* Acciones con íconos */}
-      <View style={[styles.cell, styles.actionCell]}>
-        {/* Ícono de Editar (lapicito) */}
-        <IconButton
-          icon="pencil"
-          size={20}
-          iconColor="#fff"
-          style={[styles.actionIcon, { backgroundColor: "#6a1b9a" }]}
-          onPress={() => handleEdit(item.id)}
-        />
-        {/* Ícono de Eliminar (basura) */}
-        <IconButton
-          icon="delete"
-          size={20}
-          iconColor="#fff"
-          style={[styles.actionIcon, { backgroundColor: "#d32f2f" }]}
-          onPress={() => handleDelete(item.id)}
-        />
+        {/* Título de la noticia */}
+        <Text style={styles.titleText}>
+          <Text style={styles.label}>Título de la noticia: </Text>
+          {item.title}
+        </Text>
+
+        {/* Acciones: editar / eliminar */}
+        <View style={styles.actionsRow}>
+          <IconButton
+            icon="pencil"
+            size={20}
+            iconColor="#fff"
+            style={[styles.actionIcon, styles.editIcon]}
+            onPress={() => handleEdit(item.id)}
+          />
+          <IconButton
+            icon="delete"
+            size={20}
+            iconColor="#fff"
+            style={[styles.actionIcon, styles.deleteIcon]}
+            onPress={() => handleDelete(item.id)}
+          />
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
 
       <View style={styles.content}>
-        <Text style={styles.title}>Modificar noticias:</Text>
-
-        {/* Cabecera de la tabla */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.headerCell, styles.dateCell]}>
-            Fecha de creación
-          </Text>
-          <Text style={[styles.headerCell, styles.titleCell]}>
-            Título de la noticia
-          </Text>
-          <Text style={[styles.headerCell, styles.actionCell]}>
-            Acción
-          </Text>
-        </View>
+        <Text style={styles.screenTitle}>Modificar noticias:</Text>
 
         <FlatList
           data={newsData}
@@ -119,54 +117,63 @@ export default function ManageNewsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.backgroundLight,
+  },
   content: {
     flex: 1,
     padding: 16,
   },
-  title: {
-    fontSize: 18,
+  screenTitle: {
+    fontSize: FONT_SIZES.subTitle, // 18-20
     fontWeight: "bold",
     marginBottom: 12,
-  },
-  tableHeader: {
-    flexDirection: "row",
-    borderBottomWidth: 2,
-    borderBottomColor: "#000",
-    paddingBottom: 8,
-    marginBottom: 8,
-  },
-  headerCell: {
-    fontWeight: "bold",
-    fontSize: 14,
-  },
-  tableRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
-    paddingVertical: 8,
-    alignItems: "center",
-  },
-  cell: {
-    fontSize: 14,
-  },
-  dateCell: {
-    flex: 2,
-  },
-  titleCell: {
-    flex: 4,
-    marginHorizontal: 4,
-  },
-  actionCell: {
-    flex: 3,
-    flexDirection: "row",
-    justifyContent: "space-evenly",
+    color: COLORS.textPrimary,
   },
   listContent: {
     paddingBottom: 20,
   },
+
+  // CARD
+  cardContainer: {
+    backgroundColor: COLORS.cardBg, // Ej. "#fff"
+    borderRadius: RADIUS.card,
+    padding: 12,
+    marginBottom: 12,
+
+    // Sombra suave (opcional)
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+
+  label: {
+    fontWeight: "bold",
+    color: COLORS.textPrimary,
+  },
+  dateText: {
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  titleText: {
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+
+  actionsRow: {
+    flexDirection: "row",
+  },
   actionIcon: {
     marginHorizontal: 4,
     borderRadius: 4,
+  },
+  editIcon: {
+    backgroundColor: "#6a1b9a", // Morado
+  },
+  deleteIcon: {
+    backgroundColor: "#d32f2f", // Rojo
   },
 });

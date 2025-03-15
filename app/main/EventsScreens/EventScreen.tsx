@@ -14,7 +14,6 @@ import { useLocalSearchParams } from "expo-router";
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
 import BuyTicket from "@/components/BuyTicketsComponent";
-import SoundCloud from "@/components/SocialMediaComponents/SoundCloudComponent";
 import ReviewComponent from "@/components/ReviewComponent";
 import { ReviewItem } from "@/interfaces/ReviewProps";
 
@@ -24,6 +23,7 @@ import { EventItem } from "@/interfaces/EventProps";
 // Importa tus estilos globales
 import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
+// Reseñas de ejemplo
 const mockReviews: ReviewItem[] = [
   {
     id: 1,
@@ -36,7 +36,7 @@ const mockReviews: ReviewItem[] = [
     id: 2,
     user: "Usuario27",
     comment:
-      "Me gustó mucho la fiesta. La única crítica es que esperé 15 minutos en la fila para ingresar.",
+      "Buena organización, pero faltó variedad de comida.",
     rating: 4,
     daysAgo: 6,
   },
@@ -66,7 +66,7 @@ export default function EventScreen() {
     );
   }
 
-  // openMap con la dirección real
+  // Función para abrir Google Maps con la dirección
   const openMap = () => {
     const address = encodeURIComponent(eventData.address);
     const url = `https://www.google.com/maps/search/?api=1&query=${address}`;
@@ -76,7 +76,9 @@ export default function EventScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Header />
+
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Imagen principal con botón de favorito */}
         <View style={styles.imageContainer}>
           <Image source={{ uri: eventData.imageUrl }} style={styles.img} />
           <IconButton
@@ -89,18 +91,28 @@ export default function EventScreen() {
         </View>
 
         <Title style={styles.title}>{eventData.title}</Title>
+
         <View style={styles.info}>
+          {/* Botón con ícono de calendario + texto */}
           <Button icon="calendar" labelStyle={styles.iconLabel}>
             <Text style={styles.buttonText}>
               {eventData.date} de {eventData.timeRange}
             </Text>
           </Button>
-          <Button icon="map-marker" labelStyle={styles.iconLabel} onPress={openMap}>
-            <Text style={styles.mapText}>{eventData.address}</Text>
-          </Button>
+
+          {/* Dirección (texto normal) */}
+          <Text style={styles.addressText}>{eventData.address}</Text>
+
+          {/* Botón "Como llegar" para abrir Google Maps */}
+          <TouchableOpacity style={styles.mapButton} onPress={openMap}>
+            <Text style={styles.mapButtonText}>Como llegar</Text>
+          </TouchableOpacity>
+
+          {/* Descripción */}
           <Text style={styles.description}>{eventData.description}</Text>
         </View>
 
+        {/* Sección para comprar tickets */}
         <BuyTicket />
 
         <View style={styles.btnBuyView}>
@@ -109,12 +121,10 @@ export default function EventScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Ejemplo de SoundCloud (opcional) */}
-        {/* <SoundCloud trackUrl="https://soundcloud.com/skrillex/sets/skrillex-remixes" /> */}
-
         {/* Reseñas */}
         <ReviewComponent reviews={mockReviews} />
       </ScrollView>
+
       <Footer />
     </SafeAreaView>
   );
@@ -123,7 +133,7 @@ export default function EventScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.backgroundLight, // Fondo claro principal
+    backgroundColor: COLORS.backgroundLight,
   },
   notFoundContainer: {
     flex: 1,
@@ -142,13 +152,13 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 10,
     right: 10,
-    backgroundColor: COLORS.cardBg, // Blanco
+    backgroundColor: COLORS.cardBg,
     borderRadius: 20,
   },
   title: {
     fontWeight: "bold",
     marginLeft: 8,
-    fontSize: FONT_SIZES.subTitle, // 18-20
+    fontSize: FONT_SIZES.subTitle,
     color: COLORS.textPrimary,
   },
   info: {
@@ -162,13 +172,26 @@ const styles = StyleSheet.create({
   buttonText: {
     color: COLORS.textPrimary,
   },
-  mapText: {
-    color: COLORS.info, // Un color "azul" o "naranja", como prefieras
-    textDecorationLine: "underline",
+  addressText: {
+    marginTop: 6,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
+  },
+  mapButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.card,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignSelf: "flex-start",
+    marginTop: 6,
+  },
+  mapButtonText: {
+    color: COLORS.cardBg,
+    fontWeight: "bold",
   },
   description: {
     margin: 10,
-    fontSize: FONT_SIZES.body, // 14-16
+    fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
   },
   btnBuyView: {
@@ -176,7 +199,7 @@ const styles = StyleSheet.create({
     marginRight: 20,
   },
   btnBuy: {
-    backgroundColor: COLORS.textPrimary, // "#000000"
+    backgroundColor: COLORS.textPrimary,
     height: 50,
     width: 150,
     justifyContent: "center",
@@ -184,8 +207,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.card,
   },
   btnBuyTxt: {
-    color: COLORS.cardBg, // Blanco
-    fontSize: FONT_SIZES.button, // 16-18
+    color: COLORS.cardBg,
+    fontSize: FONT_SIZES.button,
     fontWeight: "bold",
   },
 });

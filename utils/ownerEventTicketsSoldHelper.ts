@@ -43,7 +43,7 @@ import {
       totalRevenue: 965000, // Ejemplo (suma de total)
     },
     {
-      eventId: 2,
+      eventId: 3,
       eventName: "Nombre de Evento 2",
       lastUpdate: "15/01/2025 a las 14:20hs",
       rows: [

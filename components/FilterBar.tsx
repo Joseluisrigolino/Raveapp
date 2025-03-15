@@ -1,17 +1,29 @@
-// components/owner/FilterBar.tsx
-import React from "react";
-import { View, Text, TextInput, StyleSheet } from "react-native";
+// components/FilterBar.tsx
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 interface FilterBarProps {
-  filterStatus: string;
+  filterStatus: string; // "todos" | "vigente" | "pendiente" | "finalizado"
   onFilterStatusChange: (value: string) => void;
-  orderBy: string;
+  orderBy: string;      // "asc" | "desc"
   onOrderByChange: (value: string) => void;
   searchText: string;
   onSearchTextChange: (value: string) => void;
 }
 
+/**
+ * Filtro manual (sin Picker):
+ * - Botón "Estado: X" => despliega lista con "todos", "vigente", "pendiente", "finalizado"
+ * - Botón "Orden: Y" => despliega lista con "asc", "desc"
+ * - Input para búsqueda
+ */
 export default function FilterBar({
   filterStatus,
   onFilterStatusChange,
@@ -20,60 +32,94 @@ export default function FilterBar({
   searchText,
   onSearchTextChange,
 }: FilterBarProps) {
+  // Controla si se ve la lista de estados
+  const [showStatusList, setShowStatusList] = useState(false);
+  // Controla si se ve la lista de orden
+  const [showOrderList, setShowOrderList] = useState(false);
+
+  // Opciones de estado
+  const statusOptions = ["todos", "vigente", "pendiente", "finalizado"];
+  // Opciones de orden
+  const orderOptions = ["asc", "desc"];
+
+  // Manejo de pulsar estado
+  const handleStatusSelect = (status: string) => {
+    onFilterStatusChange(status);
+    setShowStatusList(false);
+  };
+
+  // Manejo de pulsar orden
+  const handleOrderSelect = (ord: string) => {
+    onOrderByChange(ord);
+    setShowOrderList(false);
+  };
+
   return (
-    <View style={styles.filterBarContainer}>
+    <View style={styles.container}>
       {/* FILTRO DE ESTADO */}
-      <View style={styles.filterBlock}>
-        <Text style={styles.label}>Mostrar:</Text>
-        <TextInput
-          style={styles.input}
-          value={filterStatus}
-          onChangeText={onFilterStatusChange}
-          placeholder="todos / vigente / pendiente / finalizado"
-          placeholderTextColor={COLORS.textSecondary}
-        />
-      </View>
+      <Text style={styles.label}>Estado:</Text>
+      <TouchableOpacity
+        style={styles.dropdownButton}
+        onPress={() => setShowStatusList(!showStatusList)}
+      >
+        <Text>{filterStatus || "Seleccionar estado"}</Text>
+      </TouchableOpacity>
 
-      {/* ORDEN */}
-      <View style={styles.filterBlock}>
-        <Text style={styles.label}>Ordenar:</Text>
-        <TextInput
-          style={styles.input}
-          value={orderBy}
-          onChangeText={onOrderByChange}
-          placeholder="asc / desc"
-          placeholderTextColor={COLORS.textSecondary}
-        />
-      </View>
+      {showStatusList && (
+        <View style={styles.dropdownContainer}>
+          {statusOptions.map((opt) => (
+            <TouchableOpacity
+              key={opt}
+              style={styles.dropdownItem}
+              onPress={() => handleStatusSelect(opt)}
+            >
+              <Text>{opt}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
-      {/* BÚSQUEDA */}
-      <View style={[styles.filterBlock, { flex: 1 }]}>
-        <Text style={styles.label}>Buscar:</Text>
-        <TextInput
-          style={[styles.input, { flex: 1 }]}
-          value={searchText}
-          onChangeText={onSearchTextChange}
-          placeholder="Buscar evento"
-          placeholderTextColor={COLORS.textSecondary}
-        />
-      </View>
+      {/* FILTRO DE ORDEN */}
+      <Text style={[styles.label, { marginTop: 12 }]}>Orden:</Text>
+      <TouchableOpacity
+        style={styles.dropdownButton}
+        onPress={() => setShowOrderList(!showOrderList)}
+      >
+        <Text>{orderBy === "asc" ? "asc" : "desc"}</Text>
+      </TouchableOpacity>
+
+      {showOrderList && (
+        <View style={styles.dropdownContainer}>
+          {orderOptions.map((opt) => (
+            <TouchableOpacity
+              key={opt}
+              style={styles.dropdownItem}
+              onPress={() => handleOrderSelect(opt)}
+            >
+              <Text>{opt}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {/* BÚSQUEDA POR TEXTO */}
+      <Text style={[styles.label, { marginTop: 12 }]}>Buscar evento:</Text>
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Escribe nombre de evento..."
+        placeholderTextColor={COLORS.textSecondary}
+        value={searchText}
+        onChangeText={onSearchTextChange}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  filterBarContainer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    padding: 8,
+  container: {
     backgroundColor: COLORS.backgroundLight,
     borderRadius: RADIUS.card,
-    marginHorizontal: 8,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  filterBlock: {
-    marginRight: 12,
+    padding: 8,
   },
   label: {
     fontSize: FONT_SIZES.body,
@@ -81,13 +127,33 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 4,
   },
-  input: {
+  dropdownButton: {
     borderWidth: 1,
     borderColor: COLORS.borderInput,
     borderRadius: RADIUS.card,
-    paddingHorizontal: 8,
     paddingVertical: 6,
-    minWidth: 120,
+    paddingHorizontal: 8,
+    backgroundColor: COLORS.cardBg,
+    marginBottom: 4,
+  },
+  dropdownContainer: {
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.cardBg,
+    marginBottom: 4,
+  },
+  dropdownItem: {
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
     color: COLORS.textPrimary,
     backgroundColor: COLORS.cardBg,
   },

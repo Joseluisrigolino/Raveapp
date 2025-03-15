@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -16,29 +16,48 @@ import TitlePers from "@/components/TitleComponent";
 import DateTimeInputComponent from "@/components/DateTimeInputComponent";
 
 import { Artist } from "@/interfaces/Artist";
+import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-// Importa tus estilos globales (ajusta la ruta según tu proyecto)
-import globalStyles, {
-  COLORS,
-  FONT_SIZES,
-  RADIUS,
-} from "@/styles/globalStyles";
+/** Representa los campos de entradas para un día */
+type DayTickets = {
+  genEarlyQty: string;
+  genEarlyPrice: string;
+  vipEarlyQty: string;
+  vipEarlyPrice: string;
+  genQty: string;
+  genPrice: string;
+  vipQty: string;
+  vipPrice: string;
+};
 
-/** Función para calcular la suma total de entradas de las 4 categorías. */
-function calcTotalTickets(
-  genEarlyQty: string,
-  vipEarlyQty: string,
-  genQty: string,
-  vipQty: string
-): number {
-  const ge = parseInt(genEarlyQty, 10) || 0;
-  const ve = parseInt(vipEarlyQty, 10) || 0;
-  const g = parseInt(genQty, 10) || 0;
-  const v = parseInt(vipQty, 10) || 0;
-  return ge + ve + g + v;
+/** Crea un "DayTickets" vacío (valores por defecto) */
+function createEmptyDayTickets(): DayTickets {
+  return {
+    genEarlyQty: "",
+    genEarlyPrice: "",
+    vipEarlyQty: "",
+    vipEarlyPrice: "",
+    genQty: "",
+    genPrice: "",
+    vipQty: "",
+    vipPrice: "",
+  };
 }
 
-// Datos simulados
+/** Calcula la suma total de entradas de un array de DayTickets */
+function calcTotalTickets(daysTickets: DayTickets[]): number {
+  let total = 0;
+  for (const day of daysTickets) {
+    const ge = parseInt(day.genEarlyQty, 10) || 0;
+    const ve = parseInt(day.vipEarlyQty, 10) || 0;
+    const g = parseInt(day.genQty, 10) || 0;
+    const v = parseInt(day.vipQty, 10) || 0;
+    total += ge + ve + g + v;
+  }
+  return total;
+}
+
+// Simulados
 const mockGenres = [
   "Techno",
   "Hard Techno",
@@ -65,20 +84,21 @@ const mockProvinces = ["Buenos Aires", "Córdoba", "Mendoza"];
 const mockMunicipalities = ["Municipio 1", "Municipio 2"];
 const mockLocalities = ["Localidad 1", "Localidad 2"];
 
+/** Tipos de evento: 1d, 2d, 3d */
+type EventType = "1d" | "2d" | "3d";
+
 export default function CreateEventScreen() {
-  // Control login (demo)
+  // Demo: control login
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Handlers parte “No logueado”
-  const handleLogin = () => console.log("Iniciar sesión presionado");
-  const handleRegister = () => console.log("Registrarme presionado");
-  const handleGoogleLogin = () => console.log("Login with Google presionado");
-  const simulateLogin = () => setIsLoggedIn(true);
-  const handleLogout = () => setIsLoggedIn(false);
+  // Manejo del tipo de evento
+  const [eventType, setEventType] = useState<EventType>("1d");
+  function handleEventTypeChange(value: "1d" | "2d" | "3d") {
+    setEventType(value);
+  }
 
-  // Campos formulario
+  // Campos básicos
   const [eventName, setEventName] = useState("");
-  const [eventType, setEventType] = useState<"1d" | "2d" | "3d">("1d");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [artistInput, setArtistInput] = useState("");
   const [selectedArtists, setSelectedArtists] = useState<Artist[]>([]);
@@ -95,30 +115,52 @@ export default function CreateEventScreen() {
   const [isLGBT, setIsLGBT] = useState(false);
   const [eventDescription, setEventDescription] = useState("");
 
-  // Fechas y entradas
+  // Fechas globales
   const [startDateTime, setStartDateTime] = useState<Date>(new Date());
   const [endDateTime, setEndDateTime] = useState<Date>(new Date());
 
-  // Cuatro categorías
-  const [genEarlyQty, setGenEarlyQty] = useState("");
-  const [genEarlyPrice, setGenEarlyPrice] = useState("");
-  const [vipEarlyQty, setVipEarlyQty] = useState("");
-  const [vipEarlyPrice, setVipEarlyPrice] = useState("");
-  const [genQty, setGenQty] = useState("");
-  const [genPrice, setGenPrice] = useState("");
-  const [vipQty, setVipQty] = useState("");
-  const [vipPrice, setVipPrice] = useState("");
+  // Para entradas: array de DayTickets, 1 por día
+  const [daysTickets, setDaysTickets] = useState<DayTickets[]>([
+    createEmptyDayTickets(),
+  ]);
 
+  // Configuración de venta
   const [startSaleDateTime, setStartSaleDateTime] = useState<Date>(new Date());
   const [earlyBirdsStock, setEarlyBirdsStock] = useState(false);
   const [useEarlyBirdsDate, setUseEarlyBirdsDate] = useState(false);
   const [earlyBirdsUntilDateTime, setEarlyBirdsUntilDateTime] =
     useState<Date>(new Date());
 
-  // Radio: Tipo de evento
-  const handleEventTypeChange = (value: "1d" | "2d" | "3d") => {
-    setEventType(value);
-  };
+  // Multimedia
+  const [photoFile, setPhotoFile] = useState<string | null>(null); // "ruta.jpg" o null
+  const [videoLink, setVideoLink] = useState("");
+  const [musicLink, setMusicLink] = useState("");
+
+  // Términos y condiciones
+  const [acceptedTC, setAcceptedTC] = useState(false);
+
+  // Demo: login
+  const handleLogin = () => console.log("Iniciar sesión presionado");
+  const handleRegister = () => console.log("Registrarme presionado");
+  const handleGoogleLogin = () => console.log("Login with Google presionado");
+  const simulateLogin = () => setIsLoggedIn(true);
+  const handleLogout = () => setIsLoggedIn(false);
+
+  // Ajustar daysTickets según eventType
+  useEffect(() => {
+    if (eventType === "1d") {
+      setDaysTickets([createEmptyDayTickets()]);
+    } else if (eventType === "2d") {
+      setDaysTickets([createEmptyDayTickets(), createEmptyDayTickets()]);
+    } else {
+      // 3d
+      setDaysTickets([
+        createEmptyDayTickets(),
+        createEmptyDayTickets(),
+        createEmptyDayTickets(),
+      ]);
+    }
+  }, [eventType]);
 
   // Checkboxes: géneros
   const toggleGenre = (genre: string) => {
@@ -129,7 +171,7 @@ export default function CreateEventScreen() {
     }
   };
 
-  // Agregar artista
+  // Artistas
   const handleAddArtist = () => {
     const trimmedName = artistInput.trim();
     if (!trimmedName) return;
@@ -139,22 +181,55 @@ export default function CreateEventScreen() {
     if (existingArtist) {
       setSelectedArtists((prev) => [...prev, existingArtist]);
     } else {
+      // Creamos un "artista" local
       const newArtist: Artist = { name: trimmedName, image: "" };
       setSelectedArtists((prev) => [...prev, newArtist]);
     }
     setArtistInput("");
   };
-
   const handleRemoveArtist = (artistName: string) => {
     setSelectedArtists(selectedArtists.filter((a) => a.name !== artistName));
   };
 
-  // Calcular total de entradas
-  const totalTickets = calcTotalTickets(genEarlyQty, vipEarlyQty, genQty, vipQty);
+  // Manejo de inputs de tickets
+  const handleTicketChange = (
+    dayIndex: number,
+    field: keyof DayTickets,
+    value: string
+  ) => {
+    setDaysTickets((prev) => {
+      const newArr = [...prev];
+      newArr[dayIndex] = {
+        ...newArr[dayIndex],
+        [field]: value,
+      };
+      return newArr;
+    });
+  };
 
-  // Al enviar
+  // Calcular total
+  const totalTickets = calcTotalTickets(daysTickets);
+
+  // Seleccionar foto (demo)
+  const handleSelectPhoto = () => {
+    console.log("Seleccionar archivo presionado");
+    setPhotoFile("ruta-de-la-imagen.jpg");
+  };
+
+  // Enviar
   const handleSubmit = () => {
-    console.log("Enviando evento:", {
+    // Validar foto obligatoria y T&C
+    if (!photoFile) {
+      alert("Debes seleccionar una foto obligatoria.");
+      return;
+    }
+    if (!acceptedTC) {
+      alert("Debes aceptar los términos y condiciones.");
+      return;
+    }
+
+    // Armar objeto final
+    const finalData = {
       eventName,
       eventType,
       selectedGenres,
@@ -166,32 +241,33 @@ export default function CreateEventScreen() {
       isAfter,
       isLGBT,
       eventDescription,
+      multimedia: {
+        photoFile,
+        videoLink,
+        musicLink,
+      },
       startDateTime,
       endDateTime,
-      genEarlyQty,
-      genEarlyPrice,
-      vipEarlyQty,
-      vipEarlyPrice,
-      genQty,
-      genPrice,
-      vipQty,
-      vipPrice,
+      daysTickets,
       startSaleDateTime,
       earlyBirdsStock,
       useEarlyBirdsDate,
       earlyBirdsUntilDateTime,
       totalTickets,
-    });
+      acceptedTC,
+    };
+    console.log("Enviando evento:", finalData);
     alert("Evento creado (ejemplo)");
   };
 
+  // Render
   return (
     <SafeAreaView style={styles.container}>
       <Header />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {!isLoggedIn ? (
-          // ---------------- NO LOGUEADO ----------------
+          // NO LOGUEADO
           <View style={styles.notLoggedContainer}>
             <TitlePers text="Crear Evento" />
             <View style={styles.divider} />
@@ -222,7 +298,7 @@ export default function CreateEventScreen() {
                 <MaterialCommunityIcons
                   name="google"
                   size={20}
-                  color={COLORS.info} // Reemplaza "#4285F4"
+                  color={COLORS.info}
                   style={{ marginRight: 8 }}
                 />
                 <Text style={styles.googleButtonText}>Login with Google</Text>
@@ -234,7 +310,7 @@ export default function CreateEventScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          // ---------------- SÍ LOGUEADO ----------------
+          // SÍ LOGUEADO
           <View style={{ width: "100%" }}>
             <TitlePers text="Crear Evento" />
             <View style={styles.divider} />
@@ -243,6 +319,7 @@ export default function CreateEventScreen() {
               <Text style={styles.demoButtonText}>Cerrar sesión (demo)</Text>
             </TouchableOpacity>
 
+            {/* Nombre */}
             <Text style={styles.label}>Nombre del evento:</Text>
             <TextInput
               style={styles.input}
@@ -251,6 +328,7 @@ export default function CreateEventScreen() {
               onChangeText={setEventName}
             />
 
+            {/* Tipo de evento */}
             <Text style={styles.label}>Tipo de evento:</Text>
             <View style={styles.radioGroup}>
               <View style={styles.radioOption}>
@@ -284,6 +362,7 @@ export default function CreateEventScreen() {
               </View>
             </View>
 
+            {/* Géneros */}
             <Text style={styles.label}>Género/s musical/es:</Text>
             <View style={styles.checkboxContainer}>
               {mockGenres.map((genre) => (
@@ -301,6 +380,7 @@ export default function CreateEventScreen() {
               ))}
             </View>
 
+            {/* Artistas */}
             <Text style={styles.label}>Artista/s:</Text>
             <View style={styles.artistInputRow}>
               <TextInput
@@ -330,7 +410,7 @@ export default function CreateEventScreen() {
               ))}
             </View>
 
-            {/* Ubicación (pickers manuales) */}
+            {/* Ubicación */}
             <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
               Ubicación del evento:
             </Text>
@@ -414,6 +494,7 @@ export default function CreateEventScreen() {
               onChangeText={setAddress}
             />
 
+            {/* Checkboxes after / LGBT */}
             <View style={[styles.checkboxItem, { width: 300, marginTop: 12 }]}>
               <TouchableOpacity
                 style={styles.checkbox}
@@ -445,7 +526,7 @@ export default function CreateEventScreen() {
               onChangeText={setEventDescription}
             />
 
-            {/* FECHAS */}
+            {/* FECHAS GLOBALES */}
             <DateTimeInputComponent
               label="Fecha y hora de inicio del evento:"
               value={startDateTime}
@@ -457,110 +538,139 @@ export default function CreateEventScreen() {
               onChange={setEndDateTime}
             />
 
-            {/* ENTRADAS */}
+            {/* ENTRADAS POR DÍA */}
             <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
-              Entradas:
+              Entradas (por día):
             </Text>
             <Text style={{ marginBottom: 8 }}>
               Cantidad total de entradas: {totalTickets}
             </Text>
 
-            {/* Generales Early Birds */}
-            <View style={styles.ticketRow}>
-              <Text style={styles.ticketLabel}>
-                Entradas generales - Early Birds:
-              </Text>
-              <View style={styles.ticketInputs}>
-                <Text>Cantidad:</Text>
-                <TextInput
-                  style={styles.smallInput}
-                  keyboardType="numeric"
-                  value={genEarlyQty}
-                  onChangeText={setGenEarlyQty}
-                  placeholder="0"
-                />
-                <Text>Precio:</Text>
-                <TextInput
-                  style={styles.smallInput}
-                  keyboardType="numeric"
-                  value={genEarlyPrice}
-                  onChangeText={setGenEarlyPrice}
-                  placeholder="$"
-                />
-              </View>
-            </View>
+            {daysTickets.map((day, dayIndex) => (
+              <View key={dayIndex} style={styles.dayBlock}>
+                <Text style={styles.dayBlockTitle}>
+                  {eventType === "1d"
+                    ? "Día único"
+                    : `Día ${dayIndex + 1} de ${
+                        eventType === "2d" ? "2" : "3"
+                      }:`}
+                </Text>
 
-            {/* VIP Early Birds */}
-            <View style={styles.ticketRow}>
-              <Text style={styles.ticketLabel}>
-                Entradas VIP - Early Birds:
-              </Text>
-              <View style={styles.ticketInputs}>
-                <Text>Cantidad:</Text>
-                <TextInput
-                  style={styles.smallInput}
-                  keyboardType="numeric"
-                  value={vipEarlyQty}
-                  onChangeText={setVipEarlyQty}
-                  placeholder="0"
-                />
-                <Text>Precio:</Text>
-                <TextInput
-                  style={styles.smallInput}
-                  keyboardType="numeric"
-                  value={vipEarlyPrice}
-                  onChangeText={setVipEarlyPrice}
-                  placeholder="$"
-                />
-              </View>
-            </View>
+                {/* Generales Early Birds */}
+                <View style={styles.ticketRow}>
+                  <Text style={styles.ticketLabel}>
+                    Entradas generales - Early Birds:
+                  </Text>
+                  <View style={styles.ticketInputs}>
+                    <Text>Cantidad:</Text>
+                    <TextInput
+                      style={styles.smallInput}
+                      keyboardType="numeric"
+                      value={day.genEarlyQty}
+                      onChangeText={(val) =>
+                        handleTicketChange(dayIndex, "genEarlyQty", val)
+                      }
+                      placeholder="0"
+                    />
+                    <Text>Precio:</Text>
+                    <TextInput
+                      style={styles.smallInput}
+                      keyboardType="numeric"
+                      value={day.genEarlyPrice}
+                      onChangeText={(val) =>
+                        handleTicketChange(dayIndex, "genEarlyPrice", val)
+                      }
+                      placeholder="$"
+                    />
+                  </View>
+                </View>
 
-            {/* Generales (no early) */}
-            <View style={styles.ticketRow}>
-              <Text style={styles.ticketLabel}>Entradas generales:</Text>
-              <View style={styles.ticketInputs}>
-                <Text>Cantidad:</Text>
-                <TextInput
-                  style={styles.smallInput}
-                  keyboardType="numeric"
-                  value={genQty}
-                  onChangeText={setGenQty}
-                  placeholder="0"
-                />
-                <Text>Precio:</Text>
-                <TextInput
-                  style={styles.smallInput}
-                  keyboardType="numeric"
-                  value={genPrice}
-                  onChangeText={setGenPrice}
-                  placeholder="$"
-                />
-              </View>
-            </View>
+                {/* VIP Early Birds */}
+                <View style={styles.ticketRow}>
+                  <Text style={styles.ticketLabel}>
+                    Entradas VIP - Early Birds:
+                  </Text>
+                  <View style={styles.ticketInputs}>
+                    <Text>Cantidad:</Text>
+                    <TextInput
+                      style={styles.smallInput}
+                      keyboardType="numeric"
+                      value={day.vipEarlyQty}
+                      onChangeText={(val) =>
+                        handleTicketChange(dayIndex, "vipEarlyQty", val)
+                      }
+                      placeholder="0"
+                    />
+                    <Text>Precio:</Text>
+                    <TextInput
+                      style={styles.smallInput}
+                      keyboardType="numeric"
+                      value={day.vipEarlyPrice}
+                      onChangeText={(val) =>
+                        handleTicketChange(dayIndex, "vipEarlyPrice", val)
+                      }
+                      placeholder="$"
+                    />
+                  </View>
+                </View>
 
-            {/* VIP (no early) */}
-            <View style={styles.ticketRow}>
-              <Text style={styles.ticketLabel}>Entradas VIP:</Text>
-              <View style={styles.ticketInputs}>
-                <Text>Cantidad:</Text>
-                <TextInput
-                  style={styles.smallInput}
-                  keyboardType="numeric"
-                  value={vipQty}
-                  onChangeText={setVipQty}
-                  placeholder="0"
-                />
-                <Text>Precio:</Text>
-                <TextInput
-                  style={styles.smallInput}
-                  keyboardType="numeric"
-                  value={vipPrice}
-                  onChangeText={setVipPrice}
-                  placeholder="$"
-                />
-              </View>
-            </View>
+                {/* Generales (no early) */}
+                <View style={styles.ticketRow}>
+                  <Text style={styles.ticketLabel}>Entradas generales:</Text>
+                  <View style={styles.ticketInputs}>
+                    <Text>Cantidad:</Text>
+                    <TextInput
+                      style={styles.smallInput}
+                      keyboardType="numeric"
+                      value={day.genQty}
+                      onChangeText={(val) =>
+                        handleTicketChange(dayIndex, "genQty", val)
+                      }
+                      placeholder="0"
+                    />
+                    <Text>Precio:</Text>
+                    <TextInput
+                      style={styles.smallInput}
+                      keyboardType="numeric"
+                      value={day.genPrice}
+                      onChangeText={(val) =>
+                        handleTicketChange(dayIndex, "genPrice", val)
+                      }
+                      placeholder="$"
+                    />
+                  </View>
+                </View>
 
+                {/* VIP (no early) */}
+                <View style={styles.ticketRow}>
+                  <Text style={styles.ticketLabel}>Entradas VIP:</Text>
+                  <View style={styles.ticketInputs}>
+                    <Text>Cantidad:</Text>
+                    <TextInput
+                      style={styles.smallInput}
+                      keyboardType="numeric"
+                      value={day.vipQty}
+                      onChangeText={(val) =>
+                        handleTicketChange(dayIndex, "vipQty", val)
+                      }
+                      placeholder="0"
+                    />
+                    <Text>Precio:</Text>
+                    <TextInput
+                      style={styles.smallInput}
+                      keyboardType="numeric"
+                      value={day.vipPrice}
+                      onChangeText={(val) =>
+                        handleTicketChange(dayIndex, "vipPrice", val)
+                      }
+                      placeholder="$"
+                    />
+                  </View>
+                </View>
+              </View>
+            ))}
+
+            {/* Configuración entradas */}
             <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
               Configuración de entradas:
             </Text>
@@ -571,7 +681,6 @@ export default function CreateEventScreen() {
             />
 
             <Text style={styles.label}>Vender Early Birds hasta:</Text>
-            {/* Opción 1: Agotar stock */}
             <View style={[styles.checkboxItem, { width: 300 }]}>
               <TouchableOpacity
                 style={styles.checkbox}
@@ -582,7 +691,6 @@ export default function CreateEventScreen() {
               <Text style={{ marginLeft: 4 }}>Agotar stock</Text>
             </View>
 
-            {/* Opción 2: Fecha/hora */}
             <View style={[styles.checkboxItem, { width: 300 }]}>
               <TouchableOpacity
                 style={styles.checkbox}
@@ -600,7 +708,57 @@ export default function CreateEventScreen() {
               />
             )}
 
-            {/* BOTÓN FINAL (centrado) */}
+            {/* MULTIMEDIA - MOVERLO AQUÍ, ANTES DE T&C Y BOTÓN FINAL */}
+            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
+              Multimedia:
+            </Text>
+            <Text style={styles.label}>
+              Foto: <Text style={{ color: COLORS.negative }}>(Obligatoria)</Text>
+            </Text>
+            <TouchableOpacity
+              style={styles.selectFileButton}
+              onPress={handleSelectPhoto}
+            >
+              <Text style={styles.selectFileButtonText}>
+                {photoFile ? "Cambiar foto" : "Seleccionar archivo"}
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={[styles.label, { marginTop: 12 }]}>
+              Agregar video: (Opcional)
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Pega el link de Youtube aquí"
+              value={videoLink}
+              onChangeText={setVideoLink}
+            />
+
+            <Text style={[styles.label, { marginTop: 12 }]}>
+              Agregar música: (Opcional)
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Pega el link de Spotify o SoundCloud aquí"
+              value={musicLink}
+              onChangeText={setMusicLink}
+            />
+
+            {/* Términos y condiciones */}
+            <View style={styles.termsRow}>
+              <TouchableOpacity
+                style={styles.checkbox}
+                onPress={() => setAcceptedTC(!acceptedTC)}
+              >
+                {acceptedTC && <View style={styles.checkboxSelected} />}
+              </TouchableOpacity>
+              <Text style={{ marginLeft: 4 }}>
+                Acepto{" "}
+                <Text style={{ color: COLORS.info }}>términos y condiciones</Text>
+              </Text>
+            </View>
+
+            {/* Botón final */}
             <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
               <Text style={styles.submitButtonText}>Crear Evento</Text>
             </TouchableOpacity>
@@ -616,7 +774,7 @@ export default function CreateEventScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.backgroundLight, // Gris claro principal
+    backgroundColor: COLORS.backgroundLight,
   },
   scrollContent: {
     padding: 16,
@@ -628,13 +786,13 @@ const styles = StyleSheet.create({
   },
   divider: {
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.textPrimary, // en lugar de "#000"
+    borderBottomColor: COLORS.textPrimary,
     width: "100%",
     marginVertical: 8,
   },
   subtitle: {
-    fontSize: FONT_SIZES.body, // 14-16
-    color: COLORS.textSecondary, // "#666"
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textSecondary,
     textAlign: "center",
     marginVertical: 12,
   },
@@ -646,38 +804,38 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   loginButton: {
-    backgroundColor: COLORS.primary, // "#4db6ac"
+    backgroundColor: COLORS.primary,
   },
   registerButton: {
-    backgroundColor: COLORS.negative, // "#ec407a" => un color "rojo" en la paleta
+    backgroundColor: COLORS.negative,
   },
   googleButton: {
-    backgroundColor: COLORS.cardBg, // "#fff"
+    backgroundColor: COLORS.cardBg,
     borderWidth: 1,
-    borderColor: COLORS.borderInput, // "#ccc"
+    borderColor: COLORS.borderInput,
   },
   googleButtonContent: {
     flexDirection: "row",
     alignItems: "center",
   },
   googleButtonText: {
-    color: COLORS.textPrimary, // "#000"
+    color: COLORS.textPrimary,
     fontWeight: "bold",
   },
   buttonText: {
-    color: COLORS.cardBg, // "#fff"
+    color: COLORS.cardBg,
     fontWeight: "bold",
   },
   demoButton: {
     marginTop: 16,
-    backgroundColor: COLORS.borderInput, // "#ddd"
+    backgroundColor: COLORS.borderInput,
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: RADIUS.card,
     alignSelf: "center",
   },
   demoButtonText: {
-    color: COLORS.textSecondary, // "#333"
+    color: COLORS.textSecondary,
   },
   label: {
     marginTop: 12,
@@ -687,9 +845,9 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.body,
   },
   input: {
-    backgroundColor: COLORS.cardBg, // "#FFF"
+    backgroundColor: COLORS.cardBg,
     borderWidth: 1,
-    borderColor: COLORS.borderInput, // "#ccc"
+    borderColor: COLORS.borderInput,
     borderRadius: RADIUS.card,
     paddingHorizontal: 8,
     paddingVertical: 6,
@@ -711,7 +869,7 @@ const styles = StyleSheet.create({
     width: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: COLORS.textPrimary, // "#000"
+    borderColor: COLORS.textPrimary,
     marginRight: 8,
     justifyContent: "center",
     alignItems: "center",
@@ -720,7 +878,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: COLORS.textPrimary, // "#000"
+    backgroundColor: COLORS.textPrimary,
   },
   checkboxContainer: {
     flexDirection: "row",
@@ -738,7 +896,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderWidth: 2,
-    borderColor: COLORS.textPrimary, // "#000"
+    borderColor: COLORS.textPrimary,
     marginRight: 6,
     justifyContent: "center",
     alignItems: "center",
@@ -746,7 +904,7 @@ const styles = StyleSheet.create({
   checkboxSelected: {
     width: 12,
     height: 12,
-    backgroundColor: COLORS.textPrimary, // "#000"
+    backgroundColor: COLORS.textPrimary,
   },
   artistInputRow: {
     flexDirection: "row",
@@ -754,7 +912,7 @@ const styles = StyleSheet.create({
     width: 300,
   },
   addArtistButton: {
-    backgroundColor: COLORS.textPrimary, // "#000"
+    backgroundColor: COLORS.textPrimary,
     borderRadius: 4,
     marginLeft: 8,
     paddingHorizontal: 12,
@@ -763,7 +921,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   addArtistButtonText: {
-    color: COLORS.cardBg, // "#fff"
+    color: COLORS.cardBg,
     fontSize: 18,
     fontWeight: "bold",
   },
@@ -776,7 +934,7 @@ const styles = StyleSheet.create({
   artistTag: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.borderInput, // "#eee"
+    backgroundColor: COLORS.borderInput,
     padding: 6,
     borderRadius: 4,
     marginRight: 8,
@@ -786,12 +944,12 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   removeArtist: {
-    color: COLORS.negative, // "red"
+    color: COLORS.negative,
     fontWeight: "bold",
   },
   sectionTitle: {
     fontWeight: "bold",
-    fontSize: FONT_SIZES.subTitle, // 16-18
+    fontSize: FONT_SIZES.subTitle,
     width: 300,
     marginTop: 12,
     color: COLORS.textPrimary,
@@ -799,18 +957,18 @@ const styles = StyleSheet.create({
   dropdownButton: {
     marginTop: 4,
     borderWidth: 1,
-    borderColor: COLORS.textPrimary, // "#000"
+    borderColor: COLORS.textPrimary,
     borderRadius: 4,
-    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
+    backgroundColor: COLORS.backgroundLight,
     paddingHorizontal: 8,
     paddingVertical: 8,
     width: 300,
   },
   dropdownContainer: {
     borderWidth: 1,
-    borderColor: COLORS.textPrimary, // "#000"
+    borderColor: COLORS.textPrimary,
     borderRadius: 4,
-    backgroundColor: COLORS.cardBg,   // "#FFF"
+    backgroundColor: COLORS.cardBg,
     width: 300,
     marginBottom: 4,
   },
@@ -819,8 +977,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
+  // Bloque de entradas por día
+  dayBlock: {
+    backgroundColor: COLORS.borderInput, // un gris clarito
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 12,
+  },
+  dayBlockTitle: {
+    fontWeight: "bold",
+    marginBottom: 6,
+    color: COLORS.textPrimary,
+  },
   ticketRow: {
-    width: 300,
+    width: "100%",
     marginTop: 8,
   },
   ticketLabel: {
@@ -834,9 +1004,9 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   smallInput: {
-    backgroundColor: COLORS.cardBg, // "#FFF"
+    backgroundColor: COLORS.cardBg,
     borderWidth: 1,
-    borderColor: COLORS.borderInput, // "#ccc"
+    borderColor: COLORS.borderInput,
     borderRadius: 4,
     marginHorizontal: 4,
     paddingHorizontal: 8,
@@ -844,8 +1014,26 @@ const styles = StyleSheet.create({
     width: 60,
     textAlign: "center",
   },
+  selectFileButton: {
+    backgroundColor: COLORS.textPrimary,
+    borderRadius: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignSelf: "flex-start",
+    marginTop: 4,
+  },
+  selectFileButtonText: {
+    color: COLORS.cardBg,
+    fontWeight: "bold",
+  },
+  termsRow: {
+    flexDirection: "row",
+    width: 300,
+    marginTop: 16,
+    alignItems: "center",
+  },
   submitButton: {
-    backgroundColor: COLORS.primary, // "#4db6ac"
+    backgroundColor: COLORS.primary,
     marginTop: 20,
     paddingVertical: 12,
     borderRadius: RADIUS.card,
@@ -854,7 +1042,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   submitButtonText: {
-    color: COLORS.cardBg, // "#fff"
+    color: COLORS.cardBg,
     fontWeight: "bold",
   },
 });

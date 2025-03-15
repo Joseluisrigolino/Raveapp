@@ -41,6 +41,12 @@ const mockOwnerEvents: OwnerEventItem[] = [
   },
 ];
 
+// NUEVA FUNCIÓN: retorna datos "completos" del evento para edición
+export function getOwnerEventById(id: number): OwnerEventItem | null {
+  const found = mockOwnerEvents.find((ev) => ev.id === id);
+  return found ?? null;
+}
+
 export function getOwnerEvents(): OwnerEventItem[] {
   return mockOwnerEvents;
 }

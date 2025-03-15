@@ -1,5 +1,6 @@
+// screens/ManageEventsScreen.tsx
 import React, { useState, useMemo } from "react";
-import { SafeAreaView, FlatList, StyleSheet } from "react-native";
+import { SafeAreaView, FlatList, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import Header from "@/components/LayoutComponents/HeaderComponent";
@@ -8,26 +9,21 @@ import FilterBar from "@/components/FilterBar";
 import OwnerEventCard from "@/components/OwnerEventCard";
 import { getOwnerEvents } from "@/utils/ownerEventsHelper";
 import { OwnerEventItem } from "@/interfaces/OwnerEventItem";
-
-// Importa tus estilos globales
 import { COLORS } from "@/styles/globalStyles";
 
 export default function ManageEventsScreen() {
   const router = useRouter();
 
-  // Filtros y búsqueda
-  const [filterStatus, setFilterStatus] = useState("todos"); // "todos" | "vigente" | "pendiente" | "finalizado"
-  const [orderBy, setOrderBy] = useState("asc"); // "asc" | "desc"
+  const [filterStatus, setFilterStatus] = useState("todos");
+  const [orderBy, setOrderBy] = useState("asc");
   const [searchText, setSearchText] = useState("");
 
-  // Obtenemos todos los eventos (mock)
   const allEvents = getOwnerEvents();
 
-  // Filtrar y ordenar usando useMemo
   const filteredEvents = useMemo(() => {
     let events = [...allEvents];
 
-    // 1. Filtro por estado
+    // 1. Filtrar por estado
     if (filterStatus !== "todos") {
       events = events.filter((ev) => ev.status === filterStatus);
     }
@@ -40,56 +36,65 @@ export default function ManageEventsScreen() {
       );
     }
 
-    // 3. Ordenar asc/desc por fecha (dd/mm/yyyy)
+    // 3. Ordenar: finalizados al final, y luego por fecha asc/desc
     events.sort((a, b) => {
-      const [dayA, monthA, yearA] = a.date.split("/").map(Number);
-      const [dayB, monthB, yearB] = b.date.split("/").map(Number);
+      // Primero, empujamos "finalizado" al final
+      if (a.status === "finalizado" && b.status !== "finalizado") {
+        return 1; // a va después
+      }
+      if (b.status === "finalizado" && a.status !== "finalizado") {
+        return -1; // b va después
 
-      const dateA = new Date(yearA, monthA - 1, dayA).getTime();
-      const dateB = new Date(yearB, monthB - 1, dayB).getTime();
+      } else {
+        // Si ambos son finalizados o ambos no lo son, ordenamos por fecha
+        const [dayA, monthA, yearA] = a.date.split("/").map(Number);
+        const [dayB, monthB, yearB] = b.date.split("/").map(Number);
 
-      return orderBy === "asc" ? dateA - dateB : dateB - dateA;
+        const dateA = new Date(yearA, monthA - 1, dayA).getTime();
+        const dateB = new Date(yearB, monthB - 1, dayB).getTime();
+
+        return orderBy === "asc" ? dateA - dateB : dateB - dateA;
+      }
     });
 
     return events;
   }, [allEvents, filterStatus, orderBy, searchText]);
 
-  // Handlers para los botones en la card
+  // Handlers
   const handleTicketsSold = (eventId: number) => {
-    console.log("Ver entradas vendidas ID:", eventId);
-    // Navegar a la pantalla de entradas vendidas
-    router.push(`/owner/TicketSoldScreen?id=${eventId}`);
+    router.push(`/owner/TicketsSoldScreen?id=${eventId}`);
   };
-
   const handleModify = (eventId: number) => {
-    console.log("Modificar evento ID:", eventId);
-    // Podrías navegar a /owner/EditEventScreen?id=eventId
+    router.push(`/owner/ModifyEventScreen?id=${eventId}`);
+  };
+  const handleCancel = (eventId: number) => {
+    router.push(`/owner/CancelEventScreen?id=${eventId}`);
   };
 
-  const handleCancel = (eventId: number) => {
-    console.log("Cancelar evento ID:", eventId);
-    // Navegar a la pantalla de cancelación
-    router.push(`/owner/CancelEventScreen?id=${eventId}`);
+  // RENDER HEADER
+  const renderHeader = () => {
+    return (
+      <View style={{ paddingHorizontal: 8 }}>
+        <FilterBar
+          filterStatus={filterStatus}
+          onFilterStatusChange={setFilterStatus}
+          orderBy={orderBy}
+          onOrderByChange={setOrderBy}
+          searchText={searchText}
+          onSearchTextChange={setSearchText}
+        />
+      </View>
+    );
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
 
-      {/* Barra de filtros (estado, orden, búsqueda) */}
-      <FilterBar
-        filterStatus={filterStatus}
-        onFilterStatusChange={setFilterStatus}
-        orderBy={orderBy}
-        onOrderByChange={setOrderBy}
-        searchText={searchText}
-        onSearchTextChange={setSearchText}
-      />
-
-      {/* Lista de eventos en tarjetas */}
       <FlatList
         data={filteredEvents}
         keyExtractor={(item) => item.id.toString()}
+        ListHeaderComponent={renderHeader}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
           <OwnerEventCard
@@ -112,6 +117,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.backgroundLight,
   },
   listContent: {
-    padding: 8,
+    paddingBottom: 16,
   },
 });

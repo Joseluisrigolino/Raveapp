@@ -1,4 +1,4 @@
-// components/owner/OwnerEventCard.tsx
+// components/OwnerEventCard.tsx
 import React from "react";
 import { View, Text, Image, StyleSheet, TouchableOpacity } from "react-native";
 import { OwnerEventItem } from "@/interfaces/OwnerEventItem";
@@ -26,7 +26,7 @@ export default function OwnerEventCard({
       statusLabel = "Vigente";
       break;
     case "pendiente":
-      statusColor = COLORS.info; // un color "naranja" o "amarillo"
+      statusColor = COLORS.info; // un color “naranja” o “amarillo”
       statusLabel = "Pendiente de aprobación";
       break;
     case "finalizado":
@@ -35,24 +35,30 @@ export default function OwnerEventCard({
       break;
   }
 
+  // Si está finalizado, aplicamos un estilo extra
+  const imageStyle = [
+    styles.eventImage,
+    item.status === "finalizado" && styles.finalizedImage,
+  ];
+
   return (
     <View style={styles.cardContainer}>
       {/* Encabezado de la card: estado e imagen */}
       <View style={styles.headerRow}>
-        <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
-        <Image source={{ uri: item.imageUrl }} style={styles.eventImage} />
+        <Text style={[styles.statusText, { color: statusColor }]}>
+          {statusLabel}
+        </Text>
+        <Image source={{ uri: item.imageUrl }} style={imageStyle} />
       </View>
 
       {/* Info principal */}
       <Text style={styles.dateText}>Fecha del evento: {item.date}</Text>
-      <Text style={styles.nameText}>
-        {item.eventName}
-        {item.isMultipleDays ? " [EVENTO DE 3 DÍAS]" : ""}
-      </Text>
+      <Text style={styles.nameText}>{item.eventName}</Text>
 
       {/* Botones */}
       <View style={styles.buttonsRow}>
-        {item.status === "vigente" && (
+        {/* Entradas vendidas si vigente o finalizado */}
+        {(item.status === "vigente" || item.status === "finalizado") && (
           <TouchableOpacity
             style={[styles.button, styles.soldTicketsButton]}
             onPress={() => onTicketsSold(item.id)}
@@ -61,13 +67,17 @@ export default function OwnerEventCard({
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity
-          style={[styles.button, styles.modifyButton]}
-          onPress={() => onModify(item.id)}
-        >
-          <Text style={styles.buttonText}>Modificar</Text>
-        </TouchableOpacity>
+        {/* Modificar solo si no finalizado */}
+        {item.status !== "finalizado" && (
+          <TouchableOpacity
+            style={[styles.button, styles.modifyButton]}
+            onPress={() => onModify(item.id)}
+          >
+            <Text style={styles.buttonText}>Modificar</Text>
+          </TouchableOpacity>
+        )}
 
+        {/* Cancelar solo si no finalizado */}
         {item.status !== "finalizado" && (
           <TouchableOpacity
             style={[styles.button, styles.cancelButton]}
@@ -110,6 +120,10 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.card,
     resizeMode: "cover",
   },
+  // Estilo extra si finalizado => opacidad
+  finalizedImage: {
+    opacity: 0.4,
+  },
   dateText: {
     color: COLORS.textSecondary,
     fontSize: FONT_SIZES.smallText,
@@ -133,7 +147,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   soldTicketsButton: {
-    backgroundColor: COLORS.info, // Ej. morado/azul
+    backgroundColor: COLORS.info, // Ej. “naranja” / “morado”
   },
   modifyButton: {
     backgroundColor: COLORS.alternative, // Ej. azul oscuro
