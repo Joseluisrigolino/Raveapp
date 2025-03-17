@@ -1,40 +1,82 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   ScrollView,
   View,
   Text,
-  Image,
-  TextInput,
   StyleSheet,
   TouchableOpacity,
+  TextInput,
 } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 
-// Reutilizamos tus componentes
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
+import { getEventById, ExtendedEventItem } from "@/utils/eventHelpers";
+import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-// Importamos las interfaces
-import { BuyTicketData, BuyerInfo } from "@/interfaces/BuyTicketProps";
-
-// Importa tus estilos globales (ajusta la ruta según tu proyecto)
-import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
-
-/**
- * Datos simulados del ticket a comprar (luego vendrán de tu API).
+/** Representa la cantidad seleccionada de cada tipo de entrada.
+ *  Ejemplo de key: "day1-genEarly", "day2-vipEarly", etc.
  */
-const mockTicketData: BuyTicketData = {
-  eventId: 123,
-  eventName: "Nombre del evento",
-  eventImageUrl: "https://picsum.photos/200/200",
-  ticketType: "Entrada general",
-  price: 2000,
-  quantity: 1,
-  serviceFee: 320,
-};
+interface SelectedTickets {
+  [key: string]: number;
+}
+
+/** Datos del comprador (puedes ajustarlo según tu proyecto). */
+interface BuyerInfo {
+  firstName: string;
+  lastName: string;
+  idType: string;
+  idNumber: string;
+  email: string;
+  confirmEmail: string;
+  phone: string;
+}
+
+/** Componente para un "stepper" de selección de cantidad de un tipo de ticket. */
+function TicketSelector({
+  label,
+  maxQty,
+  currentQty,
+  onChange,
+}: {
+  label: string;
+  maxQty: number;
+  currentQty: number;
+  onChange: (delta: number) => void;
+}) {
+  return (
+    <View style={styles.ticketSelectorRow}>
+      <Text style={styles.ticketSelectorLabel}>{label}</Text>
+      <View style={styles.ticketSelectorActions}>
+        <TouchableOpacity
+          style={styles.qtyButton}
+          onPress={() => onChange(-1)}
+          disabled={currentQty <= 0}
+        >
+          <Text style={styles.qtyButtonText}>-</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.qtyNumber}>{currentQty}</Text>
+
+        <TouchableOpacity
+          style={styles.qtyButton}
+          onPress={() => onChange(+1)}
+          disabled={currentQty >= maxQty}
+        >
+          <Text style={styles.qtyButtonText}>+</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
 
 export default function BuyTicketScreen() {
-  const [ticketData, setTicketData] = useState<BuyTicketData>(mockTicketData);
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const [eventData, setEventData] = useState<ExtendedEventItem | null>(null);
+
+  // Estado para la cantidad seleccionada de cada tipo
+  const [selectedTickets, setSelectedTickets] = useState<SelectedTickets>({});
 
   // Datos del comprador
   const [buyerInfo, setBuyerInfo] = useState<BuyerInfo>({
@@ -47,31 +89,88 @@ export default function BuyTicketScreen() {
     phone: "",
   });
 
-  const handleChangeBuyerInfo = (field: keyof BuyerInfo, value: string) => {
-    setBuyerInfo({ ...buyerInfo, [field]: value });
+  // Cargo de servicio fijo (ejemplo). Podrías calcularlo de otra forma.
+  const serviceFee = 320;
+
+  useEffect(() => {
+    if (id) {
+      const found = getEventById(Number(id));
+      setEventData(found);
+    }
+  }, [id]);
+
+  if (!eventData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header />
+        <View style={styles.notFoundContainer}>
+          <Text style={styles.notFoundText}>No se encontró el evento.</Text>
+        </View>
+        <Footer />
+      </SafeAreaView>
+    );
+  }
+
+  // Actualizar la selección de entradas
+  const updateTicketCount = (key: string, delta: number) => {
+    setSelectedTickets((prev) => {
+      const currentVal = prev[key] || 0;
+      const newVal = currentVal + delta;
+      if (newVal < 0) return prev; // no bajar de 0
+      return { ...prev, [key]: newVal };
+    });
   };
 
-  // Subtotal = precio unitario * cantidad
-  const subtotal = ticketData.price * ticketData.quantity;
-  // Cargo de servicio
-  const serviceFee = ticketData.serviceFee;
-  // Total = subtotal + cargo
+  // Manejo de campos del comprador
+  const handleChangeBuyerInfo = (field: keyof BuyerInfo, value: string) => {
+    setBuyerInfo((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Calcular subtotal (sumando todas las selecciones)
+  const calculateSubtotal = (): number => {
+    let subtotal = 0;
+    eventData.ticketsByDay.forEach((dayInfo) => {
+      const baseKey = `day${dayInfo.dayNumber}`;
+
+      // Generales Early Birds
+      if (dayInfo.genEarlyQty > 0) {
+        const key = `${baseKey}-genEarly`;
+        const qtySelected = selectedTickets[key] || 0;
+        subtotal += qtySelected * dayInfo.genEarlyPrice;
+      }
+      // VIP Early Birds
+      if (dayInfo.vipEarlyQty > 0) {
+        const key = `${baseKey}-vipEarly`;
+        const qtySelected = selectedTickets[key] || 0;
+        subtotal += qtySelected * dayInfo.vipEarlyPrice;
+      }
+      // Generales
+      if (dayInfo.genQty > 0) {
+        const key = `${baseKey}-gen`;
+        const qtySelected = selectedTickets[key] || 0;
+        subtotal += qtySelected * dayInfo.genPrice;
+      }
+      // VIP
+      if (dayInfo.vipQty > 0) {
+        const key = `${baseKey}-vip`;
+        const qtySelected = selectedTickets[key] || 0;
+        subtotal += qtySelected * dayInfo.vipPrice;
+      }
+    });
+    return subtotal;
+  };
+
+  const subtotal = calculateSubtotal();
   const total = subtotal + serviceFee;
 
-  // Cambiar cantidad (mínimo 1)
-  const handleQuantityChange = (newQuantity: number) => {
-    if (newQuantity < 1) return;
-    setTicketData({ ...ticketData, quantity: newQuantity });
-  };
-
-  const handleBuy = () => {
-    console.log("Comprando ticket...", {
-      ticketData,
-      buyerInfo,
-      subtotal,
-      serviceFee,
-      total,
-    });
+  // Confirmar compra
+  const handleConfirmPurchase = () => {
+    console.log("Comprando entradas para:", eventData.title);
+    console.log("selectedTickets:", selectedTickets);
+    console.log("BuyerInfo:", buyerInfo);
+    console.log("Subtotal:", subtotal);
+    console.log("ServiceFee:", serviceFee);
+    console.log("Total:", total);
     alert("Proceso de compra iniciado (ejemplo).");
   };
 
@@ -80,57 +179,81 @@ export default function BuyTicketScreen() {
       <Header />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.sectionTitle}>Estás comprando:</Text>
+        {/* Título */}
+        <Text style={styles.title}>
+          Entradas para {eventData.title}
+        </Text>
 
-        {/* Resumen del ticket */}
-        <View style={styles.ticketSummaryContainer}>
-          <Image
-            source={{ uri: ticketData.eventImageUrl }}
-            style={styles.eventImage}
-          />
-          <View style={styles.ticketInfo}>
-            <Text style={styles.ticketType}>
-              {ticketData.ticketType} para [{ticketData.eventName}]
-            </Text>
-            <Text style={styles.ticketPrice}>
-              Valor: ${ticketData.price.toFixed(2)}
-            </Text>
+        {/* Selección de tickets por día */}
+        {eventData.ticketsByDay.map((dayInfo) => {
+          const baseKey = `day${dayInfo.dayNumber}`;
+          const dayLabel =
+            eventData.days === 1
+              ? "Día único"
+              : `Día ${dayInfo.dayNumber} de ${eventData.days}`;
 
-            <View style={styles.row}>
-              <Text>Cantidad: </Text>
-              {/* Botón para bajar la cantidad */}
-              <TouchableOpacity
-                style={styles.qtyButton}
-                onPress={() => handleQuantityChange(ticketData.quantity - 1)}
-              >
-                <Text style={styles.qtyButtonText}>-</Text>
-              </TouchableOpacity>
+          return (
+            <View key={dayInfo.dayNumber} style={styles.dayBlock}>
+              <Text style={styles.dayBlockTitle}>{dayLabel}</Text>
 
-              <Text style={styles.qtyNumber}>{ticketData.quantity}</Text>
+              {/* Generales Early Birds */}
+              {dayInfo.genEarlyQty > 0 && (
+                <TicketSelector
+                  label={`Generales Early Birds ($${dayInfo.genEarlyPrice})`}
+                  maxQty={dayInfo.genEarlyQty}
+                  currentQty={selectedTickets[`${baseKey}-genEarly`] || 0}
+                  onChange={(delta) =>
+                    updateTicketCount(`${baseKey}-genEarly`, delta)
+                  }
+                />
+              )}
 
-              {/* Botón para subir la cantidad */}
-              <TouchableOpacity
-                style={styles.qtyButton}
-                onPress={() => handleQuantityChange(ticketData.quantity + 1)}
-              >
-                <Text style={styles.qtyButtonText}>+</Text>
-              </TouchableOpacity>
+              {/* VIP Early Birds */}
+              {dayInfo.vipEarlyQty > 0 && (
+                <TicketSelector
+                  label={`VIP Early Birds ($${dayInfo.vipEarlyPrice})`}
+                  maxQty={dayInfo.vipEarlyQty}
+                  currentQty={selectedTickets[`${baseKey}-vipEarly`] || 0}
+                  onChange={(delta) =>
+                    updateTicketCount(`${baseKey}-vipEarly`, delta)
+                  }
+                />
+              )}
+
+              {/* Generales */}
+              {dayInfo.genQty > 0 && (
+                <TicketSelector
+                  label={`Generales ($${dayInfo.genPrice})`}
+                  maxQty={dayInfo.genQty}
+                  currentQty={selectedTickets[`${baseKey}-gen`] || 0}
+                  onChange={(delta) =>
+                    updateTicketCount(`${baseKey}-gen`, delta)
+                  }
+                />
+              )}
+
+              {/* VIP */}
+              {dayInfo.vipQty > 0 && (
+                <TicketSelector
+                  label={`VIP ($${dayInfo.vipPrice})`}
+                  maxQty={dayInfo.vipQty}
+                  currentQty={selectedTickets[`${baseKey}-vip`] || 0}
+                  onChange={(delta) =>
+                    updateTicketCount(`${baseKey}-vip`, delta)
+                  }
+                />
+              )}
             </View>
-
-            <Text style={styles.subtotal}>
-              Subtotal: ${subtotal.toFixed(2)}
-            </Text>
-          </View>
-        </View>
+          );
+        })}
 
         {/* Datos del comprador */}
-        <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
-          Datos del comprador:
-        </Text>
-        <View style={styles.formContainer}>
-          <View style={styles.row}>
+        <Text style={styles.sectionTitle}>Datos del comprador:</Text>
+        <View style={styles.buyerForm}>
+          {/* Nombre y Apellido */}
+          <View style={styles.formRow}>
             <View style={styles.halfInputContainer}>
-              <Text>Nombre:</Text>
+              <Text style={styles.label}>Nombre:</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Nombre"
@@ -139,7 +262,7 @@ export default function BuyTicketScreen() {
               />
             </View>
             <View style={styles.halfInputContainer}>
-              <Text>Apellido:</Text>
+              <Text style={styles.label}>Apellido:</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Apellido"
@@ -149,10 +272,10 @@ export default function BuyTicketScreen() {
             </View>
           </View>
 
-          {/* Tipo y número de identificación */}
-          <View style={styles.row}>
+          {/* Tipo y Número de identificación */}
+          <View style={styles.formRow}>
             <View style={styles.halfInputContainer}>
-              <Text>Tipo de identificación:</Text>
+              <Text style={styles.label}>Tipo de identificación:</Text>
               <TextInput
                 style={styles.input}
                 placeholder="DNI"
@@ -161,7 +284,7 @@ export default function BuyTicketScreen() {
               />
             </View>
             <View style={styles.halfInputContainer}>
-              <Text>Número de identificación:</Text>
+              <Text style={styles.label}>Número de identificación:</Text>
               <TextInput
                 style={styles.input}
                 placeholder="12345678"
@@ -173,9 +296,9 @@ export default function BuyTicketScreen() {
           </View>
 
           {/* Email y confirmación */}
-          <View style={styles.row}>
+          <View style={styles.formRow}>
             <View style={styles.halfInputContainer}>
-              <Text>Email:</Text>
+              <Text style={styles.label}>Email:</Text>
               <TextInput
                 style={styles.input}
                 placeholder="mail@mail.com"
@@ -185,7 +308,7 @@ export default function BuyTicketScreen() {
               />
             </View>
             <View style={styles.halfInputContainer}>
-              <Text>Confirmación de Email:</Text>
+              <Text style={styles.label}>Confirmación de Email:</Text>
               <TextInput
                 style={styles.input}
                 placeholder="mail@mail.com"
@@ -199,9 +322,9 @@ export default function BuyTicketScreen() {
           </View>
 
           {/* Teléfono */}
-          <View style={styles.row}>
+          <View style={styles.formRow}>
             <View style={styles.fullInputContainer}>
-              <Text>Teléfono:</Text>
+              <Text style={styles.label}>Teléfono:</Text>
               <TextInput
                 style={styles.input}
                 placeholder="1112345678"
@@ -213,24 +336,26 @@ export default function BuyTicketScreen() {
           </View>
         </View>
 
-        {/* Subtotal, cargo y total */}
-        <View style={styles.priceContainer}>
-          <Text style={styles.subtotalText}>
-            Subtotal: ${subtotal.toFixed(2)}
+        {/* Resumen de precios */}
+        <View style={styles.priceSummary}>
+          <Text style={styles.priceLine}>
+            Subtotal: <Text style={styles.priceValue}>${subtotal}</Text>
           </Text>
-          <Text style={styles.serviceFeeText}>
-            Cargo por servicio: ${serviceFee.toFixed(2)}
+          <Text style={styles.priceLine}>
+            Cargo por servicio: <Text style={styles.serviceFee}>${serviceFee}</Text>
           </Text>
-          <Text style={styles.totalText}>Total: ${total.toFixed(2)}</Text>
+          <Text style={[styles.priceLine, styles.priceTotal]}>
+            Total: ${total}
+          </Text>
         </View>
 
-        {/* Botón comprar */}
-        <TouchableOpacity style={styles.buyButton} onPress={handleBuy}>
-          <Text style={styles.buyButtonText}>COMPRAR</Text>
+        {/* Botón Confirmar */}
+        <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmPurchase}>
+          <Text style={styles.confirmButtonText}>COMPRAR</Text>
         </TouchableOpacity>
 
         <Text style={styles.notice}>
-          Al hacer click en comprar, te redireccionamos a MercadoPago para que
+          ** Al hacer click en comprar, te redireccionaremos a MercadoPago para que
           puedas realizar el pago y finalizar la compra.
         </Text>
       </ScrollView>
@@ -240,129 +365,178 @@ export default function BuyTicketScreen() {
   );
 }
 
-// Estilos con globalStyles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.backgroundLight,
   },
   scrollContent: {
-    padding: 16,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
   },
-  sectionTitle: {
-    fontWeight: "bold",
-    fontSize: FONT_SIZES.subTitle, // 18-20
-    color: COLORS.textPrimary,
-    marginBottom: 8,
-  },
-  ticketSummaryContainer: {
-    flexDirection: "row",
-    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
-    padding: 10,
-    borderRadius: RADIUS.card,
+  notFoundContainer: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
   },
-  eventImage: {
-    width: 80,
-    height: 80,
-    borderRadius: RADIUS.card,
-    marginRight: 10,
+  notFoundText: {
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
   },
-  ticketInfo: {
+
+  // Título principal
+  title: {
+    fontSize: FONT_SIZES.subTitle,
+    fontWeight: "bold",
+    color: COLORS.textPrimary,
+    marginVertical: 12,
+    textAlign: "center",
+  },
+
+  // Bloque por día
+  dayBlock: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    padding: 12,
+    marginBottom: 12,
+    // Sombra suave
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  dayBlockTitle: {
+    fontWeight: "bold",
+    fontSize: FONT_SIZES.body,
+    color: COLORS.info,
+    marginBottom: 8,
+  },
+
+  // TicketSelector
+  ticketSelectorRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginVertical: 4,
+  },
+  ticketSelectorLabel: {
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
     flex: 1,
   },
-  ticketType: {
-    fontWeight: "bold",
-    marginBottom: 4,
-    color: COLORS.textPrimary,
-  },
-  ticketPrice: {
-    marginBottom: 4,
-    color: COLORS.textSecondary,
-  },
-  row: {
+  ticketSelectorActions: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
   },
   qtyButton: {
-    backgroundColor: COLORS.textPrimary, // "#000"
+    backgroundColor: COLORS.textPrimary,
     borderRadius: RADIUS.card,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginHorizontal: 4,
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 6,
   },
   qtyButtonText: {
-    color: COLORS.cardBg, // "#fff"
+    color: COLORS.cardBg,
     fontWeight: "bold",
+    fontSize: 18,
   },
   qtyNumber: {
-    minWidth: 20,
+    minWidth: 24,
     textAlign: "center",
     color: COLORS.textPrimary,
+    fontSize: FONT_SIZES.body,
   },
-  subtotal: {
-    fontStyle: "italic",
-    color: COLORS.textSecondary,
+
+  // Datos del comprador
+  sectionTitle: {
+    fontWeight: "bold",
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
+    marginBottom: 8,
   },
-  formContainer: {
-    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
-    padding: 10,
+  buyerForm: {
+    backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.card,
+    padding: 12,
+    marginBottom: 12,
+    // Sombra
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  formRow: {
+    flexDirection: "row",
+    marginBottom: 12,
   },
   halfInputContainer: {
     flex: 1,
-    marginRight: 5,
+    marginRight: 8,
   },
   fullInputContainer: {
     flex: 1,
   },
+  label: {
+    color: COLORS.textPrimary,
+    fontSize: FONT_SIZES.smallText,
+    marginBottom: 4,
+  },
   input: {
-    backgroundColor: COLORS.cardBg, // "#fff"
+    backgroundColor: COLORS.backgroundLight,
     borderRadius: RADIUS.card,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginTop: 4,
-    marginBottom: 8,
     borderWidth: 1,
-    borderColor: COLORS.borderInput, // "#ccc"
+    borderColor: COLORS.borderInput,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     color: COLORS.textPrimary,
   },
-  priceContainer: {
-    marginTop: 16,
-    marginBottom: 8,
+
+  // Resumen de precios
+  priceSummary: {
+    marginVertical: 12,
+    padding: 8,
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
   },
-  subtotalText: {
+  priceLine: {
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
-    marginBottom: 2,
+    marginVertical: 2,
   },
-  serviceFeeText: {
-    fontSize: FONT_SIZES.body,
-    marginBottom: 2,
-    color: COLORS.positive, // "green"
+  priceValue: {
+    fontWeight: "bold",
   },
-  totalText: {
+  serviceFee: {
+    color: COLORS.positive,
+    fontWeight: "bold",
+  },
+  priceTotal: {
+    marginTop: 6,
     fontSize: FONT_SIZES.subTitle,
     fontWeight: "bold",
-    marginTop: 4,
-    color: COLORS.textPrimary,
   },
-  buyButton: {
-    backgroundColor: COLORS.primary, // "#FF00B4" => mapeado a color principal
-    paddingVertical: 12,
+
+  // Botón comprar
+  confirmButton: {
+    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.card,
+    paddingVertical: 12,
     alignItems: "center",
+    marginBottom: 10,
   },
-  buyButtonText: {
-    color: COLORS.cardBg, // "#fff"
-    fontSize: FONT_SIZES.button, // 16-18
+  confirmButtonText: {
+    color: COLORS.cardBg,
     fontWeight: "bold",
+    fontSize: FONT_SIZES.button,
   },
   notice: {
-    marginTop: 10,
-    fontSize: FONT_SIZES.smallText, // 12
-    color: COLORS.textSecondary,     // "#666"
+    fontSize: FONT_SIZES.smallText,
+    color: COLORS.textSecondary,
     textAlign: "center",
+    marginBottom: 20,
   },
 });

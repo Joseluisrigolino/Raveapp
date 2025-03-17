@@ -4,11 +4,12 @@ import { useRouter } from "expo-router";
 
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
+import TabMenuComponent from "@/components/TabMenuComponent"; // Importa el mismo que usas en NewsScreen
 import TicketCardComponent from "@/components/TicketCardComponent";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
 import { getAllPurchasedTickets } from "@/utils/ticketMenuHelpers";
 
-import { COLORS } from "@/styles/globalStyles"; // Ajusta la ruta a tu gusto
+import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function TicketsPurchasedMenu() {
   const router = useRouter();
@@ -26,6 +27,22 @@ export default function TicketsPurchasedMenu() {
   return (
     <SafeAreaView style={styles.container}>
       <Header />
+
+      {/* Subheader con TabMenuComponent, tal como en NewsScreen */}
+      <TabMenuComponent
+        tabs={[
+          {
+            label: "Mis tickets",
+            route: "/main/TicketsScreens/TicketPurchasedMenu",
+            isActive: true,
+          },
+          {
+            label: "Eventos favoritos",
+            route: "/main/EventsScreens/FavEventScreen",
+            isActive: false,
+          },
+        ]}
+      />
 
       <FlatList
         data={mockData}
@@ -48,7 +65,7 @@ export default function TicketsPurchasedMenu() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.backgroundLight, // en lugar de default
+    backgroundColor: COLORS.backgroundLight,
   },
   flatListContent: {
     paddingHorizontal: 8,

@@ -8,19 +8,15 @@ import {
   TouchableOpacity,
   Linking,
 } from "react-native";
-import { Button, Text, IconButton } from "react-native-paper";
-import { useLocalSearchParams } from "expo-router";
+import { Text, IconButton } from "react-native-paper";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
-import BuyTicket from "@/components/BuyTicketsComponent";
 import ReviewComponent from "@/components/ReviewComponent";
 import { ReviewItem } from "@/interfaces/ReviewProps";
+import { getEventById, ExtendedEventItem } from "@/utils/eventHelpers";
 
-import { getEventById } from "@/utils/eventHelpers";
-import { EventItem } from "@/interfaces/EventProps";
-
-// Importa tus estilos globales
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 // Reseñas de ejemplo (mock)
@@ -41,9 +37,52 @@ const mockReviews: ReviewItem[] = [
   },
 ];
 
+/** Componente para renderizar la información de entradas (solo a modo resumen). */
+function TicketsOverview({ eventData }: { eventData: ExtendedEventItem }) {
+  return (
+    <View>
+      {eventData.ticketsByDay.map((dayInfo, index) => {
+        const dayLabel =
+          eventData.days === 1
+            ? "Día único"
+            : `Día ${dayInfo.dayNumber} de ${eventData.days}`;
+
+        return (
+          <View key={index} style={styles.dayTicketBlock}>
+            <Text style={styles.dayLabel}>{dayLabel}</Text>
+
+            {dayInfo.genEarlyQty > 0 && (
+              <Text style={styles.ticketLine}>
+                • Generales Early Birds (${dayInfo.genEarlyPrice})
+              </Text>
+            )}
+            {dayInfo.vipEarlyQty > 0 && (
+              <Text style={styles.ticketLine}>
+                • VIP Early Birds (${dayInfo.vipEarlyPrice})
+              </Text>
+            )}
+            {dayInfo.genQty > 0 && (
+              <Text style={styles.ticketLine}>
+                • Generales (${dayInfo.genPrice})
+              </Text>
+            )}
+            {dayInfo.vipQty > 0 && (
+              <Text style={styles.ticketLine}>
+                • VIP (${dayInfo.vipPrice})
+              </Text>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function EventScreen() {
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const [eventData, setEventData] = useState<EventItem | null>(null);
+
+  const [eventData, setEventData] = useState<ExtendedEventItem | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
@@ -65,11 +104,16 @@ export default function EventScreen() {
     );
   }
 
-  // Función para abrir Google Maps con la dirección
+  // Función para abrir Google Maps
   const openMap = () => {
     const address = encodeURIComponent(eventData.address);
     const url = `https://www.google.com/maps/search/?api=1&query=${address}`;
     Linking.openURL(url);
+  };
+
+  // Navegar a BuyTicketScreen con el ID del evento
+  const handleBuyPress = () => {
+    router.push(`/main/TicketsScreens/BuyTicketScreen?id=${eventData.id}`);
   };
 
   return (
@@ -77,22 +121,25 @@ export default function EventScreen() {
       <Header />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-
-        {/* Imagen principal con botón de favorito */}
+        {/* Imagen principal */}
         <View style={styles.imageContainer}>
           <Image source={{ uri: eventData.imageUrl }} style={styles.img} />
-          <IconButton
-            icon={isFavorite ? "heart" : "heart-outline"}
-            iconColor={isFavorite ? COLORS.negative : COLORS.textPrimary}
-            size={30}
-            style={styles.heartButton}
-            onPress={() => setIsFavorite(!isFavorite)}
-          />
         </View>
 
         {/* Tarjeta con la info del evento */}
         <View style={styles.eventCard}>
-          <Text style={styles.eventTitle}>{eventData.title}</Text>
+          {/* Fila con el título y el ícono de corazón */}
+          <View style={styles.titleRow}>
+            <Text style={styles.eventTitle}>{eventData.title}</Text>
+
+            <IconButton
+              icon={isFavorite ? "heart" : "heart-outline"}
+              iconColor={isFavorite ? COLORS.negative : COLORS.textPrimary}
+              size={30}
+              style={styles.heartIcon}
+              onPress={() => setIsFavorite(!isFavorite)}
+            />
+          </View>
 
           {/* Fecha y hora */}
           <View style={styles.infoRow}>
@@ -119,23 +166,25 @@ export default function EventScreen() {
           <Text style={styles.description}>{eventData.description}</Text>
         </View>
 
-        {/* Tarjeta para comprar tickets */}
+        {/* Resumen de tickets disponibles */}
         <View style={styles.ticketCard}>
-          <BuyTicket />
+          <Text style={styles.ticketCardTitle}>Entradas disponibles:</Text>
+          <TicketsOverview eventData={eventData} />
 
-          {/* Botón comprar (debajo de BuyTicket) */}
+          {/* Botón comprar */}
           <View style={styles.buyButtonContainer}>
-            <TouchableOpacity style={styles.buyButton}>
+            <TouchableOpacity style={styles.buyButton} onPress={handleBuyPress}>
               <Text style={styles.buyButtonText}>Comprar</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Tarjeta con reseñas */}
-        <View style={styles.reviewCard}>
-          <ReviewComponent reviews={mockReviews} />
-        </View>
-
+        {/* Reseñas solo si es recurrente (ej. eventData.isRecurrent === true) */}
+        {eventData.isRecurrent && (
+          <View style={styles.reviewCard}>
+            <ReviewComponent reviews={mockReviews} />
+          </View>
+        )}
       </ScrollView>
 
       <Footer />
@@ -143,6 +192,7 @@ export default function EventScreen() {
   );
 }
 
+// Estilos de EventScreen
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -151,8 +201,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 24,
   },
-
-  // Cuando no se encuentra el evento
   notFoundContainer: {
     flex: 1,
     justifyContent: "center",
@@ -165,18 +213,14 @@ const styles = StyleSheet.create({
 
   // Imagen principal
   imageContainer: {
-    position: "relative",
+    width: "100%",
+    height: 300,
+    backgroundColor: COLORS.borderInput,
   },
   img: {
     width: "100%",
-    height: 300,
-  },
-  heartButton: {
-    position: "absolute",
-    bottom: 10,
-    right: 10,
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 20,
+    height: "100%",
+    resizeMode: "cover",
   },
 
   // Tarjeta con la info del evento
@@ -186,18 +230,26 @@ const styles = StyleSheet.create({
     marginTop: 16,
     borderRadius: RADIUS.card,
     padding: 16,
-    // Sombra suave
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 2,
     elevation: 2,
   },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   eventTitle: {
     fontSize: FONT_SIZES.subTitle,
     fontWeight: "bold",
     color: COLORS.textPrimary,
     marginBottom: 8,
+    maxWidth: "85%",
+  },
+  heartIcon: {
+    backgroundColor: "transparent",
   },
   infoRow: {
     flexDirection: "row",
@@ -236,19 +288,37 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // Tarjeta para BuyTicket + botón comprar
+  // Tarjeta de tickets
   ticketCard: {
     backgroundColor: COLORS.cardBg,
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: RADIUS.card,
     padding: 16,
-    // Sombra
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 2,
     elevation: 2,
+  },
+  ticketCardTitle: {
+    fontSize: FONT_SIZES.body,
+    fontWeight: "bold",
+    color: COLORS.textPrimary,
+    marginBottom: 12,
+  },
+  dayTicketBlock: {
+    marginBottom: 12,
+  },
+  dayLabel: {
+    fontSize: FONT_SIZES.body,
+    fontWeight: "bold",
+    color: COLORS.info,
+    marginBottom: 4,
+  },
+  ticketLine: {
+    marginLeft: 12,
+    color: COLORS.textSecondary,
   },
   buyButtonContainer: {
     alignItems: "flex-end",
@@ -268,7 +338,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
-  // Tarjeta para reseñas
+  // Reseñas
   reviewCard: {
     backgroundColor: COLORS.cardBg,
     marginHorizontal: 16,
@@ -276,7 +346,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: RADIUS.card,
     padding: 16,
-    // Sombra
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
