@@ -20,7 +20,6 @@ import {
 } from "@/interfaces/OwnerEventCancelItem";
 import { getEventCancellationDataById } from "@/utils/ownerEventsCancelHelper";
 
-// Importamos tu globalStyles
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function CancelEventScreen() {
@@ -28,9 +27,7 @@ export default function CancelEventScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
 
   // 2. Estado para la data del evento a cancelar
-  const [cancelData, setCancelData] = useState<OwnerEventCancelItem | null>(
-    null
-  );
+  const [cancelData, setCancelData] = useState<OwnerEventCancelItem | null>(null);
 
   // 3. Estado para el motivo de la cancelación
   const [reason, setReason] = useState("");
@@ -50,8 +47,10 @@ export default function CancelEventScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <Header />
-        <View style={styles.contentWrapper}>
-          <Text>No se encontró la información del evento a cancelar.</Text>
+        <View style={styles.notFoundWrapper}>
+          <Text style={styles.notFoundText}>
+            No se encontró la información del evento a cancelar.
+          </Text>
         </View>
         <Footer />
       </SafeAreaView>
@@ -70,52 +69,63 @@ export default function CancelEventScreen() {
     <SafeAreaView style={styles.container}>
       <Header />
 
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Text style={styles.title}>Cancelación de evento:</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Título */}
+        <View style={styles.formGroup}>
+          <Text style={styles.title}>Cancelación de evento</Text>
+        </View>
 
-        <Text style={styles.infoText}>
-          La cancelación de este evento es una acción que no se puede revertir.
-          Se avisará vía mail a las personas que hayan comprado una entrada,
-          junto con el motivo que describas, y se procederá a realizar la
-          devolución del dinero de las entradas.
-        </Text>
-
-        {/* Nombre del evento */}
-        <Text style={styles.sectionLabel}>
-          Evento a cancelar: {cancelData.eventName}
-        </Text>
-
-        {/* Listado de tickets */}
-        <View style={styles.ticketListContainer}>
-          <Text style={styles.ticketSubtitle}>
-            Se reembolsarán un total de X entradas:
-          </Text>
-          {cancelData.ticketsSold.map((ticket: TicketSoldInfo, index: number) => (
-            <Text key={index} style={styles.ticketItem}>
-              • {ticket.quantity} {ticket.type} de $
-              {ticket.price.toLocaleString()}.00 c/u
-            </Text>
-          ))}
-          <Text style={styles.totalRefund}>
-            Total a devolver: ${cancelData.totalRefund.toLocaleString()}
+        {/* Info general */}
+        <View style={styles.formGroup}>
+          <Text style={styles.infoText}>
+            La cancelación de este evento es una acción que{" "}
+            <Text style={styles.infoTextBold}>no se puede revertir</Text>. Se avisará
+            vía mail a las personas que hayan comprado una entrada, junto con el
+            motivo que describas, y se procederá a realizar la devolución del dinero
+            de las entradas.
           </Text>
         </View>
 
-        {/* Motivo */}
-        <Text style={styles.motivoLabel}>Motivo:</Text>
-        <TextInput
-          style={styles.motivoInput}
-          placeholder="Describe el motivo de la cancelación..."
-          placeholderTextColor={COLORS.textSecondary}
-          multiline
-          value={reason}
-          onChangeText={setReason}
-        />
+        {/* Nombre del evento */}
+        <View style={styles.formGroup}>
+          <Text style={styles.sectionLabel}>
+            Evento a cancelar: <Text style={styles.eventName}>{cancelData.eventName}</Text>
+          </Text>
+        </View>
 
-        {/* Nota de irreversibilidad */}
-        <Text style={styles.warningText}>
-          * Esta operación no puede ser reversada.
-        </Text>
+        {/* Listado de tickets */}
+        <View style={styles.formGroup}>
+          <View style={styles.ticketListContainer}>
+            <Text style={styles.ticketSubtitle}>
+              Se reembolsarán un total de X entradas:
+            </Text>
+            {cancelData.ticketsSold.map((ticket: TicketSoldInfo, index: number) => (
+              <Text key={index} style={styles.ticketItem}>
+                • {ticket.quantity} {ticket.type} de $
+                {ticket.price.toLocaleString()}.00 c/u
+              </Text>
+            ))}
+            <Text style={styles.totalRefund}>
+              Total a devolver: ${cancelData.totalRefund.toLocaleString()}
+            </Text>
+          </View>
+        </View>
+
+        {/* Motivo */}
+        <View style={styles.formGroup}>
+          <Text style={styles.motivoLabel}>Motivo de la cancelación</Text>
+          <TextInput
+            style={styles.motivoInput}
+            placeholder="Describe el motivo de la cancelación..."
+            placeholderTextColor={COLORS.textSecondary}
+            multiline
+            value={reason}
+            onChangeText={setReason}
+          />
+          <Text style={styles.warningText}>
+            * Esta operación no puede ser revertida.
+          </Text>
+        </View>
 
         {/* Botón "Cancelar Evento" */}
         <TouchableOpacity style={styles.cancelButton} onPress={handleCancelEvent}>
@@ -128,42 +138,67 @@ export default function CancelEventScreen() {
   );
 }
 
-// Estilos con globalStyles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.backgroundLight,
   },
-  contentWrapper: {
+  notFoundWrapper: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  scrollContainer: {
+  notFoundText: {
+    color: COLORS.textPrimary,
+    fontSize: FONT_SIZES.body,
+  },
+  scrollContent: {
     padding: 16,
   },
+
+  // Agrupaciones visuales
+  formGroup: {
+    marginBottom: 16,
+    width: "100%",
+  },
+
+  // Título principal
   title: {
-    fontSize: FONT_SIZES.subTitle, // Ej. 18-20
+    fontSize: FONT_SIZES.subTitle,
     fontWeight: "bold",
     color: COLORS.textPrimary,
+    alignSelf: "center",
     marginBottom: 8,
   },
+
+  // Info general
   infoText: {
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
-    marginBottom: 16,
+    textAlign: "justify",
+    lineHeight: 20,
   },
+  infoTextBold: {
+    fontWeight: "bold",
+  },
+
+  // Nombre del evento
   sectionLabel: {
     fontSize: FONT_SIZES.body,
     fontWeight: "bold",
     color: COLORS.textPrimary,
-    marginBottom: 8,
+    marginBottom: 4,
+    paddingHorizontal: 4,
   },
+  eventName: {
+    color: COLORS.info,
+  },
+
+  // Tickets
   ticketListContainer: {
     backgroundColor: COLORS.cardBg,
     padding: 12,
     borderRadius: RADIUS.card,
-    marginBottom: 16,
   },
   ticketSubtitle: {
     fontSize: FONT_SIZES.body,
@@ -180,39 +215,47 @@ const styles = StyleSheet.create({
   totalRefund: {
     fontSize: FONT_SIZES.body,
     fontWeight: "bold",
-    color: COLORS.negative, // Podrías usar un color "rojo"
+    color: COLORS.negative,
     marginTop: 8,
   },
+
+  // Motivo
   motivoLabel: {
     fontSize: FONT_SIZES.body,
     fontWeight: "bold",
     color: COLORS.textPrimary,
-    marginBottom: 4,
+    marginBottom: 6,
+    paddingHorizontal: 4,
   },
   motivoInput: {
     backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.card,
     borderWidth: 1,
     borderColor: COLORS.borderInput,
-    padding: 8,
+    padding: 12,
     minHeight: 80,
     textAlignVertical: "top",
-    marginBottom: 8,
     color: COLORS.textPrimary,
+    marginHorizontal: 4,
   },
   warningText: {
     fontSize: FONT_SIZES.smallText,
     color: COLORS.textSecondary,
-    marginBottom: 16,
+    marginTop: 8,
+    marginHorizontal: 4,
   },
+
+  // Botón
   cancelButton: {
-    backgroundColor: COLORS.negative, // Rojo
-    paddingVertical: 12,
+    backgroundColor: COLORS.negative,
+    paddingVertical: 14,
     borderRadius: RADIUS.card,
     alignItems: "center",
+    marginTop: 16,
+    marginHorizontal: 4,
   },
   cancelButtonText: {
-    color: COLORS.cardBg, // Blanco
+    color: COLORS.cardBg,
     fontSize: FONT_SIZES.body,
     fontWeight: "bold",
   },

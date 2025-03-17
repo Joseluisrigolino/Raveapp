@@ -18,7 +18,7 @@ import DateTimeInputComponent from "@/components/DateTimeInputComponent";
 import { Artist } from "@/interfaces/Artist";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-/** Representa los campos de entradas para un día */
+// Representa los campos de entradas para un día
 type DayTickets = {
   genEarlyQty: string;
   genEarlyPrice: string;
@@ -30,7 +30,7 @@ type DayTickets = {
   vipPrice: string;
 };
 
-/** Crea un "DayTickets" vacío (valores por defecto) */
+// Crea un "DayTickets" vacío (valores por defecto)
 function createEmptyDayTickets(): DayTickets {
   return {
     genEarlyQty: "",
@@ -44,7 +44,7 @@ function createEmptyDayTickets(): DayTickets {
   };
 }
 
-/** Calcula la suma total de entradas de un array de DayTickets */
+// Calcula la suma total de entradas de un array de DayTickets
 function calcTotalTickets(daysTickets: DayTickets[]): number {
   let total = 0;
   for (const day of daysTickets) {
@@ -57,7 +57,7 @@ function calcTotalTickets(daysTickets: DayTickets[]): number {
   return total;
 }
 
-// Simulados
+// Datos simulados
 const mockGenres = [
   "Techno",
   "Hard Techno",
@@ -84,16 +84,15 @@ const mockProvinces = ["Buenos Aires", "Córdoba", "Mendoza"];
 const mockMunicipalities = ["Municipio 1", "Municipio 2"];
 const mockLocalities = ["Localidad 1", "Localidad 2"];
 
-/** Tipos de evento: 1d, 2d, 3d */
 type EventType = "1d" | "2d" | "3d";
 
 export default function CreateEventScreen() {
-  // Demo: control login
+  // Control de login (demo)
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Manejo del tipo de evento
+  // Tipo de evento
   const [eventType, setEventType] = useState<EventType>("1d");
-  function handleEventTypeChange(value: "1d" | "2d" | "3d") {
+  function handleEventTypeChange(value: EventType) {
     setEventType(value);
   }
 
@@ -119,12 +118,12 @@ export default function CreateEventScreen() {
   const [startDateTime, setStartDateTime] = useState<Date>(new Date());
   const [endDateTime, setEndDateTime] = useState<Date>(new Date());
 
-  // Para entradas: array de DayTickets, 1 por día
+  // Entradas (por día)
   const [daysTickets, setDaysTickets] = useState<DayTickets[]>([
     createEmptyDayTickets(),
   ]);
 
-  // Configuración de venta
+  // Config venta
   const [startSaleDateTime, setStartSaleDateTime] = useState<Date>(new Date());
   const [earlyBirdsStock, setEarlyBirdsStock] = useState(false);
   const [useEarlyBirdsDate, setUseEarlyBirdsDate] = useState(false);
@@ -132,7 +131,7 @@ export default function CreateEventScreen() {
     useState<Date>(new Date());
 
   // Multimedia
-  const [photoFile, setPhotoFile] = useState<string | null>(null); // "ruta.jpg" o null
+  const [photoFile, setPhotoFile] = useState<string | null>(null);
   const [videoLink, setVideoLink] = useState("");
   const [musicLink, setMusicLink] = useState("");
 
@@ -153,7 +152,6 @@ export default function CreateEventScreen() {
     } else if (eventType === "2d") {
       setDaysTickets([createEmptyDayTickets(), createEmptyDayTickets()]);
     } else {
-      // 3d
       setDaysTickets([
         createEmptyDayTickets(),
         createEmptyDayTickets(),
@@ -181,7 +179,6 @@ export default function CreateEventScreen() {
     if (existingArtist) {
       setSelectedArtists((prev) => [...prev, existingArtist]);
     } else {
-      // Creamos un "artista" local
       const newArtist: Artist = { name: trimmedName, image: "" };
       setSelectedArtists((prev) => [...prev, newArtist]);
     }
@@ -210,7 +207,7 @@ export default function CreateEventScreen() {
   // Calcular total
   const totalTickets = calcTotalTickets(daysTickets);
 
-  // Seleccionar foto (demo)
+  // Seleccionar foto
   const handleSelectPhoto = () => {
     console.log("Seleccionar archivo presionado");
     setPhotoFile("ruta-de-la-imagen.jpg");
@@ -319,230 +316,254 @@ export default function CreateEventScreen() {
               <Text style={styles.demoButtonText}>Cerrar sesión (demo)</Text>
             </TouchableOpacity>
 
-            {/* Nombre */}
-            <Text style={styles.label}>Nombre del evento:</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Nombre del evento"
-              value={eventName}
-              onChangeText={setEventName}
-            />
+            {/* NOMBRE */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Nombre del evento</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ej: Fiesta Techno..."
+                value={eventName}
+                onChangeText={setEventName}
+              />
+            </View>
 
-            {/* Tipo de evento */}
-            <Text style={styles.label}>Tipo de evento:</Text>
-            <View style={styles.radioGroup}>
-              <View style={styles.radioOption}>
+            {/* TIPO DE EVENTO */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Tipo de evento</Text>
+              <View style={styles.radioGroup}>
                 <TouchableOpacity
-                  style={styles.radioCircle}
+                  style={styles.radioOption}
                   onPress={() => handleEventTypeChange("1d")}
                 >
-                  {eventType === "1d" && <View style={styles.radioSelected} />}
+                  <View style={styles.radioCircle}>
+                    {eventType === "1d" && <View style={styles.radioSelected} />}
+                  </View>
+                  <Text style={styles.radioText}>1 día</Text>
                 </TouchableOpacity>
-                <Text>Evento común de 1 día.</Text>
-              </View>
 
-              <View style={styles.radioOption}>
                 <TouchableOpacity
-                  style={styles.radioCircle}
+                  style={styles.radioOption}
                   onPress={() => handleEventTypeChange("2d")}
                 >
-                  {eventType === "2d" && <View style={styles.radioSelected} />}
+                  <View style={styles.radioCircle}>
+                    {eventType === "2d" && <View style={styles.radioSelected} />}
+                  </View>
+                  <Text style={styles.radioText}>2 días</Text>
                 </TouchableOpacity>
-                <Text>Evento/festival de 2 días.</Text>
-              </View>
 
-              <View style={styles.radioOption}>
                 <TouchableOpacity
-                  style={styles.radioCircle}
+                  style={styles.radioOption}
                   onPress={() => handleEventTypeChange("3d")}
                 >
-                  {eventType === "3d" && <View style={styles.radioSelected} />}
+                  <View style={styles.radioCircle}>
+                    {eventType === "3d" && <View style={styles.radioSelected} />}
+                  </View>
+                  <Text style={styles.radioText}>3 días</Text>
                 </TouchableOpacity>
-                <Text>Evento/festival de 3 días.</Text>
               </View>
             </View>
 
-            {/* Géneros */}
-            <Text style={styles.label}>Género/s musical/es:</Text>
-            <View style={styles.checkboxContainer}>
-              {mockGenres.map((genre) => (
-                <View key={genre} style={styles.checkboxItem}>
-                  <TouchableOpacity
-                    style={styles.checkbox}
-                    onPress={() => toggleGenre(genre)}
-                  >
-                    {selectedGenres.includes(genre) && (
-                      <View style={styles.checkboxSelected} />
-                    )}
-                  </TouchableOpacity>
-                  <Text>{genre}</Text>
-                </View>
-              ))}
+            {/* GÉNEROS */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Género/s musical/es</Text>
+              <View style={styles.genresContainer}>
+                {mockGenres.map((genre) => {
+                  const isSelected = selectedGenres.includes(genre);
+                  return (
+                    <TouchableOpacity
+                      key={genre}
+                      style={[
+                        styles.genreChip,
+                        isSelected && styles.genreChipSelected,
+                      ]}
+                      onPress={() => toggleGenre(genre)}
+                    >
+                      <Text
+                        style={[
+                          styles.genreChipText,
+                          isSelected && styles.genreChipTextSelected,
+                        ]}
+                      >
+                        {genre}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
 
-            {/* Artistas */}
-            <Text style={styles.label}>Artista/s:</Text>
-            <View style={styles.artistInputRow}>
+            {/* ARTISTAS */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Artistas</Text>
+              <View style={styles.artistRow}>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder="Nombre del artista"
+                  value={artistInput}
+                  onChangeText={setArtistInput}
+                />
+                <TouchableOpacity
+                  style={styles.addArtistButton}
+                  onPress={handleAddArtist}
+                >
+                  <Text style={styles.addArtistButtonText}>+</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.addedArtistsContainer}>
+                {selectedArtists.map((artist) => (
+                  <View key={artist.name} style={styles.artistTag}>
+                    <Text style={styles.artistName}>{artist.name}</Text>
+                    <TouchableOpacity
+                      onPress={() => handleRemoveArtist(artist.name)}
+                    >
+                      <Text style={styles.removeArtist}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* UBICACIÓN */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Ubicación del evento</Text>
+
+              <Text style={styles.subLabel}>Provincia</Text>
+              <TouchableOpacity
+                style={styles.dropdownButton}
+                onPress={() => setShowProvinces(!showProvinces)}
+              >
+                <Text style={styles.dropdownText}>
+                  {province || "Seleccione una provincia"}
+                </Text>
+              </TouchableOpacity>
+              {showProvinces && (
+                <View style={styles.dropdownContainer}>
+                  {mockProvinces.map((prov) => (
+                    <TouchableOpacity
+                      key={prov}
+                      onPress={() => {
+                        setProvince(prov);
+                        setShowProvinces(false);
+                      }}
+                      style={styles.dropdownItem}
+                    >
+                      <Text>{prov}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              <Text style={styles.subLabel}>Municipio</Text>
+              <TouchableOpacity
+                style={styles.dropdownButton}
+                onPress={() => setShowMunicipalities(!showMunicipalities)}
+              >
+                <Text style={styles.dropdownText}>
+                  {municipality || "Seleccione un municipio"}
+                </Text>
+              </TouchableOpacity>
+              {showMunicipalities && (
+                <View style={styles.dropdownContainer}>
+                  {mockMunicipalities.map((mun) => (
+                    <TouchableOpacity
+                      key={mun}
+                      onPress={() => {
+                        setMunicipality(mun);
+                        setShowMunicipalities(false);
+                      }}
+                      style={styles.dropdownItem}
+                    >
+                      <Text>{mun}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              <Text style={styles.subLabel}>Localidad</Text>
+              <TouchableOpacity
+                style={styles.dropdownButton}
+                onPress={() => setShowLocalities(!showLocalities)}
+              >
+                <Text style={styles.dropdownText}>
+                  {locality || "Seleccione una localidad"}
+                </Text>
+              </TouchableOpacity>
+              {showLocalities && (
+                <View style={styles.dropdownContainer}>
+                  {mockLocalities.map((loc) => (
+                    <TouchableOpacity
+                      key={loc}
+                      onPress={() => {
+                        setLocality(loc);
+                        setShowLocalities(false);
+                      }}
+                      style={styles.dropdownItem}
+                    >
+                      <Text>{loc}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              <Text style={styles.subLabel}>Dirección</Text>
               <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="Escribe el nombre del artista"
-                value={artistInput}
-                onChangeText={setArtistInput}
+                style={styles.input}
+                placeholder="Ej: Av. Corrientes 1234"
+                value={address}
+                onChangeText={setAddress}
               />
-              <TouchableOpacity
-                style={styles.addArtistButton}
-                onPress={handleAddArtist}
-              >
-                <Text style={styles.addArtistButtonText}>+</Text>
-              </TouchableOpacity>
             </View>
 
-            <View style={styles.addedArtistsContainer}>
-              {selectedArtists.map((artist) => (
-                <View key={artist.name} style={styles.artistTag}>
-                  <Text style={styles.artistName}>{artist.name}</Text>
-                  <TouchableOpacity
-                    onPress={() => handleRemoveArtist(artist.name)}
-                  >
-                    <Text style={styles.removeArtist}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-
-            {/* Ubicación */}
-            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
-              Ubicación del evento:
-            </Text>
-            <Text style={styles.label}>Provincia:</Text>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setShowProvinces(!showProvinces)}
-            >
-              <Text>{province || "Seleccione una provincia"}</Text>
-            </TouchableOpacity>
-            {showProvinces && (
-              <View style={styles.dropdownContainer}>
-                {mockProvinces.map((prov) => (
-                  <TouchableOpacity
-                    key={prov}
-                    onPress={() => {
-                      setProvince(prov);
-                      setShowProvinces(false);
-                    }}
-                    style={styles.dropdownItem}
-                  >
-                    <Text>{prov}</Text>
-                  </TouchableOpacity>
-                ))}
+            <View style={styles.formGroup}>
+              <View style={styles.checkboxRow}>
+                <TouchableOpacity
+                  style={styles.checkbox}
+                  onPress={() => setIsAfter(!isAfter)}
+                >
+                  {isAfter && <View style={styles.checkboxSelected} />}
+                </TouchableOpacity>
+                <Text style={{ marginLeft: 4 }}>¿Es after?</Text>
               </View>
-            )}
-
-            <Text style={styles.label}>Municipio:</Text>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setShowMunicipalities(!showMunicipalities)}
-            >
-              <Text>{municipality || "Seleccione un municipio"}</Text>
-            </TouchableOpacity>
-            {showMunicipalities && (
-              <View style={styles.dropdownContainer}>
-                {mockMunicipalities.map((mun) => (
-                  <TouchableOpacity
-                    key={mun}
-                    onPress={() => {
-                      setMunicipality(mun);
-                      setShowMunicipalities(false);
-                    }}
-                    style={styles.dropdownItem}
-                  >
-                    <Text>{mun}</Text>
-                  </TouchableOpacity>
-                ))}
+              <View style={styles.checkboxRow}>
+                <TouchableOpacity
+                  style={styles.checkbox}
+                  onPress={() => setIsLGBT(!isLGBT)}
+                >
+                  {isLGBT && <View style={styles.checkboxSelected} />}
+                </TouchableOpacity>
+                <Text style={{ marginLeft: 4 }}>¿Es un evento LGBT?</Text>
               </View>
-            )}
-
-            <Text style={styles.label}>Localidad:</Text>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setShowLocalities(!showLocalities)}
-            >
-              <Text>{locality || "Seleccione una localidad"}</Text>
-            </TouchableOpacity>
-            {showLocalities && (
-              <View style={styles.dropdownContainer}>
-                {mockLocalities.map((loc) => (
-                  <TouchableOpacity
-                    key={loc}
-                    onPress={() => {
-                      setLocality(loc);
-                      setShowLocalities(false);
-                    }}
-                    style={styles.dropdownItem}
-                  >
-                    <Text>{loc}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            <Text style={styles.label}>Dirección:</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Dirección del evento"
-              value={address}
-              onChangeText={setAddress}
-            />
-
-            {/* Checkboxes after / LGBT */}
-            <View style={[styles.checkboxItem, { width: 300, marginTop: 12 }]}>
-              <TouchableOpacity
-                style={styles.checkbox}
-                onPress={() => setIsAfter(!isAfter)}
-              >
-                {isAfter && <View style={styles.checkboxSelected} />}
-              </TouchableOpacity>
-              <Text style={{ marginLeft: 4 }}>¿Es after?</Text>
             </View>
 
-            <View style={[styles.checkboxItem, { width: 300, marginTop: 12 }]}>
-              <TouchableOpacity
-                style={styles.checkbox}
-                onPress={() => setIsLGBT(!isLGBT)}
-              >
-                {isLGBT && <View style={styles.checkboxSelected} />}
-              </TouchableOpacity>
-              <Text style={{ marginLeft: 4 }}>¿Es un evento LGBT?</Text>
+            {/* DESCRIPCIÓN */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Descripción</Text>
+              <TextInput
+                style={[styles.input, styles.multiLineInput]}
+                multiline
+                placeholder="Describe aquí el evento..."
+                value={eventDescription}
+                onChangeText={setEventDescription}
+              />
             </View>
-
-            <Text style={[styles.label, { marginTop: 12 }]}>
-              Descripción del evento:
-            </Text>
-            <TextInput
-              style={[styles.input, { height: 80, textAlignVertical: "top" }]}
-              multiline
-              placeholder="Describe aquí el evento..."
-              value={eventDescription}
-              onChangeText={setEventDescription}
-            />
 
             {/* FECHAS GLOBALES */}
-            <DateTimeInputComponent
-              label="Fecha y hora de inicio del evento:"
-              value={startDateTime}
-              onChange={setStartDateTime}
-            />
-            <DateTimeInputComponent
-              label="Fecha y hora de finalización del evento:"
-              value={endDateTime}
-              onChange={setEndDateTime}
-            />
+            <View style={styles.formGroup}>
+              <DateTimeInputComponent
+                label="Fecha y hora de inicio del evento:"
+                value={startDateTime}
+                onChange={setStartDateTime}
+              />
+              <DateTimeInputComponent
+                label="Fecha y hora de finalización del evento:"
+                value={endDateTime}
+                onChange={setEndDateTime}
+              />
+            </View>
 
             {/* ENTRADAS POR DÍA */}
-            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
-              Entradas (por día):
-            </Text>
-            <Text style={{ marginBottom: 8 }}>
+            <Text style={styles.sectionTitle}>Entradas (por día)</Text>
+            <Text style={styles.infoText}>
               Cantidad total de entradas: {totalTickets}
             </Text>
 
@@ -562,7 +583,7 @@ export default function CreateEventScreen() {
                     Entradas generales - Early Birds:
                   </Text>
                   <View style={styles.ticketInputs}>
-                    <Text>Cantidad:</Text>
+                    <Text>Cant.:</Text>
                     <TextInput
                       style={styles.smallInput}
                       keyboardType="numeric"
@@ -591,7 +612,7 @@ export default function CreateEventScreen() {
                     Entradas VIP - Early Birds:
                   </Text>
                   <View style={styles.ticketInputs}>
-                    <Text>Cantidad:</Text>
+                    <Text>Cant.:</Text>
                     <TextInput
                       style={styles.smallInput}
                       keyboardType="numeric"
@@ -618,7 +639,7 @@ export default function CreateEventScreen() {
                 <View style={styles.ticketRow}>
                   <Text style={styles.ticketLabel}>Entradas generales:</Text>
                   <View style={styles.ticketInputs}>
-                    <Text>Cantidad:</Text>
+                    <Text>Cant.:</Text>
                     <TextInput
                       style={styles.smallInput}
                       keyboardType="numeric"
@@ -645,7 +666,7 @@ export default function CreateEventScreen() {
                 <View style={styles.ticketRow}>
                   <Text style={styles.ticketLabel}>Entradas VIP:</Text>
                   <View style={styles.ticketInputs}>
-                    <Text>Cantidad:</Text>
+                    <Text>Cant.:</Text>
                     <TextInput
                       style={styles.smallInput}
                       keyboardType="numeric"
@@ -670,95 +691,100 @@ export default function CreateEventScreen() {
               </View>
             ))}
 
-            {/* Configuración entradas */}
-            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
-              Configuración de entradas:
-            </Text>
-            <DateTimeInputComponent
-              label="Inicio de venta de entradas:"
-              value={startSaleDateTime}
-              onChange={setStartSaleDateTime}
-            />
-
-            <Text style={styles.label}>Vender Early Birds hasta:</Text>
-            <View style={[styles.checkboxItem, { width: 300 }]}>
-              <TouchableOpacity
-                style={styles.checkbox}
-                onPress={() => setEarlyBirdsStock(!earlyBirdsStock)}
-              >
-                {earlyBirdsStock && <View style={styles.checkboxSelected} />}
-              </TouchableOpacity>
-              <Text style={{ marginLeft: 4 }}>Agotar stock</Text>
-            </View>
-
-            <View style={[styles.checkboxItem, { width: 300 }]}>
-              <TouchableOpacity
-                style={styles.checkbox}
-                onPress={() => setUseEarlyBirdsDate(!useEarlyBirdsDate)}
-              >
-                {useEarlyBirdsDate && <View style={styles.checkboxSelected} />}
-              </TouchableOpacity>
-              <Text style={{ marginLeft: 4 }}>Fecha y hora:</Text>
-            </View>
-            {useEarlyBirdsDate && (
+            {/* CONFIG ENTRADAS */}
+            <View style={styles.formGroup}>
+              <Text style={styles.sectionTitle}>Configuración de entradas</Text>
               <DateTimeInputComponent
-                label=""
-                value={earlyBirdsUntilDateTime}
-                onChange={setEarlyBirdsUntilDateTime}
+                label="Inicio de venta de entradas:"
+                value={startSaleDateTime}
+                onChange={setStartSaleDateTime}
               />
-            )}
+              <Text style={styles.subLabel}>Vender Early Birds hasta:</Text>
 
-            {/* MULTIMEDIA - MOVERLO AQUÍ, ANTES DE T&C Y BOTÓN FINAL */}
-            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
-              Multimedia:
-            </Text>
-            <Text style={styles.label}>
-              Foto: <Text style={{ color: COLORS.negative }}>(Obligatoria)</Text>
-            </Text>
-            <TouchableOpacity
-              style={styles.selectFileButton}
-              onPress={handleSelectPhoto}
-            >
-              <Text style={styles.selectFileButtonText}>
-                {photoFile ? "Cambiar foto" : "Seleccionar archivo"}
-              </Text>
-            </TouchableOpacity>
+              <View style={styles.checkboxRow}>
+                <TouchableOpacity
+                  style={styles.checkbox}
+                  onPress={() => setEarlyBirdsStock(!earlyBirdsStock)}
+                >
+                  {earlyBirdsStock && <View style={styles.checkboxSelected} />}
+                </TouchableOpacity>
+                <Text style={{ marginLeft: 4 }}>Agotar stock</Text>
+              </View>
 
-            <Text style={[styles.label, { marginTop: 12 }]}>
-              Agregar video: (Opcional)
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Pega el link de Youtube aquí"
-              value={videoLink}
-              onChangeText={setVideoLink}
-            />
-
-            <Text style={[styles.label, { marginTop: 12 }]}>
-              Agregar música: (Opcional)
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Pega el link de Spotify o SoundCloud aquí"
-              value={musicLink}
-              onChangeText={setMusicLink}
-            />
-
-            {/* Términos y condiciones */}
-            <View style={styles.termsRow}>
-              <TouchableOpacity
-                style={styles.checkbox}
-                onPress={() => setAcceptedTC(!acceptedTC)}
-              >
-                {acceptedTC && <View style={styles.checkboxSelected} />}
-              </TouchableOpacity>
-              <Text style={{ marginLeft: 4 }}>
-                Acepto{" "}
-                <Text style={{ color: COLORS.info }}>términos y condiciones</Text>
-              </Text>
+              <View style={styles.checkboxRow}>
+                <TouchableOpacity
+                  style={styles.checkbox}
+                  onPress={() => setUseEarlyBirdsDate(!useEarlyBirdsDate)}
+                >
+                  {useEarlyBirdsDate && <View style={styles.checkboxSelected} />}
+                </TouchableOpacity>
+                <Text style={{ marginLeft: 4 }}>Fecha y hora:</Text>
+              </View>
+              {useEarlyBirdsDate && (
+                <DateTimeInputComponent
+                  label=""
+                  value={earlyBirdsUntilDateTime}
+                  onChange={setEarlyBirdsUntilDateTime}
+                />
+              )}
             </View>
 
-            {/* Botón final */}
+            {/* MULTIMEDIA */}
+            <View style={styles.formGroup}>
+              <Text style={styles.sectionTitle}>Multimedia</Text>
+              <Text style={styles.label}>
+                Foto:{" "}
+                <Text style={{ color: COLORS.negative }}>(Obligatoria)</Text>
+              </Text>
+              <TouchableOpacity
+                style={styles.selectFileButton}
+                onPress={handleSelectPhoto}
+              >
+                <Text style={styles.selectFileButtonText}>
+                  {photoFile ? "Cambiar foto" : "Seleccionar archivo"}
+                </Text>
+              </TouchableOpacity>
+
+              <Text style={[styles.label, { marginTop: 12 }]}>
+                Agregar video: (Opcional)
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Link de Youtube..."
+                value={videoLink}
+                onChangeText={setVideoLink}
+              />
+
+              <Text style={[styles.label, { marginTop: 12 }]}>
+                Agregar música: (Opcional)
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Link de Spotify o SoundCloud..."
+                value={musicLink}
+                onChangeText={setMusicLink}
+              />
+            </View>
+
+            {/* TÉRMINOS Y CONDICIONES */}
+            <View style={styles.formGroup}>
+              <View style={styles.checkboxRow}>
+                <TouchableOpacity
+                  style={styles.checkbox}
+                  onPress={() => setAcceptedTC(!acceptedTC)}
+                >
+                  {acceptedTC && <View style={styles.checkboxSelected} />}
+                </TouchableOpacity>
+                <Text style={{ marginLeft: 4 }}>
+                  Acepto{" "}
+                  <Text style={{ color: COLORS.info }}>
+                    términos y condiciones
+                  </Text>
+                </Text>
+              </View>
+            </View>
+
+            {/* BOTÓN FINAL */}
             <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
               <Text style={styles.submitButtonText}>Crear Evento</Text>
             </TouchableOpacity>
@@ -778,17 +804,18 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    alignItems: "center",
+    // Justifica un poco más los items para mobile
   },
   notLoggedContainer: {
     width: "100%",
     alignItems: "center",
+    marginTop: 24,
   },
   divider: {
     borderBottomWidth: 1,
     borderBottomColor: COLORS.textPrimary,
     width: "100%",
-    marginVertical: 8,
+    marginVertical: 12,
   },
   subtitle: {
     fontSize: FONT_SIZES.body,
@@ -797,8 +824,8 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
   button: {
-    width: "70%",
-    paddingVertical: 12,
+    width: "80%",
+    paddingVertical: 14,
     borderRadius: RADIUS.card,
     alignItems: "center",
     marginVertical: 8,
@@ -837,40 +864,60 @@ const styles = StyleSheet.create({
   demoButtonText: {
     color: COLORS.textSecondary,
   },
+
+  // Form groups
+  formGroup: {
+    marginBottom: 16,
+    width: "100%",
+    alignItems: "center",
+  },
   label: {
-    marginTop: 12,
+    width: "90%",
     fontWeight: "bold",
-    width: 300,
     color: COLORS.textPrimary,
     fontSize: FONT_SIZES.body,
+    marginBottom: 6,
+  },
+  subLabel: {
+    width: "90%",
+    color: COLORS.textSecondary,
+    fontSize: FONT_SIZES.body,
+    marginBottom: 4,
   },
   input: {
+    width: "90%",
     backgroundColor: COLORS.cardBg,
     borderWidth: 1,
     borderColor: COLORS.borderInput,
     borderRadius: RADIUS.card,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    marginTop: 4,
-    width: 300,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
   },
+  multiLineInput: {
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+
+  // Radio
   radioGroup: {
+    width: "90%",
+    flexDirection: "row",
+    justifyContent: "space-around",
     marginTop: 8,
-    marginBottom: 8,
-    width: 300,
   },
   radioOption: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 4,
   },
   radioCircle: {
-    height: 20,
     width: 20,
+    height: 20,
     borderRadius: 10,
     borderWidth: 2,
     borderColor: COLORS.textPrimary,
-    marginRight: 8,
+    marginRight: 6,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -880,17 +927,115 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: COLORS.textPrimary,
   },
-  checkboxContainer: {
+  radioText: {
+    color: COLORS.textPrimary,
+  },
+
+  // Géneros
+  genresContainer: {
+    width: "90%",
     flexDirection: "row",
     flexWrap: "wrap",
     marginTop: 8,
-    width: 300,
   },
-  checkboxItem: {
+  genreChip: {
+    backgroundColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  genreChipSelected: {
+    backgroundColor: COLORS.primary,
+  },
+  genreChipText: {
+    color: COLORS.textPrimary,
+    fontWeight: "500",
+  },
+  genreChipTextSelected: {
+    color: COLORS.cardBg,
+  },
+
+  // Artistas
+  artistRow: {
+    width: "90%",
     flexDirection: "row",
     alignItems: "center",
-    width: "45%",
+  },
+  addArtistButton: {
+    backgroundColor: COLORS.textPrimary,
+    borderRadius: RADIUS.card,
+    marginLeft: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  addArtistButtonText: {
+    color: COLORS.cardBg,
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  addedArtistsContainer: {
+    width: "90%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 8,
+  },
+  artistTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.borderInput,
+    padding: 6,
+    borderRadius: RADIUS.card,
+    marginRight: 8,
     marginBottom: 8,
+  },
+  artistName: {
+    marginRight: 4,
+    color: COLORS.textPrimary,
+  },
+  removeArtist: {
+    color: COLORS.negative,
+    fontWeight: "bold",
+  },
+
+  // Dropdowns
+  dropdownButton: {
+    width: "90%",
+    backgroundColor: COLORS.backgroundLight,
+    borderWidth: 1,
+    borderColor: COLORS.textPrimary,
+    borderRadius: RADIUS.card,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+    justifyContent: "center",
+  },
+  dropdownText: {
+    color: COLORS.textPrimary,
+  },
+  dropdownContainer: {
+    width: "90%",
+    borderWidth: 1,
+    borderColor: COLORS.textPrimary,
+    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.cardBg,
+    marginBottom: 8,
+    alignSelf: "center",
+  },
+  dropdownItem: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+
+  checkboxRow: {
+    width: "90%",
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 6,
   },
   checkbox: {
     width: 20,
@@ -906,83 +1051,15 @@ const styles = StyleSheet.create({
     height: 12,
     backgroundColor: COLORS.textPrimary,
   },
-  artistInputRow: {
-    flexDirection: "row",
-    marginTop: 4,
-    width: 300,
-  },
-  addArtistButton: {
-    backgroundColor: COLORS.textPrimary,
-    borderRadius: 4,
-    marginLeft: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  addArtistButtonText: {
-    color: COLORS.cardBg,
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  addedArtistsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 8,
-    width: 300,
-  },
-  artistTag: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.borderInput,
-    padding: 6,
-    borderRadius: 4,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  artistName: {
-    marginRight: 4,
-  },
-  removeArtist: {
-    color: COLORS.negative,
-    fontWeight: "bold",
-  },
-  sectionTitle: {
-    fontWeight: "bold",
-    fontSize: FONT_SIZES.subTitle,
-    width: 300,
-    marginTop: 12,
-    color: COLORS.textPrimary,
-  },
-  dropdownButton: {
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: COLORS.textPrimary,
-    borderRadius: 4,
-    backgroundColor: COLORS.backgroundLight,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    width: 300,
-  },
-  dropdownContainer: {
-    borderWidth: 1,
-    borderColor: COLORS.textPrimary,
-    borderRadius: 4,
-    backgroundColor: COLORS.cardBg,
-    width: 300,
-    marginBottom: 4,
-  },
-  dropdownItem: {
-    padding: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
+
   // Bloque de entradas por día
   dayBlock: {
-    backgroundColor: COLORS.borderInput, // un gris clarito
-    borderRadius: 4,
-    padding: 8,
+    width: "90%",
+    backgroundColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    padding: 10,
     marginBottom: 12,
+    alignSelf: "center",
   },
   dayBlockTitle: {
     fontWeight: "bold",
@@ -990,7 +1067,6 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   ticketRow: {
-    width: "100%",
     marginTop: 8,
   },
   ticketLabel: {
@@ -1007,16 +1083,33 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBg,
     borderWidth: 1,
     borderColor: COLORS.borderInput,
-    borderRadius: 4,
+    borderRadius: RADIUS.card,
     marginHorizontal: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
     width: 60,
     textAlign: "center",
+    color: COLORS.textPrimary,
   },
+
+  // Secciones
+  sectionTitle: {
+    fontWeight: "bold",
+    fontSize: FONT_SIZES.subTitle,
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+    alignSelf: "center",
+  },
+  infoText: {
+    color: COLORS.textSecondary,
+    marginBottom: 8,
+    alignSelf: "center",
+  },
+
+  // Botón de seleccionar archivo (foto)
   selectFileButton: {
     backgroundColor: COLORS.textPrimary,
-    borderRadius: 4,
+    borderRadius: RADIUS.card,
     paddingVertical: 8,
     paddingHorizontal: 12,
     alignSelf: "flex-start",
@@ -1026,23 +1119,30 @@ const styles = StyleSheet.create({
     color: COLORS.cardBg,
     fontWeight: "bold",
   },
+
+  // Términos y condiciones
   termsRow: {
+    width: "90%",
     flexDirection: "row",
-    width: 300,
     marginTop: 16,
     alignItems: "center",
+    alignSelf: "center",
   },
+
+  // Botón final
   submitButton: {
     backgroundColor: COLORS.primary,
     marginTop: 20,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: RADIUS.card,
     alignItems: "center",
-    width: 200,
+    width: "80%",
     alignSelf: "center",
+    marginBottom: 30, // un extra bottom spacing
   },
   submitButtonText: {
     color: COLORS.cardBg,
     fontWeight: "bold",
+    fontSize: FONT_SIZES.body,
   },
 });

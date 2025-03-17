@@ -1,68 +1,80 @@
 // screens/ManageEventsScreen.tsx
 import React, { useState, useMemo } from "react";
-import { SafeAreaView, FlatList, StyleSheet, View } from "react-native";
+import {
+  SafeAreaView,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+} from "react-native";
 import { useRouter } from "expo-router";
 
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
-import FilterBar from "@/components/FilterBar";
+import SearchBarComponent from "@/components/SearchBarComponent";
 import OwnerEventCard from "@/components/OwnerEventCard";
+
 import { getOwnerEvents } from "@/utils/ownerEventsHelper";
 import { OwnerEventItem } from "@/interfaces/OwnerEventItem";
-import { COLORS } from "@/styles/globalStyles";
+import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function ManageEventsScreen() {
   const router = useRouter();
 
-  const [filterStatus, setFilterStatus] = useState("todos");
-  const [orderBy, setOrderBy] = useState("asc");
+  // Estados disponibles (chips): "Todos", "Vigente", "Pendiente de aprobación", "Finalizado"
+  const statusChips = [
+    { label: "Todos", value: "todos" },
+    { label: "Vigente", value: "vigente" },
+    { label: "Pendiente de aprobación", value: "pendiente" },
+    { label: "Finalizado", value: "finalizado" },
+  ];
+
+  // Estado seleccionado
+  const [selectedStatus, setSelectedStatus] = useState<string>("todos");
+
+  // Texto de búsqueda
   const [searchText, setSearchText] = useState("");
 
+  // Obtener eventos (mock o API)
   const allEvents = getOwnerEvents();
 
+  // Filtrado y ordenado con useMemo
   const filteredEvents = useMemo(() => {
     let events = [...allEvents];
 
-    // 1. Filtrar por estado
-    if (filterStatus !== "todos") {
-      events = events.filter((ev) => ev.status === filterStatus);
+    // Filtrar por estado
+    if (selectedStatus !== "todos") {
+      events = events.filter((ev) => ev.status === selectedStatus);
     }
 
-    // 2. Búsqueda por nombre
-    if (searchText.trim().length > 0) {
-      const lowerSearch = searchText.toLowerCase();
+    // Búsqueda por nombre
+    if (searchText.trim()) {
+      const lower = searchText.toLowerCase();
       events = events.filter((ev) =>
-        ev.eventName.toLowerCase().includes(lowerSearch)
+        ev.eventName.toLowerCase().includes(lower)
       );
     }
 
-    // 3. Ordenar: finalizados al final, y luego por fecha asc/desc
+    // Empujar "finalizado" al final, y luego ordenar por fecha asc (opcional)
     events.sort((a, b) => {
-      // Primero, empujamos "finalizado" al final
-      if (a.status === "finalizado" && b.status !== "finalizado") {
-        return 1; // a va después
-      }
-      if (b.status === "finalizado" && a.status !== "finalizado") {
-        return -1; // b va después
-
-      } else {
-        // Si ambos son finalizados o ambos no lo son, ordenamos por fecha
-        const [dayA, monthA, yearA] = a.date.split("/").map(Number);
-        const [dayB, monthB, yearB] = b.date.split("/").map(Number);
-
-        const dateA = new Date(yearA, monthA - 1, dayA).getTime();
-        const dateB = new Date(yearB, monthB - 1, dayB).getTime();
-
-        return orderBy === "asc" ? dateA - dateB : dateB - dateA;
-      }
+      if (a.status === "finalizado" && b.status !== "finalizado") return 1;
+      if (b.status === "finalizado" && a.status !== "finalizado") return -1;
+      // Si ambos finalizados o ambos no, podrías ordenar por fecha
+      // (ej. ascendente). Ajusta si lo deseas
+      const [dA, mA, yA] = a.date.split("/").map(Number);
+      const [dB, mB, yB] = b.date.split("/").map(Number);
+      const dateA = new Date(yA, mA - 1, dA).getTime();
+      const dateB = new Date(yB, mB - 1, dB).getTime();
+      return dateA - dateB;
     });
 
     return events;
-  }, [allEvents, filterStatus, orderBy, searchText]);
+  }, [allEvents, selectedStatus, searchText]);
 
-  // Handlers
+  // Handlers para acciones en las cards
   const handleTicketsSold = (eventId: number) => {
-    router.push(`/owner/TicketsSoldScreen?id=${eventId}`);
+    router.push(`/owner/TicketSoldScreen?id=${eventId}`);
   };
   const handleModify = (eventId: number) => {
     router.push(`/owner/ModifyEventScreen?id=${eventId}`);
@@ -71,40 +83,69 @@ export default function ManageEventsScreen() {
     router.push(`/owner/CancelEventScreen?id=${eventId}`);
   };
 
-  // RENDER HEADER
-  const renderHeader = () => {
-    return (
-      <View style={{ paddingHorizontal: 8 }}>
-        <FilterBar
-          filterStatus={filterStatus}
-          onFilterStatusChange={setFilterStatus}
-          orderBy={orderBy}
-          onOrderByChange={setOrderBy}
-          searchText={searchText}
-          onSearchTextChange={setSearchText}
-        />
-      </View>
-    );
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <Header />
 
-      <FlatList
-        data={filteredEvents}
-        keyExtractor={(item) => item.id.toString()}
-        ListHeaderComponent={renderHeader}
-        contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => (
-          <OwnerEventCard
-            item={item}
-            onTicketsSold={handleTicketsSold}
-            onModify={handleModify}
-            onCancel={handleCancel}
-          />
+      {/* Sección de filtros (chips horizontales) */}
+      <View style={styles.chipsContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipsScroll}
+        >
+          {statusChips.map((chip, idx) => {
+            const isActive = chip.value === selectedStatus;
+            return (
+              <TouchableOpacity
+                key={idx}
+                style={[
+                  styles.chip,
+                  isActive && styles.chipActive,
+                ]}
+                onPress={() => setSelectedStatus(chip.value)}
+              >
+                <Text
+                  style={[
+                    styles.chipText,
+                    isActive && styles.chipTextActive,
+                  ]}
+                >
+                  {chip.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Search bar (separado de los eventos) */}
+      <View style={styles.searchContainer}>
+        <SearchBarComponent
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="Buscar por nombre..."
+        />
+      </View>
+
+      {/* Lista de eventos filtrados */}
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {filteredEvents.length === 0 ? (
+          <Text style={styles.noEventsText}>
+            No se encontraron eventos con esos filtros.
+          </Text>
+        ) : (
+          filteredEvents.map((item) => (
+            <OwnerEventCard
+              key={item.id}
+              item={item}
+              onTicketsSold={handleTicketsSold}
+              onModify={handleModify}
+              onCancel={handleCancel}
+            />
+          ))
         )}
-      />
+      </ScrollView>
 
       <Footer />
     </SafeAreaView>
@@ -116,7 +157,55 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.backgroundLight,
   },
-  listContent: {
+  // Contenedor de chips (filtros)
+  chipsContainer: {
+    paddingHorizontal: 8,
+    paddingTop: 8,
+  },
+  chipsScroll: {
+    marginBottom: 8,
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    // Fondo blanco
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: COLORS.textPrimary,
+  },
+  chipActive: {
+    // Fondo negro (o textoPrimario) cuando está activo
+    backgroundColor: COLORS.textPrimary,
+  },
+  chipText: {
+    // Texto negro
+    color: COLORS.textPrimary,
+    fontWeight: "bold",
+  },
+  chipTextActive: {
+    // Texto blanco
+    color: COLORS.cardBg,
+  },
+
+  // Search bar
+  searchContainer: {
+    marginHorizontal: 8,
+    marginBottom: 8,
+  },
+
+  // Scroll principal
+  scrollContent: {
     paddingBottom: 16,
+    paddingHorizontal: 8,
+  },
+  noEventsText: {
+    color: COLORS.textSecondary,
+    fontSize: FONT_SIZES.body,
+    marginTop: 20,
+    textAlign: "center",
   },
 });

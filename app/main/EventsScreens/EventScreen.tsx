@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   Linking,
 } from "react-native";
-import { Button, Text, Title, IconButton } from "react-native-paper";
+import { Button, Text, IconButton } from "react-native-paper";
 import { useLocalSearchParams } from "expo-router";
 
 import Header from "@/components/LayoutComponents/HeaderComponent";
@@ -21,9 +21,9 @@ import { getEventById } from "@/utils/eventHelpers";
 import { EventItem } from "@/interfaces/EventProps";
 
 // Importa tus estilos globales
-import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-// Reseñas de ejemplo
+// Reseñas de ejemplo (mock)
 const mockReviews: ReviewItem[] = [
   {
     id: 1,
@@ -35,8 +35,7 @@ const mockReviews: ReviewItem[] = [
   {
     id: 2,
     user: "Usuario27",
-    comment:
-      "Buena organización, pero faltó variedad de comida.",
+    comment: "Buena organización, pero faltó variedad de comida.",
     rating: 4,
     daysAgo: 6,
   },
@@ -59,7 +58,7 @@ export default function EventScreen() {
       <SafeAreaView style={styles.container}>
         <Header />
         <View style={styles.notFoundContainer}>
-          <Text>Evento no encontrado.</Text>
+          <Text style={styles.notFoundText}>Evento no encontrado.</Text>
         </View>
         <Footer />
       </SafeAreaView>
@@ -77,7 +76,8 @@ export default function EventScreen() {
     <SafeAreaView style={styles.container}>
       <Header />
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+
         {/* Imagen principal con botón de favorito */}
         <View style={styles.imageContainer}>
           <Image source={{ uri: eventData.imageUrl }} style={styles.img} />
@@ -90,39 +90,52 @@ export default function EventScreen() {
           />
         </View>
 
-        <Title style={styles.title}>{eventData.title}</Title>
+        {/* Tarjeta con la info del evento */}
+        <View style={styles.eventCard}>
+          <Text style={styles.eventTitle}>{eventData.title}</Text>
 
-        <View style={styles.info}>
-          {/* Botón con ícono de calendario + texto */}
-          <Button icon="calendar" labelStyle={styles.iconLabel}>
-            <Text style={styles.buttonText}>
+          {/* Fecha y hora */}
+          <View style={styles.infoRow}>
+            <IconButton
+              icon="calendar"
+              size={20}
+              iconColor={COLORS.textPrimary}
+              style={styles.iconNoPadding}
+            />
+            <Text style={styles.infoText}>
               {eventData.date} de {eventData.timeRange}
             </Text>
-          </Button>
+          </View>
 
-          {/* Dirección (texto normal) */}
+          {/* Dirección */}
           <Text style={styles.addressText}>{eventData.address}</Text>
 
-          {/* Botón "Como llegar" para abrir Google Maps */}
+          {/* Botón "Cómo llegar" */}
           <TouchableOpacity style={styles.mapButton} onPress={openMap}>
-            <Text style={styles.mapButtonText}>Como llegar</Text>
+            <Text style={styles.mapButtonText}>Cómo llegar</Text>
           </TouchableOpacity>
 
           {/* Descripción */}
           <Text style={styles.description}>{eventData.description}</Text>
         </View>
 
-        {/* Sección para comprar tickets */}
-        <BuyTicket />
+        {/* Tarjeta para comprar tickets */}
+        <View style={styles.ticketCard}>
+          <BuyTicket />
 
-        <View style={styles.btnBuyView}>
-          <TouchableOpacity style={styles.btnBuy}>
-            <Text style={styles.btnBuyTxt}>Comprar</Text>
-          </TouchableOpacity>
+          {/* Botón comprar (debajo de BuyTicket) */}
+          <View style={styles.buyButtonContainer}>
+            <TouchableOpacity style={styles.buyButton}>
+              <Text style={styles.buyButtonText}>Comprar</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Reseñas */}
-        <ReviewComponent reviews={mockReviews} />
+        {/* Tarjeta con reseñas */}
+        <View style={styles.reviewCard}>
+          <ReviewComponent reviews={mockReviews} />
+        </View>
+
       </ScrollView>
 
       <Footer />
@@ -135,18 +148,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.backgroundLight,
   },
+  scrollContent: {
+    paddingBottom: 24,
+  },
+
+  // Cuando no se encuentra el evento
   notFoundContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
+  notFoundText: {
+    color: COLORS.textPrimary,
+    fontSize: FONT_SIZES.body,
+  },
+
+  // Imagen principal
   imageContainer: {
     position: "relative",
   },
   img: {
     width: "100%",
     height: 300,
-    alignSelf: "flex-start",
   },
   heartButton: {
     position: "absolute",
@@ -155,60 +178,109 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBg,
     borderRadius: 20,
   },
-  title: {
-    fontWeight: "bold",
-    marginLeft: 8,
+
+  // Tarjeta con la info del evento
+  eventCard: {
+    backgroundColor: COLORS.cardBg,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: RADIUS.card,
+    padding: 16,
+    // Sombra suave
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  eventTitle: {
     fontSize: FONT_SIZES.subTitle,
+    fontWeight: "bold",
     color: COLORS.textPrimary,
+    marginBottom: 8,
   },
-  info: {
-    alignItems: "flex-start",
-    marginLeft: 8,
-    marginTop: 8,
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
   },
-  iconLabel: {
+  iconNoPadding: {
+    margin: 0,
+  },
+  infoText: {
     color: COLORS.textPrimary,
-  },
-  buttonText: {
-    color: COLORS.textPrimary,
+    fontSize: FONT_SIZES.body,
   },
   addressText: {
-    marginTop: 6,
+    marginBottom: 8,
     fontSize: FONT_SIZES.body,
-    color: COLORS.textPrimary,
+    color: COLORS.textSecondary,
   },
   mapButton: {
+    alignSelf: "flex-start",
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.card,
     paddingVertical: 6,
     paddingHorizontal: 12,
-    alignSelf: "flex-start",
-    marginTop: 6,
+    marginBottom: 8,
   },
   mapButtonText: {
     color: COLORS.cardBg,
     fontWeight: "bold",
   },
   description: {
-    margin: 10,
+    marginTop: 4,
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
+    textAlign: "justify",
+    lineHeight: 20,
   },
-  btnBuyView: {
+
+  // Tarjeta para BuyTicket + botón comprar
+  ticketCard: {
+    backgroundColor: COLORS.cardBg,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: RADIUS.card,
+    padding: 16,
+    // Sombra
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  buyButtonContainer: {
     alignItems: "flex-end",
-    marginRight: 20,
+    marginTop: 8,
   },
-  btnBuy: {
+  buyButton: {
     backgroundColor: COLORS.textPrimary,
-    height: 50,
+    borderRadius: RADIUS.card,
     width: 150,
+    height: 45,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: RADIUS.card,
   },
-  btnBuyTxt: {
+  buyButtonText: {
     color: COLORS.cardBg,
     fontSize: FONT_SIZES.button,
     fontWeight: "bold",
+  },
+
+  // Tarjeta para reseñas
+  reviewCard: {
+    backgroundColor: COLORS.cardBg,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    borderRadius: RADIUS.card,
+    padding: 16,
+    // Sombra
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
   },
 });

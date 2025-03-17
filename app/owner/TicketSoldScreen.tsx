@@ -1,6 +1,13 @@
 // owner/TicketsSoldScreen.tsx
 import React, { useState, useEffect } from "react";
-import { SafeAreaView, ScrollView, View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  SafeAreaView,
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+} from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import Header from "@/components/LayoutComponents/HeaderComponent";
@@ -9,14 +16,15 @@ import Footer from "@/components/LayoutComponents/FooterComponent";
 import { OwnerEventTicketsSoldData } from "@/interfaces/OwnerEventTicketsSold";
 import { getTicketsSoldDataById } from "@/utils/ownerEventTicketsSoldHelper";
 
-// Importa tu globalStyles
+// Importa tus estilos globales
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function TicketsSoldScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
 
-  const [ticketsSoldData, setTicketsSoldData] = useState<OwnerEventTicketsSoldData | null>(null);
+  const [ticketsSoldData, setTicketsSoldData] =
+    useState<OwnerEventTicketsSoldData | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -31,8 +39,10 @@ export default function TicketsSoldScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <Header />
-        <View style={styles.contentWrapper}>
-          <Text>No se encontró información de entradas vendidas para este evento.</Text>
+        <View style={styles.notFoundWrapper}>
+          <Text style={styles.notFoundText}>
+            No se encontró información de entradas vendidas para este evento.
+          </Text>
         </View>
         <Footer />
       </SafeAreaView>
@@ -44,6 +54,7 @@ export default function TicketsSoldScreen() {
       <Header />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Título principal */}
         <Text style={styles.title}>
           Entradas vendidas de {ticketsSoldData.eventName}
         </Text>
@@ -52,29 +63,35 @@ export default function TicketsSoldScreen() {
           Información al {ticketsSoldData.lastUpdate}
         </Text>
 
-        {/* Tabla de entradas vendidas */}
-        <View style={styles.tableContainer}>
-          {/* Encabezado de la tabla */}
-          <View style={styles.tableHeaderRow}>
-            <Text style={[styles.headerCell, styles.typeCell]}>Tipo de entrada</Text>
-            <Text style={[styles.headerCell, styles.priceCell]}>Precio</Text>
-            <Text style={[styles.headerCell, styles.qtyCell]}>Cantidad</Text>
-            <Text style={[styles.headerCell, styles.totalCell]}>Total</Text>
-            <Text style={[styles.headerCell, styles.stockCell]}>Aún en stock</Text>
-          </View>
-
-          {/* Filas */}
+        {/* Tarjetas de entradas vendidas */}
+        <View style={styles.cardsContainer}>
           {ticketsSoldData.rows.map((row, index) => (
-            <View key={index} style={styles.tableRow}>
-              <Text style={[styles.cell, styles.typeCell]}>{row.type}</Text>
-              <Text style={[styles.cell, styles.priceCell]}>
-                ${row.price.toLocaleString()}
-              </Text>
-              <Text style={[styles.cell, styles.qtyCell]}>{row.quantity}</Text>
-              <Text style={[styles.cell, styles.totalCell]}>
-                ${row.total.toLocaleString()}
-              </Text>
-              <Text style={[styles.cell, styles.stockCell]}>{row.inStock}</Text>
+            <View key={index} style={styles.ticketCard}>
+              <Text style={styles.ticketTitle}>{row.type}</Text>
+
+              <View style={styles.ticketInfoRow}>
+                <Text style={styles.label}>Precio:</Text>
+                <Text style={styles.value}>
+                  ${row.price.toLocaleString()}
+                </Text>
+              </View>
+
+              <View style={styles.ticketInfoRow}>
+                <Text style={styles.label}>Cantidad:</Text>
+                <Text style={styles.value}>{row.quantity}</Text>
+              </View>
+
+              <View style={styles.ticketInfoRow}>
+                <Text style={styles.label}>Total:</Text>
+                <Text style={styles.value}>
+                  ${row.total.toLocaleString()}
+                </Text>
+              </View>
+
+              <View style={styles.ticketInfoRow}>
+                <Text style={styles.label}>En stock:</Text>
+                <Text style={styles.value}>{row.inStock}</Text>
+              </View>
             </View>
           ))}
         </View>
@@ -82,7 +99,9 @@ export default function TicketsSoldScreen() {
         {/* Totales */}
         <Text style={styles.footerText}>
           Total de entradas vendidas:{" "}
-          <Text style={styles.totalNumber}>{ticketsSoldData.totalTickets}</Text>
+          <Text style={styles.totalNumber}>
+            {ticketsSoldData.totalTickets}
+          </Text>
         </Text>
         <Text style={styles.footerText}>
           Total recaudado al momento:{" "}
@@ -92,7 +111,10 @@ export default function TicketsSoldScreen() {
         </Text>
 
         {/* Botón Volver */}
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
           <Text style={styles.backButtonText}>Volver</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -102,94 +124,96 @@ export default function TicketsSoldScreen() {
   );
 }
 
-// Estilos
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.backgroundLight,
   },
-  contentWrapper: {
+  notFoundWrapper: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
+  notFoundText: {
+    color: COLORS.textPrimary,
+    fontSize: FONT_SIZES.body,
+    textAlign: "center",
+    paddingHorizontal: 16,
+  },
   scrollContent: {
     padding: 16,
+    paddingBottom: 32, // un poco más de espacio al final
   },
   title: {
     fontSize: FONT_SIZES.subTitle, // 18-20
     fontWeight: "bold",
     color: COLORS.textPrimary,
     marginBottom: 8,
+    textAlign: "center",
   },
   subInfo: {
     fontSize: FONT_SIZES.body,
     color: COLORS.textSecondary,
     marginBottom: 16,
+    textAlign: "center",
   },
-  tableContainer: {
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
-    borderRadius: RADIUS.card,
-    overflow: "hidden",
+
+  // Contenedor para las tarjetas
+  cardsContainer: {
     marginBottom: 16,
   },
-  tableHeaderRow: {
-    flexDirection: "row",
-    backgroundColor: COLORS.textPrimary, // por ejemplo, un fondo oscuro
-    padding: 8,
+  // Cada tarjeta de ticket
+  ticketCard: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    padding: 16,
+    marginBottom: 12,
+    // Sombra suave (opcional)
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  headerCell: {
+  ticketTitle: {
+    fontSize: FONT_SIZES.body,
     fontWeight: "bold",
-    color: COLORS.cardBg, // blanco
-    fontSize: FONT_SIZES.smallText,
+    color: COLORS.textPrimary,
+    marginBottom: 8,
   },
-  tableRow: {
+  ticketInfoRow: {
     flexDirection: "row",
-    padding: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderInput,
+    marginBottom: 4,
   },
-  cell: {
-    fontSize: FONT_SIZES.smallText,
+  label: {
+    color: COLORS.textPrimary,
+    fontWeight: "600",
+    marginRight: 4,
+  },
+  value: {
     color: COLORS.textPrimary,
   },
-  // Ajustes de ancho (puedes cambiar flex para adaptarlo)
-  typeCell: {
-    flex: 2,
-  },
-  priceCell: {
-    flex: 1,
-    textAlign: "right",
-  },
-  qtyCell: {
-    flex: 1,
-    textAlign: "right",
-  },
-  totalCell: {
-    flex: 1,
-    textAlign: "right",
-  },
-  stockCell: {
-    flex: 1,
-    textAlign: "right",
-  },
+
+  // Totales al final
   footerText: {
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
     marginBottom: 4,
+    textAlign: "center",
   },
   totalNumber: {
     fontWeight: "bold",
-    color: COLORS.info, // un color llamativo
+    color: COLORS.info,
   },
   totalMoney: {
     fontWeight: "bold",
-    color: COLORS.positive, // verde, p.ej.
+    color: COLORS.positive, // verde
   },
+
+  // Botón "Volver"
   backButton: {
-    backgroundColor: COLORS.alternative, // un azul oscuro
-    paddingVertical: 10,
+    backgroundColor: COLORS.alternative, // un color azul/oscuro
+    paddingVertical: 12,
     borderRadius: RADIUS.card,
     alignItems: "center",
     marginTop: 16,

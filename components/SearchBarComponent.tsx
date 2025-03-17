@@ -3,9 +3,11 @@ import React from "react";
 import { StyleSheet, View } from "react-native";
 import { TextInput } from "react-native-paper";
 import { SearchBarProps } from "@/interfaces/SearchBarProps";
+import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-import globalStyles, { COLORS } from "@/styles/globalStyles";
-
+/**
+ * SearchBar que se ve con fondo blanco, ícono de lupa, etc.
+ */
 const SearchBar: React.FC<SearchBarProps> = ({
   value,
   onChangeText,
@@ -18,20 +20,31 @@ const SearchBar: React.FC<SearchBarProps> = ({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        left={<TextInput.Icon icon="magnify" color={COLORS.textPrimary} size={24} />}
+        left={<TextInput.Icon icon="magnify" color={COLORS.textPrimary} />}
         style={styles.input}
+        outlineStyle={styles.outline}
+        textColor={COLORS.textPrimary}
+        placeholderTextColor={COLORS.textSecondary}
       />
     </View>
   );
 };
 
+export default SearchBar;
+
 const styles = StyleSheet.create({
   container: {
-    margin: 10,
+    marginHorizontal: 8,
+    marginTop: 8,
   },
   input: {
-    backgroundColor: globalStyles.COLORS.cardBg, // Blanco
+    backgroundColor: COLORS.cardBg, // Blanco
+    borderRadius: RADIUS.card,
+    fontSize: FONT_SIZES.body,
+  },
+  outline: {
+    borderRadius: RADIUS.card,
+    borderColor: COLORS.borderInput,
+    borderWidth: 1,
   },
 });
-
-export default SearchBar;

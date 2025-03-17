@@ -21,13 +21,6 @@ export default function RegisterUserScreen() {
         height={50}
         onPress={() => console.log("Crear cuenta")}
       />
-      <ButtonInApp
-        icon="google"
-        text="Registrarse con google"
-        width="75%"
-        height={50}
-        onPress={() => console.log("Crear cuenta con google")}
-      />
     </View>
   );
 }
