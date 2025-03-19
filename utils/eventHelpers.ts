@@ -18,15 +18,17 @@ interface DayTickets {
 export interface ExtendedEventItem {
   id: number;
   title: string;
-  date: string;       // "dd/mm/yyyy"
-  timeRange: string;  // "HHhs a HHhs"
+  date: string;         // "dd/mm/yyyy"
+  timeRange: string;    // "HHhs a HHhs"
   address: string;
   description: string;
   imageUrl: string;
-  type: string;       // Rave, Techno, etc.
-  days: number;       // 1, 2 o 3
+  type: string;         // Rave, Techno, etc.
+  days: number;         // 1, 2 o 3
   ticketsByDay: DayTickets[];
-  isRecurrent: boolean;  // true => evento recurrente (mostrar reseñas)
+  isRecurrent: boolean; // true => evento recurrente (mostrar reseñas)
+  isAfter: boolean;     // true => es un after
+  isLGBT: boolean;      // true => es evento LGBT
 }
 
 /** Arreglo de reseñas de ejemplo (podrías moverlo a otro archivo). */
@@ -48,7 +50,7 @@ export const mockReviews: ReviewItem[] = [
 ];
 
 const mockEvents: ExtendedEventItem[] = [
-  // 1) Evento de 1 día, NO recurrente (sin reseñas)
+  // 1) Evento de 1 día, NO recurrente (sin VIP)
   {
     id: 1,
     title: "Evento Single Day #1",
@@ -73,6 +75,8 @@ const mockEvents: ExtendedEventItem[] = [
       },
     ],
     isRecurrent: false,
+    isAfter: false,
+    isLGBT: false,
   },
 
   // 2) Evento de 1 día, recurrente (con reseñas)
@@ -100,6 +104,8 @@ const mockEvents: ExtendedEventItem[] = [
       },
     ],
     isRecurrent: true,
+    isAfter: true,    // Ej: after
+    isLGBT: false,
   },
 
   // 3) Evento de 1 día, NO recurrente
@@ -127,6 +133,8 @@ const mockEvents: ExtendedEventItem[] = [
       },
     ],
     isRecurrent: false,
+    isAfter: false,
+    isLGBT: true,     // Ej: LGBT
   },
 
   // 4) Evento de 2 días, recurrente (con reseñas)
@@ -165,6 +173,8 @@ const mockEvents: ExtendedEventItem[] = [
       },
     ],
     isRecurrent: true,
+    isAfter: false,
+    isLGBT: false,
   },
 
   // 5) Evento de 2 días, NO recurrente
@@ -203,6 +213,8 @@ const mockEvents: ExtendedEventItem[] = [
       },
     ],
     isRecurrent: false,
+    isAfter: false,
+    isLGBT: true,
   },
 
   // 6) Evento de 2 días, NO recurrente
@@ -241,6 +253,8 @@ const mockEvents: ExtendedEventItem[] = [
       },
     ],
     isRecurrent: false,
+    isAfter: true,
+    isLGBT: false,
   },
 
   // 7) Evento de 3 días, recurrente
@@ -290,6 +304,8 @@ const mockEvents: ExtendedEventItem[] = [
       },
     ],
     isRecurrent: true,
+    isAfter: true,
+    isLGBT: false,
   },
 
   // 8) Evento de 3 días, NO recurrente
@@ -339,6 +355,8 @@ const mockEvents: ExtendedEventItem[] = [
       },
     ],
     isRecurrent: false,
+    isAfter: false,
+    isLGBT: false,
   },
 
   // 9) Evento de 3 días, recurrente
@@ -388,7 +406,67 @@ const mockEvents: ExtendedEventItem[] = [
       },
     ],
     isRecurrent: true,
+    isAfter: false,
+    isLGBT: false,
   },
+
+  // 10) Evento que cae en la semana actual (ejemplo)
+  {
+    id: 10,
+    title: "Fiesta de la Semana",
+    date: "21/03/2025", // Ajusta si deseas otra fecha
+    timeRange: "22hs a 04hs",
+    address: "Salón Primavera, Ciudad J",
+    description: "Evento especial que sucede esta misma semana.",
+    imageUrl: "https://picsum.photos/700/400?random=110",
+    type: "Electrónica",
+    days: 1,
+    ticketsByDay: [
+      {
+        dayNumber: 1,
+        genEarlyQty: 20,
+        genEarlyPrice: 1000,
+        vipEarlyQty: 5,
+        vipEarlyPrice: 1500,
+        genQty: 50,
+        genPrice: 2000,
+        vipQty: 10,
+        vipPrice: 3000,
+      },
+    ],
+    isRecurrent: false,
+    isAfter: false,
+    isLGBT: false,
+  },
+  // ...
+{
+  id: 11,
+  title: "After LGBT Semanal",
+  date: "21/03/2025", // Ajusta si quieres otra fecha de la semana
+  timeRange: "01hs a 06hs",
+  address: "Salón Diverso, Ciudad K",
+  description: "Un after LGBT que sucede esta misma semana. ¡Imperdible!",
+  imageUrl: "https://picsum.photos/700/400?random=111",
+  type: "Electrónica",
+  days: 1,
+  ticketsByDay: [
+    {
+      dayNumber: 1,
+      genEarlyQty: 10,
+      genEarlyPrice: 1200,
+      vipEarlyQty: 5,
+      vipEarlyPrice: 1800,
+      genQty: 30,
+      genPrice: 2500,
+      vipQty: 15,
+      vipPrice: 4000,
+    },
+  ],
+  isRecurrent: false,
+  isAfter: true,   // Indica que es after
+  isLGBT: true,    // Indica que es LGBT
+},
+
 ];
 
 /** Retorna todos los eventos. */
@@ -400,3 +478,4 @@ export function getAllEvents(): ExtendedEventItem[] {
 export function getEventById(id: number): ExtendedEventItem | null {
   return mockEvents.find((ev) => ev.id === id) ?? null;
 }
+

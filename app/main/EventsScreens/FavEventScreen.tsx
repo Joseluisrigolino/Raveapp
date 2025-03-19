@@ -12,116 +12,68 @@ import { IconButton } from "react-native-paper";
 import { useRouter } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
-// Componentes
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
-import TabMenuComponent from "@/components/TabMenuComponent"; // Importa el mismo que usas en NewsScreen
-import SearchBarComponent from "@/components/SearchBarComponent";
 import CardComponent from "@/components/CardComponent";
+import SearchBarComponent from "@/components/SearchBarComponent";
 
-// Estilos
+// Helpers que traen SOLO favoritos
+import { getAllFavEvents, ExtendedEventItem } from "@/utils/eventFavHelpers";
+
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-/** Ejemplo simulado de evento favorito. Ajusta según tu interfaz real. */
-type FavoriteEvent = {
-  id: number;
-  title: string;
-  description: string;
-  date: string;
-  address: string;
-  imageUrl: string;
-};
+/** Función para determinar si el evento cae en la semana actual (mismo helper que en MenuScreen). */
+function isInCurrentWeek(dateStr: string): boolean {
+  const [day, month, year] = dateStr.split("/").map(Number);
+  const eventDate = new Date(year, month - 1, day);
+
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0 (Dom) ... 6 (Sáb)
+  const startOfWeek = new Date(now);
+  startOfWeek.setHours(0, 0, 0, 0);
+  startOfWeek.setDate(now.getDate() - dayOfWeek);
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+  return eventDate >= startOfWeek && eventDate <= endOfWeek;
+}
 
 export default function FavEventScreen() {
   const router = useRouter();
 
-  // Lista de favoritos definida explícitamente, con IDs del 1 al 5
-  const [favorites, setFavorites] = useState<FavoriteEvent[]>(() => [
-    {
-      id: 1,
-      title: "Fiesta 1",
-      description: "Diviértete con amigos (evento 1)",
-      date: "10/01/2025",
-      address: "Av. Siempre Viva 742",
-      imageUrl: "https://picsum.photos/700/400?random=1",
-    },
-    {
-      id: 2,
-      title: "Fiesta 2",
-      description: "Diviértete con amigos (evento 2)",
-      date: "10/02/2025",
-      address: "Av. Siempre Viva 742",
-      imageUrl: "https://picsum.photos/700/400?random=2",
-    },
-    {
-      id: 3,
-      title: "Fiesta 3",
-      description: "Diviértete con amigos (evento 3)",
-      date: "10/03/2025",
-      address: "Av. Siempre Viva 742",
-      imageUrl: "https://picsum.photos/700/400?random=3",
-    },
-    {
-      id: 4,
-      title: "Fiesta 4",
-      description: "Diviértete con amigos (evento 4)",
-      date: "10/04/2025",
-      address: "Av. Siempre Viva 742",
-      imageUrl: "https://picsum.photos/700/400?random=4",
-    },
-    {
-      id: 5,
-      title: "Fiesta 5",
-      description: "Diviértete con amigos (evento 5)",
-      date: "10/05/2025",
-      address: "Av. Siempre Viva 742",
-      imageUrl: "https://picsum.photos/700/400?random=5",
-    },
-  ]);
+  // Lista de favoritos (mismos campos y estilo que MenuScreen)
+  const [favEvents, setFavEvents] = useState<ExtendedEventItem[]>([]);
 
   // Filtros
   const [searchText, setSearchText] = useState("");
-  const [orderFilter, setOrderFilter] = useState("default");
-
-  // Filtro de fechas
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
 
-  // Filtro de ubicación
   const [locationFilterOpen, setLocationFilterOpen] = useState(false);
   const [locationText, setLocationText] = useState("");
 
-  // Cerrar desplegable de fechas si ya se tienen ambas
+  const [weekActive, setWeekActive] = useState(false);
+  const [afterActive, setAfterActive] = useState(false);
+  const [lgbtActive, setLgbtActive] = useState(false);
+
+  // Cargamos los eventos FAVORITOS al montar
   useEffect(() => {
-    if (startDate && endDate) {
-      setDateFilterOpen(false);
-    }
-  }, [startDate, endDate]);
+    const events = getAllFavEvents();
+    setFavEvents(events);
+  }, []);
 
-  // Cerrar desplegable de ubicación si se escribió algo
-  useEffect(() => {
-    if (locationText.trim() !== "") {
-      setLocationFilterOpen(false);
-    }
-  }, [locationText]);
+  // Filtrado idéntico a MenuScreen
+  const filteredFavs = useMemo(() => {
+    let results = [...favEvents];
 
-  // Saber si el filtro de fecha o ubicación está activo
-  const isDateActive = Boolean(startDate && endDate);
-  const isLocationActive = Boolean(locationText.trim() !== "");
-
-  // Lógica de filtrado con useMemo
-  const filteredFavorites = useMemo(() => {
-    let results = [...favorites];
-
-    // (a) Filtro por nombre
+    // (a) Filtro por texto
     if (searchText.trim() !== "") {
       const lower = searchText.toLowerCase();
-      results = results.filter((ev) =>
-        ev.title.toLowerCase().includes(lower)
-      );
+      results = results.filter((ev) => ev.title.toLowerCase().includes(lower));
     }
 
     // (b) Rango de fechas
@@ -129,51 +81,44 @@ export default function FavEventScreen() {
       results = results.filter((ev) => {
         const [day, month, year] = ev.date.split("/").map(Number);
         const eventTime = new Date(year, month - 1, day).getTime();
-        return (
-          eventTime >= startDate.getTime() && eventTime <= endDate.getTime()
-        );
+        return eventTime >= startDate.getTime() && eventTime <= endDate.getTime();
       });
     }
 
     // (c) Ubicación
     if (locationText.trim() !== "") {
       const locLower = locationText.toLowerCase();
-      results = results.filter((ev) =>
-        ev.address.toLowerCase().includes(locLower)
-      );
+      results = results.filter((ev) => ev.address.toLowerCase().includes(locLower));
     }
 
-    // (d) Orden (ejemplo con "fecha" o "semana")
-    if (orderFilter === "fecha") {
-      results.sort((a, b) => {
-        const [dayA, monthA, yearA] = a.date.split("/").map(Number);
-        const [dayB, monthB, yearB] = b.date.split("/").map(Number);
-        const timeA = new Date(yearA, monthA - 1, dayA).getTime();
-        const timeB = new Date(yearB, monthB - 1, dayB).getTime();
-        return timeA - timeB;
-      });
+    // (d) "Esta semana"
+    if (weekActive) {
+      results = results.filter((ev) => isInCurrentWeek(ev.date));
     }
-    // Si "semana" tuviera lógica especial, la implementas aquí.
+
+    // (e) After
+    if (afterActive) {
+      results = results.filter((ev) => ev.isAfter === true);
+    }
+
+    // (f) LGBT
+    if (lgbtActive) {
+      results = results.filter((ev) => ev.isLGBT === true);
+    }
 
     return results;
-  }, [favorites, searchText, startDate, endDate, locationText, orderFilter]);
+  }, [
+    favEvents,
+    searchText,
+    startDate,
+    endDate,
+    locationText,
+    weekActive,
+    afterActive,
+    lgbtActive,
+  ]);
 
-  // Quitar de favoritos (ícono de corazón)
-  const toggleFavorite = (id: number) => {
-    setFavorites((prev) => prev.filter((ev) => ev.id !== id));
-  };
-
-  // Al pulsar una Card => Ir a EventScreen con su ID
-  const handleCardPress = (eventId: number) => {
-    router.push(`/main/EventsScreens/EventScreen?id=${eventId}`);
-  };
-
-  // Cambiar “orden”
-  const handleSelectOrder = (option: string) => {
-    setOrderFilter(option);
-  };
-
-  // Manejo de date pickers
+  // Handlers para pickers
   const onStartDateChange = (_event: any, selectedDate?: Date) => {
     setShowStartPicker(false);
     if (selectedDate) {
@@ -187,7 +132,20 @@ export default function FavEventScreen() {
     }
   };
 
-  // Funciones para togglear un desplegable y cerrar el otro
+  // Cerrar paneles
+  useEffect(() => {
+    if (startDate && endDate) {
+      setDateFilterOpen(false);
+    }
+  }, [startDate, endDate]);
+
+  useEffect(() => {
+    if (locationText.trim() !== "") {
+      setLocationFilterOpen(false);
+    }
+  }, [locationText]);
+
+  // Toggle panel de fechas / ubicación
   const toggleDateFilter = () => {
     setDateFilterOpen(!dateFilterOpen);
     setLocationFilterOpen(false);
@@ -197,43 +155,25 @@ export default function FavEventScreen() {
     setDateFilterOpen(false);
   };
 
+  // Navegar al detalle
+  const handleCardPress = (eventId?: number) => {
+    if (!eventId) return;
+    router.push(`/main/EventsScreens/EventScreen?id=${eventId}`);
+  };
+
   return (
     <SafeAreaView style={styles.mainContainer}>
       <Header />
 
-      {/* Agregamos el subheader con TabMenuComponent */}
-      <TabMenuComponent
-        tabs={[
-          {
-            label: "Mis tickets",
-            route: "/main/TicketsScreens/TicketPurchasedMenu",
-            isActive: false,
-          },
-          {
-            label: "Eventos favoritos",
-            route: "/main/FavEventScreen",
-            isActive: true,
-          },
-        ]}
-      />
-
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Título */}
-        <Text style={styles.screenTitle}>Eventos favoritos</Text>
-
-        {/* Sección de Filtros + SearchBar */}
+        {/* Filtros - mismos estilos que en MenuScreen */}
         <View style={styles.filtersSection}>
-          {/* Scroll horizontal con 3 chips: Fecha, Ubicación, Esta semana */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.horizontalScroll}
-          >
-            {/* Botón "Fecha" */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+            {/* Botón Fecha */}
             <TouchableOpacity
               style={[
                 styles.filterChip,
-                isDateActive && styles.filterChipActive,
+                (dateFilterOpen || (startDate && endDate)) && styles.filterChipActive,
               ]}
               onPress={toggleDateFilter}
             >
@@ -246,18 +186,18 @@ export default function FavEventScreen() {
               <Text
                 style={[
                   styles.filterChipText,
-                  isDateActive && styles.filterChipTextActive,
+                  (dateFilterOpen || (startDate && endDate)) && styles.filterChipTextActive,
                 ]}
               >
                 Fecha
               </Text>
             </TouchableOpacity>
 
-            {/* Botón "Ubicación" */}
+            {/* Botón Ubicación */}
             <TouchableOpacity
               style={[
                 styles.filterChip,
-                isLocationActive && styles.filterChipActive,
+                (locationFilterOpen || locationText.trim() !== "") && styles.filterChipActive,
               ]}
               onPress={toggleLocationFilter}
             >
@@ -270,17 +210,17 @@ export default function FavEventScreen() {
               <Text
                 style={[
                   styles.filterChipText,
-                  isLocationActive && styles.filterChipTextActive,
+                  (locationFilterOpen || locationText.trim() !== "") && styles.filterChipTextActive,
                 ]}
               >
                 Ubicación
               </Text>
             </TouchableOpacity>
 
-            {/* Botón "Esta semana" */}
+            {/* Botón Esta semana */}
             <TouchableOpacity
-              style={styles.filterChip}
-              onPress={() => handleSelectOrder("semana")}
+              style={[styles.filterChip, weekActive && styles.filterChipActive]}
+              onPress={() => setWeekActive(!weekActive)}
             >
               <IconButton
                 icon="newspaper-plus"
@@ -288,7 +228,56 @@ export default function FavEventScreen() {
                 iconColor={COLORS.textPrimary}
                 style={{ margin: 0 }}
               />
-              <Text style={styles.filterChipText}>Esta semana</Text>
+              <Text
+                style={[
+                  styles.filterChipText,
+                  weekActive && styles.filterChipTextActive,
+                ]}
+              >
+                Esta semana
+              </Text>
+            </TouchableOpacity>
+
+            {/* Botón After */}
+            <TouchableOpacity
+              style={[styles.filterChip, afterActive && styles.filterChipActive]}
+              onPress={() => setAfterActive(!afterActive)}
+            >
+              <IconButton
+                icon="moon-waning-crescent"
+                size={18}
+                iconColor={COLORS.textPrimary}
+                style={{ margin: 0 }}
+              />
+              <Text
+                style={[
+                  styles.filterChipText,
+                  afterActive && styles.filterChipTextActive,
+                ]}
+              >
+                After
+              </Text>
+            </TouchableOpacity>
+
+            {/* Botón LGBT */}
+            <TouchableOpacity
+              style={[styles.filterChip, lgbtActive && styles.filterChipActive]}
+              onPress={() => setLgbtActive(!lgbtActive)}
+            >
+              <IconButton
+                icon="gender-transgender"
+                size={18}
+                iconColor={COLORS.textPrimary}
+                style={{ margin: 0 }}
+              />
+              <Text
+                style={[
+                  styles.filterChipText,
+                  lgbtActive && styles.filterChipTextActive,
+                ]}
+              >
+                LGBT
+              </Text>
             </TouchableOpacity>
           </ScrollView>
 
@@ -297,20 +286,16 @@ export default function FavEventScreen() {
             <SearchBarComponent
               value={searchText}
               onChangeText={setSearchText}
-              placeholder="Buscar por nombre..."
+              placeholder="Buscar evento..."
             />
           </View>
 
-          {/* Desplegable de fechas */}
+          {/* Panel de fechas */}
           {dateFilterOpen && (
             <View style={styles.dateFilterContainer}>
               <Text style={styles.dateFilterLabel}>Seleccionar rango de fechas:</Text>
 
-              {/* Fecha inicio */}
-              <TouchableOpacity
-                style={styles.dateInput}
-                onPress={() => setShowStartPicker(true)}
-              >
+              <TouchableOpacity style={styles.dateInput} onPress={() => setShowStartPicker(true)}>
                 <Text style={styles.dateInputText}>
                   {startDate
                     ? `Desde: ${startDate.toLocaleDateString()}`
@@ -326,11 +311,7 @@ export default function FavEventScreen() {
                 />
               )}
 
-              {/* Fecha fin */}
-              <TouchableOpacity
-                style={styles.dateInput}
-                onPress={() => setShowEndPicker(true)}
-              >
+              <TouchableOpacity style={styles.dateInput} onPress={() => setShowEndPicker(true)}>
                 <Text style={styles.dateInputText}>
                   {endDate
                     ? `Hasta: ${endDate.toLocaleDateString()}`
@@ -346,7 +327,6 @@ export default function FavEventScreen() {
                 />
               )}
 
-              {/* Botón para limpiar fechas */}
               <TouchableOpacity
                 style={styles.clearButton}
                 onPress={() => {
@@ -359,7 +339,7 @@ export default function FavEventScreen() {
             </View>
           )}
 
-          {/* Desplegable de ubicación */}
+          {/* Panel de ubicación */}
           {locationFilterOpen && (
             <View style={styles.locationFilterContainer}>
               <Text style={styles.dateFilterLabel}>Filtrar por ubicación:</Text>
@@ -370,7 +350,6 @@ export default function FavEventScreen() {
                 value={locationText}
                 onChangeText={setLocationText}
               />
-              {/* Botón para limpiar ubicación */}
               <TouchableOpacity
                 style={styles.clearButton}
                 onPress={() => {
@@ -383,29 +362,32 @@ export default function FavEventScreen() {
           )}
         </View>
 
-        {/* Lista de favoritos filtrados */}
+        {/* Lista de favoritos (filtrados) */}
         <View style={styles.containerCards}>
-          {filteredFavorites.length === 0 ? (
+          {filteredFavs.length === 0 ? (
             <Text style={styles.noEventsText}>
-              No hay eventos favoritos con esos filtros
+              No existen eventos con esos filtros. ¡Cambia de filtros!
             </Text>
           ) : (
-            filteredFavorites.map((fav) => (
-              <View key={fav.id} style={styles.cardContainer}>
+            filteredFavs.map((ev) => (
+              <View key={ev.id} style={styles.cardContainer}>
+                {/* Card idéntico, salvo que agregamos el corazón en la parte superior derecha */}
                 <CardComponent
-                  title={fav.title}
-                  text={fav.description}
-                  date={fav.date}
-                  foto={fav.imageUrl}
-                  onPress={() => handleCardPress(fav.id)}
+                  title={ev.title}
+                  text={ev.description}
+                  date={ev.date}
+                  foto={ev.imageUrl}
+                  onPress={() => handleCardPress(ev.id)}
                 />
-                {/* Ícono corazón para quitar de favoritos (sin círculo blanco) */}
                 <IconButton
                   icon="heart"
-                  iconColor={COLORS.negative} // rojo
-                  size={30}
-                  style={styles.heartButton}
-                  onPress={() => toggleFavorite(fav.id)}
+                  size={24}
+                  iconColor={COLORS.negative}
+                  style={styles.heartIcon}
+                  onPress={() => {
+                    // Lógica para quitar de favoritos (simulación)
+                    console.log("Quitar de favoritos:", ev.id);
+                  }}
                 />
               </View>
             ))
@@ -426,19 +408,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 16,
   },
-  // Subheader con Tabs
-  // (lo agregamos con TabMenuComponent antes del ScrollView)
-
-  // Título principal
-  screenTitle: {
-    fontSize: FONT_SIZES.titleMain,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginTop: 10,
-    color: COLORS.textPrimary,
-  },
-
-  // Sección de filtros
   filtersSection: {
     backgroundColor: COLORS.backgroundLight,
     paddingBottom: 8,
@@ -467,14 +436,10 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: COLORS.cardBg,
   },
-
-  // SearchBar
   searchContainer: {
     marginHorizontal: 8,
     marginTop: 8,
   },
-
-  // Desplegable de fechas
   dateFilterContainer: {
     backgroundColor: COLORS.cardBg,
     marginHorizontal: 8,
@@ -509,8 +474,6 @@ const styles = StyleSheet.create({
     color: COLORS.cardBg,
     fontWeight: "bold",
   },
-
-  // Desplegable de ubicación
   locationFilterContainer: {
     backgroundColor: COLORS.cardBg,
     marginHorizontal: 8,
@@ -525,27 +488,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     color: COLORS.textPrimary,
   },
-
-  // Lista de tarjetas
   containerCards: {
     marginTop: 10,
     paddingHorizontal: 8,
   },
   cardContainer: {
     position: "relative",
-    marginBottom: 20,
-  },
-  // Ícono corazón sin fondo
-  heartButton: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    backgroundColor: "transparent",
+    marginBottom: 10, // Mismo margin que el MenuScreen (puedes ajustarlo)
   },
   noEventsText: {
     marginTop: 20,
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
     textAlign: "center",
+  },
+  heartIcon: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "transparent",
   },
 });

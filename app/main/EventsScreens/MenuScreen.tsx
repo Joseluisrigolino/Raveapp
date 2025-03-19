@@ -12,18 +12,32 @@ import { IconButton } from "react-native-paper";
 import { useRouter } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
-// Tus componentes
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
 import CardComponent from "@/components/CardComponent";
 import SearchBarComponent from "@/components/SearchBarComponent";
 
-// Helpers e interfaces
 import { getAllEvents } from "@/utils/eventHelpers";
 import { EventItem } from "@/interfaces/EventProps";
 
-// Estilos globales
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+
+/** Ejemplo de función que retorna el rango de la semana actual. */
+function getWeekRange() {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const startOfWeek = new Date(now);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  // Ajustamos para que el lunes sea el inicio de semana (si prefieres domingo, ajusta la lógica)
+  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  startOfWeek.setDate(startOfWeek.getDate() - diffToMonday);
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+  return { startOfWeek, endOfWeek };
+}
 
 export default function MenuScreen() {
   const router = useRouter();
@@ -31,32 +45,40 @@ export default function MenuScreen() {
   // Lista base de eventos
   const [allEvents, setAllEvents] = useState<EventItem[]>([]);
 
-  // Filtros
+  // Filtros de texto, fecha y ubicación
   const [searchText, setSearchText] = useState("");
-  const [orderFilter, setOrderFilter] = useState("default");
-
-  // Fechas
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-
-  // Ubicación
   const [locationFilterOpen, setLocationFilterOpen] = useState(false);
   const [locationText, setLocationText] = useState("");
 
-  // Cargar eventos al montar
+  // Filtro: "Esta semana"
+  const [weekActive, setWeekActive] = useState(false);
+
+  // Filtro: "After"
+  const [afterActive, setAfterActive] = useState(false);
+
+  // Filtro: "LGBT"
+  const [lgbtActive, setLgbtActive] = useState(false);
+
+  // Saber si hay rango de fechas activo
+  const isDateActive = Boolean(startDate && endDate);
+  // Saber si hay ubicación activa
+  const isLocationActive = Boolean(locationText.trim() !== "");
+
   useEffect(() => {
     const events = getAllEvents();
     setAllEvents(events);
   }, []);
 
-  // Filtrado con useMemo
+  // Filtrado
   const filteredEvents = useMemo(() => {
     let results = [...allEvents];
 
-    // (a) Filtrar por texto en el título
+    // (a) Filtrar por texto (nombre del evento)
     if (searchText.trim() !== "") {
       const lower = searchText.toLowerCase();
       results = results.filter((ev) =>
@@ -69,9 +91,7 @@ export default function MenuScreen() {
       results = results.filter((ev) => {
         const [day, month, year] = ev.date.split("/").map(Number);
         const eventTime = new Date(year, month - 1, day).getTime();
-        return (
-          eventTime >= startDate.getTime() && eventTime <= endDate.getTime()
-        );
+        return eventTime >= startDate.getTime() && eventTime <= endDate.getTime();
       });
     }
 
@@ -83,51 +103,43 @@ export default function MenuScreen() {
       );
     }
 
-    // (d) Orden (ejemplo con "fecha", "populares", "semana", "tendencias", etc.)
-    if (orderFilter === "fecha") {
-      results.sort((a, b) => {
-        const [dayA, monthA, yearA] = a.date.split("/").map(Number);
-        const [dayB, monthB, yearB] = b.date.split("/").map(Number);
-        const timeA = new Date(yearA, monthA - 1, dayA).getTime();
-        const timeB = new Date(yearB, monthB - 1, dayB).getTime();
-        return timeA - timeB;
+    // (d) Filtro "Esta semana"
+    if (weekActive) {
+      const { startOfWeek, endOfWeek } = getWeekRange();
+      results = results.filter((ev) => {
+        const [day, month, year] = ev.date.split("/").map(Number);
+        const eventTime = new Date(year, month - 1, day).getTime();
+        return (
+          eventTime >= startOfWeek.getTime() && eventTime < endOfWeek.getTime()
+        );
       });
     }
-    // Aquí podrías implementar tu propia lógica si "populares", "semana" o "tendencias"
-    // hacen un ordenamiento o filtrado especial.
+
+    // (e) Filtro "After"
+    if (afterActive) {
+      // Suponiendo que EventItem tiene un boolean "isAfter"
+      results = results.filter((ev) => ev.isAfter === true);
+    }
+
+    // (f) Filtro "LGBT"
+    if (lgbtActive) {
+      // Suponiendo que EventItem tiene un boolean "isLGBT"
+      results = results.filter((ev) => ev.isLGBT === true);
+    }
 
     return results;
-  }, [allEvents, searchText, startDate, endDate, locationText, orderFilter]);
+  }, [
+    allEvents,
+    searchText,
+    startDate,
+    endDate,
+    locationText,
+    weekActive,
+    afterActive,
+    lgbtActive,
+  ]);
 
-  // Cerrar desplegable de fechas si ya se tienen ambas
-  useEffect(() => {
-    if (startDate && endDate) {
-      setDateFilterOpen(false);
-    }
-  }, [startDate, endDate]);
-
-  // Cerrar desplegable de ubicación si se escribió algo
-  useEffect(() => {
-    if (locationText.trim() !== "") {
-      setLocationFilterOpen(false);
-    }
-  }, [locationText]);
-
-  // Saber si el filtro de fecha o ubicación está activo
-  const isDateActive = Boolean(startDate && endDate);
-  const isLocationActive = Boolean(locationText.trim() !== "");
-
-  // Handlers
-  const handleCardPress = (title: string, id?: number) => {
-    if (id) {
-      router.push(`/main/EventsScreens/EventScreen?id=${id}`);
-    }
-  };
-
-  const handleSelectOrder = (option: string) => {
-    setOrderFilter(option);
-  };
-
+  // Handlers para pickers de fecha
   const onStartDateChange = (_event: any, selectedDate?: Date) => {
     setShowStartPicker(false);
     if (selectedDate) {
@@ -141,14 +153,41 @@ export default function MenuScreen() {
     }
   };
 
-  // Funciones para togglear un desplegable y cerrar el otro
+  // Cerrar panel de fechas si ambas están definidas
+  useEffect(() => {
+    if (startDate && endDate) {
+      setDateFilterOpen(false);
+    }
+  }, [startDate, endDate]);
+
+  // Cerrar panel de ubicación si se ha escrito algo
+  useEffect(() => {
+    if (locationText.trim() !== "") {
+      setLocationFilterOpen(false);
+    }
+  }, [locationText]);
+
+  // Toggle panel de fechas
   const toggleDateFilter = () => {
     setDateFilterOpen(!dateFilterOpen);
     setLocationFilterOpen(false);
   };
+
+  // Toggle panel de ubicación
   const toggleLocationFilter = () => {
     setLocationFilterOpen(!locationFilterOpen);
     setDateFilterOpen(false);
+  };
+
+  // Navegar a detalle
+  const handleCardPress = (title: string, id?: number) => {
+    if (id) {
+      // Ajusta la ruta a tu pantalla de detalle
+      // p. ej. /main/EventsScreens/EventScreen?id=${id}
+      // O la ruta que uses
+      console.log(`Navegando a evento ID=${id}`);
+      // router.push(...)
+    }
   };
 
   return (
@@ -156,9 +195,9 @@ export default function MenuScreen() {
       <Header />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Sección de Filtros + SearchBar */}
+        {/* Sección de filtros */}
         <View style={styles.filtersSection}>
-          {/* Scroll horizontal con los chips (sin "Ordenar") */}
+          {/* Scroll horizontal con los chips */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -212,24 +251,10 @@ export default function MenuScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* Botón "Populares" */}
-            <TouchableOpacity
-              style={styles.filterChip}
-              onPress={() => handleSelectOrder("populares")}
-            >
-              <IconButton
-                icon="fire"
-                size={18}
-                iconColor={COLORS.textPrimary}
-                style={{ margin: 0 }}
-              />
-              <Text style={styles.filterChipText}>Populares</Text>
-            </TouchableOpacity>
-
             {/* Botón "Esta semana" */}
             <TouchableOpacity
-              style={styles.filterChip}
-              onPress={() => handleSelectOrder("semana")}
+              style={[styles.filterChip, weekActive && styles.filterChipActive]}
+              onPress={() => setWeekActive(!weekActive)}
             >
               <IconButton
                 icon="newspaper-plus"
@@ -237,25 +262,60 @@ export default function MenuScreen() {
                 iconColor={COLORS.textPrimary}
                 style={{ margin: 0 }}
               />
-              <Text style={styles.filterChipText}>Esta semana</Text>
+              <Text
+                style={[
+                  styles.filterChipText,
+                  weekActive && styles.filterChipTextActive,
+                ]}
+              >
+                Esta semana
+              </Text>
             </TouchableOpacity>
 
-            {/* Botón "Tendencias" */}
+            {/* Botón "After" */}
             <TouchableOpacity
-              style={styles.filterChip}
-              onPress={() => handleSelectOrder("tendencias")}
+              style={[styles.filterChip, afterActive && styles.filterChipActive]}
+              onPress={() => setAfterActive(!afterActive)}
             >
               <IconButton
-                icon="chart-line"
+                icon="moon-waning-crescent" 
                 size={18}
                 iconColor={COLORS.textPrimary}
                 style={{ margin: 0 }}
               />
-              <Text style={styles.filterChipText}>Tendencias</Text>
+              <Text
+                style={[
+                  styles.filterChipText,
+                  afterActive && styles.filterChipTextActive,
+                ]}
+              >
+                After
+              </Text>
+            </TouchableOpacity>
+
+            {/* Botón "LGBT" */}
+            <TouchableOpacity
+              style={[styles.filterChip, lgbtActive && styles.filterChipActive]}
+              onPress={() => setLgbtActive(!lgbtActive)}
+            >
+              <IconButton
+                icon="gender-transgender" 
+                size={18}
+                iconColor={COLORS.textPrimary}
+                style={{ margin: 0 }}
+              />
+              <Text
+                style={[
+                  styles.filterChipText,
+                  lgbtActive && styles.filterChipTextActive,
+                ]}
+              >
+                LGBT
+              </Text>
             </TouchableOpacity>
           </ScrollView>
 
-          {/* SearchBarComponent */}
+          {/* SearchBar */}
           <View style={styles.searchContainer}>
             <SearchBarComponent
               value={searchText}
@@ -264,7 +324,7 @@ export default function MenuScreen() {
             />
           </View>
 
-          {/* Desplegable de fechas */}
+          {/* Panel de fechas */}
           {dateFilterOpen && (
             <View style={styles.dateFilterContainer}>
               <Text style={styles.dateFilterLabel}>Seleccionar rango de fechas:</Text>
@@ -322,7 +382,7 @@ export default function MenuScreen() {
             </View>
           )}
 
-          {/* Desplegable de ubicación */}
+          {/* Panel de ubicación */}
           {locationFilterOpen && (
             <View style={styles.locationFilterContainer}>
               <Text style={styles.dateFilterLabel}>Filtrar por ubicación:</Text>
@@ -388,12 +448,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     marginTop: 8,
   },
-  topFilterContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    // Eliminamos el scroll horizontal aquí
-    // y en su lugar, lo hacemos en horizontalScroll
-  },
   filterChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -403,13 +457,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
+  filterChipActive: {
+    backgroundColor: COLORS.primary,
+  },
   filterChipText: {
     color: COLORS.textPrimary,
     fontSize: FONT_SIZES.body,
     marginLeft: 2,
-  },
-  filterChipActive: {
-    backgroundColor: COLORS.primary,
   },
   filterChipTextActive: {
     color: COLORS.cardBg,
