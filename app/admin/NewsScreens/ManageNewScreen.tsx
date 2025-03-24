@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 
-import { getAllNews } from "@/utils/newsHelpers";
+import { getAllNews } from "@/utils/news/newsHelpers";
 import { NewsItem } from "@/interfaces/NewsProps";
 
 // Importa tus estilos globales si deseas

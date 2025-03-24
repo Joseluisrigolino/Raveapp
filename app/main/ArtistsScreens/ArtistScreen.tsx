@@ -14,7 +14,7 @@ import { useLocalSearchParams } from "expo-router";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import { Artist } from "@/interfaces/Artist";
-import { getArtistByName } from "@/utils/artistHelpers";
+import { getArtistByName } from "@/utils/artists/artistHelpers";
 
 // Importa tus estilos globales
 import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";

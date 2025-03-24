@@ -1,5 +1,5 @@
 // utils/eventFavHelpers.ts
-import { ExtendedEventItem } from "@/utils/eventHelpers";
+import { ExtendedEventItem } from "@/utils/events/eventHelpers";
 
 /**
  * Aquí defines tus eventos favoritos. Pueden ser un subset

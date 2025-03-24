@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { Linking } from "react-native";
 
-import { getEventById, ExtendedEventItem } from "@/utils/eventHelpers";
+import { getEventById, ExtendedEventItem } from "@/utils/events/eventHelpers";
 import { ReviewItem } from "@/interfaces/ReviewProps";
 
 /**

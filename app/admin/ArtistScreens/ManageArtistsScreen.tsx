@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import { getAllArtists, searchArtistsByName } from "@/utils/artistHelpers";
+import { getAllArtists, searchArtistsByName } from "@/utils/artists/artistHelpers";
 import { Artist } from "@/interfaces/Artist";
 
 export default function ManageArtistsScreen() {

@@ -17,7 +17,7 @@ import Footer from "@/components/layout/FooterComponent";
 import ReviewComponent from "@/components/events/ReviewComponent";
 import { ReviewItem } from "@/interfaces/ReviewProps";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
-import { getTicketMenuById } from "@/utils/ticketMenuHelpers";
+import { getTicketMenuById } from "@/utils/tickets/ticketMenuHelpers";
 
 // Importa tus estilos globales
 import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";

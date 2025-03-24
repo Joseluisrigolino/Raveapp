@@ -1,7 +1,7 @@
 // hooks/useFavFilters.ts
 import { useState, useEffect, useMemo } from "react";
-import { getAllFavEvents, ExtendedEventItem } from "@/utils/eventFavHelpers";
-import { fetchLocalitiesByName } from "@/utils/georefHelpers";
+import { getAllFavEvents, ExtendedEventItem } from "@/utils/events/eventFavHelpers";
+import { fetchLocalitiesByName } from "@/utils/georef/georefHelpers";
 
 /** Función para calcular la semana actual */
 function getWeekRange() {

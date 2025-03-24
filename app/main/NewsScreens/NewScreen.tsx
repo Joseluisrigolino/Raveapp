@@ -14,7 +14,7 @@ import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import TitlePers from "@/components/common/TitleComponent"; 
 import { NewsItem } from "@/interfaces/NewsProps";
-import { getNewsById } from "@/utils/newsHelpers";
+import { getNewsById } from "@/utils/news/newsHelpers";
 
 // Importamos globalStyles y las constantes que necesitemos
 import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";

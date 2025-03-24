@@ -18,7 +18,7 @@ import {
   OwnerEventCancelItem,
   TicketSoldInfo,
 } from "@/interfaces/OwnerEventCancelItem";
-import { getEventCancellationDataById } from "@/utils/ownerEventsCancelHelper";
+import { getEventCancellationDataById } from "@/utils/owners/ownerEventsCancelHelper";
 
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 

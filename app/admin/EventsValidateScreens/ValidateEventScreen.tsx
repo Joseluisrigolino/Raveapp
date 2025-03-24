@@ -14,7 +14,7 @@ import { useLocalSearchParams } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import { getEventToValidateById } from "@/utils/validationEventHelpers";
+import { getEventToValidateById } from "@/utils/events/validationEventHelpers";
 import { EventToValidate } from "@/interfaces/EventToValidateProps";
 
 export default function ValidateEventScreen() {

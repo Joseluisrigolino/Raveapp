@@ -1,8 +1,8 @@
 // hooks/useMenuFilters.ts
 import { useState, useEffect, useMemo } from "react";
-import { getAllEvents } from "@/utils/eventHelpers";
+import { getAllEvents } from "@/utils/events/eventHelpers";
 import { EventItem } from "@/interfaces/EventProps";
-import { fetchLocalitiesByName } from "@/utils/georefHelpers";
+import { fetchLocalitiesByName } from "@/utils/georef/georefHelpers";
 
 /** Función para calcular la semana actual */
 function getWeekRange() {

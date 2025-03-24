@@ -14,7 +14,7 @@ import { useLocalSearchParams } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import { getArtistById } from "@/utils/artistHelpers";
+import { getArtistById } from "@/utils/artists/artistHelpers";
 import { Artist } from "@/interfaces/Artist";
 
 export default function EditArtistScreen() {

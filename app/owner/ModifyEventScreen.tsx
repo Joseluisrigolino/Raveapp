@@ -20,7 +20,7 @@ import DateTimeInputComponent from "@/components/common/DateTimeInputComponent";
 
 import { Artist } from "@/interfaces/Artist";
 import { OwnerEventItem } from "@/interfaces/OwnerEventItem";
-import { getOwnerEventById } from "@/utils/ownerEventsHelper";
+import { getOwnerEventById } from "@/utils/owners/ownerEventsHelper";
 
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 

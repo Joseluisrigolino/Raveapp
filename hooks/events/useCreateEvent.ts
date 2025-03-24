@@ -7,7 +7,7 @@ import {
   fetchProvinces,
   fetchMunicipalities,
   fetchLocalities,
-} from "@/utils/georefHelpers";
+} from "@/utils/georef/georefHelpers";
 
 /** Representa los campos de entradas para un día. */
 type DayTickets = {

@@ -9,7 +9,7 @@ import TitlePers from "@/components/common/TitleComponent";
 import globalStyles from "@/styles/globalStyles";
 
 // Importamos nuestro helper
-import { validateUser } from "@/utils/authHelpers";
+import { validateUser } from "@/utils/auth/authHelpers";
 
 export default function Index() {
   const router = useRouter();

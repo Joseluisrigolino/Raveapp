@@ -14,7 +14,7 @@ import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 
 import { OwnerEventTicketsSoldData } from "@/interfaces/OwnerEventTicketsSold";
-import { getTicketsSoldDataById } from "@/utils/ownerEventTicketsSoldHelper";
+import { getTicketsSoldDataById } from "@/utils/owners/ownerEventTicketsSoldHelper";
 
 // Importa tus estilos globales
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";

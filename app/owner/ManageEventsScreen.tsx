@@ -15,7 +15,7 @@ import Footer from "@/components/layout/FooterComponent";
 import SearchBarComponent from "@/components/common/SearchBarComponent";
 import OwnerEventCard from "@/components/OwnerEventCard";
 
-import { getOwnerEvents } from "@/utils/ownerEventsHelper";
+import { getOwnerEvents } from "@/utils/owners/ownerEventsHelper";
 import { OwnerEventItem } from "@/interfaces/OwnerEventItem";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 

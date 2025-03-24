@@ -12,7 +12,7 @@ import { useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import { getAllEventsToValidate } from "@/utils/validationEventHelpers";
+import { getAllEventsToValidate } from "@/utils/events/validationEventHelpers";
 import { EventToValidate } from "@/interfaces/EventToValidateProps";
 
 // Importa tus estilos globales si deseas
