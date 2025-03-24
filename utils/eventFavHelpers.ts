@@ -38,7 +38,7 @@ const mockFavEvents: ExtendedEventItem[] = [
     title: "Evento 2 Días #2 (Favorito)",
     date: "25/04/2025",
     timeRange: "10hs a 20hs",
-    address: "Parque de la Costa, Ciudad E",
+    address: "Parque de la Costa, Villa Ballester",
     description: "Evento al aire libre, con DJs locales e internacionales.",
     imageUrl: "https://picsum.photos/700/400?random=105",
     type: "LGBT",

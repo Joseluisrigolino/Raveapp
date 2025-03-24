@@ -9,10 +9,10 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
-import Header from "@/components/LayoutComponents/HeaderComponent";
-import Footer from "@/components/LayoutComponents/FooterComponent";
-import TabMenuComponent from "@/components/TabMenuComponent";
-import TicketCardComponent from "@/components/TicketCardComponent";
+import Header from "@/components/layout/HeaderComponent";
+import Footer from "@/components/layout/FooterComponent";
+import TabMenuComponent from "@/components/layout/TabMenuComponent";
+import TicketCardComponent from "@/components/tickets/TicketCardComponent";
 import { COLORS } from "@/styles/globalStyles";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
 

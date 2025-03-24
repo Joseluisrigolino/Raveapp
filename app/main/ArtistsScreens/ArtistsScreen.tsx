@@ -2,11 +2,11 @@ import React, { useState, useMemo } from "react";
 import { View, StyleSheet, ScrollView, SafeAreaView, Text } from "react-native";
 import { useRouter } from "expo-router";
 
-import Header from "@/components/LayoutComponents/HeaderComponent";
-import Footer from "@/components/LayoutComponents/FooterComponent";
-import ArtistCard from "@/components/ArtistsComponents/ArtistCardComponent";
+import Header from "@/components/layout/HeaderComponent";
+import Footer from "@/components/layout/FooterComponent";
+import ArtistCard from "@/components/artists/ArtistCardComponent";
 import SearchBar from "@/components/SearchBarComponent";
-import TabMenuComponent from "@/components/TabMenuComponent";
+import TabMenuComponent from "@/components/layout/TabMenuComponent";
 
 import { Artist } from "@/interfaces/Artist";
 import globalStyles, { COLORS, FONT_SIZES } from "@/styles/globalStyles";

@@ -10,8 +10,8 @@ import {
 } from "react-native";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
-import Header from "@/components/LayoutComponents/HeaderComponent";
-import Footer from "@/components/LayoutComponents/FooterComponent";
+import Header from "@/components/layout/HeaderComponent";
+import Footer from "@/components/layout/FooterComponent";
 import { UserProfile } from "@/interfaces/UserProfileProps";
 
 // Importa tus estilos globales

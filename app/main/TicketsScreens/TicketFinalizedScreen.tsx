@@ -12,8 +12,8 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 
-import Header from "@/components/LayoutComponents/HeaderComponent";
-import Footer from "@/components/LayoutComponents/FooterComponent";
+import Header from "@/components/layout/HeaderComponent";
+import Footer from "@/components/layout/FooterComponent";
 import ReviewComponent from "@/components/ReviewComponent";
 import { ReviewItem } from "@/interfaces/ReviewProps";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";

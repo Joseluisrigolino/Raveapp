@@ -10,8 +10,8 @@ import {
   StyleSheet,
   Image,
 } from "react-native";
-import Header from "@/components/LayoutComponents/HeaderComponent";
-import Footer from "@/components/LayoutComponents/FooterComponent";
+import Header from "@/components/layout/HeaderComponent";
+import Footer from "@/components/layout/FooterComponent";
 
 export default function NewArtistScreen() {
   const [artistName, setArtistName] = useState("");

@@ -12,8 +12,8 @@ import {
 import { IconButton } from "react-native-paper";
 import { useRouter } from "expo-router";
 
-import Header from "@/components/LayoutComponents/HeaderComponent";
-import Footer from "@/components/LayoutComponents/FooterComponent";
+import Header from "@/components/layout/HeaderComponent";
+import Footer from "@/components/layout/FooterComponent";
 import { getAllArtists, searchArtistsByName } from "@/utils/artistHelpers";
 import { Artist } from "@/interfaces/Artist";
 

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// CreateEventScreen.tsx
+import React from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -10,254 +11,117 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import Header from "@/components/LayoutComponents/HeaderComponent";
-import Footer from "@/components/LayoutComponents/FooterComponent";
+import Header from "@/components/layout/HeaderComponent";
+import Footer from "@/components/layout/FooterComponent";
 import TitlePers from "@/components/TitleComponent";
 import DateTimeInputComponent from "@/components/DateTimeInputComponent";
 
-import { Artist } from "@/interfaces/Artist";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { ELECTRONIC_GENRES } from "@/utils/electronicGenresHelper";
 
-// Representa los campos de entradas para un día
-type DayTickets = {
-  genEarlyQty: string;
-  genEarlyPrice: string;
-  vipEarlyQty: string;
-  vipEarlyPrice: string;
-  genQty: string;
-  genPrice: string;
-  vipQty: string;
-  vipPrice: string;
-};
-
-// Crea un "DayTickets" vacío (valores por defecto)
-function createEmptyDayTickets(): DayTickets {
-  return {
-    genEarlyQty: "",
-    genEarlyPrice: "",
-    vipEarlyQty: "",
-    vipEarlyPrice: "",
-    genQty: "",
-    genPrice: "",
-    vipQty: "",
-    vipPrice: "",
-  };
-}
-
-// Calcula la suma total de entradas de un array de DayTickets
-function calcTotalTickets(daysTickets: DayTickets[]): number {
-  let total = 0;
-  for (const day of daysTickets) {
-    const ge = parseInt(day.genEarlyQty, 10) || 0;
-    const ve = parseInt(day.vipEarlyQty, 10) || 0;
-    const g = parseInt(day.genQty, 10) || 0;
-    const v = parseInt(day.vipQty, 10) || 0;
-    total += ge + ve + g + v;
-  }
-  return total;
-}
-
-// Datos simulados
-const mockGenres = [
-  "Techno",
-  "Hard Techno",
-  "Melodic Techno",
-  "Trance",
-  "Tech-House",
-  "Acid Techno",
-  "Industrial Techno",
-  "Tribal",
-  "House",
-  "Minimal Techno",
-  "Dub-Techno",
-  "Psytrance",
-  "Progressive",
-];
-
-const fakeArtistDatabase: Artist[] = [
-  { name: "Artista 1", image: "" },
-  { name: "Artista 2", image: "" },
-  { name: "Artista 3", image: "" },
-];
-
-const mockProvinces = ["Buenos Aires", "Córdoba", "Mendoza"];
-const mockMunicipalities = ["Municipio 1", "Municipio 2"];
-const mockLocalities = ["Localidad 1", "Localidad 2"];
-
-type EventType = "1d" | "2d" | "3d";
+// <-- Importamos el hook
+import { useCreateEvent } from "@/hooks/useCreateEvent";
 
 export default function CreateEventScreen() {
-  // Control de login (demo)
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // Consumimos toda la lógica desde el hook
+  const {
+    // 1) Login
+    isLoggedIn,
+    handleLogin,
+    handleRegister,
+    handleGoogleLogin,
+    simulateLogin,
+    handleLogout,
 
-  // Tipo de evento
-  const [eventType, setEventType] = useState<EventType>("1d");
-  function handleEventTypeChange(value: EventType) {
+    // 2) Campos
+    eventType,
+    setEventType,
+    eventName,
+    setEventName,
+    selectedGenres,
+    toggleGenre,
+    artistInput,
+    setArtistInput,
+    selectedArtists,
+    handleAddArtist,
+    handleRemoveArtist,
+
+    // 3) Ubicación
+    provinces,
+    municipalities,
+    localities,
+    showProvinces,
+    setShowProvinces,
+    showMunicipalities,
+    setShowMunicipalities,
+    showLocalities,
+    setShowLocalities,
+    provinceId,
+    provinceName,
+    municipalityId,
+    municipalityName,
+    localityId,
+    localityName,
+    handleSelectProvince,
+    handleSelectMunicipality,
+    handleSelectLocality,
+    street,
+    setStreet,
+    streetNumber,
+    setStreetNumber,
+
+    // 4) After / LGBT
+    isAfter,
+    setIsAfter,
+    isLGBT,
+    setIsLGBT,
+
+    // 5) Descripción
+    eventDescription,
+    setEventDescription,
+
+    // 6) Fechas
+    startDateTime,
+    setStartDateTime,
+    endDateTime,
+    setEndDateTime,
+
+    // 7) Tickets
+    daysTickets,
+    handleTicketChange,
+    totalTickets,
+
+    // 8) Config venta
+    startSaleDateTime,
+    setStartSaleDateTime,
+    earlyBirdsStock,
+    setEarlyBirdsStock,
+    useEarlyBirdsDate,
+    setUseEarlyBirdsDate,
+    earlyBirdsUntilDateTime,
+    setEarlyBirdsUntilDateTime,
+
+    // 9) Multimedia
+    photoFile,
+    handleSelectPhoto,
+    videoLink,
+    setVideoLink,
+    musicLink,
+    setMusicLink,
+
+    // 10) Términos
+    acceptedTC,
+    setAcceptedTC,
+
+    // Submit
+    handleSubmit,
+  } = useCreateEvent();
+
+  function handleEventTypeChange(value: "1d" | "2d" | "3d") {
     setEventType(value);
   }
 
-  // Campos básicos
-  const [eventName, setEventName] = useState("");
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [artistInput, setArtistInput] = useState("");
-  const [selectedArtists, setSelectedArtists] = useState<Artist[]>([]);
-
-  // Ubicación
-  const [showProvinces, setShowProvinces] = useState(false);
-  const [showMunicipalities, setShowMunicipalities] = useState(false);
-  const [showLocalities, setShowLocalities] = useState(false);
-  const [province, setProvince] = useState("");
-  const [municipality, setMunicipality] = useState("");
-  const [locality, setLocality] = useState("");
-  const [address, setAddress] = useState("");
-  const [isAfter, setIsAfter] = useState(false);
-  const [isLGBT, setIsLGBT] = useState(false);
-  const [eventDescription, setEventDescription] = useState("");
-
-  // Fechas globales
-  const [startDateTime, setStartDateTime] = useState<Date>(new Date());
-  const [endDateTime, setEndDateTime] = useState<Date>(new Date());
-
-  // Entradas (por día)
-  const [daysTickets, setDaysTickets] = useState<DayTickets[]>([
-    createEmptyDayTickets(),
-  ]);
-
-  // Config venta
-  const [startSaleDateTime, setStartSaleDateTime] = useState<Date>(new Date());
-  const [earlyBirdsStock, setEarlyBirdsStock] = useState(false);
-  const [useEarlyBirdsDate, setUseEarlyBirdsDate] = useState(false);
-  const [earlyBirdsUntilDateTime, setEarlyBirdsUntilDateTime] =
-    useState<Date>(new Date());
-
-  // Multimedia
-  const [photoFile, setPhotoFile] = useState<string | null>(null);
-  const [videoLink, setVideoLink] = useState("");
-  const [musicLink, setMusicLink] = useState("");
-
-  // Términos y condiciones
-  const [acceptedTC, setAcceptedTC] = useState(false);
-
-  // Demo: login
-  const handleLogin = () => console.log("Iniciar sesión presionado");
-  const handleRegister = () => console.log("Registrarme presionado");
-  const handleGoogleLogin = () => console.log("Login with Google presionado");
-  const simulateLogin = () => setIsLoggedIn(true);
-  const handleLogout = () => setIsLoggedIn(false);
-
-  // Ajustar daysTickets según eventType
-  useEffect(() => {
-    if (eventType === "1d") {
-      setDaysTickets([createEmptyDayTickets()]);
-    } else if (eventType === "2d") {
-      setDaysTickets([createEmptyDayTickets(), createEmptyDayTickets()]);
-    } else {
-      setDaysTickets([
-        createEmptyDayTickets(),
-        createEmptyDayTickets(),
-        createEmptyDayTickets(),
-      ]);
-    }
-  }, [eventType]);
-
-  // Checkboxes: géneros
-  const toggleGenre = (genre: string) => {
-    if (selectedGenres.includes(genre)) {
-      setSelectedGenres(selectedGenres.filter((g) => g !== genre));
-    } else {
-      setSelectedGenres([...selectedGenres, genre]);
-    }
-  };
-
-  // Artistas
-  const handleAddArtist = () => {
-    const trimmedName = artistInput.trim();
-    if (!trimmedName) return;
-    const existingArtist = fakeArtistDatabase.find(
-      (a) => a.name.toLowerCase() === trimmedName.toLowerCase()
-    );
-    if (existingArtist) {
-      setSelectedArtists((prev) => [...prev, existingArtist]);
-    } else {
-      const newArtist: Artist = { name: trimmedName, image: "" };
-      setSelectedArtists((prev) => [...prev, newArtist]);
-    }
-    setArtistInput("");
-  };
-  const handleRemoveArtist = (artistName: string) => {
-    setSelectedArtists(selectedArtists.filter((a) => a.name !== artistName));
-  };
-
-  // Manejo de inputs de tickets
-  const handleTicketChange = (
-    dayIndex: number,
-    field: keyof DayTickets,
-    value: string
-  ) => {
-    setDaysTickets((prev) => {
-      const newArr = [...prev];
-      newArr[dayIndex] = {
-        ...newArr[dayIndex],
-        [field]: value,
-      };
-      return newArr;
-    });
-  };
-
-  // Calcular total
-  const totalTickets = calcTotalTickets(daysTickets);
-
-  // Seleccionar foto
-  const handleSelectPhoto = () => {
-    console.log("Seleccionar archivo presionado");
-    setPhotoFile("ruta-de-la-imagen.jpg");
-  };
-
-  // Enviar
-  const handleSubmit = () => {
-    // Validar foto obligatoria y T&C
-    if (!photoFile) {
-      alert("Debes seleccionar una foto obligatoria.");
-      return;
-    }
-    if (!acceptedTC) {
-      alert("Debes aceptar los términos y condiciones.");
-      return;
-    }
-
-    // Armar objeto final
-    const finalData = {
-      eventName,
-      eventType,
-      selectedGenres,
-      selectedArtists,
-      province,
-      municipality,
-      locality,
-      address,
-      isAfter,
-      isLGBT,
-      eventDescription,
-      multimedia: {
-        photoFile,
-        videoLink,
-        musicLink,
-      },
-      startDateTime,
-      endDateTime,
-      daysTickets,
-      startSaleDateTime,
-      earlyBirdsStock,
-      useEarlyBirdsDate,
-      earlyBirdsUntilDateTime,
-      totalTickets,
-      acceptedTC,
-    };
-    console.log("Enviando evento:", finalData);
-    alert("Evento creado (ejemplo)");
-  };
-
-  // Render
+  // Render principal
   return (
     <SafeAreaView style={styles.container}>
       <Header />
@@ -367,7 +231,7 @@ export default function CreateEventScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.label}>Género/s musical/es</Text>
               <View style={styles.genresContainer}>
-                {mockGenres.map((genre) => {
+                {ELECTRONIC_GENRES.map((genre) => {
                   const isSelected = selectedGenres.includes(genre);
                   return (
                     <TouchableOpacity
@@ -427,93 +291,128 @@ export default function CreateEventScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.label}>Ubicación del evento</Text>
 
+              {/* PROVINCIA */}
               <Text style={styles.subLabel}>Provincia</Text>
               <TouchableOpacity
                 style={styles.dropdownButton}
-                onPress={() => setShowProvinces(!showProvinces)}
+                onPress={() => {
+                  setShowProvinces(!showProvinces);
+                  setShowMunicipalities(false);
+                  setShowLocalities(false);
+                }}
               >
                 <Text style={styles.dropdownText}>
-                  {province || "Seleccione una provincia"}
+                  {provinceName || "Seleccione una provincia"}
                 </Text>
               </TouchableOpacity>
               {showProvinces && (
                 <View style={styles.dropdownContainer}>
-                  {mockProvinces.map((prov) => (
+                  {provinces.map((prov) => (
                     <TouchableOpacity
-                      key={prov}
-                      onPress={() => {
-                        setProvince(prov);
-                        setShowProvinces(false);
-                      }}
+                      key={prov.id}
+                      onPress={() =>
+                        handleSelectProvince(prov.id, prov.nombre)
+                      }
                       style={styles.dropdownItem}
                     >
-                      <Text>{prov}</Text>
+                      <Text>{prov.nombre}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
 
+              {/* MUNICIPIO */}
               <Text style={styles.subLabel}>Municipio</Text>
               <TouchableOpacity
                 style={styles.dropdownButton}
-                onPress={() => setShowMunicipalities(!showMunicipalities)}
+                onPress={() => {
+                  setShowMunicipalities(!showMunicipalities);
+                  setShowProvinces(false);
+                  setShowLocalities(false);
+                }}
+                disabled={!provinceId}
               >
-                <Text style={styles.dropdownText}>
-                  {municipality || "Seleccione un municipio"}
+                <Text
+                  style={[
+                    styles.dropdownText,
+                    !provinceId && { opacity: 0.5 },
+                  ]}
+                >
+                  {municipalityName || "Seleccione un municipio"}
                 </Text>
               </TouchableOpacity>
               {showMunicipalities && (
                 <View style={styles.dropdownContainer}>
-                  {mockMunicipalities.map((mun) => (
+                  {municipalities.map((mun) => (
                     <TouchableOpacity
-                      key={mun}
-                      onPress={() => {
-                        setMunicipality(mun);
-                        setShowMunicipalities(false);
-                      }}
+                      key={mun.id}
+                      onPress={() =>
+                        handleSelectMunicipality(mun.id, mun.nombre)
+                      }
                       style={styles.dropdownItem}
                     >
-                      <Text>{mun}</Text>
+                      <Text>{mun.nombre}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
 
+              {/* LOCALIDAD */}
               <Text style={styles.subLabel}>Localidad</Text>
               <TouchableOpacity
                 style={styles.dropdownButton}
-                onPress={() => setShowLocalities(!showLocalities)}
+                onPress={() => {
+                  setShowLocalities(!showLocalities);
+                  setShowProvinces(false);
+                  setShowMunicipalities(false);
+                }}
+                disabled={!municipalityId}
               >
-                <Text style={styles.dropdownText}>
-                  {locality || "Seleccione una localidad"}
+                <Text
+                  style={[
+                    styles.dropdownText,
+                    !municipalityId && { opacity: 0.5 },
+                  ]}
+                >
+                  {localityName || "Seleccione una localidad"}
                 </Text>
               </TouchableOpacity>
               {showLocalities && (
                 <View style={styles.dropdownContainer}>
-                  {mockLocalities.map((loc) => (
+                  {localities.map((loc) => (
                     <TouchableOpacity
-                      key={loc}
-                      onPress={() => {
-                        setLocality(loc);
-                        setShowLocalities(false);
-                      }}
+                      key={loc.id}
+                      onPress={() =>
+                        handleSelectLocality(loc.id, loc.nombre)
+                      }
                       style={styles.dropdownItem}
                     >
-                      <Text>{loc}</Text>
+                      <Text>{loc.nombre}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
 
-              <Text style={styles.subLabel}>Dirección</Text>
+              {/* CALLE y NÚMERO */}
+              <Text style={styles.subLabel}>Calle</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Ej: Av. Corrientes 1234"
-                value={address}
-                onChangeText={setAddress}
+                placeholder="Ej: Av. Corrientes"
+                value={street}
+                onChangeText={setStreet}
+              />
+
+              <Text style={styles.subLabel}>Número</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ej: 1234"
+                value={streetNumber}
+                onChangeText={setStreetNumber}
+                keyboardType="numeric"
               />
             </View>
 
+            {/* CHECKBOX: AFTER / LGBT */}
             <View style={styles.formGroup}>
               <View style={styles.checkboxRow}>
                 <TouchableOpacity
@@ -733,9 +632,10 @@ export default function CreateEventScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.sectionTitle}>Multimedia</Text>
               <Text style={styles.label}>
-                Foto:{" "}
-                <Text style={{ color: COLORS.negative }}>(Obligatoria)</Text>
+                Foto: <Text style={{ color: COLORS.negative }}>(Obligatoria)</Text>
               </Text>
+
+              {/* Botón para abrir galería */}
               <TouchableOpacity
                 style={styles.selectFileButton}
                 onPress={handleSelectPhoto}
@@ -804,7 +704,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    // Justifica un poco más los items para mobile
   },
   notLoggedContainer: {
     width: "100%",

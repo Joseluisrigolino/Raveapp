@@ -11,8 +11,8 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import QRCode from "react-native-qrcode-svg";
 
-import Header from "@/components/LayoutComponents/HeaderComponent";
-import Footer from "@/components/LayoutComponents/FooterComponent";
+import Header from "@/components/layout/HeaderComponent";
+import Footer from "@/components/layout/FooterComponent";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
 import { getTicketMenuById } from "@/utils/ticketMenuHelpers";
 

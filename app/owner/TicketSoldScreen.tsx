@@ -10,8 +10,8 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
-import Header from "@/components/LayoutComponents/HeaderComponent";
-import Footer from "@/components/LayoutComponents/FooterComponent";
+import Header from "@/components/layout/HeaderComponent";
+import Footer from "@/components/layout/FooterComponent";
 
 import { OwnerEventTicketsSoldData } from "@/interfaces/OwnerEventTicketsSold";
 import { getTicketsSoldDataById } from "@/utils/ownerEventTicketsSoldHelper";

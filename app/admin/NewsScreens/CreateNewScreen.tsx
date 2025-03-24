@@ -11,8 +11,8 @@ import {
 } from "react-native";
 
 // Importa tu Header y Footer, ajustando las rutas a tu proyecto
-import Header from "@/components/LayoutComponents/HeaderComponent";
-import Footer from "@/components/LayoutComponents/FooterComponent";
+import Header from "@/components/layout/HeaderComponent";
+import Footer from "@/components/layout/FooterComponent";
 
 export default function CreateNewsScreen() {
   // Estados locales para manejar los inputs

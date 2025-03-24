@@ -365,7 +365,7 @@ const mockEvents: ExtendedEventItem[] = [
     title: "Lollapalozza (Ejemplo) 2025",
     date: "25/05/2025",
     timeRange: "12hs a 00hs",
-    address: "Hipódromo, Ciudad I",
+    address: "Hipódromo, Villa Ballester",
     description: "Festival internacional de 3 días, recurrente cada año.",
     imageUrl: "https://picsum.photos/700/400?random=109",
     type: "Pop",

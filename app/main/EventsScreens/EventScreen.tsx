@@ -1,96 +1,34 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  SafeAreaView,
-  Image,
-  TouchableOpacity,
-  Linking,
-} from "react-native";
-import { Text, IconButton } from "react-native-paper";
-import { useLocalSearchParams, useRouter } from "expo-router";
+// EventScreen.tsx
+import React from "react";
+import { SafeAreaView, ScrollView, View, Text, Image, StyleSheet, TouchableOpacity } from "react-native";
+import { IconButton } from "react-native-paper";
+import { useLocalSearchParams } from "expo-router";
 
-import Header from "@/components/LayoutComponents/HeaderComponent";
-import Footer from "@/components/LayoutComponents/FooterComponent";
+import Header from "@/components/layout/HeaderComponent";
+import Footer from "@/components/layout/FooterComponent";
 import ReviewComponent from "@/components/ReviewComponent";
-import { ReviewItem } from "@/interfaces/ReviewProps";
-import { getEventById, ExtendedEventItem } from "@/utils/eventHelpers";
+import TicketSelector from "@/components/tickets/TicketSelector";
+
+// <-- importamos nuestro custom hook
+import { useEventDetail } from "@/hooks/useEventDetail";
 
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-// Reseñas de ejemplo (mock)
-const mockReviews: ReviewItem[] = [
-  {
-    id: 1,
-    user: "Usuario99",
-    comment: "Me gustó mucho la fiesta. Gente muy agradable. Volvería a ir.",
-    rating: 5,
-    daysAgo: 6,
-  },
-  {
-    id: 2,
-    user: "Usuario27",
-    comment: "Buena organización, pero faltó variedad de comida.",
-    rating: 4,
-    daysAgo: 6,
-  },
-];
-
-/** Componente para renderizar la información de entradas (solo a modo resumen). */
-function TicketsOverview({ eventData }: { eventData: ExtendedEventItem }) {
-  return (
-    <View>
-      {eventData.ticketsByDay.map((dayInfo, index) => {
-        const dayLabel =
-          eventData.days === 1
-            ? "Día único"
-            : `Día ${dayInfo.dayNumber} de ${eventData.days}`;
-
-        return (
-          <View key={index} style={styles.dayTicketBlock}>
-            <Text style={styles.dayLabel}>{dayLabel}</Text>
-
-            {dayInfo.genEarlyQty > 0 && (
-              <Text style={styles.ticketLine}>
-                • Generales Early Birds (${dayInfo.genEarlyPrice})
-              </Text>
-            )}
-            {dayInfo.vipEarlyQty > 0 && (
-              <Text style={styles.ticketLine}>
-                • VIP Early Birds (${dayInfo.vipEarlyPrice})
-              </Text>
-            )}
-            {dayInfo.genQty > 0 && (
-              <Text style={styles.ticketLine}>
-                • Generales (${dayInfo.genPrice})
-              </Text>
-            )}
-            {dayInfo.vipQty > 0 && (
-              <Text style={styles.ticketLine}>
-                • VIP (${dayInfo.vipPrice})
-              </Text>
-            )}
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 export default function EventScreen() {
-  const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
 
-  const [eventData, setEventData] = useState<ExtendedEventItem | null>(null);
-  const [isFavorite, setIsFavorite] = useState(false);
-
-  useEffect(() => {
-    if (id) {
-      const found = getEventById(Number(id));
-      setEventData(found);
-    }
-  }, [id]);
+  // Consumimos la lógica del hook
+  const {
+    eventData,
+    isFavorite,
+    toggleFavorite,
+    selectedTickets,
+    updateTicketCount,
+    subtotal,
+    handleBuyPress,
+    openMap,
+    mockReviews,
+  } = useEventDetail(id);
 
   if (!eventData) {
     return (
@@ -104,18 +42,6 @@ export default function EventScreen() {
     );
   }
 
-  // Función para abrir Google Maps
-  const openMap = () => {
-    const address = encodeURIComponent(eventData.address);
-    const url = `https://www.google.com/maps/search/?api=1&query=${address}`;
-    Linking.openURL(url);
-  };
-
-  // Navegar a BuyTicketScreen con el ID del evento
-  const handleBuyPress = () => {
-    router.push(`/main/TicketsScreens/BuyTicketScreen?id=${eventData.id}`);
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <Header />
@@ -126,18 +52,17 @@ export default function EventScreen() {
           <Image source={{ uri: eventData.imageUrl }} style={styles.img} />
         </View>
 
-        {/* Tarjeta con la info del evento */}
+        {/* Card con la info del evento */}
         <View style={styles.eventCard}>
-          {/* Fila con el título y el ícono de corazón */}
+          {/* Fila con título + corazón */}
           <View style={styles.titleRow}>
             <Text style={styles.eventTitle}>{eventData.title}</Text>
-
             <IconButton
               icon={isFavorite ? "heart" : "heart-outline"}
               iconColor={isFavorite ? COLORS.negative : COLORS.textPrimary}
               size={30}
               style={styles.heartIcon}
-              onPress={() => setIsFavorite(!isFavorite)}
+              onPress={toggleFavorite}
             />
           </View>
 
@@ -147,18 +72,19 @@ export default function EventScreen() {
               icon="calendar"
               size={20}
               iconColor={COLORS.textPrimary}
-              style={styles.iconNoPadding}
+              style={{ margin: 0 }}
             />
             <Text style={styles.infoText}>
               {eventData.date} de {eventData.timeRange}
             </Text>
           </View>
 
-          {/* Dirección */}
+          {/* Dirección + botón "Cómo llegar" */}
           <Text style={styles.addressText}>{eventData.address}</Text>
-
-          {/* Botón "Cómo llegar" */}
-          <TouchableOpacity style={styles.mapButton} onPress={openMap}>
+          <TouchableOpacity
+            style={styles.mapButton}
+            onPress={() => openMap(eventData.address)}
+          >
             <Text style={styles.mapButtonText}>Cómo llegar</Text>
           </TouchableOpacity>
 
@@ -166,10 +92,76 @@ export default function EventScreen() {
           <Text style={styles.description}>{eventData.description}</Text>
         </View>
 
-        {/* Resumen de tickets disponibles */}
+        {/* Selección de tickets */}
         <View style={styles.ticketCard}>
-          <Text style={styles.ticketCardTitle}>Entradas disponibles:</Text>
-          <TicketsOverview eventData={eventData} />
+          <Text style={styles.ticketCardTitle}>Selecciona tus entradas:</Text>
+
+          {eventData.ticketsByDay.map((dayInfo) => {
+            const baseKey = `day${dayInfo.dayNumber}`;
+            const dayLabel =
+              eventData.days === 1
+                ? "Día único"
+                : `Día ${dayInfo.dayNumber} de ${eventData.days}`;
+
+            return (
+              <View key={dayInfo.dayNumber} style={styles.dayBlock}>
+                <Text style={styles.dayLabel}>{dayLabel}</Text>
+
+                {/* Generales Early Birds */}
+                {dayInfo.genEarlyQty > 0 && (
+                  <TicketSelector
+                    label={`Generales Early Birds ($${dayInfo.genEarlyPrice})`}
+                    maxQty={dayInfo.genEarlyQty}
+                    currentQty={selectedTickets[`${baseKey}-genEarly`] || 0}
+                    onChange={(delta) =>
+                      updateTicketCount(`${baseKey}-genEarly`, delta)
+                    }
+                  />
+                )}
+
+                {/* VIP Early Birds */}
+                {dayInfo.vipEarlyQty > 0 && (
+                  <TicketSelector
+                    label={`VIP Early Birds ($${dayInfo.vipEarlyPrice})`}
+                    maxQty={dayInfo.vipEarlyQty}
+                    currentQty={selectedTickets[`${baseKey}-vipEarly`] || 0}
+                    onChange={(delta) =>
+                      updateTicketCount(`${baseKey}-vipEarly`, delta)
+                    }
+                  />
+                )}
+
+                {/* Generales */}
+                {dayInfo.genQty > 0 && (
+                  <TicketSelector
+                    label={`Generales ($${dayInfo.genPrice})`}
+                    maxQty={dayInfo.genQty}
+                    currentQty={selectedTickets[`${baseKey}-gen`] || 0}
+                    onChange={(delta) =>
+                      updateTicketCount(`${baseKey}-gen`, delta)
+                    }
+                  />
+                )}
+
+                {/* VIP */}
+                {dayInfo.vipQty > 0 && (
+                  <TicketSelector
+                    label={`VIP ($${dayInfo.vipPrice})`}
+                    maxQty={dayInfo.vipQty}
+                    currentQty={selectedTickets[`${baseKey}-vip`] || 0}
+                    onChange={(delta) =>
+                      updateTicketCount(`${baseKey}-vip`, delta)
+                    }
+                  />
+                )}
+              </View>
+            );
+          })}
+
+          {/* Subtotal de entradas */}
+          <Text style={styles.subtotalText}>
+            Subtotal (sin cargo de servicio): ${subtotal}
+          </Text>
 
           {/* Botón comprar */}
           <View style={styles.buyButtonContainer}>
@@ -179,7 +171,7 @@ export default function EventScreen() {
           </View>
         </View>
 
-        {/* Reseñas solo si es recurrente (ej. eventData.isRecurrent === true) */}
+        {/* Reseñas (solo si recurrente) */}
         {eventData.isRecurrent && (
           <View style={styles.reviewCard}>
             <ReviewComponent reviews={mockReviews} />
@@ -192,7 +184,6 @@ export default function EventScreen() {
   );
 }
 
-// Estilos de EventScreen
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -223,17 +214,13 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
   },
 
-  // Tarjeta con la info del evento
+  // Info del evento
   eventCard: {
     backgroundColor: COLORS.cardBg,
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: RADIUS.card,
     padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
     elevation: 2,
   },
   titleRow: {
@@ -255,9 +242,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 6,
-  },
-  iconNoPadding: {
-    margin: 0,
   },
   infoText: {
     color: COLORS.textPrimary,
@@ -288,17 +272,13 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // Tarjeta de tickets
+  // Selección de tickets
   ticketCard: {
     backgroundColor: COLORS.cardBg,
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: RADIUS.card,
     padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
     elevation: 2,
   },
   ticketCardTitle: {
@@ -307,18 +287,21 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 12,
   },
-  dayTicketBlock: {
-    marginBottom: 12,
+  dayBlock: {
+    marginBottom: 16,
   },
   dayLabel: {
     fontSize: FONT_SIZES.body,
     fontWeight: "bold",
     color: COLORS.info,
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  ticketLine: {
-    marginLeft: 12,
-    color: COLORS.textSecondary,
+  subtotalText: {
+    textAlign: "right",
+    marginTop: 8,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
+    fontWeight: "600",
   },
   buyButtonContainer: {
     alignItems: "flex-end",
@@ -346,10 +329,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: RADIUS.card,
     padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
     elevation: 2,
   },
 });

@@ -12,8 +12,8 @@ import {
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 
-import Header from "@/components/LayoutComponents/HeaderComponent";
-import Footer from "@/components/LayoutComponents/FooterComponent";
+import Header from "@/components/layout/HeaderComponent";
+import Footer from "@/components/layout/FooterComponent";
 import { getArtistById } from "@/utils/artistHelpers";
 import { Artist } from "@/interfaces/Artist";
 
