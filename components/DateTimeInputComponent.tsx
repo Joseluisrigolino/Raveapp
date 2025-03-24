@@ -1,56 +1,124 @@
+// DateTimeInputComponent.tsx
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 interface DateTimeInputProps {
   label: string;
   value: Date;
-  onChange: (date: Date) => void;
-  mode?: "date" | "time" | "datetime";
+  onChange: (newDate: Date) => void;
 }
 
+/**
+ * Muestra dos botones: uno para elegir la fecha, otro para la hora.
+ * Al hacer tap, abre un DateTimePicker en modo 'date' o 'time'.
+ */
 export default function DateTimeInputComponent({
   label,
   value,
   onChange,
-  mode = "datetime",
 }: DateTimeInputProps) {
-  const [showPicker, setShowPicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
-  const handleChange = (event: any, selectedDate?: Date) => {
-    setShowPicker(false);
+  // Manejo del cambio de fecha
+  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowDatePicker(false);
     if (selectedDate) {
-      onChange(selectedDate);
+      // Conservar hora/minutos de "value"
+      const newDate = new Date(value);
+      newDate.setFullYear(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate()
+      );
+      onChange(newDate);
     }
   };
 
-  const formatDateTime = (date: Date) => {
-    if (!date) return "Seleccionar fecha/hora";
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${day}/${month}/${year} - ${hours}:${minutes}hs`;
+  // Manejo del cambio de hora
+  const handleTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowTimePicker(false);
+    if (selectedDate) {
+      // Conservar día/mes/año de "value"
+      const newDate = new Date(value);
+      newDate.setHours(selectedDate.getHours());
+      newDate.setMinutes(selectedDate.getMinutes());
+      onChange(newDate);
+    }
   };
+
+  // Helpers para formatear
+  function formatDate(date: Date): string {
+    const dd = String(date.getDate()).padStart(2, "0");
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const yyyy = date.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  function formatTime(date: Date): string {
+    const hh = String(date.getHours()).padStart(2, "0");
+    const min = String(date.getMinutes()).padStart(2, "0");
+    return `${hh}:${min}hs`;
+  }
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
 
-      <TouchableOpacity style={styles.fakeInput} onPress={() => setShowPicker(true)}>
-        <Text style={styles.dateText}>{formatDateTime(value)}</Text>
-      </TouchableOpacity>
+      {/* Fila con botón de fecha y botón de hora */}
+      <View style={styles.row}>
+        {/* Botón de fecha */}
+        <TouchableOpacity
+          style={styles.dateTimeButton}
+          onPress={() => setShowDatePicker(true)}
+        >
+          <MaterialCommunityIcons
+            name="calendar"
+            size={20}
+            color={COLORS.cardBg}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={styles.buttonText}>{formatDate(value)}</Text>
+        </TouchableOpacity>
 
-      {showPicker && (
+        {/* Botón de hora */}
+        <TouchableOpacity
+          style={styles.dateTimeButton}
+          onPress={() => setShowTimePicker(true)}
+        >
+          <MaterialCommunityIcons
+            name="clock-outline"
+            size={20}
+            color={COLORS.cardBg}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={styles.buttonText}>{formatTime(value)}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Picker de fecha */}
+      {showDatePicker && (
         <DateTimePicker
           value={value}
-          mode={mode === "datetime" ? "date" : mode}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+        />
+      )}
+
+      {/* Picker de hora */}
+      {showTimePicker && (
+        <DateTimePicker
+          value={value}
+          mode="time"
           is24Hour={true}
           display="default"
-          onChange={handleChange}
+          onChange={handleTimeChange}
         />
       )}
     </View>
@@ -59,22 +127,32 @@ export default function DateTimeInputComponent({
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 12,
-    width: 300,
+    width: "90%",
+    alignSelf: "center",
+    marginBottom: 16,
   },
   label: {
+    color: COLORS.textPrimary,
     fontWeight: "bold",
-    marginBottom: 4,
-    color: COLORS.textPrimary,
-    fontSize: FONT_SIZES.body,
+    marginBottom: 6,
   },
-  fakeInput: {
-    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  dateTimeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.textPrimary,
     borderRadius: RADIUS.card,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minWidth: 140,
+    justifyContent: "center",
   },
-  dateText: {
-    color: COLORS.textPrimary,
+  buttonText: {
+    color: COLORS.cardBg,
+    fontWeight: "bold",
+    fontSize: FONT_SIZES.body,
   },
 });

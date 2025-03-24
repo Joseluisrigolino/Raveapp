@@ -1,3 +1,4 @@
+// FavEventScreen.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import {
   SafeAreaView,
@@ -17,63 +18,79 @@ import Footer from "@/components/LayoutComponents/FooterComponent";
 import CardComponent from "@/components/CardComponent";
 import SearchBarComponent from "@/components/SearchBarComponent";
 
-// Helpers que traen SOLO favoritos
+// Traemos eventos favoritos en lugar de todos
 import { getAllFavEvents, ExtendedEventItem } from "@/utils/eventFavHelpers";
+// Y nuestra lista de géneros
+import { ELECTRONIC_GENRES } from "@/utils/electronicGenresHelper";
 
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-/** Función para determinar si el evento cae en la semana actual (mismo helper que en MenuScreen). */
-function isInCurrentWeek(dateStr: string): boolean {
-  const [day, month, year] = dateStr.split("/").map(Number);
-  const eventDate = new Date(year, month - 1, day);
-
+/** Ejemplo de función que retorna el rango de la semana actual. */
+function getWeekRange() {
   const now = new Date();
-  const dayOfWeek = now.getDay(); // 0 (Dom) ... 6 (Sáb)
+  const dayOfWeek = now.getDay();
   const startOfWeek = new Date(now);
   startOfWeek.setHours(0, 0, 0, 0);
-  startOfWeek.setDate(now.getDate() - dayOfWeek);
+
+  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  startOfWeek.setDate(startOfWeek.getDate() - diffToMonday);
 
   const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6);
+  endOfWeek.setDate(startOfWeek.getDate() + 7);
 
-  return eventDate >= startOfWeek && eventDate <= endOfWeek;
+  return { startOfWeek, endOfWeek };
 }
 
 export default function FavEventScreen() {
   const router = useRouter();
 
-  // Lista de favoritos (mismos campos y estilo que MenuScreen)
+  // Lista base de eventos FAVORITOS
   const [favEvents, setFavEvents] = useState<ExtendedEventItem[]>([]);
 
-  // Filtros
+  // Filtros de texto, fecha y ubicación
   const [searchText, setSearchText] = useState("");
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-
   const [locationFilterOpen, setLocationFilterOpen] = useState(false);
   const [locationText, setLocationText] = useState("");
 
+  // Filtro: "Esta semana"
   const [weekActive, setWeekActive] = useState(false);
+  // Filtro: "After"
   const [afterActive, setAfterActive] = useState(false);
+  // Filtro: "LGBT"
   const [lgbtActive, setLgbtActive] = useState(false);
 
-  // Cargamos los eventos FAVORITOS al montar
+  // *** Estados para el filtro de Género:
+  const [genreFilterOpen, setGenreFilterOpen] = useState(false);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+
+  // Saber si hay rango de fechas activo
+  const isDateActive = Boolean(startDate && endDate);
+  // Saber si hay ubicación activa
+  const isLocationActive = Boolean(locationText.trim() !== "");
+  // *** Saber si hay géneros activos
+  const isGenreActive = selectedGenres.length > 0;
+
+  // Cargar los eventos favoritos al montar
   useEffect(() => {
     const events = getAllFavEvents();
     setFavEvents(events);
   }, []);
 
-  // Filtrado idéntico a MenuScreen
-  const filteredFavs = useMemo(() => {
+  // Filtrado
+  const filteredEvents = useMemo(() => {
     let results = [...favEvents];
 
-    // (a) Filtro por texto
+    // (a) Filtrar por texto
     if (searchText.trim() !== "") {
       const lower = searchText.toLowerCase();
-      results = results.filter((ev) => ev.title.toLowerCase().includes(lower));
+      results = results.filter((ev) =>
+        ev.title.toLowerCase().includes(lower)
+      );
     }
 
     // (b) Rango de fechas
@@ -88,22 +105,36 @@ export default function FavEventScreen() {
     // (c) Ubicación
     if (locationText.trim() !== "") {
       const locLower = locationText.toLowerCase();
-      results = results.filter((ev) => ev.address.toLowerCase().includes(locLower));
+      results = results.filter((ev) =>
+        ev.address.toLowerCase().includes(locLower)
+      );
     }
 
-    // (d) "Esta semana"
+    // (d) Filtro "Esta semana"
     if (weekActive) {
-      results = results.filter((ev) => isInCurrentWeek(ev.date));
+      const { startOfWeek, endOfWeek } = getWeekRange();
+      results = results.filter((ev) => {
+        const [day, month, year] = ev.date.split("/").map(Number);
+        const eventTime = new Date(year, month - 1, day).getTime();
+        return (
+          eventTime >= startOfWeek.getTime() && eventTime < endOfWeek.getTime()
+        );
+      });
     }
 
-    // (e) After
+    // (e) Filtro "After"
     if (afterActive) {
       results = results.filter((ev) => ev.isAfter === true);
     }
 
-    // (f) LGBT
+    // (f) Filtro "LGBT"
     if (lgbtActive) {
       results = results.filter((ev) => ev.isLGBT === true);
+    }
+
+    // *** (g) Filtro de Género
+    if (selectedGenres.length > 0) {
+      results = results.filter((ev) => selectedGenres.includes(ev.type));
     }
 
     return results;
@@ -116,9 +147,10 @@ export default function FavEventScreen() {
     weekActive,
     afterActive,
     lgbtActive,
+    selectedGenres,
   ]);
 
-  // Handlers para pickers
+  // Handlers para pickers de fecha
   const onStartDateChange = (_event: any, selectedDate?: Date) => {
     setShowStartPicker(false);
     if (selectedDate) {
@@ -132,33 +164,63 @@ export default function FavEventScreen() {
     }
   };
 
-  // Cerrar paneles
+  // Cerrar panel de fechas si ambas están definidas
   useEffect(() => {
     if (startDate && endDate) {
       setDateFilterOpen(false);
     }
   }, [startDate, endDate]);
 
+  // Cerrar panel de ubicación si se ha escrito algo
   useEffect(() => {
     if (locationText.trim() !== "") {
       setLocationFilterOpen(false);
     }
   }, [locationText]);
 
-  // Toggle panel de fechas / ubicación
+  // Toggle panel de fechas
   const toggleDateFilter = () => {
     setDateFilterOpen(!dateFilterOpen);
     setLocationFilterOpen(false);
+    setGenreFilterOpen(false);
   };
+
+  // Toggle panel de ubicación
   const toggleLocationFilter = () => {
     setLocationFilterOpen(!locationFilterOpen);
     setDateFilterOpen(false);
+    setGenreFilterOpen(false);
   };
 
-  // Navegar al detalle
-  const handleCardPress = (eventId?: number) => {
-    if (!eventId) return;
-    router.push(`/main/EventsScreens/EventScreen?id=${eventId}`);
+  // *** Toggle panel de géneros
+  const toggleGenreFilter = () => {
+    setGenreFilterOpen(!genreFilterOpen);
+    setDateFilterOpen(false);
+    setLocationFilterOpen(false);
+  };
+
+  // *** Seleccionar/deseleccionar un género
+  function toggleGenre(g: string) {
+    setSelectedGenres((prev) => {
+      if (prev.includes(g)) {
+        return prev.filter((item) => item !== g);
+      } else {
+        return [...prev, g];
+      }
+    });
+  }
+
+  // *** Limpiar géneros
+  function clearGenres() {
+    setSelectedGenres([]);
+  }
+
+  // Navegar a detalle
+  const handleCardPress = (title: string, id?: number) => {
+    if (id) {
+      console.log(`Navegando a evento ID=${id}`);
+      router.push(`/main/EventsScreens/EventScreen?id=${id}`);
+    }
   };
 
   return (
@@ -166,14 +228,19 @@ export default function FavEventScreen() {
       <Header />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Filtros - mismos estilos que en MenuScreen */}
+        {/* Sección de filtros */}
         <View style={styles.filtersSection}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-            {/* Botón Fecha */}
+          {/* Scroll horizontal con los chips */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.horizontalScroll}
+          >
+            {/* Botón "Fecha" */}
             <TouchableOpacity
               style={[
                 styles.filterChip,
-                (dateFilterOpen || (startDate && endDate)) && styles.filterChipActive,
+                isDateActive && styles.filterChipActive,
               ]}
               onPress={toggleDateFilter}
             >
@@ -186,18 +253,18 @@ export default function FavEventScreen() {
               <Text
                 style={[
                   styles.filterChipText,
-                  (dateFilterOpen || (startDate && endDate)) && styles.filterChipTextActive,
+                  isDateActive && styles.filterChipTextActive,
                 ]}
               >
                 Fecha
               </Text>
             </TouchableOpacity>
 
-            {/* Botón Ubicación */}
+            {/* Botón "Ubicación" */}
             <TouchableOpacity
               style={[
                 styles.filterChip,
-                (locationFilterOpen || locationText.trim() !== "") && styles.filterChipActive,
+                isLocationActive && styles.filterChipActive,
               ]}
               onPress={toggleLocationFilter}
             >
@@ -210,14 +277,14 @@ export default function FavEventScreen() {
               <Text
                 style={[
                   styles.filterChipText,
-                  (locationFilterOpen || locationText.trim() !== "") && styles.filterChipTextActive,
+                  isLocationActive && styles.filterChipTextActive,
                 ]}
               >
                 Ubicación
               </Text>
             </TouchableOpacity>
 
-            {/* Botón Esta semana */}
+            {/* Botón "Esta semana" */}
             <TouchableOpacity
               style={[styles.filterChip, weekActive && styles.filterChipActive]}
               onPress={() => setWeekActive(!weekActive)}
@@ -238,7 +305,7 @@ export default function FavEventScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* Botón After */}
+            {/* Botón "After" */}
             <TouchableOpacity
               style={[styles.filterChip, afterActive && styles.filterChipActive]}
               onPress={() => setAfterActive(!afterActive)}
@@ -259,7 +326,7 @@ export default function FavEventScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* Botón LGBT */}
+            {/* Botón "LGBT" */}
             <TouchableOpacity
               style={[styles.filterChip, lgbtActive && styles.filterChipActive]}
               onPress={() => setLgbtActive(!lgbtActive)}
@@ -279,6 +346,30 @@ export default function FavEventScreen() {
                 LGBT
               </Text>
             </TouchableOpacity>
+
+            {/* *** Botón "Género" */}
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                isGenreActive && styles.filterChipActive,
+              ]}
+              onPress={toggleGenreFilter}
+            >
+              <IconButton
+                icon="music"
+                size={18}
+                iconColor={COLORS.textPrimary}
+                style={{ margin: 0 }}
+              />
+              <Text
+                style={[
+                  styles.filterChipText,
+                  isGenreActive && styles.filterChipTextActive,
+                ]}
+              >
+                Género
+              </Text>
+            </TouchableOpacity>
           </ScrollView>
 
           {/* SearchBar */}
@@ -295,7 +386,11 @@ export default function FavEventScreen() {
             <View style={styles.dateFilterContainer}>
               <Text style={styles.dateFilterLabel}>Seleccionar rango de fechas:</Text>
 
-              <TouchableOpacity style={styles.dateInput} onPress={() => setShowStartPicker(true)}>
+              {/* Fecha inicio */}
+              <TouchableOpacity
+                style={styles.dateInput}
+                onPress={() => setShowStartPicker(true)}
+              >
                 <Text style={styles.dateInputText}>
                   {startDate
                     ? `Desde: ${startDate.toLocaleDateString()}`
@@ -311,7 +406,11 @@ export default function FavEventScreen() {
                 />
               )}
 
-              <TouchableOpacity style={styles.dateInput} onPress={() => setShowEndPicker(true)}>
+              {/* Fecha fin */}
+              <TouchableOpacity
+                style={styles.dateInput}
+                onPress={() => setShowEndPicker(true)}
+              >
                 <Text style={styles.dateInputText}>
                   {endDate
                     ? `Hasta: ${endDate.toLocaleDateString()}`
@@ -327,6 +426,7 @@ export default function FavEventScreen() {
                 />
               )}
 
+              {/* Botón para limpiar fechas */}
               <TouchableOpacity
                 style={styles.clearButton}
                 onPress={() => {
@@ -350,6 +450,7 @@ export default function FavEventScreen() {
                 value={locationText}
                 onChangeText={setLocationText}
               />
+              {/* Botón para limpiar ubicación */}
               <TouchableOpacity
                 style={styles.clearButton}
                 onPress={() => {
@@ -360,32 +461,70 @@ export default function FavEventScreen() {
               </TouchableOpacity>
             </View>
           )}
+
+          {/* *** Panel de Género (multi-selección) */}
+          {genreFilterOpen && (
+            <View style={styles.genreFilterContainer}>
+              <Text style={styles.dateFilterLabel}>Seleccionar géneros:</Text>
+              {ELECTRONIC_GENRES.map((g) => {
+                const isSelected = selectedGenres.includes(g);
+                return (
+                  <TouchableOpacity
+                    key={g}
+                    style={[
+                      styles.genreItem,
+                      isSelected && styles.genreItemSelected,
+                    ]}
+                    onPress={() => toggleGenre(g)}
+                  >
+                    <Text style={styles.genreItemText}>{g}</Text>
+                    {isSelected && (
+                      <IconButton
+                        icon="check"
+                        size={18}
+                        iconColor={COLORS.primary}
+                        style={{ margin: 0 }}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+
+              {/* Botón para limpiar géneros */}
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={clearGenres}
+              >
+                <Text style={styles.clearButtonText}>Limpiar géneros</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
-        {/* Lista de favoritos (filtrados) */}
+        {/* Lista de eventos (filtrados) */}
         <View style={styles.containerCards}>
-          {filteredFavs.length === 0 ? (
+          {filteredEvents.length === 0 ? (
             <Text style={styles.noEventsText}>
               No existen eventos con esos filtros. ¡Cambia de filtros!
             </Text>
           ) : (
-            filteredFavs.map((ev) => (
+            filteredEvents.map((ev) => (
               <View key={ev.id} style={styles.cardContainer}>
-                {/* Card idéntico, salvo que agregamos el corazón en la parte superior derecha */}
                 <CardComponent
                   title={ev.title}
                   text={ev.description}
                   date={ev.date}
                   foto={ev.imageUrl}
-                  onPress={() => handleCardPress(ev.id)}
+                  onPress={() => handleCardPress(ev.title, ev.id)}
                 />
+
+                {/* Ícono de corazón superpuesto (favorito) */}
                 <IconButton
                   icon="heart"
                   size={24}
                   iconColor={COLORS.negative}
                   style={styles.heartIcon}
                   onPress={() => {
-                    // Lógica para quitar de favoritos (simulación)
                     console.log("Quitar de favoritos:", ev.id);
                   }}
                 />
@@ -492,20 +631,46 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingHorizontal: 8,
   },
-  cardContainer: {
-    position: "relative",
-    marginBottom: 10, // Mismo margin que el MenuScreen (puedes ajustarlo)
-  },
   noEventsText: {
     marginTop: 20,
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
     textAlign: "center",
   },
+  cardContainer: {
+    position: "relative",
+    marginBottom: 10,
+  },
   heartIcon: {
     position: "absolute",
     top: 10,
     right: 10,
     backgroundColor: "transparent",
+  },
+
+  // Panel de géneros
+  genreFilterContainer: {
+    backgroundColor: COLORS.cardBg,
+    marginHorizontal: 8,
+    marginTop: 8,
+    borderRadius: RADIUS.card,
+    padding: 10,
+  },
+  genreItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.backgroundLight,
+    borderRadius: RADIUS.card,
+    marginBottom: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    justifyContent: "space-between",
+  },
+  genreItemSelected: {
+    backgroundColor: "#e0e0e0",
+  },
+  genreItemText: {
+    color: COLORS.textPrimary,
+    fontSize: FONT_SIZES.body,
   },
 });

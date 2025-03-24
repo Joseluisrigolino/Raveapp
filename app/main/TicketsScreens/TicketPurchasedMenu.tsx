@@ -1,21 +1,61 @@
+// app/main/TicketsScreens/TicketsPurchasedMenu.tsx
+// (o la ruta que uses en tu proyecto)
+
 import React from "react";
-import { SafeAreaView, FlatList, StyleSheet } from "react-native";
+import {
+  SafeAreaView,
+  FlatList,
+  StyleSheet,
+} from "react-native";
 import { useRouter } from "expo-router";
 
 import Header from "@/components/LayoutComponents/HeaderComponent";
 import Footer from "@/components/LayoutComponents/FooterComponent";
-import TabMenuComponent from "@/components/TabMenuComponent"; // Importa el mismo que usas en NewsScreen
+import TabMenuComponent from "@/components/TabMenuComponent";
 import TicketCardComponent from "@/components/TicketCardComponent";
+import { COLORS } from "@/styles/globalStyles";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
-import { getAllPurchasedTickets } from "@/utils/ticketMenuHelpers";
 
-import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+/** Mock local o Helper real (aquí el mock local) */
+const mockTickets: TicketPurchasedMenuItem[] = [
+  {
+    id: 1,
+    imageUrl: "https://picsum.photos/200?random=1",
+    eventName: "Nombre del evento 1",
+    date: "Fecha del evento 1",
+    description: "Descripción del evento 1, muy interesante.",
+    isFinished: false,
+  },
+  {
+    id: 2,
+    imageUrl: "https://picsum.photos/200?random=2",
+    eventName: "Nombre del evento 2",
+    date: "Fecha del evento 2",
+    description: "Descripción del evento 2, está finalizado.",
+    isFinished: true,
+  },
+  {
+    id: 3,
+    imageUrl: "https://picsum.photos/200?random=3",
+    eventName: "Nombre del evento 3",
+    date: "Fecha del evento 3",
+    description: "Descripción del evento 3, con DJs locales.",
+    isFinished: false,
+  },
+  // ... Agrega más si quieres
+];
 
 export default function TicketsPurchasedMenu() {
   const router = useRouter();
 
-  const mockData: TicketPurchasedMenuItem[] = getAllPurchasedTickets();
+  // Ordenar: primero los NO finalizados, luego los finalizados
+  const sortedTickets = [...mockTickets].sort((a, b) => {
+    if (a.isFinished && !b.isFinished) return 1;
+    if (!a.isFinished && b.isFinished) return -1;
+    return 0;
+  });
 
+  // Manejo del click en un ticket
   const handleTicketPress = (item: TicketPurchasedMenuItem) => {
     if (item.isFinished) {
       router.push(`/main/TicketsScreens/TicketFinalizedScreen?id=${item.id}`);
@@ -28,7 +68,6 @@ export default function TicketsPurchasedMenu() {
     <SafeAreaView style={styles.container}>
       <Header />
 
-      {/* Subheader con TabMenuComponent, tal como en NewsScreen */}
       <TabMenuComponent
         tabs={[
           {
@@ -45,9 +84,9 @@ export default function TicketsPurchasedMenu() {
       />
 
       <FlatList
-        data={mockData}
+        data={sortedTickets}
         keyExtractor={(item) => item.id.toString()}
-        numColumns={2}
+        numColumns={1}
         contentContainerStyle={styles.flatListContent}
         renderItem={({ item }) => (
           <TicketCardComponent
