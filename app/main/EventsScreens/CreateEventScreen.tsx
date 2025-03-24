@@ -13,14 +13,14 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import TitlePers from "@/components/TitleComponent";
-import DateTimeInputComponent from "@/components/DateTimeInputComponent";
+import TitlePers from "@/components/common/TitleComponent";
+import DateTimeInputComponent from "@/components/common/DateTimeInputComponent";
 
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { ELECTRONIC_GENRES } from "@/utils/electronicGenresHelper";
 
 // <-- Importamos el hook
-import { useCreateEvent } from "@/hooks/useCreateEvent";
+import { useCreateEvent } from "@/hooks/events/useCreateEvent";
 
 export default function CreateEventScreen() {
   // Consumimos toda la lógica desde el hook

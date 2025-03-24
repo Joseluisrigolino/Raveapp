@@ -6,11 +6,11 @@ import { useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import CardComponent from "@/components/CardComponent";
+import CardComponent from "@/components/events/CardComponent";
 import FiltersSection from "@/components/filters/FiltersSection";
 
 // <-- importamos nuestro custom hook
-import { useFavFilters } from "@/hooks/useFavFilters";
+import { useFavFilters } from "@/hooks/filters/useFavFilters";
 
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 

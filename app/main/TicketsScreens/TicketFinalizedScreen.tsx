@@ -14,7 +14,7 @@ import { useLocalSearchParams } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import ReviewComponent from "@/components/ReviewComponent";
+import ReviewComponent from "@/components/events/ReviewComponent";
 import { ReviewItem } from "@/interfaces/ReviewProps";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
 import { getTicketMenuById } from "@/utils/ticketMenuHelpers";

@@ -6,11 +6,11 @@ import { useLocalSearchParams } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import ReviewComponent from "@/components/ReviewComponent";
+import ReviewComponent from "@/components/events/ReviewComponent";
 import TicketSelector from "@/components/tickets/TicketSelector";
 
 // <-- importamos nuestro custom hook
-import { useEventDetail } from "@/hooks/useEventDetail";
+import { useEventDetail } from "@/hooks/events/useEventDetail";
 
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 

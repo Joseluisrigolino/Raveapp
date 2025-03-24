@@ -15,8 +15,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import TitlePers from "@/components/TitleComponent";
-import DateTimeInputComponent from "@/components/DateTimeInputComponent";
+import TitlePers from "@/components/common/TitleComponent";
+import DateTimeInputComponent from "@/components/common/DateTimeInputComponent";
 
 import { Artist } from "@/interfaces/Artist";
 import { OwnerEventItem } from "@/interfaces/OwnerEventItem";

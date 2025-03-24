@@ -1,6 +1,6 @@
 import ButtonInApp from "@/components/ButtonComponent";
 import InputField from "@/components/InputFieldComponent";
-import TitlePers from "@/components/TitleComponent";
+import TitlePers from "@/components/common/TitleComponent";
 import { View, StyleSheet } from "react-native";
 
 export default function RegisterUserScreen() {

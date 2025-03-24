@@ -12,7 +12,7 @@ import { useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import SearchBarComponent from "@/components/SearchBarComponent";
+import SearchBarComponent from "@/components/common/SearchBarComponent";
 import OwnerEventCard from "@/components/OwnerEventCard";
 
 import { getOwnerEvents } from "@/utils/ownerEventsHelper";

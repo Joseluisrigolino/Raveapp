@@ -5,7 +5,7 @@ import { Link, useRouter } from "expo-router";
 
 import ButtonInApp from "@/components/ButtonComponent";
 import InputField from "@/components/InputFieldComponent";
-import TitlePers from "@/components/TitleComponent";
+import TitlePers from "@/components/common/TitleComponent";
 import globalStyles from "@/styles/globalStyles";
 
 // Importamos nuestro helper

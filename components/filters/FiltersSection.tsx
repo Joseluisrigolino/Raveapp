@@ -11,7 +11,7 @@ import {
 import { IconButton } from "react-native-paper";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
-import SearchBarComponent from "@/components/SearchBarComponent";
+import SearchBarComponent from "@/components/common/SearchBarComponent";
 import { ELECTRONIC_GENRES } from "@/utils/electronicGenresHelper";
 
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";

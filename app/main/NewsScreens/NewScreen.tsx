@@ -12,7 +12,7 @@ import { useLocalSearchParams } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import TitlePers from "@/components/TitleComponent"; 
+import TitlePers from "@/components/common/TitleComponent"; 
 import { NewsItem } from "@/interfaces/NewsProps";
 import { getNewsById } from "@/utils/newsHelpers";
 
