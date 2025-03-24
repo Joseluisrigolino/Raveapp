@@ -1,3 +1,4 @@
+// screens/Index.tsx (ejemplo de LoginScreen)
 import React, { useState } from "react";
 import { View, StyleSheet, Alert } from "react-native";
 import { Text } from "react-native-paper";
@@ -8,22 +9,22 @@ import InputField from "@/components/InputFieldComponent";
 import TitlePers from "@/components/common/TitleComponent";
 import globalStyles from "@/styles/globalStyles";
 
-// Importamos nuestro helper
-import { validateUser } from "@/utils/auth/authHelpers";
+// <-- Importamos useAuth para acceder al login global
+import { useAuth } from "@/context/AuthContext";
 
 export default function Index() {
   const router = useRouter();
+  const { login } = useAuth();   // <-- aquí obtenemos la función login del contexto
 
-  // Estados locales para usuario y password
+  // Estados locales
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  // Handler para el botón de login
+  // Handler de login
   const handleLogin = () => {
-    // Validamos contra el helper
-    const isValid = validateUser(username, password);
-    if (isValid) {
-      // Si es admin/admin, vamos a MenuScreen
+    const success = login(username, password);
+    if (success) {
+      // Si es válido, vamos a la pantalla principal
       router.push("/main/EventsScreens/MenuScreen");
     } else {
       Alert.alert("Error", "Usuario o contraseña incorrectos.");
@@ -34,14 +35,12 @@ export default function Index() {
     <View style={styles.container}>
       <TitlePers text="Bienvenido a Raveapp" />
 
-      {/* Input usuario */}
       <InputField
         label="Usuario"
         value={username}
         onChangeText={setUsername}
       />
 
-      {/* Input contraseña */}
       <InputField
         label="Contraseña"
         secureTextEntry
@@ -49,7 +48,6 @@ export default function Index() {
         onChangeText={setPassword}
       />
 
-      {/* Botón de login con cuenta */}
       <ButtonInApp
         icon=""
         text="Ingresar con Cuenta"
@@ -58,7 +56,6 @@ export default function Index() {
         onPress={handleLogin}
       />
 
-      {/* Botón de login con Google (ejemplo) */}
       <ButtonInApp
         icon="google"
         text="Ingresar con Google"
@@ -77,7 +74,9 @@ export default function Index() {
 
       <View style={styles.registerText}>
         <Text variant="labelLarge">
-          <Link href="/main/EventsScreens/MenuScreen">Ingresar como invitado</Link>
+          <Link href="/main/EventsScreens/MenuScreen">
+            Ingresar como invitado
+          </Link>
         </Text>
       </View>
     </View>

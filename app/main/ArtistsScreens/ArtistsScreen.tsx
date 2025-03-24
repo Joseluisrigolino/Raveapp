@@ -1,3 +1,4 @@
+// screens/ArtistsScreens/ArtistsScreen.tsx
 import React, { useState, useMemo } from "react";
 import { View, StyleSheet, ScrollView, SafeAreaView, Text } from "react-native";
 import { useRouter } from "expo-router";
@@ -11,89 +12,25 @@ import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import { Artist } from "@/interfaces/Artist";
 import globalStyles, { COLORS, FONT_SIZES } from "@/styles/globalStyles";
 
-// Simulados
-type Alphabet =
-  | "A"
-  | "B"
-  | "C"
-  | "D"
-  | "E"
-  | "F"
-  | "G"
-  | "H"
-  | "I"
-  | "J"
-  | "K"
-  | "L"
-  | "M"
-  | "N"
-  | "O"
-  | "P"
-  | "Q"
-  | "R"
-  | "S"
-  | "T"
-  | "U"
-  | "V"
-  | "W"
-  | "X"
-  | "Y"
-  | "Z";
-
-const artistData: Record<Alphabet, string[]> = {
-  A: ["Ariana Grande", "Alicia Keys", "Adele"],
-  B: ["Beyoncé", "Bruno Mars", "Billie Eilish"],
-  C: ["Charlie Puth", "Coldplay", "Chris Brown"],
-  D: ["Drake", "David Guetta", "Dua Lipa"],
-  E: ["Ed Sheeran", "Elton John", "Emeli Sandé"],
-  F: ["Freddie Mercury", "Future", "Florence Welch"],
-  G: ["Gwen Stefani", "Green Day", "Galantis"],
-  H: [],
-  I: ["Imagine Dragons", "Iggy Azalea", "Iron Maiden"],
-  J: ["Justin Bieber", "Jennifer Lopez", "John Legend"],
-  K: ["Katy Perry", "Kendrick Lamar", "Kesha"],
-  L: ["Lorde", "Lana Del Rey", "Lil Nas X"],
-  M: ["Mariah Carey", "Miley Cyrus", "Maroon 5"],
-  N: ["Nicki Minaj", "Niall Horan", "Ne-Yo"],
-  O: ["Olivia Rodrigo", "OneRepublic", "OutKast"],
-  P: ["Post Malone", "P!nk", "Pharrell Williams"],
-  Q: ["Queen", "Quavo", "Quinn XCII"],
-  R: ["Rihanna", "Red Hot Chili Peppers", "Rod Stewart"],
-  S: ["Shakira", "Sia", "Selena Gomez"],
-  T: ["Taylor Swift", "The Weeknd", "Travis Scott"],
-  U: ["Usher", "U2", "Underoath"],
-  V: [],
-  W: ["Wiz Khalifa", "Wham!", "The White Stripes"],
-  X: [],
-  Y: ["Yoncé", "Yo-Yo Ma", "Yungblud"],
-  Z: ["Zayn Malik", "Zedd", "Zac Brown Band"],
-};
-
-const generateArtists = (): Artist[] => {
-  const artistsList: Artist[] = [];
-  (Object.keys(artistData) as Alphabet[]).forEach((letter: Alphabet) => {
-    artistData[letter].forEach((name: string) => {
-      const randomNum = Math.floor(Math.random() * 100) + 1;
-      artistsList.push({
-        name,
-        image: `https://picsum.photos/200/200?random=${randomNum}`,
-      });
-    });
-  });
-  return artistsList;
-};
+// <-- Importamos el helper:
+import { getAllArtists } from "@/utils/artists/artistHelpers";
 
 export default function ArtistsScreen() {
   const router = useRouter();
   const [searchText, setSearchText] = useState("");
-  const [artists] = useState<Artist[]>(() => generateArtists());
 
-  // Filtra
+  // Obtenemos todo el array de artistas (con datos completos)
+  const [artists] = useState<Artist[]>(() => getAllArtists());
+
+  // Filtra en memoria (por el inicio del nombre, en este ejemplo)
   const filteredArtists = useMemo(() => {
     return artists.filter((artist) =>
       artist.name.toLowerCase().startsWith(searchText.toLowerCase())
     );
   }, [artists, searchText]);
+
+  // Agrupación por letra
+  const alphabet = "abcdefghijklmnopqrstuvwxyz".split("");
 
   const getLetterGroup = (letter: string) => {
     return filteredArtists.filter(
@@ -101,11 +38,11 @@ export default function ArtistsScreen() {
     );
   };
 
-  const alphabet = "abcdefghijklmnopqrstuvwxyz".split("");
-
-  // Al tocar un artista, navegamos a /main/ArtistScreen con ?name=...
+  // Navegar a detalle por "name"
   const handleArtistPress = (artist: Artist) => {
-    router.push(`/main/ArtistsScreens/ArtistScreen?name=${encodeURIComponent(artist.name)}`);
+    router.push(
+      `/main/ArtistsScreens/ArtistScreen?name=${encodeURIComponent(artist.name)}`
+    );
   };
 
   return (
@@ -134,9 +71,9 @@ export default function ArtistsScreen() {
             <View key={letter} style={styles.letterGroup}>
               <Text style={styles.letterTitle}>{letter.toUpperCase()}</Text>
               <View style={styles.artistCardsRow}>
-                {group.map((artist, index) => (
+                {group.map((artist) => (
                   <ArtistCard
-                    key={index}
+                    key={artist.id}
                     artistName={artist.name}
                     artistImage={artist.image}
                     onPress={() => handleArtistPress(artist)}
@@ -156,13 +93,13 @@ export default function ArtistsScreen() {
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
-    backgroundColor: globalStyles.COLORS.backgroundLight, // Gris claro principal
+    backgroundColor: globalStyles.COLORS.backgroundLight,
   },
   letterGroup: {
     marginTop: 20,
   },
   letterTitle: {
-    fontSize: FONT_SIZES.subTitle,       // 18-20 px
+    fontSize: FONT_SIZES.subTitle,
     fontWeight: "bold",
     color: globalStyles.COLORS.textPrimary,
     marginLeft: 10,

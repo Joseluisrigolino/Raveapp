@@ -1,4 +1,5 @@
 // screens/admin/ManageArtistsScreen.tsx
+
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -8,6 +9,7 @@ import {
   FlatList,
   Alert,
   TextInput,
+  TouchableOpacity,
 } from "react-native";
 import { IconButton } from "react-native-paper";
 import { useRouter } from "expo-router";
@@ -17,26 +19,30 @@ import Footer from "@/components/layout/FooterComponent";
 import { getAllArtists, searchArtistsByName } from "@/utils/artists/artistHelpers";
 import { Artist } from "@/interfaces/Artist";
 
+import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+
 export default function ManageArtistsScreen() {
   const router = useRouter();
 
   const [artists, setArtists] = useState<Artist[]>([]);
   const [searchText, setSearchText] = useState("");
 
+  // Carga inicial
   useEffect(() => {
     loadArtists();
   }, []);
 
+  // Función para recargar todos
   const loadArtists = () => {
     const data = getAllArtists();
     setArtists(data);
   };
 
-  // Filtra artistas al cambiar el texto de búsqueda
+  // Filtra artistas
   const handleSearch = (text: string) => {
     setSearchText(text);
     if (!text) {
-      loadArtists(); // Si está vacío, recarga todos
+      loadArtists();
     } else {
       const results = searchArtistsByName(text);
       setArtists(results);
@@ -63,6 +69,11 @@ export default function ManageArtistsScreen() {
         },
       ]
     );
+  };
+
+  // Nuevo: Botón "Crear artista"
+  const handleCreateArtist = () => {
+    router.push("/admin/ArtistScreens/CreateArtistScreen");
   };
 
   const renderItem = ({ item }: { item: Artist }) => (
@@ -108,6 +119,11 @@ export default function ManageArtistsScreen() {
       <Header />
 
       <View style={styles.content}>
+        {/* Botón "Crear artista" arriba, estilo similar a ManageNewsScreen */}
+        <TouchableOpacity style={styles.createButton} onPress={handleCreateArtist}>
+          <Text style={styles.createButtonText}>Crear artista</Text>
+        </TouchableOpacity>
+
         <Text style={styles.title}>Modificar artistas:</Text>
 
         {/* Barra de búsqueda */}
@@ -142,12 +158,29 @@ export default function ManageArtistsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: COLORS.backgroundLight },
   content: { flex: 1, padding: 16 },
+
+  // Botón "Crear artista"
+  createButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.card,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  createButtonText: {
+    color: COLORS.cardBg,
+    fontWeight: "bold",
+    fontSize: FONT_SIZES.body,
+  },
+
   title: {
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 12,
+    color: COLORS.textPrimary,
   },
   searchRow: {
     flexDirection: "row",

@@ -1,4 +1,5 @@
-import React from "react";
+// screens/NewsScreens/NewsScreen.tsx
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -10,25 +11,40 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
+// Importa tu hook o contexto de autenticación:
+import { useAuth } from "@/context/AuthContext";
+
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
+
+// Importamos el helper de noticias
+import { getAllNews } from "@/utils/news/newsHelpers";
 import { NewsItem } from "@/interfaces/NewsProps";
 
-// Importa tus estilos globales (ajusta la ruta si difiere)
+// Estilos globales
 import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
-
-const newsData: NewsItem[] = [
-  { id: 1, title: "New Release 1", imageUrl: "https://picsum.photos/700/400?random=1" },
-  { id: 2, title: "New Release 2", imageUrl: "https://picsum.photos/700/400?random=2" },
-  { id: 3, title: "New Release 3", imageUrl: "https://picsum.photos/700/400?random=3" },
-];
 
 export default function NewsScreen() {
   const router = useRouter();
+  const { user } = useAuth();  // Para ver el rol (admin/user)
+
+  // Estado para guardar las noticias que traemos del helper
+  const [newsList, setNewsList] = useState<NewsItem[]>([]);
+
+  useEffect(() => {
+    // Cargar las 5 noticias del helper
+    const allNews = getAllNews();
+    setNewsList(allNews);
+  }, []);
 
   const handlePress = (item: NewsItem) => {
     router.push(`/main/NewsScreens/NewScreen?id=${item.id}`);
+  };
+
+  // Función para ir a la pantalla de crear evento (si eres admin)
+  const handleCreateEvent = () => {
+    router.push("/main/EventsScreens/CreateEventScreen");
   };
 
   return (
@@ -37,13 +53,24 @@ export default function NewsScreen() {
 
       <TabMenuComponent
         tabs={[
-          { label: "Noticias", route: "/main/NewsScreen", isActive: true },
+          { label: "Noticias", route: "/main/NewsScreens/NewsScreen", isActive: true },
           { label: "Artistas", route: "/main/ArtistsScreens/ArtistsScreen", isActive: false },
         ]}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {newsData.map((item) => (
+        {/* SOLO mostrar el botón si user && user.role === "admin" */}
+        {user?.role === "admin" && (
+          <TouchableOpacity
+            style={styles.createEventButton}
+            onPress={handleCreateEvent}
+          >
+            <Text style={styles.createEventButtonText}>Crear evento</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Render de las noticias que tenemos en newsList */}
+        {newsList.map((item) => (
           <TouchableOpacity
             key={item.id}
             style={styles.newsCard}
@@ -68,16 +95,29 @@ export default function NewsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: globalStyles.COLORS.backgroundLight, // Gris claro principal
+    backgroundColor: globalStyles.COLORS.backgroundLight,
   },
   scrollContent: {
     paddingVertical: 16,
   },
+  createEventButton: {
+    backgroundColor: COLORS.primary,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: RADIUS.card,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  createEventButtonText: {
+    color: COLORS.cardBg,
+    fontWeight: "bold",
+    fontSize: FONT_SIZES.body,
+  },
   newsCard: {
     marginBottom: 20,
     alignItems: "center",
-    backgroundColor: globalStyles.COLORS.cardBg, // Blanco
-    borderRadius: RADIUS.card,                   // Borde redondeado (10-15px)
+    backgroundColor: globalStyles.COLORS.cardBg,
+    borderRadius: RADIUS.card,
     marginHorizontal: 16,
     padding: 10,
   },
@@ -88,8 +128,8 @@ const styles = StyleSheet.create({
   },
   newsTitle: {
     marginTop: 10,
-    fontSize: FONT_SIZES.subTitle,         // Por ejemplo 18-20px
-    color: globalStyles.COLORS.textPrimary,// Gris oscuro
+    fontSize: FONT_SIZES.subTitle,
+    color: globalStyles.COLORS.textPrimary,
     fontWeight: "bold",
   },
 });

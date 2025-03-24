@@ -1,5 +1,9 @@
-// utils/newsHelpers.ts
+// utils/news/newsHelpers.ts
+
 import { NewsItem } from "@/interfaces/NewsProps";
+import { getAllEvents, getEventById } from "@/utils/events/eventHelpers"; 
+// ^ Podrías importar si quisieras usarlo internamente, 
+//   pero en este ejemplo no hace falta para la creación de mockNews.
 
 const mockNews: NewsItem[] = [
   {
@@ -9,20 +13,35 @@ const mockNews: NewsItem[] = [
     description: `Llegó el viernes y se viene finde largo...
 https://open.spotify.com/playlist/3PanXbcy6jmHBtJh2dvFIB
 Visita nuestro sitio: https://example.com`,
+    eventId: 2, // <--- noticia vinculada al evento con id=2 (Techno Day)
   },
   {
     id: 2,
     title: "New Release 2",
     imageUrl: "https://picsum.photos/700/400?random=2",
     description: `Otra noticia con un link: https://expo.dev`,
+    // sin eventId => no hay evento relacionado
   },
   {
     id: 3,
     title: "New Release 3",
     imageUrl: "https://picsum.photos/700/400?random=3",
     description: `Descubre más en https://reactnative.dev`,
+    eventId: 7, // <--- noticia vinculada al evento con id=7 (Ultra Festival)
   },
-  // Agrega las que necesites...
+  {
+    id: 4,
+    title: "New Release 4 (sin evento)",
+    imageUrl: "https://picsum.photos/700/400?random=4",
+    description: `Esta noticia no tiene evento linkeado.`,
+  },
+  {
+    id: 5,
+    title: "New Release 5",
+    imageUrl: "https://picsum.photos/700/400?random=5",
+    description: `Check this link: https://docs.expo.dev`,
+    eventId: 11, // <--- noticia vinculada al evento con id=11 (After LGBT Semanal)
+  },
 ];
 
 /** Retorna todas las noticias (mock). */

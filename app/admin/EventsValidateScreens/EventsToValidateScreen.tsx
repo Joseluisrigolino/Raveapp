@@ -1,5 +1,4 @@
-// screens/admin/EventsToValidateScreen.tsx
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -15,7 +14,6 @@ import Footer from "@/components/layout/FooterComponent";
 import { getAllEventsToValidate } from "@/utils/events/validationEventHelpers";
 import { EventToValidate } from "@/interfaces/EventToValidateProps";
 
-// Importa tus estilos globales si deseas
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function EventsToValidateScreen() {
@@ -27,15 +25,19 @@ export default function EventsToValidateScreen() {
     setEvents(data);
   }, []);
 
-  // Botón “Verificar” -> navega a ValidateEventScreen
+  // Navegar a la pantalla de verificación
   const handleVerify = (id: number) => {
     router.push(`/admin/EventsValidateScreens/ValidateEventScreen?id=${id}`);
   };
 
-  // Renderizamos cada evento como una “card”
+  // Botón para crear evento
+  const handleCreateEvent = () => {
+    router.push("/main/EventsScreens/CreateEventScreen");
+  };
+
+  // Render de cada item
   const renderItem = ({ item }: { item: EventToValidate }) => (
     <View style={styles.cardContainer}>
-      {/* Puedes mostrar la info en distintos Texts */}
       <Text style={styles.eventDate}>
         <Text style={styles.label}>Fecha del evento: </Text>
         {item.eventDate}
@@ -61,7 +63,6 @@ export default function EventsToValidateScreen() {
         {item.ownerUser}
       </Text>
 
-      {/* Botón para verificar */}
       <TouchableOpacity
         style={styles.verifyButton}
         onPress={() => handleVerify(item.id)}
@@ -76,6 +77,11 @@ export default function EventsToValidateScreen() {
       <Header />
 
       <View style={styles.content}>
+        {/* Botón "Crear evento" al principio, con estilo alargado */}
+        <TouchableOpacity style={styles.createButton} onPress={handleCreateEvent}>
+          <Text style={styles.createButtonText}>Crear evento</Text>
+        </TouchableOpacity>
+
         <Text style={styles.screenTitle}>Eventos a validar:</Text>
 
         <FlatList
@@ -94,14 +100,30 @@ export default function EventsToValidateScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.backgroundLight, // Ej. "#F5F5F5"
+    backgroundColor: COLORS.backgroundLight,
   },
   content: {
     flex: 1,
     padding: 16,
   },
+  // === Botón "Crear evento" alargado (similar a ManageNewsScreen) ===
+  createButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.card,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  createButtonText: {
+    color: COLORS.cardBg,
+    fontWeight: "bold",
+    fontSize: FONT_SIZES.body,
+  },
+  // ===============================================================
+
   screenTitle: {
-    fontSize: FONT_SIZES.subTitle, // 18-20
+    fontSize: FONT_SIZES.subTitle,
     fontWeight: "bold",
     marginBottom: 12,
     color: COLORS.textPrimary,
@@ -110,21 +132,18 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
 
-  // CARD
   cardContainer: {
-    backgroundColor: COLORS.cardBg, // Ej. "#fff"
+    backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.card,
     padding: 12,
     marginBottom: 12,
-
-    // Sombras suaves (opcional)
+    // Sombra suave (opcional)
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-
   label: {
     fontWeight: "bold",
     color: COLORS.textPrimary,
@@ -150,16 +169,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: COLORS.textPrimary,
   },
-
   verifyButton: {
     alignSelf: "flex-start",
-    backgroundColor: COLORS.alternative, // Ej. un color morado
+    backgroundColor: COLORS.alternative, // color para "Verificar"
     borderRadius: RADIUS.card,
     paddingVertical: 8,
     paddingHorizontal: 16,
   },
   verifyButtonText: {
-    color: COLORS.cardBg, // blanco
+    color: COLORS.cardBg,
     fontWeight: "bold",
     fontSize: FONT_SIZES.body,
   },

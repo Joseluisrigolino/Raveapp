@@ -6,6 +6,8 @@ import {
   StyleSheet,
   FlatList,
   Alert,
+  TouchableOpacity,
+  Image,
 } from "react-native";
 import { IconButton } from "react-native-paper";
 import { useRouter } from "expo-router";
@@ -16,27 +18,24 @@ import Footer from "@/components/layout/FooterComponent";
 import { getAllNews } from "@/utils/news/newsHelpers";
 import { NewsItem } from "@/interfaces/NewsProps";
 
-// Importa tus estilos globales si deseas
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function ManageNewsScreen() {
   const router = useRouter();
-
   const [newsData, setNewsData] = useState<NewsItem[]>([]);
 
   useEffect(() => {
-    // Cargamos las noticias desde el helper (mock).
     const data = getAllNews();
     setNewsData(data);
   }, []);
 
-  // Editar -> Navegar a EditNewsScreen con el ID
+  // Navegar a EditNewsScreen
   const handleEdit = (itemId: number) => {
     console.log("Editar noticia con ID:", itemId);
     router.push(`/admin/NewsScreens/EditNewScreen?id=${itemId}`);
   };
 
-  // Eliminar -> Muestra popup de confirmación
+  // Eliminar (con confirmación)
   const handleDelete = (itemId: number) => {
     Alert.alert(
       "Confirmar eliminación",
@@ -55,27 +54,37 @@ export default function ManageNewsScreen() {
     );
   };
 
-  // Renderiza cada noticia como una “card”
+  // Renderiza cada noticia
   const renderItem = ({ item }: { item: NewsItem }) => {
-    // Supongamos que no tenemos fecha en NewsItem,
-    // por demo usaremos un valor estático “23/02/2025”
+    // Fecha simulada (si no la tienes en NewsItem)
     const fakeDate = "23/02/2025";
 
     return (
       <View style={styles.cardContainer}>
-        {/* Fecha de creación (ficticia) */}
-        <Text style={styles.dateText}>
-          <Text style={styles.label}>Fecha de creación: </Text>
-          {fakeDate}
-        </Text>
+        {/* Cabecera: texto (fecha/título) a la izquierda, imagen a la derecha */}
+        <View style={styles.cardHeader}>
+          {/* Bloque de texto (fecha y título) */}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.dateText}>
+              <Text style={styles.label}>Fecha de creación: </Text>
+              {fakeDate}
+            </Text>
 
-        {/* Título de la noticia */}
-        <Text style={styles.titleText}>
-          <Text style={styles.label}>Título de la noticia: </Text>
-          {item.title}
-        </Text>
+            <Text style={styles.titleText}>
+              <Text style={styles.label}>Título de la noticia: </Text>
+              {item.title}
+            </Text>
+          </View>
 
-        {/* Acciones: editar / eliminar */}
+          {/* Imagen pequeña (thumbnail) a la derecha */}
+          <Image
+            source={{ uri: item.imageUrl }}
+            style={styles.thumbnail}
+            resizeMode="cover"
+          />
+        </View>
+
+        {/* Fila de acciones: Editar / Eliminar */}
         <View style={styles.actionsRow}>
           <IconButton
             icon="pencil"
@@ -96,11 +105,21 @@ export default function ManageNewsScreen() {
     );
   };
 
+  // Botón "Crear noticia"
+  const handleCreateNews = () => {
+    router.push("/admin/NewsScreens/CreateNewScreen");
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Header />
 
       <View style={styles.content}>
+        {/* Botón "Crear noticia" arriba de la lista */}
+        <TouchableOpacity style={styles.createButton} onPress={handleCreateNews}>
+          <Text style={styles.createButtonText}>Crear noticia</Text>
+        </TouchableOpacity>
+
         <Text style={styles.screenTitle}>Modificar noticias:</Text>
 
         <FlatList
@@ -125,8 +144,21 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  createButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.card,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  createButtonText: {
+    color: COLORS.cardBg,
+    fontWeight: "bold",
+    fontSize: FONT_SIZES.body,
+  },
   screenTitle: {
-    fontSize: FONT_SIZES.subTitle, // 18-20
+    fontSize: FONT_SIZES.subTitle,
     fontWeight: "bold",
     marginBottom: 12,
     color: COLORS.textPrimary,
@@ -137,19 +169,23 @@ const styles = StyleSheet.create({
 
   // CARD
   cardContainer: {
-    backgroundColor: COLORS.cardBg, // Ej. "#fff"
+    backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.card,
     padding: 12,
     marginBottom: 12,
-
-    // Sombra suave (opcional)
+    // Sombra suave
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-
+  // Cabecera de la tarjeta: texto + thumbnail
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   label: {
     fontWeight: "bold",
     color: COLORS.textPrimary,
@@ -162,9 +198,16 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 8,
   },
+  thumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: RADIUS.card,
+    marginLeft: 8,
+  },
 
   actionsRow: {
     flexDirection: "row",
+    marginTop: 8,
   },
   actionIcon: {
     marginHorizontal: 4,
