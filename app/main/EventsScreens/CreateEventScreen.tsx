@@ -19,13 +19,15 @@ import DateTimeInputComponent from "@/components/common/DateTimeInputComponent";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { ELECTRONIC_GENRES } from "@/utils/electronicGenresHelper";
 
-// <-- Importamos el hook
+// Hook con la lógica de creación de evento
 import { useCreateEvent } from "@/hooks/events/useCreateEvent";
+// Hook/contexto de autenticación
+import { useAuth } from "@/context/AuthContext";
 
 export default function CreateEventScreen() {
-  // Consumimos toda la lógica desde el hook
+  // Lógica interna para crear evento
   const {
-    // 1) Login
+    // 1) Info de login
     isLoggedIn,
     handleLogin,
     handleRegister,
@@ -33,7 +35,7 @@ export default function CreateEventScreen() {
     simulateLogin,
     handleLogout,
 
-    // 2) Campos
+    // 2) Campos y métodos del formulario
     eventType,
     setEventType,
     eventName,
@@ -46,7 +48,6 @@ export default function CreateEventScreen() {
     handleAddArtist,
     handleRemoveArtist,
 
-    // 3) Ubicación
     provinces,
     municipalities,
     localities,
@@ -70,28 +71,23 @@ export default function CreateEventScreen() {
     streetNumber,
     setStreetNumber,
 
-    // 4) After / LGBT
     isAfter,
     setIsAfter,
     isLGBT,
     setIsLGBT,
 
-    // 5) Descripción
     eventDescription,
     setEventDescription,
 
-    // 6) Fechas
     startDateTime,
     setStartDateTime,
     endDateTime,
     setEndDateTime,
 
-    // 7) Tickets
     daysTickets,
     handleTicketChange,
     totalTickets,
 
-    // 8) Config venta
     startSaleDateTime,
     setStartSaleDateTime,
     earlyBirdsStock,
@@ -101,7 +97,6 @@ export default function CreateEventScreen() {
     earlyBirdsUntilDateTime,
     setEarlyBirdsUntilDateTime,
 
-    // 9) Multimedia
     photoFile,
     handleSelectPhoto,
     videoLink,
@@ -109,26 +104,31 @@ export default function CreateEventScreen() {
     musicLink,
     setMusicLink,
 
-    // 10) Términos
     acceptedTC,
     setAcceptedTC,
 
-    // Submit
     handleSubmit,
   } = useCreateEvent();
+
+  // Obtenemos el user desde tu AuthContext
+  const { user } = useAuth();
+  // Asumimos user?.role => "guest" | "user" | "owner" | "admin"
+
+  // Decidimos que si user es nulo/undefined o su rol es "guest",
+  // entonces mostramos el mensaje de "Debes iniciar sesión..."
+  const mustShowLoginMessage = !user || user.role === "guest";
 
   function handleEventTypeChange(value: "1d" | "2d" | "3d") {
     setEventType(value);
   }
 
-  // Render principal
   return (
     <SafeAreaView style={styles.container}>
       <Header />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {!isLoggedIn ? (
-          // NO LOGUEADO
+        {mustShowLoginMessage ? (
+          // NO logueado (o rol "guest")
           <View style={styles.notLoggedContainer}>
             <TitlePers text="Crear Evento" />
             <View style={styles.divider} />
@@ -171,14 +171,12 @@ export default function CreateEventScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          // SÍ LOGUEADO
+          // Usuario con rol "user", "owner" o "admin" => Formulario
           <View style={{ width: "100%" }}>
             <TitlePers text="Crear Evento" />
             <View style={styles.divider} />
 
-            <TouchableOpacity style={styles.demoButton} onPress={handleLogout}>
-              <Text style={styles.demoButtonText}>Cerrar sesión (demo)</Text>
-            </TouchableOpacity>
+           
 
             {/* NOMBRE */}
             <View style={styles.formGroup}>
@@ -287,11 +285,10 @@ export default function CreateEventScreen() {
               </View>
             </View>
 
-            {/* UBICACIÓN */}
+            {/* UBICACIÓN (Provincia, Municipio, Localidad, etc.) */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Ubicación del evento</Text>
 
-              {/* PROVINCIA */}
               <Text style={styles.subLabel}>Provincia</Text>
               <TouchableOpacity
                 style={styles.dropdownButton}
@@ -321,7 +318,6 @@ export default function CreateEventScreen() {
                 </View>
               )}
 
-              {/* MUNICIPIO */}
               <Text style={styles.subLabel}>Municipio</Text>
               <TouchableOpacity
                 style={styles.dropdownButton}
@@ -357,7 +353,6 @@ export default function CreateEventScreen() {
                 </View>
               )}
 
-              {/* LOCALIDAD */}
               <Text style={styles.subLabel}>Localidad</Text>
               <TouchableOpacity
                 style={styles.dropdownButton}
@@ -382,9 +377,7 @@ export default function CreateEventScreen() {
                   {localities.map((loc) => (
                     <TouchableOpacity
                       key={loc.id}
-                      onPress={() =>
-                        handleSelectLocality(loc.id, loc.nombre)
-                      }
+                      onPress={() => handleSelectLocality(loc.id, loc.nombre)}
                       style={styles.dropdownItem}
                     >
                       <Text>{loc.nombre}</Text>
@@ -393,7 +386,6 @@ export default function CreateEventScreen() {
                 </View>
               )}
 
-              {/* CALLE y NÚMERO */}
               <Text style={styles.subLabel}>Calle</Text>
               <TextInput
                 style={styles.input}
@@ -412,7 +404,7 @@ export default function CreateEventScreen() {
               />
             </View>
 
-            {/* CHECKBOX: AFTER / LGBT */}
+            {/* AFTER / LGBT */}
             <View style={styles.formGroup}>
               <View style={styles.checkboxRow}>
                 <TouchableOpacity
@@ -697,6 +689,7 @@ export default function CreateEventScreen() {
   );
 }
 
+// Estilos
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1019,15 +1012,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
-  // Términos y condiciones
-  termsRow: {
-    width: "90%",
-    flexDirection: "row",
-    marginTop: 16,
-    alignItems: "center",
-    alignSelf: "center",
-  },
-
   // Botón final
   submitButton: {
     backgroundColor: COLORS.primary,
@@ -1037,7 +1021,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "80%",
     alignSelf: "center",
-    marginBottom: 30, // un extra bottom spacing
+    marginBottom: 30,
   },
   submitButtonText: {
     color: COLORS.cardBg,

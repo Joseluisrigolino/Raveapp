@@ -1,25 +1,32 @@
-// FavEventScreen.tsx
+// app/main/EventsScreens/FavEventScreen.tsx
 import React from "react";
-import { SafeAreaView, ScrollView, View, Text, StyleSheet } from "react-native";
+import {
+  SafeAreaView,
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+} from "react-native";
 import { IconButton } from "react-native-paper";
 import { useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
+import TabMenuComponent from "@/components/layout/TabMenuComponent";  // <-- Se importa para el submenú
 import CardComponent from "@/components/events/CardComponent";
 import FiltersSection from "@/components/filters/FiltersSection";
 
-// <-- importamos nuestro custom hook
+// Hook personalizado de filtros de "favoritos"
 import { useFavFilters } from "@/hooks/filters/useFavFilters";
 
-import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
 
 export default function FavEventScreen() {
   const router = useRouter();
 
-  // Extraemos todo desde el custom hook
+  // Obtenemos todas las variables y handlers desde el hook
   const {
-    // Filtros
+    // Estados/handlers de texto de búsqueda, fechas, ubicación, géneros, etc.
     searchText, setSearchText,
     dateFilterOpen, setDateFilterOpen,
     startDate, endDate,
@@ -33,8 +40,6 @@ export default function FavEventScreen() {
     lgbtActive, setLgbtActive,
     genreFilterOpen, setGenreFilterOpen,
     selectedGenres,
-
-    // Handlers
     handleLocationTextChange,
     handlePickLocation,
     onStartDateChange,
@@ -44,10 +49,11 @@ export default function FavEventScreen() {
     onToggleGenre,
     onClearGenres,
 
-    // Resultado final
+    // Lista de eventos favoritos tras aplicar filtros
     filteredEvents,
   } = useFavFilters();
 
+  // Navegar al detalle del evento
   function handleCardPress(_title: string, id?: number) {
     if (id) {
       router.push(`/main/EventsScreens/EventScreen?id=${id}`);
@@ -58,13 +64,30 @@ export default function FavEventScreen() {
     <SafeAreaView style={styles.mainContainer}>
       <Header />
 
+      {/* Submenú igual que en TicketsPurchasedMenu */}
+      <TabMenuComponent
+        tabs={[
+          {
+            label: "Mis tickets",
+            route: "/main/TicketsScreens/TicketPurchasedMenu",
+            isActive: false,
+          },
+          {
+            label: "Eventos favoritos",
+            route: "/main/EventsScreens/FavEventScreen",
+            isActive: true,
+          },
+        ]}
+      />
+
+      {/* Contenido principal con scroll y filtros */}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         nestedScrollEnabled
         keyboardShouldPersistTaps="handled"
       >
+        {/* Sección de filtros (igual que antes) */}
         <FiltersSection
-          // 1) Chips horizontales
           isDateActive={Boolean(startDate && endDate)}
           isLocationActive={Boolean(locationText.trim() !== "")}
           isGenreActive={selectedGenres.length > 0}
@@ -75,11 +98,9 @@ export default function FavEventScreen() {
           onToggleAfter={() => setAfterActive(!afterActive)}
           onToggleLgbt={() => setLgbtActive(!lgbtActive)}
 
-          // 2) SearchBar
           searchText={searchText}
           onSearchTextChange={setSearchText}
 
-          // 3) Date filter
           dateFilterOpen={dateFilterOpen}
           onToggleDateFilter={() => setDateFilterOpen(!dateFilterOpen)}
           startDate={startDate}
@@ -92,7 +113,6 @@ export default function FavEventScreen() {
           onEndDateChange={onEndDateChange}
           onClearDates={onClearDates}
 
-          // 4) Location filter
           locationFilterOpen={locationFilterOpen}
           onToggleLocationFilter={() => setLocationFilterOpen(!locationFilterOpen)}
           locationText={locationText}
@@ -101,7 +121,6 @@ export default function FavEventScreen() {
           onPickLocation={handlePickLocation}
           onClearLocation={onClearLocation}
 
-          // 5) Género filter
           genreFilterOpen={genreFilterOpen}
           onToggleGenreFilter={() => setGenreFilterOpen(!genreFilterOpen)}
           selectedGenres={selectedGenres}
@@ -111,10 +130,12 @@ export default function FavEventScreen() {
           nestedScrollEnabled
         />
 
-        {/* Lista de eventos (filtrados) */}
+        {/* Render de los eventos filtrados */}
         <View style={styles.containerCards}>
           {filteredEvents.length === 0 ? (
-            <Text style={styles.noEventsText}>No existen eventos con esos filtros.</Text>
+            <Text style={styles.noEventsText}>
+              No existen eventos con esos filtros.
+            </Text>
           ) : (
             filteredEvents.map((ev) => (
               <View key={ev.id} style={styles.cardContainer}>
@@ -125,6 +146,7 @@ export default function FavEventScreen() {
                   foto={ev.imageUrl}
                   onPress={() => handleCardPress(ev.title, ev.id)}
                 />
+                {/* Botón de "Quitar de favoritos" (simulado) */}
                 <IconButton
                   icon="heart"
                   size={24}
@@ -143,6 +165,7 @@ export default function FavEventScreen() {
   );
 }
 
+// Estilos
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
@@ -155,12 +178,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingHorizontal: 8,
   },
-  noEventsText: {
-    marginTop: 20,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textPrimary,
-    textAlign: "center",
-  },
   cardContainer: {
     position: "relative",
     marginBottom: 10,
@@ -170,5 +187,11 @@ const styles = StyleSheet.create({
     top: 10,
     right: 10,
     backgroundColor: "transparent",
+  },
+  noEventsText: {
+    marginTop: 20,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
+    textAlign: "center",
   },
 });

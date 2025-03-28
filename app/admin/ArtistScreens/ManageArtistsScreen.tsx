@@ -10,6 +10,7 @@ import {
   Alert,
   TextInput,
   TouchableOpacity,
+  Image,
 } from "react-native";
 import { IconButton } from "react-native-paper";
 import { useRouter } from "expo-router";
@@ -27,32 +28,32 @@ export default function ManageArtistsScreen() {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [searchText, setSearchText] = useState("");
 
-  // Carga inicial
   useEffect(() => {
     loadArtists();
   }, []);
 
-  // Función para recargar todos
   const loadArtists = () => {
     const data = getAllArtists();
     setArtists(data);
   };
 
-  // Filtra artistas
+  // Filtrar artistas por nombre
   const handleSearch = (text: string) => {
     setSearchText(text);
     if (!text) {
-      loadArtists();
+      loadArtists(); // Si está vacío, recargamos todos
     } else {
       const results = searchArtistsByName(text);
       setArtists(results);
     }
   };
 
+  // Navegar a EditArtistScreen
   const handleEdit = (id: number) => {
     router.push(`/admin/ArtistScreens/EditArtistScreen?id=${id}`);
   };
 
+  // Eliminar con confirmación
   const handleDelete = (id: number) => {
     Alert.alert(
       "Confirmar eliminación",
@@ -64,67 +65,79 @@ export default function ManageArtistsScreen() {
           style: "destructive",
           onPress: () => {
             console.log("Eliminar artista con ID:", id);
-            // Lógica real de eliminar
+            // Lógica real de eliminación
           },
         },
       ]
     );
   };
 
-  // Nuevo: Botón "Crear artista"
+  // Botón para crear artista
   const handleCreateArtist = () => {
-    router.push("/admin/ArtistScreens/CreateArtistScreen");
+    router.push("/admin/ArtistScreens/NewArtistScreen");
   };
 
-  const renderItem = ({ item }: { item: Artist }) => (
-    <View style={styles.tableRow}>
-      {/* Imagen o placeholder */}
-      <View style={[styles.cell, styles.imageCell]}>
-        {/* Podrías mostrar la imagen con <Image> si deseas */}
-        <Text>IMG</Text>
+  // Renderiza cada artista como una “card”, al estilo ManageNews
+  const renderItem = ({ item }: { item: Artist }) => {
+    // Fecha simulada si no existe
+    const fakeDate = "23/02/2025";
+
+    return (
+      <View style={styles.cardContainer}>
+        {/* Cabecera: texto (fecha/nombre) a la izquierda, imagen a la derecha */}
+        <View style={styles.cardHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.dateText}>
+              <Text style={styles.label}>Fecha de creación: </Text>
+              {item.creationDate || fakeDate}
+            </Text>
+
+            <Text style={styles.titleText}>
+              <Text style={styles.label}>Nombre del artista: </Text>
+              {item.name}
+            </Text>
+          </View>
+
+          {/* Imagen del artista (thumbnail) a la derecha */}
+          <Image
+            source={{ uri: item.image }}
+            style={styles.thumbnail}
+            resizeMode="cover"
+          />
+        </View>
+
+        {/* Fila de acciones: Editar / Eliminar */}
+        <View style={styles.actionsRow}>
+          <IconButton
+            icon="pencil"
+            size={20}
+            iconColor="#fff"
+            style={[styles.actionIcon, styles.editIcon]}
+            onPress={() => handleEdit(item.id!)}
+          />
+          <IconButton
+            icon="delete"
+            size={20}
+            iconColor="#fff"
+            style={[styles.actionIcon, styles.deleteIcon]}
+            onPress={() => handleDelete(item.id!)}
+          />
+        </View>
       </View>
-
-      {/* Nombre del artista */}
-      <Text style={[styles.cell, styles.nameCell]} numberOfLines={1}>
-        {item.name}
-      </Text>
-
-      {/* Fecha de creación (si existe) */}
-      <Text style={[styles.cell, styles.dateCell]}>
-        {item.creationDate || "23/02/2025"}
-      </Text>
-
-      {/* Botones Editar/Eliminar */}
-      <View style={[styles.cell, styles.actionCell]}>
-        <IconButton
-          icon="pencil"
-          size={20}
-          iconColor="#fff"
-          style={[styles.actionIcon, { backgroundColor: "#6a1b9a" }]}
-          onPress={() => handleEdit(item.id!)}
-        />
-        <IconButton
-          icon="delete"
-          size={20}
-          iconColor="#fff"
-          style={[styles.actionIcon, { backgroundColor: "#d32f2f" }]}
-          onPress={() => handleDelete(item.id!)}
-        />
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
 
       <View style={styles.content}>
-        {/* Botón "Crear artista" arriba, estilo similar a ManageNewsScreen */}
+        {/* Botón "Crear artista" al inicio */}
         <TouchableOpacity style={styles.createButton} onPress={handleCreateArtist}>
           <Text style={styles.createButtonText}>Crear artista</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>Modificar artistas:</Text>
+        <Text style={styles.screenTitle}>Modificar artistas:</Text>
 
         {/* Barra de búsqueda */}
         <View style={styles.searchRow}>
@@ -134,14 +147,6 @@ export default function ManageArtistsScreen() {
             value={searchText}
             onChangeText={handleSearch}
           />
-        </View>
-
-        {/* Cabecera de la tabla */}
-        <View style={styles.tableHeader}>
-          <Text style={[styles.headerCell, styles.imageCell]}> </Text>
-          <Text style={[styles.headerCell, styles.nameCell]}>Artista</Text>
-          <Text style={[styles.headerCell, styles.dateCell]}>Fecha de creación</Text>
-          <Text style={[styles.headerCell, styles.actionCell]}>Acción</Text>
         </View>
 
         <FlatList
@@ -158,8 +163,14 @@ export default function ManageArtistsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.backgroundLight },
-  content: { flex: 1, padding: 16 },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.backgroundLight,
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
 
   // Botón "Crear artista"
   createButton: {
@@ -176,12 +187,13 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.body,
   },
 
-  title: {
-    fontSize: 18,
+  screenTitle: {
+    fontSize: FONT_SIZES.subTitle,
     fontWeight: "bold",
     marginBottom: 12,
     color: COLORS.textPrimary,
   },
+
   searchRow: {
     flexDirection: "row",
     marginBottom: 12,
@@ -195,47 +207,61 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     width: 200,
   },
-  tableHeader: {
-    flexDirection: "row",
-    borderBottomWidth: 2,
-    borderBottomColor: "#000",
-    paddingBottom: 8,
-    marginBottom: 8,
-  },
-  headerCell: {
-    fontWeight: "bold",
-    fontSize: 14,
-  },
-  tableRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
-    paddingVertical: 8,
-    alignItems: "center",
-  },
-  cell: {
-    fontSize: 14,
-  },
-  imageCell: {
-    flex: 1,
-    alignItems: "center",
-  },
-  nameCell: {
-    flex: 2,
-  },
-  dateCell: {
-    flex: 2,
-  },
-  actionCell: {
-    flex: 2,
-    flexDirection: "row",
-    justifyContent: "space-evenly",
-  },
+
   listContent: {
     paddingBottom: 20,
+  },
+
+  // CARD
+  cardContainer: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    padding: 12,
+    marginBottom: 12,
+    // Sombra suave
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  label: {
+    fontWeight: "bold",
+    color: COLORS.textPrimary,
+  },
+  dateText: {
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  titleText: {
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  thumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: RADIUS.card,
+    marginLeft: 8,
+  },
+
+  actionsRow: {
+    flexDirection: "row",
+    marginTop: 8,
   },
   actionIcon: {
     marginHorizontal: 4,
     borderRadius: 4,
+  },
+  editIcon: {
+    backgroundColor: "#6a1b9a", // Morado
+  },
+  deleteIcon: {
+    backgroundColor: "#d32f2f", // Rojo
   },
 });
