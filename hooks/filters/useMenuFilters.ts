@@ -2,117 +2,162 @@
 import { useState, useEffect, useMemo } from "react";
 import { getAllEvents } from "@/utils/events/eventHelpers";
 import { EventItem } from "@/interfaces/EventProps";
-import { fetchLocalitiesByName } from "@/utils/georef/georefHelpers";
+import {
+  fetchProvinces,
+  fetchMunicipalities,
+  fetchLocalities,
+  fetchLocalitiesByName,
+} from "@/utils/georef/georefHelpers";
 
-/** Función para calcular la semana actual */
-function getWeekRange() {
-  const now = new Date();
-  const dayOfWeek = now.getDay();
-  const startOfWeek = new Date(now);
-  startOfWeek.setHours(0, 0, 0, 0);
+// ... (La función getWeekRange y demás lógica)
 
-  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  startOfWeek.setDate(startOfWeek.getDate() - diffToMonday);
-
-  const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 7);
-
-  return { startOfWeek, endOfWeek };
-}
-
-/**
- * Custom hook que encapsula toda la lógica de:
- * - Carga de eventos
- * - Estados de filtros (fecha, ubicación, etc.)
- * - Filtrado final (filteredEvents)
- */
 export function useMenuFilters() {
-  // 1) Estado base de eventos
+  // Estado base de eventos, etc.
   const [allEvents, setAllEvents] = useState<EventItem[]>([]);
-
-  // 2) Efecto para cargar eventos
   useEffect(() => {
     const events = getAllEvents();
     setAllEvents(events);
   }, []);
 
-  // ============= ESTADOS de los filtros =============
+  // Otros estados de filtros (texto, fecha, etc.)
   const [searchText, setSearchText] = useState("");
-
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
 
+  // NUEVOS estados para ubicación (tres inputs)
   const [locationFilterOpen, setLocationFilterOpen] = useState(false);
-  const [locationText, setLocationText] = useState("");
-  const [locationSuggestions, setLocationSuggestions] = useState<
-    { id: string; nombre: string }[]
-  >([]);
+  
+  // Para Provincia
+  const [provinceText, setProvinceText] = useState("");
+  const [provinceSuggestions, setProvinceSuggestions] = useState<{ id: string; nombre: string }[]>([]);
+  
+  // Para Municipio
+  const [municipalityText, setMunicipalityText] = useState("");
+  const [municipalitySuggestions, setMunicipalitySuggestions] = useState<{ id: string; nombre: string }[]>([]);
+  
+  // Para Localidad (ya existía como locationText)
+  const [localityText, setLocalityText] = useState("");
+  const [localitySuggestions, setLocalitySuggestions] = useState<{ id: string; nombre: string }[]>([]);
 
+  // Otros filtros (semana, after, LGBT, género)
   const [weekActive, setWeekActive] = useState(false);
   const [afterActive, setAfterActive] = useState(false);
   const [lgbtActive, setLgbtActive] = useState(false);
-
   const [genreFilterOpen, setGenreFilterOpen] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
 
-  // ============ HANDLERS =============
-  async function handleLocationTextChange(value: string) {
-    setLocationText(value);
+  // ===== HANDLERS para ubicación =====
+  // Provincia
+  async function onProvinceTextChange(value: string) {
+    setProvinceText(value);
     if (value.trim().length < 3) {
-      setLocationSuggestions([]);
+      setProvinceSuggestions([]);
       return;
     }
     try {
-      const results = await fetchLocalitiesByName(value.trim());
-      setLocationSuggestions(results);
+      const results = await fetchProvinces();
+      // Opcional: filtrar resultados según el texto
+      setProvinceSuggestions(results.filter((prov) =>
+        prov.nombre.toLowerCase().includes(value.toLowerCase())
+      ));
     } catch (error) {
-      console.error("Error al buscar localidades:", error);
-      setLocationSuggestions([]);
+      console.error("Error al buscar provincias:", error);
+      setProvinceSuggestions([]);
     }
   }
-  function handlePickLocation(locName: string) {
-    setLocationText(locName);
-    setLocationSuggestions([]);
-  }
-  function onStartDateChange(_event: any, selectedDate?: Date) {
-    setShowStartPicker(false);
-    if (selectedDate) setStartDate(selectedDate);
-  }
-  function onEndDateChange(_event: any, selectedDate?: Date) {
-    setShowEndPicker(false);
-    if (selectedDate) setEndDate(selectedDate);
-  }
-  function onClearDates() {
-    setStartDate(null);
-    setEndDate(null);
-  }
-  function onClearLocation() {
-    setLocationText("");
-    setLocationSuggestions([]);
-  }
-  function onToggleGenre(g: string) {
-    setSelectedGenres((prev) =>
-      prev.includes(g) ? prev.filter((item) => item !== g) : [...prev, g]
-    );
-  }
-  function onClearGenres() {
-    setSelectedGenres([]);
+  function onPickProvince(name: string) {
+    setProvinceText(name);
+    setProvinceSuggestions([]);
   }
 
-  // ============ FILTRADO final =============
+  // Municipio
+  async function onMunicipalityTextChange(value: string) {
+    setMunicipalityText(value);
+    if (value.trim().length < 3 || !provinceText) {
+      setMunicipalitySuggestions([]);
+      return;
+    }
+    try {
+      const results = await fetchMunicipalities(provinceText);
+      setMunicipalitySuggestions(results.filter((mun) =>
+        mun.nombre.toLowerCase().includes(value.toLowerCase())
+      ));
+    } catch (error) {
+      console.error("Error al buscar municipios:", error);
+      setMunicipalitySuggestions([]);
+    }
+  }
+  function onPickMunicipality(name: string) {
+    setMunicipalityText(name);
+    setMunicipalitySuggestions([]);
+  }
+
+  // Localidad
+  async function onLocalityTextChange(value: string) {
+    setLocalityText(value);
+    if (value.trim().length < 3) {
+      setLocalitySuggestions([]);
+      return;
+    }
+    try {
+      // Si tienes provincia y municipio, usalos para buscar
+      if (provinceText && municipalityText) {
+        const results = await fetchLocalities(provinceText, municipalityText);
+        setLocalitySuggestions(results.filter((loc) =>
+          loc.nombre.toLowerCase().includes(value.toLowerCase())
+        ));
+      } else {
+        // Fallback: búsqueda por nombre
+        const results = await fetchLocalitiesByName(value);
+        setLocalitySuggestions(results);
+      }
+    } catch (error) {
+      console.error("Error al buscar localidades:", error);
+      setLocalitySuggestions([]);
+    }
+  }
+  function onPickLocality(name: string) {
+    setLocalityText(name);
+    setLocalitySuggestions([]);
+  }
+
+  function onClearLocation() {
+    setProvinceText("");
+    setMunicipalityText("");
+    setLocalityText("");
+    setProvinceSuggestions([]);
+    setMunicipalitySuggestions([]);
+    setLocalitySuggestions([]);
+  }
+
+  // Agrega estas funciones justo antes del return final en tu hook:
+function onToggleGenre(g: string) {
+  setSelectedGenres((prev) =>
+    prev.includes(g) ? prev.filter((item) => item !== g) : [...prev, g]
+  );
+}
+
+function onClearGenres() {
+  setSelectedGenres([]);
+}
+
+
+  // ===== FILTRADO final =====
   const filteredEvents = useMemo(() => {
     let results = [...allEvents];
 
-    // (a) Texto
+    // Filtrado por texto
     if (searchText.trim() !== "") {
       const lower = searchText.toLowerCase();
-      results = results.filter((ev) => ev.title.toLowerCase().includes(lower));
+      results = results.filter((ev) =>
+        ev.title.toLowerCase().includes(lower)
+      );
     }
 
-    // (b) Rango de fechas
+    // Filtrado por rango de fechas
     if (startDate && endDate) {
       results = results.filter((ev) => {
         const [day, month, year] = ev.date.split("/").map(Number);
@@ -121,13 +166,24 @@ export function useMenuFilters() {
       });
     }
 
-    // (c) Ubicación
-    if (locationText.trim() !== "") {
-      const locLower = locationText.toLowerCase();
-      results = results.filter((ev) => ev.address.toLowerCase().includes(locLower));
+    // Filtrado por ubicación (ejemplo: si tus eventos tienen propiedades province, municipality y address)
+    if (provinceText.trim() !== "") {
+      results = results.filter((ev) =>
+        ev.province?.toLowerCase().includes(provinceText.toLowerCase())
+      );
+    }
+    if (municipalityText.trim() !== "") {
+      results = results.filter((ev) =>
+        ev.municipality?.toLowerCase().includes(municipalityText.toLowerCase())
+      );
+    }
+    if (localityText.trim() !== "") {
+      results = results.filter((ev) =>
+        ev.address?.toLowerCase().includes(localityText.toLowerCase())
+      );
     }
 
-    // (d) Esta semana
+    // Filtrado por "Esta semana", After, LGBT y Géneros (como ya lo tenías)
     if (weekActive) {
       const { startOfWeek, endOfWeek } = getWeekRange();
       results = results.filter((ev) => {
@@ -136,21 +192,28 @@ export function useMenuFilters() {
         return eventTime >= startOfWeek.getTime() && eventTime < endOfWeek.getTime();
       });
     }
-
-    // (e) After
     if (afterActive) {
       results = results.filter((ev) => ev.isAfter === true);
     }
-
-    // (f) LGBT
     if (lgbtActive) {
       results = results.filter((ev) => ev.isLGBT === true);
     }
-
-    // (g) Géneros
     if (selectedGenres.length > 0) {
-      results = results.filter((ev) => selectedGenres.includes(ev.type));
+      results = results.filter((ev) =>
+        selectedGenres.includes(ev.type)
+      );
     }
+    // Agrega estas funciones justo antes del return final en tu hook:
+function onToggleGenre(g: string) {
+  setSelectedGenres((prev) =>
+    prev.includes(g) ? prev.filter((item) => item !== g) : [...prev, g]
+  );
+}
+
+function onClearGenres() {
+  setSelectedGenres([]);
+}
+
 
     return results;
   }, [
@@ -158,7 +221,9 @@ export function useMenuFilters() {
     searchText,
     startDate,
     endDate,
-    locationText,
+    provinceText,
+    municipalityText,
+    localityText,
     weekActive,
     afterActive,
     lgbtActive,
@@ -166,7 +231,7 @@ export function useMenuFilters() {
   ]);
 
   return {
-    // Estados y setters
+    // Estados y setters para otros filtros...
     searchText,
     setSearchText,
     dateFilterOpen,
@@ -179,12 +244,26 @@ export function useMenuFilters() {
     setShowStartPicker,
     showEndPicker,
     setShowEndPicker,
+    // NUEVOS estados de ubicación:
     locationFilterOpen,
     setLocationFilterOpen,
-    locationText,
-    setLocationText,
-    locationSuggestions,
-    setLocationSuggestions,
+    provinceText,
+    setProvinceText, // si lo necesitas directamente
+    onProvinceTextChange,
+    provinceSuggestions,
+    onPickProvince,
+    municipalityText,
+    setMunicipalityText,
+    onMunicipalityTextChange,
+    municipalitySuggestions,
+    onPickMunicipality,
+    localityText,
+    setLocalityText,
+    onLocalityTextChange,
+    localitySuggestions,
+    onPickLocality,
+    onClearLocation,
+    // Otros filtros
     weekActive,
     setWeekActive,
     afterActive,
@@ -195,17 +274,9 @@ export function useMenuFilters() {
     setGenreFilterOpen,
     selectedGenres,
     setSelectedGenres,
-
-    // Handlers
-    handleLocationTextChange,
-    handlePickLocation,
-    onStartDateChange,
-    onEndDateChange,
-    onClearDates,
-    onClearLocation,
+    // Handlers para género
     onToggleGenre,
     onClearGenres,
-
     // Resultado final
     filteredEvents,
   };

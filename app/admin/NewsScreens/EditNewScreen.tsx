@@ -1,3 +1,4 @@
+// screens/NewsScreens/EditNewScreen.tsx
 import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
@@ -8,62 +9,113 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import { getNewsById } from "@/utils/news/newsHelpers";
+
+// Importa las funciones de la API para noticias
+import { getNewsById, updateNews } from "@/utils/news/newsApi";
 import { NewsItem } from "@/interfaces/NewsProps";
 
-export default function EditNewsScreen() {
-  // 1. Leer param "id"
+export default function EditNewScreen() {
+  // Leer el parámetro "id" (se asume que es el idNoticia)
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const router = useRouter();
 
-  // 2. Estados para los campos de la noticia
+  // Estados para los campos de la noticia
   const [newsTitle, setNewsTitle] = useState("");
   const [newsBody, setNewsBody] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // 3. Cargar la noticia
+  // Cargar la noticia desde la API
   useEffect(() => {
-    if (id) {
-      const found = getNewsById(Number(id));
-      if (found) {
-        // Precargamos la data en los estados
-        setNewsTitle(found.title);
-        setSelectedImage(found.imageUrl);
-        setNewsBody(found.description ?? "");
-        // Si tuvieras un campo event, lo pondrías aquí
+    async function fetchNews() {
+      if (id) {
+        try {
+          const found = await getNewsById(id);
+          if (found) {
+            // Precarga la data en los estados
+            setNewsTitle(found.titulo);
+            setSelectedImage(found.imagen);
+            setNewsBody(found.contenido || "");
+            // Si la noticia tiene campo eventId, se carga (ajusta según tu estructura)
+            if (found.eventId) {
+              setSelectedEvent(String(found.eventId));
+            }
+          } else {
+            Alert.alert("Noticia no encontrada");
+          }
+        } catch (error) {
+          console.error("Error fetching news:", error);
+          Alert.alert("Error al cargar la noticia");
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
       }
     }
+    fetchNews();
   }, [id]);
 
   // Handler para actualizar la noticia
-  const handleUpdateNews = () => {
-    console.log("Editar noticia presionado");
-    console.log({
-      id,
-      title: newsTitle,
-      body: newsBody,
-      image: selectedImage,
-      event: selectedEvent,
-    });
-    // Aquí la lógica para actualizar la noticia en la API
+  const handleUpdateNews = async () => {
+    if (!id) return;
+
+    // Crea el objeto con los datos a actualizar.
+    // Se asume que la API espera un objeto con estos campos:
+    // idNoticia, titulo, contenido, imagen y dtPublicado
+    const updatedNews: Partial<NewsItem> = {
+      idNoticia: id,
+      titulo: newsTitle,
+      contenido: newsBody,
+      imagen: selectedImage || "",
+      dtPublicado: new Date().toISOString(), // Se actualiza con la fecha actual. Ajusta si es necesario.
+      // Si tienes eventId, puedes incluirlo:
+      eventId: selectedEvent ? Number(selectedEvent) : undefined,
+    };
+
+    try {
+      const updated = await updateNews(updatedNews);
+      console.log("Noticia actualizada:", updated);
+      Alert.alert("Noticia actualizada con éxito");
+      // Redirige a la pantalla de administración de noticias
+      router.push("/admin/NewsScreens/ManageNewScreen");
+    } catch (error) {
+      console.error("Error updating news:", error);
+      Alert.alert("Error al actualizar la noticia");
+    }
   };
 
-  // Handler para seleccionar nueva imagen (opcional)
+  // Handler para seleccionar nueva imagen (puedes integrar expo-image-picker)
   const handleSelectImage = () => {
     console.log("Seleccionar imagen presionado");
-    // setSelectedImage("nueva-imagen.jpg");
+    // Ejemplo: setSelectedImage("nueva-imagen-url.jpg");
   };
 
   // Handler para seleccionar evento (opcional)
   const handleSelectEvent = () => {
     console.log("Seleccionar evento presionado");
-    // setSelectedEvent("EventoX");
+    // Ejemplo: setSelectedEvent("id-del-evento");
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#000" />
+        </View>
+        <Footer />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -92,7 +144,7 @@ export default function EditNewsScreen() {
                   style={{ width: "100%", height: "100%" }}
                 />
               ) : (
-                <Text style={styles.imagePlaceholderText}>IMG</Text>
+                <Text style={styles.imagePlaceholderText}>Sin imagen</Text>
               )}
             </View>
 
@@ -104,7 +156,7 @@ export default function EditNewsScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Cuerpo de la noticia */}
+          {/* Campo: Cuerpo de la noticia */}
           <Text style={styles.label}>Cuerpo de la noticia:</Text>
           <View style={styles.textAreaContainer}>
             <TextInput
@@ -116,11 +168,11 @@ export default function EditNewsScreen() {
             />
           </View>
 
-          {/* Asociar noticia a evento (opcional) */}
+          {/* Campo: Noticia asociada a evento (opcional) */}
           <Text style={styles.label}>Noticia asociada a evento:</Text>
           <View style={styles.eventRow}>
             <Text style={styles.eventPlaceholder}>
-              {selectedEvent ? selectedEvent : "XXXXXXXXXXXXXXXXXXXX"}
+              {selectedEvent ? selectedEvent : "No asociado"}
             </Text>
             <TouchableOpacity
               style={styles.selectEventButton}
@@ -142,7 +194,6 @@ export default function EditNewsScreen() {
   );
 }
 
-// Estilos (muy similares a CreateNewsScreen)
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { padding: 16 },
@@ -244,5 +295,10 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

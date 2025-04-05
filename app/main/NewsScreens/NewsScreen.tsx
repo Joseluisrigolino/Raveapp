@@ -8,6 +8,7 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -18,8 +19,8 @@ import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
 
-// Importamos el helper de noticias
-import { getAllNews } from "@/utils/news/newsHelpers";
+// Importa la función getNews del API (no el helper mock)
+import { getNews } from "@/utils/news/newsApi";
 import { NewsItem } from "@/interfaces/NewsProps";
 
 // Estilos globales
@@ -29,23 +30,58 @@ export default function NewsScreen() {
   const router = useRouter();
   const { user } = useAuth();  // Para ver el rol (admin/user)
 
-  // Estado para guardar las noticias que traemos del helper
+  // Estado para guardar las noticias que se obtienen de la API
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Cargar las 5 noticias del helper
-    const allNews = getAllNews();
-    setNewsList(allNews);
+    async function fetchNews() {
+      try {
+        const data = await getNews();
+        setNewsList(data);
+      } catch (err) {
+        console.error("Error fetching news:", err);
+        setError("Error al cargar las noticias");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchNews();
   }, []);
 
   const handlePress = (item: NewsItem) => {
-    router.push(`/main/NewsScreens/NewScreen?id=${item.id}`);
+    router.push(`/main/NewsScreens/NewScreen?id=${item.idNoticia}`);
   };
 
-  // Función para ir a la pantalla de crear evento (si eres admin)
+  // Función para ir a la pantalla de crear evento (solo si eres admin)
   const handleCreateEvent = () => {
     router.push("/main/EventsScreens/CreateEventScreen");
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+        <Footer />
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+        <Footer />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -59,7 +95,6 @@ export default function NewsScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* SOLO mostrar el botón si user && user.role === "admin" */}
         {user?.role === "admin" && (
           <TouchableOpacity
             style={styles.createEventButton}
@@ -69,20 +104,29 @@ export default function NewsScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Render de las noticias que tenemos en newsList */}
         {newsList.map((item) => (
           <TouchableOpacity
-            key={item.id}
+            key={item.idNoticia}
             style={styles.newsCard}
             onPress={() => handlePress(item)}
             activeOpacity={0.7}
           >
-            <Image
-              source={{ uri: item.imageUrl }}
-              style={styles.newsImage}
-              resizeMode="cover"
-            />
-            <Text style={styles.newsTitle}>{item.title}</Text>
+            {item.imagen ? (
+              <Image
+                source={{ uri: item.imagen }}
+                style={styles.newsImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[styles.newsImage, styles.noImage]}>
+                <Text style={styles.noImageText}>Sin imagen</Text>
+              </View>
+            )}
+            <Text style={styles.newsTitle}>{item.titulo}</Text>
+            <Text style={styles.newsContent}>{item.contenido}</Text>
+            <Text style={styles.newsDate}>
+              {new Date(item.dtPublicado).toLocaleDateString()}
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -126,10 +170,43 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: RADIUS.card,
   },
+  noImage: {
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.borderInput,
+  },
+  noImageText: {
+    color: COLORS.textSecondary,
+  },
   newsTitle: {
     marginTop: 10,
     fontSize: FONT_SIZES.subTitle,
     color: globalStyles.COLORS.textPrimary,
     fontWeight: "bold",
+  },
+  newsContent: {
+    marginTop: 5,
+    fontSize: FONT_SIZES.body,
+    color: globalStyles.COLORS.textPrimary,
+  },
+  newsDate: {
+    marginTop: 5,
+    fontSize: FONT_SIZES.small,
+    color: globalStyles.COLORS.textSecondary,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorContainer: {
+    flex: 1,
+    padding: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorText: {
+    fontSize: FONT_SIZES.body,
+    color: COLORS.negative,
   },
 });

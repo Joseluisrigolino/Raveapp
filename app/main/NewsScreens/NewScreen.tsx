@@ -1,5 +1,4 @@
 // screens/NewsScreens/NewScreen.tsx
-
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -10,6 +9,7 @@ import {
   StyleSheet,
   Linking,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
@@ -17,51 +17,76 @@ import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import TitlePers from "@/components/common/TitleComponent";
 import { NewsItem } from "@/interfaces/NewsProps";
-import { getNewsById } from "@/utils/news/newsHelpers";
 
-import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
-// Importamos para buscar el evento:
+// Importa la función getNewsById de tu API (no del helper mock)
+import { getNewsById } from "@/utils/news/newsApi";
+
+// Se mantiene la obtención del evento vinculado
 import { getEventById } from "@/utils/events/eventHelpers";
 import { ExtendedEventItem } from "@/utils/events/eventHelpers";
+
+import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function NewScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [newsItem, setNewsItem] = useState<NewsItem | null>(null);
   const [linkedEvent, setLinkedEvent] = useState<ExtendedEventItem | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const router = useRouter();
 
   useEffect(() => {
-    if (id) {
-      const found = getNewsById(Number(id));
-      if (found) {
-        setNewsItem(found);
-        // Si la noticia tiene eventId, buscamos el evento
-        if (found.eventId) {
-          const ev = getEventById(found.eventId);
-          if (ev) {
-            setLinkedEvent(ev);
+    async function fetchNews() {
+      if (id) {
+        try {
+          const found = await getNewsById(id);
+          if (found) {
+            setNewsItem(found);
+            // Si la noticia tiene eventId, buscamos el evento vinculado
+            if (found.eventId) {
+              const ev = getEventById(found.eventId);
+              if (ev) {
+                setLinkedEvent(ev);
+              }
+            }
           }
+        } catch (error) {
+          console.error("Error fetching news by id:", error);
+        } finally {
+          setLoading(false);
         }
+      } else {
+        setLoading(false);
       }
     }
+    fetchNews();
   }, [id]);
 
-  if (!newsItem) {
+  if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <Header />
-        <View style={styles.contentContainer}>
-          <Text style={{ textAlign: "center", marginTop: 50 }}>
-            Noticia no encontrada.
-          </Text>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
         <Footer />
       </SafeAreaView>
     );
   }
 
-  // Convierte URLs en enlaces clickeables
+  if (!newsItem) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header />
+        <View style={styles.contentContainer}>
+          <Text style={styles.errorText}>Noticia no encontrada.</Text>
+        </View>
+        <Footer />
+      </SafeAreaView>
+    );
+  }
+
+  // Función para convertir URLs en enlaces clickeables dentro del texto
   const linkifyText = (text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const tokens = text.split(urlRegex);
@@ -83,7 +108,6 @@ export default function NewScreen() {
     });
   };
 
-  // Navegar al detalle del evento
   const handleGoToEvent = (eventId: number) => {
     router.push(`/main/EventsScreens/EventScreen?id=${eventId}`);
   };
@@ -94,17 +118,23 @@ export default function NewScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.contentContainer}>
-          <TitlePers text={newsItem.title} />
+          <TitlePers text={newsItem.titulo} />
 
-          <Image
-            source={{ uri: newsItem.imageUrl }}
-            style={styles.newsImage}
-            resizeMode="cover"
-          />
+          {newsItem.imagen ? (
+            <Image
+              source={{ uri: newsItem.imagen }}
+              style={styles.newsImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.newsImage, styles.noImage]}>
+              <Text style={styles.noImageText}>Sin imagen</Text>
+            </View>
+          )}
 
-          {newsItem.description && (
+          {newsItem.contenido && (
             <Text style={styles.description}>
-              {linkifyText(newsItem.description)}
+              {linkifyText(newsItem.contenido)}
             </Text>
           )}
 
@@ -137,7 +167,6 @@ export default function NewScreen() {
   );
 }
 
-// Estilos
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -156,6 +185,14 @@ const styles = StyleSheet.create({
     borderRadius: globalStyles.RADIUS.card,
     marginBottom: 16,
   },
+  noImage: {
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.borderInput,
+  },
+  noImageText: {
+    color: COLORS.textSecondary,
+  },
   description: {
     fontSize: globalStyles.FONT_SIZES.body,
     color: globalStyles.COLORS.textPrimary,
@@ -166,15 +203,12 @@ const styles = StyleSheet.create({
     color: globalStyles.COLORS.info,
     textDecorationLine: "underline",
   },
-
-  // Estilos del bloque de evento relacionado
   eventContainer: {
     width: "100%",
     backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.card,
     padding: 12,
     marginBottom: 20,
-    // Sombra suave
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -213,5 +247,16 @@ const styles = StyleSheet.create({
   eventButtonText: {
     color: COLORS.cardBg,
     fontWeight: "bold",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorText: {
+    marginTop: 50,
+    textAlign: "center",
+    fontSize: globalStyles.FONT_SIZES.body,
+    color: COLORS.negative,
   },
 });

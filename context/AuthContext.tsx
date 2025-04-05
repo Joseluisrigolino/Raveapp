@@ -9,7 +9,7 @@ type Role = "admin" | "owner" | "user";
 interface AuthUser {
   username: string;
   password: string;
-  role: Role;    // <-- “admin”, “owner” o “user”
+  role: Role; // <-- “admin”, “owner” o “user”
 }
 
 interface AuthContextValue {
@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Llamamos a nuestro helper:
     const validatedUser = validateUser(username, password);
     if (validatedUser) {
-      setUser(validatedUser);  // <-- guardamos en el estado global
+      setUser(validatedUser); // <-- guardamos en el estado global
       return true;
     }
     return false;

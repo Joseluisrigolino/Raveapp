@@ -1,22 +1,16 @@
 // app/main/EventsScreens/FavEventScreen.tsx
 import React from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-} from "react-native";
+import { SafeAreaView, ScrollView, View, Text, StyleSheet } from "react-native";
 import { IconButton } from "react-native-paper";
 import { useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import TabMenuComponent from "@/components/layout/TabMenuComponent";  // <-- Se importa para el submenú
+import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import CardComponent from "@/components/events/CardComponent";
 import FiltersSection from "@/components/filters/FiltersSection";
 
-// Hook personalizado de filtros de "favoritos"
+// Importa el hook actualizado
 import { useFavFilters } from "@/hooks/filters/useFavFilters";
 
 import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
@@ -24,36 +18,69 @@ import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
 export default function FavEventScreen() {
   const router = useRouter();
 
-  // Obtenemos todas las variables y handlers desde el hook
   const {
-    // Estados/handlers de texto de búsqueda, fechas, ubicación, géneros, etc.
-    searchText, setSearchText,
-    dateFilterOpen, setDateFilterOpen,
-    startDate, endDate,
-    showStartPicker, setShowStartPicker,
-    showEndPicker, setShowEndPicker,
-    locationFilterOpen, setLocationFilterOpen,
-    locationText,
-    locationSuggestions,
-    weekActive, setWeekActive,
-    afterActive, setAfterActive,
-    lgbtActive, setLgbtActive,
-    genreFilterOpen, setGenreFilterOpen,
+    searchText,
+    setSearchText,
+    dateFilterOpen,
+    setDateFilterOpen,
+    startDate,
+    endDate,
+    showStartPicker,
+    setShowStartPicker,
+    showEndPicker,
+    setShowEndPicker,
+    locationFilterOpen,
+    setLocationFilterOpen,
+    // Nuevos estados para ubicación:
+    provinceText,
+    onProvinceTextChange,
+    provinceSuggestions,
+    onPickProvince,
+    municipalityText,
+    onMunicipalityTextChange,
+    municipalitySuggestions,
+    onPickMunicipality,
+    localityText,
+    onLocalityTextChange,
+    localitySuggestions,
+    onPickLocality,
+    onClearLocation,
+    weekActive,
+    setWeekActive,
+    afterActive,
+    setAfterActive,
+    lgbtActive,
+    setLgbtActive,
+    genreFilterOpen,
+    setGenreFilterOpen,
     selectedGenres,
-    handleLocationTextChange,
-    handlePickLocation,
     onStartDateChange,
     onEndDateChange,
     onClearDates,
-    onClearLocation,
     onToggleGenre,
     onClearGenres,
-
-    // Lista de eventos favoritos tras aplicar filtros
     filteredEvents,
   } = useFavFilters();
 
-  // Navegar al detalle del evento
+  // Funciones para abrir un filtro y cerrar los demás popups
+  const handleToggleDateFilter = () => {
+    setDateFilterOpen(!dateFilterOpen);
+    setLocationFilterOpen(false);
+    setGenreFilterOpen(false);
+  };
+
+  const handleToggleLocationFilter = () => {
+    setLocationFilterOpen(!locationFilterOpen);
+    setDateFilterOpen(false);
+    setGenreFilterOpen(false);
+  };
+
+  const handleToggleGenreFilter = () => {
+    setGenreFilterOpen(!genreFilterOpen);
+    setDateFilterOpen(false);
+    setLocationFilterOpen(false);
+  };
+
   function handleCardPress(_title: string, id?: number) {
     if (id) {
       router.push(`/main/EventsScreens/EventScreen?id=${id}`);
@@ -64,7 +91,6 @@ export default function FavEventScreen() {
     <SafeAreaView style={styles.mainContainer}>
       <Header />
 
-      {/* Submenú igual que en TicketsPurchasedMenu */}
       <TabMenuComponent
         tabs={[
           {
@@ -80,16 +106,16 @@ export default function FavEventScreen() {
         ]}
       />
 
-      {/* Contenido principal con scroll y filtros */}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         nestedScrollEnabled
         keyboardShouldPersistTaps="handled"
       >
-        {/* Sección de filtros (igual que antes) */}
         <FiltersSection
           isDateActive={Boolean(startDate && endDate)}
-          isLocationActive={Boolean(locationText.trim() !== "")}
+          isLocationActive={Boolean(
+            provinceText || municipalityText || localityText
+          )}
           isGenreActive={selectedGenres.length > 0}
           weekActive={weekActive}
           afterActive={afterActive}
@@ -97,12 +123,10 @@ export default function FavEventScreen() {
           onToggleWeek={() => setWeekActive(!weekActive)}
           onToggleAfter={() => setAfterActive(!afterActive)}
           onToggleLgbt={() => setLgbtActive(!lgbtActive)}
-
           searchText={searchText}
           onSearchTextChange={setSearchText}
-
           dateFilterOpen={dateFilterOpen}
-          onToggleDateFilter={() => setDateFilterOpen(!dateFilterOpen)}
+          onToggleDateFilter={handleToggleDateFilter}
           startDate={startDate}
           endDate={endDate}
           showStartPicker={showStartPicker}
@@ -112,25 +136,29 @@ export default function FavEventScreen() {
           onStartDateChange={onStartDateChange}
           onEndDateChange={onEndDateChange}
           onClearDates={onClearDates}
-
           locationFilterOpen={locationFilterOpen}
-          onToggleLocationFilter={() => setLocationFilterOpen(!locationFilterOpen)}
-          locationText={locationText}
-          onLocationTextChange={handleLocationTextChange}
-          locationSuggestions={locationSuggestions}
-          onPickLocation={handlePickLocation}
+          onToggleLocationFilter={handleToggleLocationFilter}
+          provinceText={provinceText}
+          onProvinceTextChange={onProvinceTextChange}
+          provinceSuggestions={provinceSuggestions}
+          onPickProvince={onPickProvince}
+          municipalityText={municipalityText}
+          onMunicipalityTextChange={onMunicipalityTextChange}
+          municipalitySuggestions={municipalitySuggestions}
+          onPickMunicipality={onPickMunicipality}
+          localityText={localityText}
+          onLocalityTextChange={onLocalityTextChange}
+          localitySuggestions={localitySuggestions}
+          onPickLocality={onPickLocality}
           onClearLocation={onClearLocation}
-
           genreFilterOpen={genreFilterOpen}
-          onToggleGenreFilter={() => setGenreFilterOpen(!genreFilterOpen)}
+          onToggleGenreFilter={handleToggleGenreFilter}
           selectedGenres={selectedGenres}
           onToggleGenre={onToggleGenre}
           onClearGenres={onClearGenres}
-
           nestedScrollEnabled
         />
 
-        {/* Render de los eventos filtrados */}
         <View style={styles.containerCards}>
           {filteredEvents.length === 0 ? (
             <Text style={styles.noEventsText}>
@@ -146,7 +174,6 @@ export default function FavEventScreen() {
                   foto={ev.imageUrl}
                   onPress={() => handleCardPress(ev.title, ev.id)}
                 />
-                {/* Botón de "Quitar de favoritos" (simulado) */}
                 <IconButton
                   icon="heart"
                   size={24}
@@ -165,23 +192,11 @@ export default function FavEventScreen() {
   );
 }
 
-// Estilos
 const styles = StyleSheet.create({
-  mainContainer: {
-    flex: 1,
-    backgroundColor: COLORS.backgroundLight,
-  },
-  scrollContent: {
-    paddingBottom: 16,
-  },
-  containerCards: {
-    marginTop: 10,
-    paddingHorizontal: 8,
-  },
-  cardContainer: {
-    position: "relative",
-    marginBottom: 10,
-  },
+  mainContainer: { flex: 1, backgroundColor: COLORS.backgroundLight },
+  scrollContent: { paddingBottom: 16 },
+  containerCards: { marginTop: 10, paddingHorizontal: 8 },
+  cardContainer: { position: "relative", marginBottom: 10 },
   heartIcon: {
     position: "absolute",
     top: 10,

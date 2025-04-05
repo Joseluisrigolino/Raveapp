@@ -16,7 +16,6 @@ import { ELECTRONIC_GENRES } from "@/utils/electronicGenresHelper";
 
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-/** Definimos la interfaz de props que recibirá nuestro componente de filtros. */
 interface FiltersSectionProps {
   // --- Estados y callbacks para los chips horizontales ---
   isDateActive: boolean;
@@ -46,13 +45,25 @@ interface FiltersSectionProps {
   onEndDateChange: (event: any, selectedDate?: Date) => void;
   onClearDates: () => void;
 
-  // --- Location filter ---
+  // --- Ubicación filter con 3 inputs ---
   locationFilterOpen: boolean;
   onToggleLocationFilter: () => void;
-  locationText: string;
-  onLocationTextChange: (val: string) => void;
-  locationSuggestions: { id: string; nombre: string }[];
-  onPickLocation: (locName: string) => void;
+  // Provincia
+  provinceText: string;
+  onProvinceTextChange: (val: string) => void;
+  provinceSuggestions: { id: string; nombre: string }[];
+  onPickProvince: (provName: string) => void;
+  // Municipio
+  municipalityText: string;
+  onMunicipalityTextChange: (val: string) => void;
+  municipalitySuggestions: { id: string; nombre: string }[];
+  onPickMunicipality: (munName: string) => void;
+  // Localidad
+  localityText: string;
+  onLocalityTextChange: (val: string) => void;
+  localitySuggestions: { id: string; nombre: string }[];
+  onPickLocality: (locName: string) => void;
+  // Botón para limpiar los 3 inputs
   onClearLocation: () => void;
 
   // --- Género filter ---
@@ -66,14 +77,6 @@ interface FiltersSectionProps {
   nestedScrollEnabled?: boolean;
 }
 
-/**
- * Componente que muestra:
- *  1) Chips horizontales (Fecha, Ubicación, Esta semana, After, LGBT, Género)
- *  2) SearchBar
- *  3) Panel de fechas (si dateFilterOpen)
- *  4) Panel de ubicación (si locationFilterOpen)
- *  5) Panel de géneros (si genreFilterOpen)
- */
 export default function FiltersSection(props: FiltersSectionProps) {
   const {
     // Chips horizontales
@@ -104,23 +107,30 @@ export default function FiltersSection(props: FiltersSectionProps) {
     onEndDateChange,
     onClearDates,
 
-    // Location filter
+    // Ubicación filter (3 inputs)
     locationFilterOpen,
     onToggleLocationFilter,
-    locationText,
-    onLocationTextChange,
-    locationSuggestions,
-    onPickLocation,
+    provinceText,
+    onProvinceTextChange,
+    provinceSuggestions,
+    onPickProvince,
+    municipalityText,
+    onMunicipalityTextChange,
+    municipalitySuggestions,
+    onPickMunicipality,
+    localityText,
+    onLocalityTextChange,
+    localitySuggestions,
+    onPickLocality,
     onClearLocation,
 
-    // Género
+    // Género filter
     genreFilterOpen,
     onToggleGenreFilter,
     selectedGenres,
     onToggleGenre,
     onClearGenres,
 
-    // nested scroll
     nestedScrollEnabled,
   } = props;
 
@@ -132,6 +142,27 @@ export default function FiltersSection(props: FiltersSectionProps) {
         showsHorizontalScrollIndicator={false}
         style={styles.horizontalScroll}
       >
+        {/* Género */}
+        <TouchableOpacity
+          style={[styles.filterChip, isGenreActive && styles.filterChipActive]}
+          onPress={onToggleGenreFilter}
+        >
+          <IconButton
+            icon="music"
+            size={18}
+            iconColor={COLORS.textPrimary}
+            style={{ margin: 0 }}
+          />
+          <Text
+            style={[
+              styles.filterChipText,
+              isGenreActive && styles.filterChipTextActive,
+            ]}
+          >
+            Género
+          </Text>
+        </TouchableOpacity>
+
         {/* Fecha */}
         <TouchableOpacity
           style={[styles.filterChip, isDateActive && styles.filterChipActive]}
@@ -236,27 +267,6 @@ export default function FiltersSection(props: FiltersSectionProps) {
             LGBT
           </Text>
         </TouchableOpacity>
-
-        {/* Género */}
-        <TouchableOpacity
-          style={[styles.filterChip, isGenreActive && styles.filterChipActive]}
-          onPress={onToggleGenreFilter}
-        >
-          <IconButton
-            icon="music"
-            size={18}
-            iconColor={COLORS.textPrimary}
-            style={{ margin: 0 }}
-          />
-          <Text
-            style={[
-              styles.filterChipText,
-              isGenreActive && styles.filterChipTextActive,
-            ]}
-          >
-            Género
-          </Text>
-        </TouchableOpacity>
       </ScrollView>
 
       {/* SearchBar */}
@@ -271,9 +281,9 @@ export default function FiltersSection(props: FiltersSectionProps) {
       {/* Panel de fechas */}
       {dateFilterOpen && (
         <View style={styles.dateFilterContainer}>
-          <Text style={styles.dateFilterLabel}>Seleccionar rango de fechas:</Text>
-
-          {/* Fecha inicio */}
+          <Text style={styles.dateFilterLabel}>
+            Seleccionar rango de fechas:
+          </Text>
           <TouchableOpacity
             style={styles.dateInput}
             onPress={() => onShowStartPicker(true)}
@@ -292,8 +302,6 @@ export default function FiltersSection(props: FiltersSectionProps) {
               onChange={onStartDateChange}
             />
           )}
-
-          {/* Fecha fin */}
           <TouchableOpacity
             style={styles.dateInput}
             onPress={() => onShowEndPicker(true)}
@@ -312,40 +320,93 @@ export default function FiltersSection(props: FiltersSectionProps) {
               onChange={onEndDateChange}
             />
           )}
-
-          {/* Botón para limpiar fechas */}
           <TouchableOpacity style={styles.clearButton} onPress={onClearDates}>
             <Text style={styles.clearButtonText}>Limpiar fechas</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Panel de ubicación */}
+      {/* Panel de ubicación con 3 inputs */}
       {locationFilterOpen && (
         <View style={styles.locationFilterContainer}>
           <Text style={styles.dateFilterLabel}>Filtrar por ubicación:</Text>
-
+          
+          {/* Input para Provincia */}
           <TextInput
             style={styles.locationInput}
-            placeholder="Escribe una ciudad, dirección, etc."
+            placeholder="Provincia"
             placeholderTextColor={COLORS.textSecondary}
-            value={locationText}
-            onChangeText={onLocationTextChange}
+            value={provinceText}
+            onChangeText={onProvinceTextChange}
           />
-
-          {/* Sugerencias */}
-          {props.locationSuggestions.length > 0 && (
+          {provinceSuggestions.length > 0 && (
             <View style={styles.suggestionsContainer}>
               <ScrollView
                 style={styles.suggestionsScroll}
                 nestedScrollEnabled={nestedScrollEnabled}
                 keyboardShouldPersistTaps="handled"
               >
-                {props.locationSuggestions.map((loc) => (
+                {provinceSuggestions.map((prov) => (
+                  <TouchableOpacity
+                    key={prov.id}
+                    style={styles.suggestionItem}
+                    onPress={() => onPickProvince(prov.nombre)}
+                  >
+                    <Text style={styles.suggestionItemText}>{prov.nombre}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Input para Municipio */}
+          <TextInput
+            style={styles.locationInput}
+            placeholder="Municipio"
+            placeholderTextColor={COLORS.textSecondary}
+            value={municipalityText}
+            onChangeText={onMunicipalityTextChange}
+          />
+          {municipalitySuggestions.length > 0 && (
+            <View style={styles.suggestionsContainer}>
+              <ScrollView
+                style={styles.suggestionsScroll}
+                nestedScrollEnabled={nestedScrollEnabled}
+                keyboardShouldPersistTaps="handled"
+              >
+                {municipalitySuggestions.map((mun) => (
+                  <TouchableOpacity
+                    key={mun.id}
+                    style={styles.suggestionItem}
+                    onPress={() => onPickMunicipality(mun.nombre)}
+                  >
+                    <Text style={styles.suggestionItemText}>{mun.nombre}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Input para Localidad */}
+          <TextInput
+            style={styles.locationInput}
+            placeholder="Localidad"
+            placeholderTextColor={COLORS.textSecondary}
+            value={localityText}
+            onChangeText={onLocalityTextChange}
+          />
+          {localitySuggestions.length > 0 && (
+            <View style={styles.suggestionsContainer}>
+              <ScrollView
+                style={styles.suggestionsScroll}
+                nestedScrollEnabled={nestedScrollEnabled}
+                keyboardShouldPersistTaps="handled"
+              >
+                {localitySuggestions.map((loc) => (
                   <TouchableOpacity
                     key={loc.id}
                     style={styles.suggestionItem}
-                    onPress={() => onPickLocation(loc.nombre)}
+                    onPress={() => onPickLocality(loc.nombre)}
                   >
                     <Text style={styles.suggestionItemText}>{loc.nombre}</Text>
                   </TouchableOpacity>
@@ -364,7 +425,6 @@ export default function FiltersSection(props: FiltersSectionProps) {
       {genreFilterOpen && (
         <View style={styles.genreFilterContainer}>
           <Text style={styles.dateFilterLabel}>Seleccionar géneros:</Text>
-
           <ScrollView
             style={styles.genreScroll}
             nestedScrollEnabled={nestedScrollEnabled}
@@ -391,7 +451,6 @@ export default function FiltersSection(props: FiltersSectionProps) {
               );
             })}
           </ScrollView>
-
           <TouchableOpacity style={styles.clearButton} onPress={onClearGenres}>
             <Text style={styles.clearButtonText}>Limpiar géneros</Text>
           </TouchableOpacity>
@@ -481,19 +540,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     color: COLORS.textPrimary,
+    marginBottom: 4,
   },
   suggestionsContainer: {
-    marginTop: 8,
+    marginTop: 4,
     backgroundColor: COLORS.backgroundLight,
     borderRadius: RADIUS.card,
     borderWidth: 1,
     borderColor: COLORS.borderInput,
     maxHeight: 200,
     overflow: "hidden",
+    marginBottom: 4,
   },
-  suggestionsScroll: {
-    // scroll interno
-  },
+  suggestionsScroll: {},
   suggestionItem: {
     padding: 8,
     borderBottomWidth: 1,
@@ -511,9 +570,7 @@ const styles = StyleSheet.create({
     maxHeight: 250,
     overflow: "hidden",
   },
-  genreScroll: {
-    // scroll interno
-  },
+  genreScroll: {},
   genreItem: {
     flexDirection: "row",
     alignItems: "center",

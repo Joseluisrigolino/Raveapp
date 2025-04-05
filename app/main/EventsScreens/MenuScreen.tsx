@@ -1,4 +1,4 @@
-// MenuScreen.tsx
+// app/main/MenuScreen.tsx
 import React from "react";
 import {
   SafeAreaView,
@@ -14,46 +14,62 @@ import Footer from "@/components/layout/FooterComponent";
 import CardComponent from "@/components/events/CardComponent";
 import FiltersSection from "@/components/filters/FiltersSection";
 
-// <-- importamos nuestro custom hook
 import { useMenuFilters } from "@/hooks/filters/useMenuFilters";
-
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function MenuScreen() {
   const router = useRouter();
-
-  // Extraemos todo desde el custom hook
   const {
-    // Filtros
     searchText, setSearchText,
     dateFilterOpen, setDateFilterOpen,
     startDate, endDate,
     showStartPicker, setShowStartPicker,
     showEndPicker, setShowEndPicker,
     locationFilterOpen, setLocationFilterOpen,
-    locationText,
-    locationSuggestions,
+    provinceText,
+    onProvinceTextChange,
+    provinceSuggestions,
+    onPickProvince,
+    municipalityText,
+    onMunicipalityTextChange,
+    municipalitySuggestions,
+    onPickMunicipality,
+    localityText,
+    onLocalityTextChange,
+    localitySuggestions,
+    onPickLocality,
+    onClearLocation,
     weekActive, setWeekActive,
     afterActive, setAfterActive,
     lgbtActive, setLgbtActive,
     genreFilterOpen, setGenreFilterOpen,
     selectedGenres,
-
-    // Handlers
-    handleLocationTextChange,
-    handlePickLocation,
     onStartDateChange,
     onEndDateChange,
     onClearDates,
-    onClearLocation,
     onToggleGenre,
     onClearGenres,
-
-    // Resultado final
     filteredEvents,
   } = useMenuFilters();
 
-  // Función para navegar al detalle
+  const handleToggleDateFilter = () => {
+    setDateFilterOpen(!dateFilterOpen);
+    setLocationFilterOpen(false);
+    setGenreFilterOpen(false);
+  };
+
+  const handleToggleLocationFilter = () => {
+    setLocationFilterOpen(!locationFilterOpen);
+    setDateFilterOpen(false);
+    setGenreFilterOpen(false);
+  };
+
+  const handleToggleGenreFilter = () => {
+    setGenreFilterOpen(!genreFilterOpen);
+    setDateFilterOpen(false);
+    setLocationFilterOpen(false);
+  };
+
   function handleCardPress(_title: string, id?: number) {
     if (id) router.push(`/main/EventsScreens/EventScreen?id=${id}`);
   }
@@ -68,9 +84,8 @@ export default function MenuScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <FiltersSection
-          // 1) Chips horizontales
           isDateActive={Boolean(startDate && endDate)}
-          isLocationActive={Boolean(locationText.trim() !== "")}
+          isLocationActive={Boolean(provinceText || municipalityText || localityText)}
           isGenreActive={selectedGenres.length > 0}
           weekActive={weekActive}
           afterActive={afterActive}
@@ -78,14 +93,10 @@ export default function MenuScreen() {
           onToggleWeek={() => setWeekActive(!weekActive)}
           onToggleAfter={() => setAfterActive(!afterActive)}
           onToggleLgbt={() => setLgbtActive(!lgbtActive)}
-
-          // 2) SearchBar
           searchText={searchText}
           onSearchTextChange={setSearchText}
-
-          // 3) Date filter
           dateFilterOpen={dateFilterOpen}
-          onToggleDateFilter={() => setDateFilterOpen(!dateFilterOpen)}
+          onToggleDateFilter={handleToggleDateFilter}
           startDate={startDate}
           endDate={endDate}
           showStartPicker={showStartPicker}
@@ -95,30 +106,34 @@ export default function MenuScreen() {
           onStartDateChange={onStartDateChange}
           onEndDateChange={onEndDateChange}
           onClearDates={onClearDates}
-
-          // 4) Location filter
           locationFilterOpen={locationFilterOpen}
-          onToggleLocationFilter={() => setLocationFilterOpen(!locationFilterOpen)}
-          locationText={locationText}
-          onLocationTextChange={handleLocationTextChange}
-          locationSuggestions={locationSuggestions}
-          onPickLocation={handlePickLocation}
+          onToggleLocationFilter={handleToggleLocationFilter}
+          provinceText={provinceText}
+          onProvinceTextChange={onProvinceTextChange}
+          provinceSuggestions={provinceSuggestions}
+          onPickProvince={onPickProvince}
+          municipalityText={municipalityText}
+          onMunicipalityTextChange={onMunicipalityTextChange}
+          municipalitySuggestions={municipalitySuggestions}
+          onPickMunicipality={onPickMunicipality}
+          localityText={localityText}
+          onLocalityTextChange={onLocalityTextChange}
+          localitySuggestions={localitySuggestions}
+          onPickLocality={onPickLocality}
           onClearLocation={onClearLocation}
-
-          // 5) Género filter
           genreFilterOpen={genreFilterOpen}
-          onToggleGenreFilter={() => setGenreFilterOpen(!genreFilterOpen)}
+          onToggleGenreFilter={handleToggleGenreFilter}
           selectedGenres={selectedGenres}
           onToggleGenre={onToggleGenre}
           onClearGenres={onClearGenres}
-
           nestedScrollEnabled
         />
 
-        {/* Lista de eventos (filtrados) */}
         <View style={styles.containerCards}>
           {filteredEvents.length === 0 ? (
-            <Text style={styles.noEventsText}>No existen eventos con esos filtros.</Text>
+            <Text style={styles.noEventsText}>
+              No existen eventos con esos filtros.
+            </Text>
           ) : (
             filteredEvents.map((ev) => (
               <CardComponent
