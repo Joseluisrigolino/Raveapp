@@ -1,4 +1,4 @@
-// screens/admin/EditArtistScreen.tsx
+// src/screens/admin/EditArtistScreen.tsx
 import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
@@ -10,15 +10,19 @@ import {
   StyleSheet,
   Image,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import axios from "axios";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import { getArtistById } from "@/utils/artists/artistHelpers";
 import { Artist } from "@/interfaces/Artist";
 
+const API_BASE_URL = "http://144.22.158.49:8080";
+
 export default function EditArtistScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const router = useRouter();
 
   const [artistName, setArtistName] = useState("");
   const [artistImage, setArtistImage] = useState<string | null>(null);
@@ -33,36 +37,47 @@ export default function EditArtistScreen() {
       if (found) {
         setArtistName(found.name);
         setArtistImage(found.image);
-        setArtistDescription(found.description ?? "");
-        setInstagramURL(found.instagramURL ?? "");
-        setSoundcloudURL(found.soundcloudURL ?? "");
-        setSpotifyURL(found.spotifyURL ?? "");
+        setArtistDescription(found.description || "");
+        setInstagramURL(found.instagramURL || "");
+        setSoundcloudURL(found.soundcloudURL || "");
+        setSpotifyURL(found.spotifyURL || "");
       }
     }
   }, [id]);
 
   const handleSelectImage = () => {
     console.log("Seleccionar nueva imagen");
+    // Aquí implementarías la lógica para seleccionar una imagen
   };
 
-  const handleUpdateArtist = () => {
-    console.log("Actualizar artista presionado");
-    console.log({
-      id,
+  const handleUpdateArtist = async () => {
+    // Construimos el objeto de actualización
+    const updatedArtist = {
       name: artistName,
       image: artistImage,
       description: artistDescription,
       instagramURL,
       soundcloudURL,
       spotifyURL,
-    });
-    // Lógica para actualizar en la API
+    };
+
+    try {
+      // Realizamos una petición PUT a la API
+      await axios.put(`${API_BASE_URL}/v1/Artista/UpdateArtista/${id}`, updatedArtist, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      console.log("Artista actualizado correctamente");
+      router.back(); // Regresar a ManageArtistsScreen
+    } catch (error) {
+      console.error("Error al actualizar el artista:", error);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
-
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.contentWrapper}>
           <Text style={styles.mainTitle}>Editar artista</Text>
@@ -87,12 +102,13 @@ export default function EditArtistScreen() {
                 <Text style={styles.imagePlaceholderText}>IMG</Text>
               )}
             </View>
-
             <TouchableOpacity
               style={styles.selectImageButton}
               onPress={handleSelectImage}
             >
-              <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
+              <Text style={styles.selectImageButtonText}>
+                Seleccionar imagen
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -107,7 +123,7 @@ export default function EditArtistScreen() {
             />
           </View>
 
-          <Text style={styles.label}>URL del Instagram del artista:</Text>
+          <Text style={styles.label}>URL del Instagram:</Text>
           <TextInput
             style={styles.input}
             placeholder="URL de Instagram"
@@ -115,7 +131,7 @@ export default function EditArtistScreen() {
             onChangeText={setInstagramURL}
           />
 
-          <Text style={styles.label}>URL del SoundCloud del artista:</Text>
+          <Text style={styles.label}>URL del SoundCloud:</Text>
           <TextInput
             style={styles.input}
             placeholder="URL de SoundCloud"
@@ -123,7 +139,7 @@ export default function EditArtistScreen() {
             onChangeText={setSoundcloudURL}
           />
 
-          <Text style={styles.label}>URL del Spotify del artista:</Text>
+          <Text style={styles.label}>URL del Spotify:</Text>
           <TextInput
             style={styles.input}
             placeholder="URL de Spotify"
@@ -136,7 +152,6 @@ export default function EditArtistScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-
       <Footer />
     </SafeAreaView>
   );
@@ -177,7 +192,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     backgroundColor: "#ccc",
-    borderRadius: 8,
+    borderRadius: 40,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,

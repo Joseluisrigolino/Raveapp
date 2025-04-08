@@ -1,5 +1,5 @@
-// screens/ArtistsScreens/ArtistsScreen.tsx
-import React, { useState, useMemo } from "react";
+// src/screens/ArtistsScreens/ArtistsScreen.tsx
+import React, { useState, useEffect, useMemo } from "react";
 import { View, StyleSheet, ScrollView, SafeAreaView, Text } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -12,33 +12,38 @@ import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import { Artist } from "@/interfaces/Artist";
 import globalStyles, { COLORS, FONT_SIZES } from "@/styles/globalStyles";
 
-// <-- Importamos el helper:
-import { getAllArtists } from "@/utils/artists/artistHelpers";
+// Importa la función para obtener artistas desde la API
+import { fetchArtistsFromApi } from "@/utils/artists/artistApi";
 
 export default function ArtistsScreen() {
   const router = useRouter();
   const [searchText, setSearchText] = useState("");
+  const [artists, setArtists] = useState<Artist[]>([]);
 
-  // Obtenemos todo el array de artistas (con datos completos)
-  const [artists] = useState<Artist[]>(() => getAllArtists());
+  useEffect(() => {
+    fetchArtistsFromApi()
+      .then((result) => setArtists(result))
+      .catch((error) => console.error("Error fetching artists:", error));
+  }, []);
 
-  // Filtra en memoria (por el inicio del nombre, en este ejemplo)
+  // Filtrado en memoria basado en searchText
   const filteredArtists = useMemo(() => {
+    const lowerSearch = searchText.toLowerCase();
     return artists.filter((artist) =>
-      artist.name.toLowerCase().startsWith(searchText.toLowerCase())
+      artist.name.toLowerCase().includes(lowerSearch)
     );
   }, [artists, searchText]);
 
-  // Agrupación por letra
+  // Agrupamos artistas por la primera letra de su nombre
   const alphabet = "abcdefghijklmnopqrstuvwxyz".split("");
 
   const getLetterGroup = (letter: string) => {
     return filteredArtists.filter(
-      (artist) => artist.name[0].toLowerCase() === letter.toLowerCase()
+      (artist) => artist.name[0]?.toLowerCase() === letter.toLowerCase()
     );
   };
 
-  // Navegar a detalle por "name"
+  // Navegar al detalle de un artista
   const handleArtistPress = (artist: Artist) => {
     router.push(
       `/main/ArtistsScreens/ArtistScreen?name=${encodeURIComponent(artist.name)}`
