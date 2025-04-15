@@ -16,7 +16,7 @@ export async function getNews(): Promise<NewsItem[]> {
 
 /** Obtiene una noticia por su idNoticia */
 export async function getNewsById(id: string): Promise<NewsItem | null> {
-  const allNews = await getNews();
+  const allNews = await getNews(); 
   return allNews.find((item) => item.idNoticia === id) || null;
 }
 

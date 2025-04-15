@@ -1,4 +1,4 @@
-// screens/admin/NewArtistScreen.tsx
+// src/screens/admin/NewArtistScreen.tsx
 import React, { useState } from "react";
 import {
   SafeAreaView,
@@ -9,11 +9,17 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
+  Alert,
 } from "react-native";
+import { useRouter } from "expo-router";
+
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
+import { createArtistOnApi } from "@/utils/artists/artistApi";
 
 export default function NewArtistScreen() {
+  const router = useRouter();
+
   const [artistName, setArtistName] = useState("");
   const [artistImage, setArtistImage] = useState<string | null>(null);
   const [artistDescription, setArtistDescription] = useState("");
@@ -24,21 +30,30 @@ export default function NewArtistScreen() {
   // Handler para seleccionar imagen
   const handleSelectImage = () => {
     console.log("Seleccionar imagen presionado");
-    // setArtistImage("https://nueva-imagen.jpg");
+    // Aquí iría la lógica para abrir galería / cámara
   };
 
   // Handler para crear artista
-  const handleCreateArtist = () => {
-    console.log("Ingresar Artista presionado");
-    console.log({
+  const handleCreateArtist = async () => {
+    // Armo el objeto con los datos del artista
+    const newArtist = {
       name: artistName,
-      image: artistImage,
       description: artistDescription,
-      instagramURL,
-      soundcloudURL,
-      spotifyURL,
-    });
-    // Lógica para enviar a la API o mock
+      // Si en el futuro deseás agregar más campos, como redes, agrégalos aquí.
+    };
+
+    // Logueo los datos a enviar en la consola.
+    console.log("Datos del nuevo artista:", newArtist);
+
+    try {
+      await createArtistOnApi(newArtist);
+      console.log("Artista creado correctamente:", newArtist);
+      Alert.alert("Éxito", "Artista creado correctamente.");
+      router.back(); // Regresa a la pantalla anterior (ManageArtistsScreen)
+    } catch (error) {
+      console.error("Error al crear el artista:", error);
+      Alert.alert("Error", "No se pudo crear el artista.");
+    }
   };
 
   return (
@@ -73,7 +88,9 @@ export default function NewArtistScreen() {
               style={styles.selectImageButton}
               onPress={handleSelectImage}
             >
-              <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
+              <Text style={styles.selectImageButtonText}>
+                Seleccionar imagen
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -188,5 +205,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "100%",
   },
-  createButtonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  createButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
 });

@@ -17,7 +17,10 @@ import { useFocusEffect } from "@react-navigation/native";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import { getAllArtists, searchArtistsByName } from "@/utils/artists/artistHelpers";
+import {
+  fetchArtistsFromApi,
+  deleteArtistFromApi,
+} from "@/utils/artists/artistApi";
 import { Artist } from "@/interfaces/Artist";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
@@ -26,42 +29,36 @@ export default function ManageArtistsScreen() {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [searchText, setSearchText] = useState("");
 
-  // Función para cargar artistas (desde la API o mock)
-  const loadArtists = () => {
-    const data = getAllArtists();
-    setArtists(data);
+  const loadArtists = async () => {
+    try {
+      const data = await fetchArtistsFromApi();
+      setArtists(data);
+    } catch (error) {
+      console.error("Error al cargar artistas:", error);
+      Alert.alert("Error", "No se pudieron cargar los artistas desde la API.");
+    }
   };
 
-  // Carga inicial
   useEffect(() => {
     loadArtists();
   }, []);
 
-  // Recargar artistas cada vez que la pantalla gana foco
   useFocusEffect(
     useCallback(() => {
       loadArtists();
     }, [])
   );
 
-  // Filtrar artistas al escribir en el buscador
-  const handleSearch = (text: string) => {
+  const handleSearch = async (text: string) => {
     setSearchText(text);
-    if (!text) {
-      loadArtists();
-    } else {
-      const results = searchArtistsByName(text);
-      setArtists(results);
-    }
+    loadArtists();
   };
 
-  // Navegar a EditArtistScreen
-  const handleEdit = (id: number) => {
-    router.push(`/admin/ArtistScreens/EditArtistScreen?id=${id}`);
+  const handleEdit = (idArtista: string) => {
+    router.push(`/admin/ArtistScreens/EditArtistScreen?id=${idArtista}`);
   };
 
-  // Eliminar con confirmación
-  const handleDelete = (id: number) => {
+  const handleDelete = (idArtista: string) => {
     Alert.alert(
       "Confirmar eliminación",
       "¿Estás seguro de que deseas eliminar este artista?",
@@ -70,28 +67,33 @@ export default function ManageArtistsScreen() {
         {
           text: "Eliminar",
           style: "destructive",
-          onPress: () => {
-            console.log("Eliminar artista con ID:", id);
-            // Aquí deberías llamar a la función para eliminar el artista (API, etc.)
+          onPress: async () => {
+            try {
+              await deleteArtistFromApi(idArtista);
+
+              // Eliminar del array local sin recargar toda la lista
+              setArtists((prev) => prev.filter((a) => a.idArtista !== idArtista));
+
+              Alert.alert("Éxito", "Artista eliminado correctamente.");
+            } catch (error) {
+              console.error("Error al eliminar artista:", error);
+              Alert.alert("Error", "No se pudo eliminar el artista.");
+            }
           },
         },
       ]
     );
   };
 
-  // Botón para crear artista
   const handleCreateArtist = () => {
     router.push("/admin/ArtistScreens/NewArtistScreen");
   };
 
-  // Renderiza cada artista como una “card”, estilo similar a ManageNewsScreen
   const renderItem = ({ item }: { item: Artist }) => {
-    // Fecha simulada si no existe
     const fakeDate = "23/02/2025";
 
     return (
       <View style={styles.cardContainer}>
-        {/* Cabecera: texto (fecha y nombre) a la izquierda, imagen a la derecha */}
         <View style={styles.cardHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.dateText}>
@@ -103,7 +105,6 @@ export default function ManageArtistsScreen() {
               {item.name}
             </Text>
           </View>
-          {/* Imagen circular del artista */}
           <Image
             source={{ uri: item.image }}
             style={styles.artistImage}
@@ -111,21 +112,20 @@ export default function ManageArtistsScreen() {
           />
         </View>
 
-        {/* Fila de acciones: editar / eliminar */}
         <View style={styles.actionsRow}>
           <IconButton
             icon="pencil"
             size={20}
             iconColor="#fff"
             style={[styles.actionIcon, { backgroundColor: "#6a1b9a" }]}
-            onPress={() => handleEdit(item.id!)}
+            onPress={() => handleEdit(item.idArtista)}
           />
           <IconButton
             icon="delete"
             size={20}
             iconColor="#fff"
             style={[styles.actionIcon, { backgroundColor: "#d32f2f" }]}
-            onPress={() => handleDelete(item.id!)}
+            onPress={() => handleDelete(item.idArtista)}
           />
         </View>
       </View>
@@ -137,14 +137,15 @@ export default function ManageArtistsScreen() {
       <Header />
 
       <View style={styles.content}>
-        {/* Botón "Crear artista" al inicio */}
-        <TouchableOpacity style={styles.createButton} onPress={handleCreateArtist}>
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={handleCreateArtist}
+        >
           <Text style={styles.createButtonText}>Crear artista</Text>
         </TouchableOpacity>
 
         <Text style={styles.screenTitle}>Modificar artistas:</Text>
 
-        {/* Barra de búsqueda */}
         <View style={styles.searchRow}>
           <TextInput
             style={styles.searchInput}
@@ -156,7 +157,7 @@ export default function ManageArtistsScreen() {
 
         <FlatList
           data={artists}
-          keyExtractor={(item) => item.id?.toString() ?? "0"}
+          keyExtractor={(item) => item.idArtista}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
         />

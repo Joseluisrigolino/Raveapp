@@ -9,16 +9,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import axios from "axios";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import { getArtistById } from "@/utils/artists/artistHelpers";
-import { Artist } from "@/interfaces/Artist";
-
-const API_BASE_URL = "http://144.22.158.49:8080";
+import { fetchOneArtistFromApi, updateArtistOnApi } from "@/utils/artists/artistApi";
 
 export default function EditArtistScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -27,51 +24,45 @@ export default function EditArtistScreen() {
   const [artistName, setArtistName] = useState("");
   const [artistImage, setArtistImage] = useState<string | null>(null);
   const [artistDescription, setArtistDescription] = useState("");
-  const [instagramURL, setInstagramURL] = useState("");
-  const [soundcloudURL, setSoundcloudURL] = useState("");
-  const [spotifyURL, setSpotifyURL] = useState("");
+  const [creationDate, setCreationDate] = useState("");
 
   useEffect(() => {
     if (id) {
-      const found = getArtistById(Number(id));
-      if (found) {
-        setArtistName(found.name);
-        setArtistImage(found.image);
-        setArtistDescription(found.description || "");
-        setInstagramURL(found.instagramURL || "");
-        setSoundcloudURL(found.soundcloudURL || "");
-        setSpotifyURL(found.spotifyURL || "");
-      }
+      fetchOneArtistFromApi(id)
+        .then((artist) => {
+          setArtistName(artist.name);
+          setArtistImage(artist.image);
+          setArtistDescription(artist.description || "");
+          setCreationDate(artist.creationDate || new Date().toISOString());
+        })
+        .catch((error) => {
+          console.error("Error al cargar artista:", error);
+          Alert.alert("Error", "No se pudo cargar el artista.");
+        });
     }
   }, [id]);
 
   const handleSelectImage = () => {
     console.log("Seleccionar nueva imagen");
-    // Aquí implementarías la lógica para seleccionar una imagen
+    // Si querés permitir edición de imagen, implementalo acá.
   };
 
   const handleUpdateArtist = async () => {
-    // Construimos el objeto de actualización
-    const updatedArtist = {
-      name: artistName,
-      image: artistImage,
-      description: artistDescription,
-      instagramURL,
-      soundcloudURL,
-      spotifyURL,
-    };
+    if (!id) return;
 
     try {
-      // Realizamos una petición PUT a la API
-      await axios.put(`${API_BASE_URL}/v1/Artista/UpdateArtista/${id}`, updatedArtist, {
-        headers: {
-          "Content-Type": "application/json",
-        },
+      await updateArtistOnApi({
+        idArtista: id,
+        name: artistName,
+        description: artistDescription,
+        creationDate: creationDate,
       });
-      console.log("Artista actualizado correctamente");
-      router.back(); // Regresar a ManageArtistsScreen
+
+      Alert.alert("Éxito", "Artista actualizado correctamente.");
+      router.back();
     } catch (error) {
       console.error("Error al actualizar el artista:", error);
+      Alert.alert("Error", "No se pudo actualizar el artista.");
     }
   };
 
@@ -106,9 +97,7 @@ export default function EditArtistScreen() {
               style={styles.selectImageButton}
               onPress={handleSelectImage}
             >
-              <Text style={styles.selectImageButtonText}>
-                Seleccionar imagen
-              </Text>
+              <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
             </TouchableOpacity>
           </View>
 
@@ -116,36 +105,12 @@ export default function EditArtistScreen() {
           <View style={styles.textAreaContainer}>
             <TextInput
               style={styles.textArea}
-              placeholder="Espacio para escribir información del artista"
+              placeholder="Escribí la bio del artista"
               multiline
               value={artistDescription}
               onChangeText={setArtistDescription}
             />
           </View>
-
-          <Text style={styles.label}>URL del Instagram:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="URL de Instagram"
-            value={instagramURL}
-            onChangeText={setInstagramURL}
-          />
-
-          <Text style={styles.label}>URL del SoundCloud:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="URL de SoundCloud"
-            value={soundcloudURL}
-            onChangeText={setSoundcloudURL}
-          />
-
-          <Text style={styles.label}>URL del Spotify:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="URL de Spotify"
-            value={spotifyURL}
-            onChangeText={setSpotifyURL}
-          />
 
           <TouchableOpacity style={styles.updateButton} onPress={handleUpdateArtist}>
             <Text style={styles.updateButtonText}>Confirmar</Text>

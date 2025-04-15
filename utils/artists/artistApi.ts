@@ -1,5 +1,4 @@
 // src/utils/artistApi.ts
-
 import { apiClient, login } from "@/utils/apiConfig";
 import { Artist } from "@/interfaces/Artist";
 
@@ -20,7 +19,7 @@ function parseApiArtist(apiArt: ApiArtist): Artist {
     name: apiArt.nombre,
     description: apiArt.bio,
     creationDate: apiArt.dtAlta,
-    // Relleno de imagen ficticio o si tu API provee imagen, úsala
+    // Imagen ficticia; si la API provee imagen, usala en su lugar
     image: "https://picsum.photos/200/200?random=999",
     instagramURL: "",
     soundcloudURL: "",
@@ -31,7 +30,6 @@ function parseApiArtist(apiArt: ApiArtist): Artist {
 /** Obtiene todos los artistas desde la API. */
 export async function fetchArtistsFromApi(): Promise<Artist[]> {
   const token = await login();
-
   const response = await apiClient.get("/v1/Artista/GetArtista", {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -49,12 +47,7 @@ export async function fetchArtistsFromApi(): Promise<Artist[]> {
 
 /** Obtiene un artista por su GUID (idArtista). */
 export async function fetchOneArtistFromApi(idArtista: string): Promise<Artist> {
-  // Podrías tener un endpoint GET /v1/Artista/GetArtista/{id} o 
-  // reusar la misma /GetArtista y filtrar. Ajusta a tu API real.
   const token = await login();
-
-  // Suponiendo que NO hay endpoint GET por ID, 
-  // repetimos la lógica y filtramos local. O si tu API lo provee, úsalo:
   const response = await apiClient.get("/v1/Artista/GetArtista", {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -84,6 +77,45 @@ export async function updateArtistOnApi(artist: Partial<Artist>): Promise<void> 
   };
 
   await apiClient.put("/v1/Artista/UpdateArtista", body, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "*/*",
+    },
+  });
+}
+
+/** Elimina un artista (DELETE /v1/Artista/DeleteArtista/{id}) */
+export async function deleteArtistFromApi(idArtista: string): Promise<void> {
+  const token = await login();
+
+  try {
+    const response = await apiClient.delete(`/v1/Artista/DeleteArtista/${idArtista}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "*/*",
+      },
+    });
+    console.log("Respuesta DELETE:", response.data);
+  } catch (error: any) {
+    console.error("Error en deleteArtistFromApi:", error.response || error.message);
+    throw error;
+  }
+}
+
+/** Crea un artista (POST /v1/Artista/CreateArtista). */
+export async function createArtistOnApi(newArtist: Partial<Artist>): Promise<void> {
+  const token = await login();
+
+  // Ajusta el body según lo que tu endpoint POST realmente requiera.
+  // Según tu Swagger, al menos requiere: { nombre: string, bio: string }
+  const body = {
+    nombre: newArtist.name,
+    bio: newArtist.description,
+    // Si necesitás más campos (ej. isActivo, dtAlta), agrégalos aquí.
+  };
+
+  await apiClient.post("/v1/Artista/CreateArtista", body, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
