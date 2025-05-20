@@ -1,125 +1,126 @@
-// src/utils/artistApi.ts
+// src/utils/artists/artistApi.ts
 import { apiClient, login } from "@/utils/apiConfig";
 import { Artist } from "@/interfaces/Artist";
 
-// Estructura real de la API:
+interface ApiMedia {
+  idMedia: string;
+  imagen: string;
+  video: string;
+  idEntidadMedia: string;
+}
+
+interface ApiSocials {
+  idSocial: string | null;
+  mdInstagram: string | null;
+  mdSpotify: string | null;
+  mdSoundcloud: string | null;
+}
+
 interface ApiArtist {
   idArtista: string;
   nombre: string;
   bio: string;
   dtAlta: string;
   isActivo: number;
+  media: ApiMedia[];
+  socials: ApiSocials;
 }
 
-// Mapea el artista de la API a tu interfaz local
+// Mapea la respuesta de la API a la interfaz local
 function parseApiArtist(apiArt: ApiArtist): Artist {
   return {
-    // Guarda el GUID en un nuevo campo "idArtista" para usarlo en Edición/Eliminación
     idArtista: apiArt.idArtista,
+    idSocial: apiArt.socials.idSocial,
     name: apiArt.nombre,
     description: apiArt.bio,
     creationDate: apiArt.dtAlta,
-    // Imagen ficticia; si la API provee imagen, usala en su lugar
-    image: "https://picsum.photos/200/200?random=999",
-    instagramURL: "",
-    soundcloudURL: "",
-    spotifyURL: "",
+    isActivo: apiArt.isActivo === 1,
+    image: apiArt.media?.[0]?.imagen ?? "https://picsum.photos/200/200?random=999",
+    instagramURL: apiArt.socials.mdInstagram ?? "",
+    spotifyURL: apiArt.socials.mdSpotify ?? "",
+    soundcloudURL: apiArt.socials.mdSoundcloud ?? "",
   };
 }
 
-/** Obtiene todos los artistas desde la API. */
+/** Obtiene todos los artistas */
 export async function fetchArtistsFromApi(): Promise<Artist[]> {
   const token = await login();
-  const response = await apiClient.get("/v1/Artista/GetArtista", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
-
-  if (!response.data.artistas) {
-    throw new Error("Respuesta sin 'artistas'");
-  }
-
-  const apiArtists: ApiArtist[] = response.data.artistas;
-  return apiArtists.map(parseApiArtist);
+  const { data } = await apiClient.get<{ artistas: ApiArtist[] }>(
+    "/v1/Artista/GetArtista",
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!data.artistas) throw new Error("Respuesta sin 'artistas'");
+  return data.artistas.map(parseApiArtist);
 }
 
-/** Obtiene un artista por su GUID (idArtista). */
-export async function fetchOneArtistFromApi(idArtista: string): Promise<Artist> {
-  const token = await login();
-  const response = await apiClient.get("/v1/Artista/GetArtista", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
-
-  const apiArtists: ApiArtist[] = response.data.artistas || [];
-  const found = apiArtists.find((a) => a.idArtista === idArtista);
-  if (!found) {
-    throw new Error("No se encontró el artista con ID: " + idArtista);
-  }
-  return parseApiArtist(found);
+/** Obtiene un artista por GUID */
+export async function fetchOneArtistFromApi(
+  idArtista: string
+): Promise<Artist> {
+  const all = await fetchArtistsFromApi();
+  const found = all.find((a) => a.idArtista === idArtista);
+  if (!found) throw new Error("Artista no encontrado: " + idArtista);
+  return found;
 }
 
-/** Actualiza un artista (PUT /v1/Artista/UpdateArtista). */
-export async function updateArtistOnApi(artist: Partial<Artist>): Promise<void> {
+/** Crea un artista */
+export async function createArtistOnApi(
+  newArtist: Partial<Artist>
+): Promise<void> {
   const token = await login();
+  const socialsBody: any = {
+    idSocial: "",
+    mdInstagram: newArtist.instagramURL ?? "",
+    mdSpotify: newArtist.spotifyURL ?? "",
+    mdSoundcloud: newArtist.soundcloudURL ?? "",
+  };
+  const body = {
+    nombre: newArtist.name,
+    bio: newArtist.description,
+    socials: socialsBody,
+    isActivo: true,
+  };
+  console.log("🍀 POST CreateArtista body:", body);
+  await apiClient.post(
+    "https://api.raveapp.com.ar/v1/Artista/CreateArtista",
+    body,
+    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+  );
+}
 
-  // Ajusta el body según lo que tu endpoint PUT realmente requiera
+/** Actualiza un artista */
+export async function updateArtistOnApi(
+  artist: Partial<Artist>
+): Promise<void> {
+  const token = await login();
+  const socialsBody: any = {
+    idSocial: artist.idSocial ?? "",
+    mdInstagram: artist.instagramURL ?? "",
+    mdSpotify: artist.spotifyURL ?? "",
+    mdSoundcloud: artist.soundcloudURL ?? "",
+  };
   const body = {
     idArtista: artist.idArtista,
     nombre: artist.name,
     bio: artist.description,
-    dtAlta: artist.creationDate ?? "2025-01-01T00:00:00",
-    isActivo: 1, // Ejemplo
+    socials: socialsBody,
+    isActivo: artist.isActivo === true,
   };
-
-  await apiClient.put("/v1/Artista/UpdateArtista", body, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      Accept: "*/*",
-    },
-  });
+  console.log("🍀 PUT UpdateArtista body:", body);
+  await apiClient.put(
+    "https://api.raveapp.com.ar/v1/Artista/UpdateArtista",
+    body,
+    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+  );
 }
 
-/** Elimina un artista (DELETE /v1/Artista/DeleteArtista/{id}) */
-export async function deleteArtistFromApi(idArtista: string): Promise<void> {
+/** Elimina un artista */
+export async function deleteArtistFromApi(
+  idArtista: string
+): Promise<void> {
   const token = await login();
-
-  try {
-    const response = await apiClient.delete(`/v1/Artista/DeleteArtista/${idArtista}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "*/*",
-      },
-    });
-    console.log("Respuesta DELETE:", response.data);
-  } catch (error: any) {
-    console.error("Error en deleteArtistFromApi:", error.response || error.message);
-    throw error;
-  }
-}
-
-/** Crea un artista (POST /v1/Artista/CreateArtista). */
-export async function createArtistOnApi(newArtist: Partial<Artist>): Promise<void> {
-  const token = await login();
-
-  // Ajusta el body según lo que tu endpoint POST realmente requiera.
-  // Según tu Swagger, al menos requiere: { nombre: string, bio: string }
-  const body = {
-    nombre: newArtist.name,
-    bio: newArtist.description,
-    // Si necesitás más campos (ej. isActivo, dtAlta), agrégalos aquí.
-  };
-
-  await apiClient.post("/v1/Artista/CreateArtista", body, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      Accept: "*/*",
-    },
-  });
+  await apiClient.delete(
+    `/v1/Artista/DeleteArtista/${idArtista}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
 }

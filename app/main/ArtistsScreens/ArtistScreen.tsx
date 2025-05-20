@@ -1,3 +1,4 @@
+// src/screens/ArtistsScreens/ArtistScreen.tsx
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -6,6 +7,7 @@ import {
   Image,
   StyleSheet,
   View,
+  ActivityIndicator,
   Linking,
 } from "react-native";
 import { IconButton } from "react-native-paper";
@@ -14,57 +16,72 @@ import { useLocalSearchParams } from "expo-router";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import { Artist } from "@/interfaces/Artist";
-import { getArtistByName } from "@/utils/artists/artistHelpers";
+// IMPORTAR DESDE la carpeta correcta "artists"
+import { fetchOneArtistFromApi } from "@/utils/artists/artistApi";
 
-// Importa tus estilos globales
 import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function ArtistScreen() {
-  const { name } = useLocalSearchParams<{ name?: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const [artist, setArtist] = useState<Artist | null>(null);
-  const [isLiked, setIsLiked] = useState<boolean>(false);
-  const [likeCount, setLikeCount] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
 
   useEffect(() => {
-    if (name) {
-      const found = getArtistByName(name);
-      if (found) {
-        setArtist(found);
-        setLikeCount(found.likes ?? 0);
-      } else {
-        setArtist(null);
-      }
+    if (!id) {
+      setError("Falta el ID del artista.");
+      setLoading(false);
+      return;
     }
-  }, [name]);
 
-  if (!artist) {
+    fetchOneArtistFromApi(id)
+      .then((data) => {
+        setArtist(data);
+        setLikeCount(data.likes ?? 0);
+      })
+      .catch((err) => {
+        console.error("Error fetching artist:", err);
+        setError(err.message || "Artista no encontrado.");
+      })
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
     return (
       <SafeAreaView style={styles.container}>
         <Header />
         <View style={styles.contentWrapper}>
-          <Text style={{ textAlign: "center", marginTop: 50 }}>
-            Artista no encontrado.
-          </Text>
+          <Text style={styles.errorText}>{error}</Text>
         </View>
         <Footer />
       </SafeAreaView>
     );
   }
 
+  if (!artist) return null;
+
   const handleSpotifyPress = () => {
-    Linking.openURL("https://www.spotify.com");
+    if (artist.spotifyURL) Linking.openURL(artist.spotifyURL);
   };
   const handleInstagramPress = () => {
-    Linking.openURL("https://www.instagram.com");
+    if (artist.instagramURL) Linking.openURL(artist.instagramURL);
+  };
+  const handleSoundcloudPress = () => {
+    if (artist.soundcloudURL) Linking.openURL(artist.soundcloudURL);
   };
   const handleFavoritesPress = () => {
-    if (isLiked) {
-      setIsLiked(false);
-      setLikeCount((prev) => prev - 1);
-    } else {
-      setIsLiked(true);
-      setLikeCount((prev) => prev + 1);
-    }
+    setIsLiked((prev) => !prev);
+    setLikeCount((prev) => prev + (isLiked ? -1 : 1));
   };
 
   return (
@@ -76,11 +93,13 @@ export default function ArtistScreen() {
           <View style={styles.headerRow}>
             <Text style={styles.artistTitle}>{artist.name}</Text>
             <View style={styles.iconsRow}>
+              {/* Mostrar siempre los iconos, deshabilitados si no hay URL */}
               <IconButton
                 icon="spotify"
                 size={24}
                 iconColor={COLORS.textPrimary}
                 onPress={handleSpotifyPress}
+                disabled={!artist.spotifyURL}
                 style={styles.icon}
               />
               <IconButton
@@ -88,12 +107,20 @@ export default function ArtistScreen() {
                 size={24}
                 iconColor={COLORS.textPrimary}
                 onPress={handleInstagramPress}
+                disabled={!artist.instagramURL}
+                style={styles.icon}
+              />
+              <IconButton
+                icon="soundcloud"
+                size={24}
+                iconColor={COLORS.textPrimary}
+                onPress={handleSoundcloudPress}
+                disabled={!artist.soundcloudURL}
                 style={styles.icon}
               />
               <IconButton
                 icon={isLiked ? "heart" : "heart-outline"}
                 size={24}
-                // Rojo si liked, gris oscuro si no
                 iconColor={isLiked ? COLORS.negative : COLORS.textPrimary}
                 onPress={handleFavoritesPress}
                 style={styles.icon}
@@ -101,7 +128,12 @@ export default function ArtistScreen() {
             </View>
           </View>
 
-          <Image source={{ uri: artist.image }} style={styles.artistImage} />
+          <Image
+            source={{
+              uri: artist.image || "https://picsum.photos/200/200?random=999",
+            }}
+            style={styles.artistImage}
+          />
 
           <Text style={styles.likesText}>{likeCount} usuarios les gusta</Text>
 
@@ -119,7 +151,12 @@ export default function ArtistScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.backgroundLight, // Fondo claro principal
+    backgroundColor: COLORS.backgroundLight,
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   contentWrapper: {
     flex: 1,
@@ -134,8 +171,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   artistTitle: {
-    fontSize: FONT_SIZES.titleMain,       // Ej. 22-24 px
-    color: COLORS.textPrimary,            // Gris oscuro
+    fontSize: FONT_SIZES.titleMain,
+    color: COLORS.textPrimary,
     fontWeight: "bold",
     maxWidth: "70%",
   },
@@ -148,14 +185,14 @@ const styles = StyleSheet.create({
   artistImage: {
     width: 200,
     height: 200,
-    borderRadius: 100, // redondo
+    borderRadius: RADIUS.round,
     alignSelf: "center",
     marginBottom: 10,
   },
   likesText: {
     textAlign: "center",
     marginTop: 5,
-    fontSize: FONT_SIZES.body,   // 14-16 px
+    fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
   },
   description: {
@@ -164,5 +201,11 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
     lineHeight: 22,
+  },
+  errorText: {
+    textAlign: "center",
+    marginTop: 50,
+    color: COLORS.error,
+    fontSize: FONT_SIZES.body,
   },
 });

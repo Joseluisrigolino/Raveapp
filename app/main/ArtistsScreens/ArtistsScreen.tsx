@@ -1,6 +1,13 @@
 // src/screens/ArtistsScreens/ArtistsScreen.tsx
 import React, { useState, useEffect, useMemo } from "react";
-import { View, StyleSheet, ScrollView, SafeAreaView, Text } from "react-native";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  Text,
+  ActivityIndicator,
+} from "react-native";
 import { useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
@@ -10,43 +17,44 @@ import SearchBar from "@/components/common/SearchBarComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
 
 import { Artist } from "@/interfaces/Artist";
-import globalStyles, { COLORS, FONT_SIZES } from "@/styles/globalStyles";
-
-// Importa la función para obtener artistas desde la API
 import { fetchArtistsFromApi } from "@/utils/artists/artistApi";
+import globalStyles, { COLORS, FONT_SIZES } from "@/styles/globalStyles";
 
 export default function ArtistsScreen() {
   const router = useRouter();
   const [searchText, setSearchText] = useState("");
   const [artists, setArtists] = useState<Artist[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchArtistsFromApi()
       .then((result) => setArtists(result))
-      .catch((error) => console.error("Error fetching artists:", error));
+      .catch((error) => console.error("Error fetching artists:", error))
+      .finally(() => setLoading(false));
   }, []);
 
-  // Filtrado en memoria basado en searchText
+  // Filtrar solo artistas activos y luego aplicar búsqueda
   const filteredArtists = useMemo(() => {
     const lowerSearch = searchText.toLowerCase();
-    return artists.filter((artist) =>
-      artist.name.toLowerCase().includes(lowerSearch)
-    );
+    return artists
+      .filter((artist) => artist.isActivo)
+      .filter((artist) =>
+        artist.name.toLowerCase().includes(lowerSearch)
+      );
   }, [artists, searchText]);
 
-  // Agrupamos artistas por la primera letra de su nombre
   const alphabet = "abcdefghijklmnopqrstuvwxyz".split("");
 
-  const getLetterGroup = (letter: string) => {
-    return filteredArtists.filter(
+  const getLetterGroup = (letter: string) =>
+    filteredArtists.filter(
       (artist) => artist.name[0]?.toLowerCase() === letter.toLowerCase()
     );
-  };
 
-  // Navegar al detalle de un artista
   const handleArtistPress = (artist: Artist) => {
     router.push(
-      `/main/ArtistsScreens/ArtistScreen?name=${encodeURIComponent(artist.name)}`
+      `/main/ArtistsScreens/ArtistScreen?id=${encodeURIComponent(
+        artist.idArtista
+      )}`
     );
   };
 
@@ -67,28 +75,34 @@ export default function ArtistsScreen() {
         placeholder="Buscar artista"
       />
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {alphabet.map((letter) => {
-          const group = getLetterGroup(letter);
-          if (group.length === 0) return null;
+      {loading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {alphabet.map((letter) => {
+            const group = getLetterGroup(letter);
+            if (group.length === 0) return null;
 
-          return (
-            <View key={letter} style={styles.letterGroup}>
-              <Text style={styles.letterTitle}>{letter.toUpperCase()}</Text>
-              <View style={styles.artistCardsRow}>
-                {group.map((artist) => (
-                  <ArtistCard
-                    key={artist.id}
-                    artistName={artist.name}
-                    artistImage={artist.image}
-                    onPress={() => handleArtistPress(artist)}
-                  />
-                ))}
+            return (
+              <View key={letter} style={styles.letterGroup}>
+                <Text style={styles.letterTitle}>{letter.toUpperCase()}</Text>
+                <View style={styles.artistCardsRow}>
+                  {group.map((artist) => (
+                    <ArtistCard
+                      key={artist.idArtista}
+                      artistName={artist.name}
+                      artistImage={artist.image}
+                      onPress={() => handleArtistPress(artist)}
+                    />
+                  ))}
+                </View>
               </View>
-            </View>
-          );
-        })}
-      </ScrollView>
+            );
+          })}
+        </ScrollView>
+      )}
 
       <Footer />
     </SafeAreaView>
@@ -98,7 +112,12 @@ export default function ArtistsScreen() {
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
-    backgroundColor: globalStyles.COLORS.backgroundLight,
+    backgroundColor: COLORS.backgroundLight,
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   letterGroup: {
     marginTop: 20,
@@ -106,7 +125,7 @@ const styles = StyleSheet.create({
   letterTitle: {
     fontSize: FONT_SIZES.subTitle,
     fontWeight: "bold",
-    color: globalStyles.COLORS.textPrimary,
+    color: COLORS.textPrimary,
     marginLeft: 10,
   },
   artistCardsRow: {

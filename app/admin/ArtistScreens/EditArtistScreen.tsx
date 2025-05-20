@@ -15,192 +15,158 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import { fetchOneArtistFromApi, updateArtistOnApi } from "@/utils/artists/artistApi";
+import {
+  fetchOneArtistFromApi,
+  updateArtistOnApi,
+} from "@/utils/artists/artistApi";
+import { Artist } from "@/interfaces/Artist";
 
 export default function EditArtistScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
 
-  const [artistName, setArtistName] = useState("");
-  const [artistImage, setArtistImage] = useState<string | null>(null);
-  const [artistDescription, setArtistDescription] = useState("");
-  const [creationDate, setCreationDate] = useState("");
+  const [artist, setArtist] = useState<Artist | null>(null);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [instagramURL, setInstagramURL] = useState("");
+  const [spotifyURL, setSpotifyURL] = useState("");
+  const [soundcloudURL, setSoundcloudURL] = useState("");
+  const [idSocial, setIdSocial] = useState<string | null>(null);
+  const [isActivo, setIsActivo] = useState(true);
 
   useEffect(() => {
-    if (id) {
-      fetchOneArtistFromApi(id)
-        .then((artist) => {
-          setArtistName(artist.name);
-          setArtistImage(artist.image);
-          setArtistDescription(artist.description || "");
-          setCreationDate(artist.creationDate || new Date().toISOString());
-        })
-        .catch((error) => {
-          console.error("Error al cargar artista:", error);
-          Alert.alert("Error", "No se pudo cargar el artista.");
-        });
-    }
+    if (!id) return;
+    fetchOneArtistFromApi(id)
+      .then((a) => {
+        setArtist(a);
+        setName(a.name);
+        setDescription(a.description || "");
+        setInstagramURL(a.instagramURL || "");
+        setSpotifyURL(a.spotifyURL || "");
+        setSoundcloudURL(a.soundcloudURL || "");
+        setIdSocial(a.idSocial ?? null);
+        setIsActivo(a.isActivo ?? true);
+      })
+      .catch(() => {
+        Alert.alert("Error", "No se pudo cargar el artista.");
+      });
   }, [id]);
 
-  const handleSelectImage = () => {
-    console.log("Seleccionar nueva imagen");
-    // Si querés permitir edición de imagen, implementalo acá.
-  };
-
-  const handleUpdateArtist = async () => {
-    if (!id) return;
-
+  const handleUpdate = async () => {
+    if (!id || !artist) return;
     try {
       await updateArtistOnApi({
         idArtista: id,
-        name: artistName,
-        description: artistDescription,
-        creationDate: creationDate,
+        name,
+        description,
+        instagramURL,
+        spotifyURL,
+        soundcloudURL,
+        idSocial,
+        isActivo,
       });
-
       Alert.alert("Éxito", "Artista actualizado correctamente.");
       router.back();
-    } catch (error) {
-      console.error("Error al actualizar el artista:", error);
-      Alert.alert("Error", "No se pudo actualizar el artista.");
+    } catch (err: any) {
+      console.error(err.response?.data || err);
+      Alert.alert(
+        "Error al actualizar",
+        typeof err.response?.data === "string"
+          ? err.response.data
+          : JSON.stringify(err.response?.data)
+      );
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={s.container}>
       <Header />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.contentWrapper}>
-          <Text style={styles.mainTitle}>Editar artista</Text>
+      <ScrollView contentContainerStyle={s.scroll}>
+        <Text style={s.title}>Editar Artista</Text>
 
-          <Text style={styles.label}>Nombre:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Nombre"
-            value={artistName}
-            onChangeText={setArtistName}
-          />
+        <Text style={s.label}>Nombre</Text>
+        <TextInput style={s.input} value={name} onChangeText={setName} />
 
-          <Text style={styles.label}>Foto del artista:</Text>
-          <View style={styles.imageRow}>
-            <View style={styles.imagePlaceholder}>
-              {artistImage ? (
-                <Image
-                  source={{ uri: artistImage }}
-                  style={{ width: "100%", height: "100%" }}
-                />
-              ) : (
-                <Text style={styles.imagePlaceholderText}>IMG</Text>
-              )}
-            </View>
-            <TouchableOpacity
-              style={styles.selectImageButton}
-              onPress={handleSelectImage}
-            >
-              <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
-            </TouchableOpacity>
-          </View>
+        <Text style={s.label}>Descripción</Text>
+        <TextInput
+          style={[s.input, s.textArea]}
+          multiline
+          value={description}
+          onChangeText={setDescription}
+        />
 
-          <Text style={styles.label}>Información sobre el artista:</Text>
-          <View style={styles.textAreaContainer}>
-            <TextInput
-              style={styles.textArea}
-              placeholder="Escribí la bio del artista"
-              multiline
-              value={artistDescription}
-              onChangeText={setArtistDescription}
-            />
-          </View>
+        <Text style={s.label}>Instagram URL</Text>
+        <TextInput
+          style={s.input}
+          value={instagramURL}
+          onChangeText={setInstagramURL}
+          placeholder="https://instagram.com/..."
+        />
 
-          <TouchableOpacity style={styles.updateButton} onPress={handleUpdateArtist}>
-            <Text style={styles.updateButtonText}>Confirmar</Text>
+        <Text style={s.label}>Spotify URL</Text>
+        <TextInput
+          style={s.input}
+          value={spotifyURL}
+          onChangeText={setSpotifyURL}
+          placeholder="https://open.spotify.com/..."
+        />
+
+        <Text style={s.label}>SoundCloud URL</Text>
+        <TextInput
+          style={s.input}
+          value={soundcloudURL}
+          onChangeText={setSoundcloudURL}
+          placeholder="https://soundcloud.com/..."
+        />
+
+        <View style={s.switchRow}>
+          <Text style={s.label}>¿Activo?</Text>
+          <TouchableOpacity
+            style={[s.toggle, isActivo ? s.on : s.off]}
+            onPress={() => setIsActivo((v) => !v)}
+          >
+            <Text style={s.toggleText}>{isActivo ? "Sí" : "No"}</Text>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity style={s.btn} onPress={handleUpdate}>
+          <Text style={s.btnText}>Actualizar</Text>
+        </TouchableOpacity>
       </ScrollView>
       <Footer />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scrollContent: { padding: 16 },
-  contentWrapper: { flex: 1, alignItems: "flex-start" },
-  mainTitle: {
-    fontSize: 20,
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#fff" },
+  scroll: { padding: 16 },
+  title: {
+    fontSize: 24,
     fontWeight: "bold",
     marginBottom: 20,
-    alignSelf: "center",
+    textAlign: "center",
   },
-  label: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 6,
-    marginTop: 12,
-  },
+  label: { fontSize: 16, fontWeight: "600", marginTop: 12 },
   input: {
-    backgroundColor: "#fff",
-    borderColor: "#ccc",
     borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    width: "100%",
-  },
-  imageRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-    width: "100%",
-  },
-  imagePlaceholder: {
-    width: 80,
-    height: 80,
-    backgroundColor: "#ccc",
-    borderRadius: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 16,
-  },
-  imagePlaceholderText: {
-    color: "#555",
-    fontWeight: "bold",
-  },
-  selectImageButton: {
-    backgroundColor: "#000",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  selectImageButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  textAreaContainer: {
-    backgroundColor: "#fff",
     borderColor: "#ccc",
-    borderWidth: 1,
     borderRadius: 4,
-    width: "100%",
-    minHeight: 100,
-    marginBottom: 8,
-  },
-  textArea: {
-    flex: 1,
     padding: 8,
-    textAlignVertical: "top",
+    marginTop: 4,
   },
-  updateButton: {
-    backgroundColor: "#9c27b0",
-    marginTop: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+  textArea: { minHeight: 80, textAlignVertical: "top" },
+  switchRow: { flexDirection: "row", alignItems: "center", marginTop: 12 },
+  toggle: { marginLeft: 8, padding: 6, borderRadius: 4 },
+  on: { backgroundColor: "green" },
+  off: { backgroundColor: "red" },
+  toggleText: { color: "#fff" },
+  btn: {
+    marginTop: 24,
+    backgroundColor: "#0066cc",
+    padding: 12,
+    borderRadius: 6,
     alignItems: "center",
-    width: "100%",
   },
-  updateButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
+  btnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 });

@@ -1,5 +1,5 @@
-// CreateEventScreen.tsx
-import React from "react";
+// app/main/CreateEventScreen.tsx
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -8,8 +8,10 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
@@ -18,139 +20,293 @@ import DateTimeInputComponent from "@/components/common/DateTimeInputComponent";
 
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { ELECTRONIC_GENRES } from "@/utils/electronicGenresHelper";
-
-// Hook con la lógica de creación de evento
-import { useCreateEvent } from "@/hooks/events/useCreateEvent";
-// Hook/contexto de autenticación
+import { Artist } from "@/interfaces/Artist";
+import {
+  fetchProvinces,
+  fetchMunicipalities,
+  fetchLocalities,
+} from "@/utils/georef/georefHelpers";
 import { useAuth } from "@/context/AuthContext";
 
+// Tipos
+interface DayTickets {
+  genEarlyQty: string;
+  genEarlyPrice: string;
+  vipEarlyQty: string;
+  vipEarlyPrice: string;
+  genQty: string;
+  genPrice: string;
+  vipQty: string;
+  vipPrice: string;
+}
+type EventType = "1d" | "2d" | "3d";
+
+// Utilidades
+const createEmptyDayTickets = (): DayTickets => ({
+  genEarlyQty: "",
+  genEarlyPrice: "",
+  vipEarlyQty: "",
+  vipEarlyPrice: "",
+  genQty: "",
+  genPrice: "",
+  vipQty: "",
+  vipPrice: "",
+});
+const calcTotalTickets = (daysTickets: DayTickets[]): number =>
+  daysTickets.reduce((sum, d) => {
+    const ge = parseInt(d.genEarlyQty, 10) || 0;
+    const ve = parseInt(d.vipEarlyQty, 10) || 0;
+    const g = parseInt(d.genQty, 10) || 0;
+    const v = parseInt(d.vipQty, 10) || 0;
+    return sum + ge + ve + g + v;
+  }, 0);
+
+const fakeArtistDB: Artist[] = [
+  { name: "Artista 1", image: "" },
+  { name: "Artista 2", image: "" },
+  { name: "Artista 3", image: "" },
+];
+
 export default function CreateEventScreen() {
-  // Lógica interna para crear evento
-  const {
-    // 1) Info de login
-    isLoggedIn,
-    handleLogin,
-    handleRegister,
-    handleGoogleLogin,
-    simulateLogin,
-    handleLogout,
-
-    // 2) Campos y métodos del formulario
-    eventType,
-    setEventType,
-    eventName,
-    setEventName,
-    selectedGenres,
-    toggleGenre,
-    artistInput,
-    setArtistInput,
-    selectedArtists,
-    handleAddArtist,
-    handleRemoveArtist,
-
-    provinces,
-    municipalities,
-    localities,
-    showProvinces,
-    setShowProvinces,
-    showMunicipalities,
-    setShowMunicipalities,
-    showLocalities,
-    setShowLocalities,
-    provinceId,
-    provinceName,
-    municipalityId,
-    municipalityName,
-    localityId,
-    localityName,
-    handleSelectProvince,
-    handleSelectMunicipality,
-    handleSelectLocality,
-    street,
-    setStreet,
-    streetNumber,
-    setStreetNumber,
-
-    isAfter,
-    setIsAfter,
-    isLGBT,
-    setIsLGBT,
-
-    eventDescription,
-    setEventDescription,
-
-    startDateTime,
-    setStartDateTime,
-    endDateTime,
-    setEndDateTime,
-
-    daysTickets,
-    handleTicketChange,
-    totalTickets,
-
-    startSaleDateTime,
-    setStartSaleDateTime,
-    earlyBirdsStock,
-    setEarlyBirdsStock,
-    useEarlyBirdsDate,
-    setUseEarlyBirdsDate,
-    earlyBirdsUntilDateTime,
-    setEarlyBirdsUntilDateTime,
-
-    photoFile,
-    handleSelectPhoto,
-    videoLink,
-    setVideoLink,
-    musicLink,
-    setMusicLink,
-
-    acceptedTC,
-    setAcceptedTC,
-
-    handleSubmit,
-  } = useCreateEvent();
-
-  // Obtenemos el user desde tu AuthContext
+  // Contexto de usuario
   const { user } = useAuth();
-  // Asumimos user?.role => "guest" | "user" | "owner" | "admin"
+  const mustShowLogin = !user || user.role === "guest";
 
-  // Decidimos que si user es nulo/undefined o su rol es "guest",
-  // entonces mostramos el mensaje de "Debes iniciar sesión..."
-  const mustShowLoginMessage = !user || user.role === "guest";
+  // --- Login
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const handleLogin = () => console.log("Iniciar sesión");
+  const handleRegister = () => console.log("Registrarme");
+  const handleGoogleLogin = () => console.log("Login con Google");
+  const simulateLogin = () => setIsLoggedIn(true);
+  const handleLogout = () => setIsLoggedIn(false);
 
-  function handleEventTypeChange(value: "1d" | "2d" | "3d") {
-    setEventType(value);
-  }
+  // --- Campos básicos
+  const [eventType, setEventType] = useState<EventType>("1d");
+  const [eventName, setEventName] = useState("");
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+
+  // --- Artistas
+  const [artistInput, setArtistInput] = useState("");
+  const [selectedArtists, setSelectedArtists] = useState<Artist[]>([]);
+
+  // --- Ubicación
+  const [provinces, setProvinces] = useState<{ id: string; nombre: string }[]>(
+    []
+  );
+  const [municipalities, setMunicipalities] = useState<
+    { id: string; nombre: string }[]
+  >([]);
+  const [localities, setLocalities] = useState<
+    { id: string; nombre: string }[]
+  >([]);
+  const [showProvinces, setShowProvinces] = useState(false);
+  const [showMunicipalities, setShowMunicipalities] = useState(false);
+  const [showLocalities, setShowLocalities] = useState(false);
+  const [provinceId, setProvinceId] = useState("");
+  const [provinceName, setProvinceName] = useState("");
+  const [municipalityId, setMunicipalityId] = useState("");
+  const [municipalityName, setMunicipalityName] = useState("");
+  const [localityId, setLocalityId] = useState("");
+  const [localityName, setLocalityName] = useState("");
+  const [street, setStreet] = useState("");
+  const [streetNumber, setStreetNumber] = useState("");
+
+  // --- Checkboxes
+  const [isAfter, setIsAfter] = useState(false);
+  const [isLGBT, setIsLGBT] = useState(false);
+
+  // --- Descripción
+  const [eventDescription, setEventDescription] = useState("");
+
+  // --- Fechas globales
+  const [startDateTime, setStartDateTime] = useState<Date>(new Date());
+  const [endDateTime, setEndDateTime] = useState<Date>(new Date());
+
+  // --- Tickets
+  const [daysTickets, setDaysTickets] = useState<DayTickets[]>([
+    createEmptyDayTickets(),
+  ]);
+
+  // --- Config venta
+  const [startSaleDateTime, setStartSaleDateTime] = useState<Date>(new Date());
+  const [earlyBirdsStock, setEarlyBirdsStock] = useState(false);
+  const [useEarlyBirdsDate, setUseEarlyBirdsDate] = useState(false);
+  const [earlyBirdsUntilDateTime, setEarlyBirdsUntilDateTime] = useState<Date>(
+    new Date()
+  );
+
+  // --- Multimedia
+  const [photoFile, setPhotoFile] = useState<string | null>(null);
+  const [videoLink, setVideoLink] = useState("");
+  const [musicLink, setMusicLink] = useState("");
+
+  // --- Términos
+  const [acceptedTC, setAcceptedTC] = useState(false);
+
+  // Efectos
+  useEffect(() => {
+    // Ajusta número de días según tipo
+    const count = eventType === "1d" ? 1 : eventType === "2d" ? 2 : 3;
+    setDaysTickets(Array.from({ length: count }, createEmptyDayTickets));
+  }, [eventType]);
+
+  useEffect(() => {
+    fetchProvinces()
+      .then(setProvinces)
+      .catch((err) => console.error("Error fetchProvinces:", err));
+  }, []);
+
+  // Handlers ubicación
+  const handleSelectProvince = async (id: string, name: string) => {
+    setProvinceId(id);
+    setProvinceName(name);
+    setMunicipalityId("");
+    setMunicipalityName("");
+    setLocalityId("");
+    setLocalityName("");
+    setMunicipalities([]);
+    setLocalities([]);
+    setShowProvinces(false);
+    try {
+      const mun = await fetchMunicipalities(id);
+      setMunicipalities(mun);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+  const handleSelectMunicipality = async (id: string, name: string) => {
+    setMunicipalityId(id);
+    setMunicipalityName(name);
+    setLocalityId("");
+    setLocalityName("");
+    setLocalities([]);
+    setShowMunicipalities(false);
+    try {
+      const loc = await fetchLocalities(provinceId, id);
+      setLocalities(loc);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+  const handleSelectLocality = (id: string, name: string) => {
+    setLocalityId(id);
+    setLocalityName(name);
+    setShowLocalities(false);
+  };
+
+  // Handlers géneros/artistas/tickets
+  const toggleGenre = (g: string) => {
+    setSelectedGenres((prev) =>
+      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]
+    );
+  };
+  const handleAddArtist = () => {
+    const name = artistInput.trim();
+    if (!name) return;
+    const found = fakeArtistDB.find(
+      (x) => x.name.toLowerCase() === name.toLowerCase()
+    );
+    const art = found || { name, image: "" };
+    setSelectedArtists((prev) => [...prev, art]);
+    setArtistInput("");
+  };
+  const handleRemoveArtist = (name: string) => {
+    setSelectedArtists((prev) => prev.filter((x) => x.name !== name));
+  };
+  const handleTicketChange = (
+    i: number,
+    field: keyof DayTickets,
+    val: string
+  ) => {
+    setDaysTickets((prev) => {
+      const copy = [...prev];
+      copy[i] = { ...copy[i], [field]: val };
+      return copy;
+    });
+  };
+
+  const totalTickets = calcTotalTickets(daysTickets);
+
+  // Multimedia
+  const handleSelectPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permiso denegado", "Necesitamos permiso galería");
+      return;
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+    });
+    if (!res.canceled && res.assets.length) setPhotoFile(res.assets[0].uri);
+  };
+
+  // Submit
+  const handleSubmit = () => {
+    if (!photoFile) {
+      Alert.alert("Foto obligatoria", "Selecciona una foto");
+      return;
+    }
+    if (!acceptedTC) {
+      Alert.alert("Términos", "Debes aceptar términos");
+      return;
+    }
+    const data = {
+      eventName,
+      eventType,
+      selectedGenres,
+      selectedArtists,
+      provinceId,
+      provinceName,
+      municipalityId,
+      municipalityName,
+      localityId,
+      localityName,
+      street,
+      streetNumber,
+      isAfter,
+      isLGBT,
+      eventDescription,
+      startDateTime,
+      endDateTime,
+      daysTickets,
+      startSaleDateTime,
+      earlyBirdsStock,
+      useEarlyBirdsDate,
+      earlyBirdsUntilDateTime,
+      photoFile,
+      videoLink,
+      musicLink,
+      totalTickets,
+      acceptedTC,
+    };
+    console.log("Evento creado:", data);
+    Alert.alert("Éxito", "Evento creado");
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
-
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {mustShowLoginMessage ? (
-          // NO logueado (o rol "guest")
+        {mustShowLogin ? (
           <View style={styles.notLoggedContainer}>
             <TitlePers text="Crear Evento" />
             <View style={styles.divider} />
-
             <Text style={styles.subtitle}>
-              Para crear un evento, primero debes iniciar sesión o registrarte.
+              Para crear un evento debes iniciar sesión.
             </Text>
-
             <TouchableOpacity
               style={[styles.button, styles.loginButton]}
               onPress={handleLogin}
             >
               <Text style={styles.buttonText}>Iniciar sesión</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={[styles.button, styles.registerButton]}
               onPress={handleRegister}
             >
               <Text style={styles.buttonText}>Registrarme</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
               style={[styles.button, styles.googleButton]}
               onPress={handleGoogleLogin}
@@ -162,99 +318,74 @@ export default function CreateEventScreen() {
                   color={COLORS.info}
                   style={{ marginRight: 8 }}
                 />
-                <Text style={styles.googleButtonText}>Login with Google</Text>
+                <Text style={styles.googleButtonText}>Login con Google</Text>
               </View>
             </TouchableOpacity>
-
             <TouchableOpacity style={styles.demoButton} onPress={simulateLogin}>
-              <Text style={styles.demoButtonText}>[Simular login exitoso]</Text>
+              <Text style={styles.demoButtonText}>[Simular login]</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          // Usuario con rol "user", "owner" o "admin" => Formulario
           <View style={{ width: "100%" }}>
             <TitlePers text="Crear Evento" />
             <View style={styles.divider} />
-
-           
-
-            {/* NOMBRE */}
+            {/* Nombre */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Nombre del evento</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Ej: Fiesta Techno..."
+                placeholder="Ej: Fiesta..."
                 value={eventName}
                 onChangeText={setEventName}
               />
             </View>
-
-            {/* TIPO DE EVENTO */}
+            {/* Tipo */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Tipo de evento</Text>
               <View style={styles.radioGroup}>
-                <TouchableOpacity
-                  style={styles.radioOption}
-                  onPress={() => handleEventTypeChange("1d")}
-                >
-                  <View style={styles.radioCircle}>
-                    {eventType === "1d" && <View style={styles.radioSelected} />}
-                  </View>
-                  <Text style={styles.radioText}>1 día</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.radioOption}
-                  onPress={() => handleEventTypeChange("2d")}
-                >
-                  <View style={styles.radioCircle}>
-                    {eventType === "2d" && <View style={styles.radioSelected} />}
-                  </View>
-                  <Text style={styles.radioText}>2 días</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.radioOption}
-                  onPress={() => handleEventTypeChange("3d")}
-                >
-                  <View style={styles.radioCircle}>
-                    {eventType === "3d" && <View style={styles.radioSelected} />}
-                  </View>
-                  <Text style={styles.radioText}>3 días</Text>
-                </TouchableOpacity>
+                {(["1d", "2d", "3d"] as EventType[]).map((v) => (
+                  <TouchableOpacity
+                    key={v}
+                    style={styles.radioOption}
+                    onPress={() => setEventType(v)}
+                  >
+                    <View style={styles.radioCircle}>
+                      {eventType === v && <View style={styles.radioSelected} />}
+                    </View>
+                    <Text style={styles.radioText}>{v}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
-
-            {/* GÉNEROS */}
+            {/* Géneros */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Género/s musical/es</Text>
               <View style={styles.genresContainer}>
-                {ELECTRONIC_GENRES.map((genre) => {
-                  const isSelected = selectedGenres.includes(genre);
+                {ELECTRONIC_GENRES.map((g) => {
+                  const sel = selectedGenres.includes(g);
                   return (
                     <TouchableOpacity
-                      key={genre}
+                      key={g}
                       style={[
                         styles.genreChip,
-                        isSelected && styles.genreChipSelected,
+                        sel && styles.genreChipSelected,
                       ]}
-                      onPress={() => toggleGenre(genre)}
+                      onPress={() => toggleGenre(g)}
                     >
                       <Text
                         style={[
                           styles.genreChipText,
-                          isSelected && styles.genreChipTextSelected,
+                          sel && styles.genreChipTextSelected,
                         ]}
                       >
-                        {genre}
+                        {g}
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
             </View>
-
-            {/* ARTISTAS */}
+            {/* Artistas */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Artistas</Text>
               <View style={styles.artistRow}>
@@ -272,11 +403,11 @@ export default function CreateEventScreen() {
                 </TouchableOpacity>
               </View>
               <View style={styles.addedArtistsContainer}>
-                {selectedArtists.map((artist) => (
-                  <View key={artist.name} style={styles.artistTag}>
-                    <Text style={styles.artistName}>{artist.name}</Text>
+                {selectedArtists.map((a) => (
+                  <View key={a.name} style={styles.artistTag}>
+                    <Text style={styles.artistName}>{a.name}</Text>
                     <TouchableOpacity
-                      onPress={() => handleRemoveArtist(artist.name)}
+                      onPress={() => handleRemoveArtist(a.name)}
                     >
                       <Text style={styles.removeArtist}>✕</Text>
                     </TouchableOpacity>
@@ -284,11 +415,9 @@ export default function CreateEventScreen() {
                 ))}
               </View>
             </View>
-
-            {/* UBICACIÓN (Provincia, Municipio, Localidad, etc.) */}
+            {/* Ubicación */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Ubicación del evento</Text>
-
               <Text style={styles.subLabel}>Provincia</Text>
               <TouchableOpacity
                 style={styles.dropdownButton}
@@ -299,69 +428,60 @@ export default function CreateEventScreen() {
                 }}
               >
                 <Text style={styles.dropdownText}>
-                  {provinceName || "Seleccione una provincia"}
+                  {provinceName || "Seleccione provincia"}
                 </Text>
               </TouchableOpacity>
               {showProvinces && (
                 <View style={styles.dropdownContainer}>
-                  {provinces.map((prov) => (
+                  {provinces.map((p) => (
                     <TouchableOpacity
-                      key={prov.id}
-                      onPress={() =>
-                        handleSelectProvince(prov.id, prov.nombre)
-                      }
+                      key={p.id}
                       style={styles.dropdownItem}
+                      onPress={() => handleSelectProvince(p.id, p.nombre)}
                     >
-                      <Text>{prov.nombre}</Text>
+                      <Text>{p.nombre}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
-
               <Text style={styles.subLabel}>Municipio</Text>
               <TouchableOpacity
                 style={styles.dropdownButton}
+                disabled={!provinceId}
                 onPress={() => {
                   setShowMunicipalities(!showMunicipalities);
                   setShowProvinces(false);
                   setShowLocalities(false);
                 }}
-                disabled={!provinceId}
               >
                 <Text
-                  style={[
-                    styles.dropdownText,
-                    !provinceId && { opacity: 0.5 },
-                  ]}
+                  style={[styles.dropdownText, !provinceId && { opacity: 0.5 }]}
                 >
-                  {municipalityName || "Seleccione un municipio"}
+                  {municipalityName || "Seleccione municipio"}
                 </Text>
               </TouchableOpacity>
               {showMunicipalities && (
                 <View style={styles.dropdownContainer}>
-                  {municipalities.map((mun) => (
+                  {municipalities.map((m) => (
                     <TouchableOpacity
-                      key={mun.id}
-                      onPress={() =>
-                        handleSelectMunicipality(mun.id, mun.nombre)
-                      }
+                      key={m.id}
                       style={styles.dropdownItem}
+                      onPress={() => handleSelectMunicipality(m.id, m.nombre)}
                     >
-                      <Text>{mun.nombre}</Text>
+                      <Text>{m.nombre}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
-
               <Text style={styles.subLabel}>Localidad</Text>
               <TouchableOpacity
                 style={styles.dropdownButton}
+                disabled={!municipalityId}
                 onPress={() => {
                   setShowLocalities(!showLocalities);
                   setShowProvinces(false);
                   setShowMunicipalities(false);
                 }}
-                disabled={!municipalityId}
               >
                 <Text
                   style={[
@@ -369,23 +489,22 @@ export default function CreateEventScreen() {
                     !municipalityId && { opacity: 0.5 },
                   ]}
                 >
-                  {localityName || "Seleccione una localidad"}
+                  {localityName || "Seleccione localidad"}
                 </Text>
               </TouchableOpacity>
               {showLocalities && (
                 <View style={styles.dropdownContainer}>
-                  {localities.map((loc) => (
+                  {localities.map((l) => (
                     <TouchableOpacity
-                      key={loc.id}
-                      onPress={() => handleSelectLocality(loc.id, loc.nombre)}
+                      key={l.id}
                       style={styles.dropdownItem}
+                      onPress={() => handleSelectLocality(l.id, l.nombre)}
                     >
-                      <Text>{loc.nombre}</Text>
+                      <Text>{l.nombre}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
-
               <Text style={styles.subLabel}>Calle</Text>
               <TextInput
                 style={styles.input}
@@ -393,7 +512,6 @@ export default function CreateEventScreen() {
                 value={street}
                 onChangeText={setStreet}
               />
-
               <Text style={styles.subLabel}>Número</Text>
               <TextInput
                 style={styles.input}
@@ -403,8 +521,7 @@ export default function CreateEventScreen() {
                 keyboardType="numeric"
               />
             </View>
-
-            {/* AFTER / LGBT */}
+            {/* After/LGBT */}
             <View style={styles.formGroup}>
               <View style={styles.checkboxRow}>
                 <TouchableOpacity
@@ -425,62 +542,50 @@ export default function CreateEventScreen() {
                 <Text style={{ marginLeft: 4 }}>¿Es un evento LGBT?</Text>
               </View>
             </View>
-
-            {/* DESCRIPCIÓN */}
+            {/* Descripción */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Descripción</Text>
               <TextInput
                 style={[styles.input, styles.multiLineInput]}
                 multiline
-                placeholder="Describe aquí el evento..."
+                placeholder="Describe el evento"
                 value={eventDescription}
                 onChangeText={setEventDescription}
               />
             </View>
-
-            {/* FECHAS GLOBALES */}
+            {/* Fechas globales */}
             <View style={styles.formGroup}>
               <DateTimeInputComponent
-                label="Fecha y hora de inicio del evento:"
+                label="Fecha inicio"
                 value={startDateTime}
                 onChange={setStartDateTime}
               />
               <DateTimeInputComponent
-                label="Fecha y hora de finalización del evento:"
+                label="Fecha fin"
                 value={endDateTime}
                 onChange={setEndDateTime}
               />
             </View>
-
-            {/* ENTRADAS POR DÍA */}
+            {/* Entradas por día */}
             <Text style={styles.sectionTitle}>Entradas (por día)</Text>
-            <Text style={styles.infoText}>
-              Cantidad total de entradas: {totalTickets}
-            </Text>
-
-            {daysTickets.map((day, dayIndex) => (
-              <View key={dayIndex} style={styles.dayBlock}>
+            <Text style={styles.infoText}>Total entradas: {totalTickets}</Text>
+            {daysTickets.map((day, i) => (
+              <View key={i} style={styles.dayBlock}>
                 <Text style={styles.dayBlockTitle}>
                   {eventType === "1d"
                     ? "Día único"
-                    : `Día ${dayIndex + 1} de ${
-                        eventType === "2d" ? "2" : "3"
-                      }:`}
+                    : `Día ${i + 1} de ${eventType === "2d" ? 2 : 3}`}
                 </Text>
-
-                {/* Generales Early Birds */}
                 <View style={styles.ticketRow}>
-                  <Text style={styles.ticketLabel}>
-                    Entradas generales - Early Birds:
-                  </Text>
+                  <Text style={styles.ticketLabel}>Gen Early Birds:</Text>
                   <View style={styles.ticketInputs}>
                     <Text>Cant.:</Text>
                     <TextInput
                       style={styles.smallInput}
                       keyboardType="numeric"
                       value={day.genEarlyQty}
-                      onChangeText={(val) =>
-                        handleTicketChange(dayIndex, "genEarlyQty", val)
+                      onChangeText={(v) =>
+                        handleTicketChange(i, "genEarlyQty", v)
                       }
                       placeholder="0"
                     />
@@ -489,27 +594,23 @@ export default function CreateEventScreen() {
                       style={styles.smallInput}
                       keyboardType="numeric"
                       value={day.genEarlyPrice}
-                      onChangeText={(val) =>
-                        handleTicketChange(dayIndex, "genEarlyPrice", val)
+                      onChangeText={(v) =>
+                        handleTicketChange(i, "genEarlyPrice", v)
                       }
                       placeholder="$"
                     />
                   </View>
                 </View>
-
-                {/* VIP Early Birds */}
                 <View style={styles.ticketRow}>
-                  <Text style={styles.ticketLabel}>
-                    Entradas VIP - Early Birds:
-                  </Text>
+                  <Text style={styles.ticketLabel}>VIP Early Birds:</Text>
                   <View style={styles.ticketInputs}>
                     <Text>Cant.:</Text>
                     <TextInput
                       style={styles.smallInput}
                       keyboardType="numeric"
                       value={day.vipEarlyQty}
-                      onChangeText={(val) =>
-                        handleTicketChange(dayIndex, "vipEarlyQty", val)
+                      onChangeText={(v) =>
+                        handleTicketChange(i, "vipEarlyQty", v)
                       }
                       placeholder="0"
                     />
@@ -518,26 +619,22 @@ export default function CreateEventScreen() {
                       style={styles.smallInput}
                       keyboardType="numeric"
                       value={day.vipEarlyPrice}
-                      onChangeText={(val) =>
-                        handleTicketChange(dayIndex, "vipEarlyPrice", val)
+                      onChangeText={(v) =>
+                        handleTicketChange(i, "vipEarlyPrice", v)
                       }
                       placeholder="$"
                     />
                   </View>
                 </View>
-
-                {/* Generales (no early) */}
                 <View style={styles.ticketRow}>
-                  <Text style={styles.ticketLabel}>Entradas generales:</Text>
+                  <Text style={styles.ticketLabel}>Gen:</Text>
                   <View style={styles.ticketInputs}>
                     <Text>Cant.:</Text>
                     <TextInput
                       style={styles.smallInput}
                       keyboardType="numeric"
                       value={day.genQty}
-                      onChangeText={(val) =>
-                        handleTicketChange(dayIndex, "genQty", val)
-                      }
+                      onChangeText={(v) => handleTicketChange(i, "genQty", v)}
                       placeholder="0"
                     />
                     <Text>Precio:</Text>
@@ -545,26 +642,20 @@ export default function CreateEventScreen() {
                       style={styles.smallInput}
                       keyboardType="numeric"
                       value={day.genPrice}
-                      onChangeText={(val) =>
-                        handleTicketChange(dayIndex, "genPrice", val)
-                      }
+                      onChangeText={(v) => handleTicketChange(i, "genPrice", v)}
                       placeholder="$"
                     />
                   </View>
                 </View>
-
-                {/* VIP (no early) */}
                 <View style={styles.ticketRow}>
-                  <Text style={styles.ticketLabel}>Entradas VIP:</Text>
+                  <Text style={styles.ticketLabel}>VIP:</Text>
                   <View style={styles.ticketInputs}>
                     <Text>Cant.:</Text>
                     <TextInput
                       style={styles.smallInput}
                       keyboardType="numeric"
                       value={day.vipQty}
-                      onChangeText={(val) =>
-                        handleTicketChange(dayIndex, "vipQty", val)
-                      }
+                      onChangeText={(v) => handleTicketChange(i, "vipQty", v)}
                       placeholder="0"
                     />
                     <Text>Precio:</Text>
@@ -572,26 +663,22 @@ export default function CreateEventScreen() {
                       style={styles.smallInput}
                       keyboardType="numeric"
                       value={day.vipPrice}
-                      onChangeText={(val) =>
-                        handleTicketChange(dayIndex, "vipPrice", val)
-                      }
+                      onChangeText={(v) => handleTicketChange(i, "vipPrice", v)}
                       placeholder="$"
                     />
                   </View>
                 </View>
               </View>
             ))}
-
-            {/* CONFIG ENTRADAS */}
+            {/* Config entradas */}
             <View style={styles.formGroup}>
-              <Text style={styles.sectionTitle}>Configuración de entradas</Text>
+              <Text style={styles.sectionTitle}>Config. Entradas</Text>
               <DateTimeInputComponent
-                label="Inicio de venta de entradas:"
+                label="Inicio venta"
                 value={startSaleDateTime}
                 onChange={setStartSaleDateTime}
               />
               <Text style={styles.subLabel}>Vender Early Birds hasta:</Text>
-
               <View style={styles.checkboxRow}>
                 <TouchableOpacity
                   style={styles.checkbox}
@@ -601,15 +688,16 @@ export default function CreateEventScreen() {
                 </TouchableOpacity>
                 <Text style={{ marginLeft: 4 }}>Agotar stock</Text>
               </View>
-
               <View style={styles.checkboxRow}>
                 <TouchableOpacity
                   style={styles.checkbox}
                   onPress={() => setUseEarlyBirdsDate(!useEarlyBirdsDate)}
                 >
-                  {useEarlyBirdsDate && <View style={styles.checkboxSelected} />}
+                  {useEarlyBirdsDate && (
+                    <View style={styles.checkboxSelected} />
+                  )}
                 </TouchableOpacity>
-                <Text style={{ marginLeft: 4 }}>Fecha y hora:</Text>
+                <Text style={{ marginLeft: 4 }}>Fecha y hora</Text>
               </View>
               {useEarlyBirdsDate && (
                 <DateTimeInputComponent
@@ -619,15 +707,13 @@ export default function CreateEventScreen() {
                 />
               )}
             </View>
-
-            {/* MULTIMEDIA */}
+            {/* Multimedia */}
             <View style={styles.formGroup}>
               <Text style={styles.sectionTitle}>Multimedia</Text>
               <Text style={styles.label}>
-                Foto: <Text style={{ color: COLORS.negative }}>(Obligatoria)</Text>
+                Foto:{" "}
+                <Text style={{ color: COLORS.negative }}>(Obligatoria)</Text>
               </Text>
-
-              {/* Botón para abrir galería */}
               <TouchableOpacity
                 style={styles.selectFileButton}
                 onPress={handleSelectPhoto}
@@ -636,29 +722,26 @@ export default function CreateEventScreen() {
                   {photoFile ? "Cambiar foto" : "Seleccionar archivo"}
                 </Text>
               </TouchableOpacity>
-
               <Text style={[styles.label, { marginTop: 12 }]}>
-                Agregar video: (Opcional)
+                Video (Opcional)
               </Text>
               <TextInput
                 style={styles.input}
-                placeholder="Link de Youtube..."
+                placeholder="Link YouTube..."
                 value={videoLink}
                 onChangeText={setVideoLink}
               />
-
               <Text style={[styles.label, { marginTop: 12 }]}>
-                Agregar música: (Opcional)
+                Música (Opcional)
               </Text>
               <TextInput
                 style={styles.input}
-                placeholder="Link de Spotify o SoundCloud..."
+                placeholder="Link Spotify/SoundCloud..."
                 value={musicLink}
                 onChangeText={setMusicLink}
               />
             </View>
-
-            {/* TÉRMINOS Y CONDICIONES */}
+            {/* T&C */}
             <View style={styles.formGroup}>
               <View style={styles.checkboxRow}>
                 <TouchableOpacity
@@ -675,34 +758,26 @@ export default function CreateEventScreen() {
                 </Text>
               </View>
             </View>
-
-            {/* BOTÓN FINAL */}
-            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+            {/* Submit */}
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={handleSubmit}
+            >
               <Text style={styles.submitButtonText}>Crear Evento</Text>
             </TouchableOpacity>
           </View>
         )}
       </ScrollView>
-
       <Footer />
     </SafeAreaView>
   );
 }
 
-// Estilos
+// Estilos completos
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.backgroundLight,
-  },
-  scrollContent: {
-    padding: 16,
-  },
-  notLoggedContainer: {
-    width: "100%",
-    alignItems: "center",
-    marginTop: 24,
-  },
+  container: { flex: 1, backgroundColor: COLORS.backgroundLight },
+  scrollContent: { padding: 16 },
+  notLoggedContainer: { width: "100%", alignItems: "center", marginTop: 24 },
   divider: {
     borderBottomWidth: 1,
     borderBottomColor: COLORS.textPrimary,
@@ -722,29 +797,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginVertical: 8,
   },
-  loginButton: {
-    backgroundColor: COLORS.primary,
-  },
-  registerButton: {
-    backgroundColor: COLORS.negative,
-  },
+  loginButton: { backgroundColor: COLORS.primary },
+  registerButton: { backgroundColor: COLORS.negative },
   googleButton: {
     backgroundColor: COLORS.cardBg,
     borderWidth: 1,
     borderColor: COLORS.borderInput,
   },
-  googleButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  googleButtonText: {
-    color: COLORS.textPrimary,
-    fontWeight: "bold",
-  },
-  buttonText: {
-    color: COLORS.cardBg,
-    fontWeight: "bold",
-  },
+  googleButtonContent: { flexDirection: "row", alignItems: "center" },
+  googleButtonText: { color: COLORS.textPrimary, fontWeight: "bold" },
+  buttonText: { color: COLORS.cardBg, fontWeight: "bold" },
   demoButton: {
     marginTop: 16,
     backgroundColor: COLORS.borderInput,
@@ -753,16 +815,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.card,
     alignSelf: "center",
   },
-  demoButtonText: {
-    color: COLORS.textSecondary,
-  },
-
-  // Form groups
-  formGroup: {
-    marginBottom: 16,
-    width: "100%",
-    alignItems: "center",
-  },
+  demoButtonText: { color: COLORS.textSecondary },
+  formGroup: { marginBottom: 16, width: "100%", alignItems: "center" },
   label: {
     width: "90%",
     fontWeight: "bold",
@@ -787,22 +841,14 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
   },
-  multiLineInput: {
-    minHeight: 80,
-    textAlignVertical: "top",
-  },
-
-  // Radio
+  multiLineInput: { minHeight: 80, textAlignVertical: "top" },
   radioGroup: {
     width: "90%",
     flexDirection: "row",
     justifyContent: "space-around",
     marginTop: 8,
   },
-  radioOption: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  radioOption: { flexDirection: "row", alignItems: "center" },
   radioCircle: {
     width: 20,
     height: 20,
@@ -819,11 +865,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: COLORS.textPrimary,
   },
-  radioText: {
-    color: COLORS.textPrimary,
-  },
-
-  // Géneros
+  radioText: { color: COLORS.textPrimary },
   genresContainer: {
     width: "90%",
     flexDirection: "row",
@@ -838,23 +880,10 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
-  genreChipSelected: {
-    backgroundColor: COLORS.primary,
-  },
-  genreChipText: {
-    color: COLORS.textPrimary,
-    fontWeight: "500",
-  },
-  genreChipTextSelected: {
-    color: COLORS.cardBg,
-  },
-
-  // Artistas
-  artistRow: {
-    width: "90%",
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  genreChipSelected: { backgroundColor: COLORS.primary },
+  genreChipText: { color: COLORS.textPrimary, fontWeight: "500" },
+  genreChipTextSelected: { color: COLORS.cardBg },
+  artistRow: { width: "90%", flexDirection: "row", alignItems: "center" },
   addArtistButton: {
     backgroundColor: COLORS.textPrimary,
     borderRadius: RADIUS.card,
@@ -884,16 +913,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
-  artistName: {
-    marginRight: 4,
-    color: COLORS.textPrimary,
-  },
-  removeArtist: {
-    color: COLORS.negative,
-    fontWeight: "bold",
-  },
-
-  // Dropdowns
+  artistName: { marginRight: 4, color: COLORS.textPrimary },
+  removeArtist: { color: COLORS.negative, fontWeight: "bold" },
   dropdownButton: {
     width: "90%",
     backgroundColor: COLORS.backgroundLight,
@@ -905,9 +926,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     justifyContent: "center",
   },
-  dropdownText: {
-    color: COLORS.textPrimary,
-  },
+  dropdownText: { color: COLORS.textPrimary },
   dropdownContainer: {
     width: "90%",
     borderWidth: 1,
@@ -922,7 +941,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
-
   checkboxRow: {
     width: "90%",
     flexDirection: "row",
@@ -943,8 +961,6 @@ const styles = StyleSheet.create({
     height: 12,
     backgroundColor: COLORS.textPrimary,
   },
-
-  // Bloque de entradas por día
   dayBlock: {
     width: "90%",
     backgroundColor: COLORS.borderInput,
@@ -958,19 +974,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     color: COLORS.textPrimary,
   },
-  ticketRow: {
-    marginTop: 8,
-  },
+  ticketRow: { marginTop: 8 },
   ticketLabel: {
     fontWeight: "600",
     marginBottom: 4,
     color: COLORS.textPrimary,
   },
-  ticketInputs: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginLeft: 8,
-  },
+  ticketInputs: { flexDirection: "row", alignItems: "center", marginLeft: 8 },
   smallInput: {
     backgroundColor: COLORS.cardBg,
     borderWidth: 1,
@@ -983,8 +993,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: COLORS.textPrimary,
   },
-
-  // Secciones
   sectionTitle: {
     fontWeight: "bold",
     fontSize: FONT_SIZES.subTitle,
@@ -997,8 +1005,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     alignSelf: "center",
   },
-
-  // Botón de seleccionar archivo (foto)
   selectFileButton: {
     backgroundColor: COLORS.textPrimary,
     borderRadius: RADIUS.card,
@@ -1007,12 +1013,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     marginTop: 4,
   },
-  selectFileButtonText: {
-    color: COLORS.cardBg,
-    fontWeight: "bold",
-  },
-
-  // Botón final
+  selectFileButtonText: { color: COLORS.cardBg, fontWeight: "bold" },
   submitButton: {
     backgroundColor: COLORS.primary,
     marginTop: 20,
