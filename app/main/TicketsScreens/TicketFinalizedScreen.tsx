@@ -1,3 +1,4 @@
+// app/main/TicketsScreens/TicketFinalizedScreen.tsx
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -12,6 +13,7 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 
+import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import ReviewComponent from "@/components/events/ReviewComponent";
@@ -19,8 +21,7 @@ import { ReviewItem } from "@/interfaces/ReviewProps";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
 import { getTicketMenuById } from "@/utils/tickets/ticketMenuHelpers";
 
-// Importa tus estilos globales
-import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 /** Reseñas de ejemplo */
 const mockReviews: ReviewItem[] = [
@@ -40,7 +41,7 @@ const mockReviews: ReviewItem[] = [
   },
 ];
 
-export default function TicketFinalizedScreen() {
+function TicketFinalizedScreenContent() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [ticketData, setTicketData] = useState<TicketPurchasedMenuItem | null>(
     null
@@ -159,6 +160,14 @@ export default function TicketFinalizedScreen() {
   );
 }
 
+export default function TicketFinalizedScreen() {
+  return (
+    <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
+      <TicketFinalizedScreenContent />
+    </ProtectedRoute>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -179,7 +188,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.card,
   },
   eventTitle: {
-    fontSize: FONT_SIZES.subTitle, // 18-20
+    fontSize: FONT_SIZES.subTitle,
     fontWeight: "bold",
     textAlign: "center",
     color: COLORS.textPrimary,
@@ -188,8 +197,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 4,
     marginBottom: 12,
-    fontSize: FONT_SIZES.smallText, // 14
-    color: COLORS.negative, // "red"
+    fontSize: FONT_SIZES.smallText,
+    color: COLORS.negative,
     fontWeight: "bold",
   },
   ticketContainer: {
@@ -197,32 +206,32 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   infoContainer: {
-    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
+    backgroundColor: COLORS.backgroundLight,
     padding: 16,
     borderRadius: RADIUS.card,
     width: "100%",
   },
   ticketInfo: {
-    fontSize: FONT_SIZES.body, // 14-16
+    fontSize: FONT_SIZES.body,
     textAlign: "center",
     marginBottom: 8,
     color: COLORS.textPrimary,
   },
   address: {
-    fontSize: FONT_SIZES.smallText, // 13-14
-    color: COLORS.textSecondary,     // "#555"
+    fontSize: FONT_SIZES.smallText,
+    color: COLORS.textSecondary,
     marginBottom: 12,
     textAlign: "center",
   },
   reviewNote: {
-    fontSize: FONT_SIZES.smallText, // 12-14
+    fontSize: FONT_SIZES.smallText,
     color: COLORS.textSecondary,
     marginBottom: 16,
     textAlign: "center",
     lineHeight: 18,
   },
   descriptionContainer: {
-    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
+    backgroundColor: COLORS.backgroundLight,
     padding: 16,
     borderRadius: RADIUS.card,
     marginBottom: 16,
@@ -238,12 +247,12 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   addReviewContainer: {
-    backgroundColor: COLORS.cardBg, // "#fff"
+    backgroundColor: COLORS.cardBg,
     padding: 16,
     borderRadius: RADIUS.card,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: COLORS.borderInput, // "#ddd"
+    borderColor: COLORS.borderInput,
   },
   addReviewTitle: {
     fontSize: FONT_SIZES.body,
@@ -261,7 +270,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   commentInputContainer: {
-    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
+    backgroundColor: COLORS.backgroundLight,
     borderRadius: RADIUS.card,
     marginBottom: 12,
   },
@@ -272,14 +281,14 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   submitButton: {
-    backgroundColor: COLORS.textPrimary, // "#000"
+    backgroundColor: COLORS.textPrimary,
     paddingVertical: 12,
     borderRadius: RADIUS.card,
     alignItems: "center",
   },
   submitButtonText: {
-    color: COLORS.cardBg, // "#fff"
-    fontSize: FONT_SIZES.body, // 15
+    color: COLORS.cardBg,
+    fontSize: FONT_SIZES.body,
     fontWeight: "bold",
   },
 });

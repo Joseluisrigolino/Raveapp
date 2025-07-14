@@ -1,3 +1,4 @@
+// app/main/TicketsScreens/TicketPurchasedScreen.tsx
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -7,39 +8,66 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
+  ActivityIndicator,
+  Dimensions,
+  Linking,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import QRCode from "react-native-qrcode-svg";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 
+import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
 import { getTicketMenuById } from "@/utils/tickets/ticketMenuHelpers";
+import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 
-// Importa tus estilos globales
-import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+const screenWidth = Dimensions.get("window").width;
+const QR_SIZE = 140;
 
-export default function TicketPurchasedScreen() {
+function TicketPurchasedScreenContent() {
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const [ticketData, setTicketData] = useState<TicketPurchasedMenuItem | null>(
-    null
-  );
+  const [ticketData, setTicketData] = useState<TicketPurchasedMenuItem | null>(null);
 
   useEffect(() => {
     if (id) {
       const found = getTicketMenuById(Number(id));
-      if (found) {
-        setTicketData(found);
-      }
+      setTicketData(found || null);
     }
   }, [id]);
 
+  const handleDownloadPDF = async () => {
+    if (!ticketData) return;
+    const html = `
+      <html>
+        <body style="font-family: sans-serif; text-align: center; padding: 20px;">
+          <h1>Entrada a: ${ticketData.eventName}</h1>
+          <div>
+            <img src="${ticketData.imageUrl}" width="300" style="border-radius: 10px;"/>
+          </div>
+          <div style="margin: 20px;">
+            <p>Ticket ID: ${ticketData.id}</p>
+            <p>Fecha: ${ticketData.date}</p>
+            <p>Hora: 23:50 - 07:00</p>
+          </div>
+        </body>
+      </html>`;
+    try {
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri, { mimeType: "application/pdf" });
+    } catch (err) {
+      console.error("Error generando PDF:", err);
+    }
+  };
+
   if (!ticketData) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.loaderWrapper}>
         <Header />
         <View style={styles.notFoundContainer}>
-          <Text>Ticket no encontrado.</Text>
+          <Text style={styles.notFoundText}>Ticket no encontrado.</Text>
         </View>
         <Footer />
       </SafeAreaView>
@@ -50,49 +78,58 @@ export default function TicketPurchasedScreen() {
     <SafeAreaView style={styles.container}>
       <Header />
 
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Image source={{ uri: ticketData.imageUrl }} style={styles.eventImage} />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Image
+          source={{ uri: ticketData.imageUrl }}
+          style={styles.eventImage}
+        />
 
-        <Text style={styles.eventTitle}>Entrada a: {ticketData.eventName}</Text>
+        <Text style={styles.title}>Entrada a: {ticketData.eventName}</Text>
 
-        <View style={styles.ticketContainer}>
-          <View style={styles.qrContainer}>
-            <QRCode
-              value={`TicketID:${ticketData.id} - Event:${ticketData.eventName}`}
-              size={120}
-              color="black"
-              backgroundColor="white"
-            />
+        <View style={styles.qrSection}>
+          <QRCode
+            value={`TicketID:${ticketData.id}|Event:${ticketData.eventName}`}
+            size={QR_SIZE}
+            color={COLORS.textPrimary}
+            backgroundColor={COLORS.cardBg}
+          />
+          <Text style={styles.ticketInfo}>
+            🎫 General{"\n"}
+            💵 $3000 {"\n"}
+            📅 {ticketData.date}{"\n"}
+            ⏰ 23:50 - 07:00
+          </Text>
 
-            <Text style={styles.ticketInfo}>
-              Ticket: Entrada General{"\n"}
-              Valor: $3000{"\n"}
-              {ticketData.date}
-              {"\n"}
-              23:50hs a 07:00hs
-            </Text>
-
-            <Text style={styles.address}>Dirección de ejemplo</Text>
-
-            <View style={styles.buttonsRow}>
-              <TouchableOpacity style={styles.button}>
-                <Text style={styles.buttonText}>Descargar entrada</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.button}>
-                <Text style={styles.buttonText}>Cómo llegar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <TouchableOpacity
+            style={[styles.mapButton, { marginBottom: 12 }]}
+            onPress={handleDownloadPDF}
+          >
+            <Text style={styles.mapButtonText}>Descargar entrada (PDF)</Text>
+          </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={styles.mapButton}
+          onPress={() =>
+            Linking.openURL(
+              `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                ticketData.eventName
+              )}`
+            )
+          }
+        >
+          <Text style={styles.mapButtonText}>Cómo llegar</Text>
+        </TouchableOpacity>
 
         <Text style={styles.reviewNote}>
           * Una vez finalizado el evento, podrás dejar tu reseña...
         </Text>
 
-        <View style={styles.descriptionContainer}>
-          <Text style={styles.descriptionTitle}>Descripción del evento</Text>
-          <Text style={styles.descriptionText}>
-            Aquí iría la descripción real...
+        <View style={styles.descriptionSection}>
+          <Text style={styles.sectionTitle}>Descripción del evento</Text>
+          <Text style={styles.sectionText}>
+            Aquí iría la descripción real del evento. Información útil,
+            horarios, normas de ingreso y más, para que estés bien informado.
           </Text>
         </View>
       </ScrollView>
@@ -102,97 +139,106 @@ export default function TicketPurchasedScreen() {
   );
 }
 
+export default function TicketPurchasedScreen() {
+  return (
+    <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
+      <TicketPurchasedScreenContent />
+    </ProtectedRoute>
+  );
+}
+
 const styles = StyleSheet.create({
+  loaderWrapper: {
+    flex: 1,
+    backgroundColor: COLORS.backgroundLight,
+  },
   container: {
     flex: 1,
-    backgroundColor: COLORS.backgroundLight, // "#fff"
+    backgroundColor: COLORS.backgroundLight,
   },
   notFoundContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  scrollContainer: {
+  notFoundText: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textSecondary,
+  },
+  scrollContent: {
     padding: 16,
+    paddingBottom: 32,
+    alignItems: "center",
   },
   eventImage: {
-    width: "100%",
+    width: screenWidth - 32,
     height: 200,
-    marginBottom: 12,
     borderRadius: RADIUS.card,
-  },
-  eventTitle: {
-    fontSize: FONT_SIZES.subTitle, // 18
-    fontWeight: "bold",
-    marginBottom: 12,
-    textAlign: "center",
-    color: COLORS.textPrimary,
-  },
-  ticketContainer: {
-    alignItems: "center",
     marginBottom: 16,
   },
-  qrContainer: {
-    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
-    padding: 16,
+  title: {
+    fontFamily: FONTS.titleBold,
+    fontSize: FONT_SIZES.subTitle,
+    color: COLORS.textPrimary,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  qrSection: {
+    backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.card,
+    padding: 16,
     alignItems: "center",
+    elevation: 2,
+    marginBottom: 16,
     width: "100%",
   },
   ticketInfo: {
-    fontSize: FONT_SIZES.body, // 15
-    textAlign: "center",
-    marginBottom: 8,
-    flexWrap: "wrap",
-    width: "100%",
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
-  },
-  address: {
-    fontSize: FONT_SIZES.smallText, // 13
-    color: COLORS.textSecondary,     // "#555"
-    marginBottom: 12,
     textAlign: "center",
-    flexWrap: "wrap",
-    width: "100%",
+    marginTop: 12,
+    lineHeight: FONT_SIZES.body * 1.5,
   },
-  buttonsRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    width: "100%",
-    marginTop: 8,
-  },
-  button: {
-    backgroundColor: COLORS.textPrimary, // "#000"
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  mapButton: {
+    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.card,
-    marginHorizontal: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
   },
-  buttonText: {
-    color: COLORS.cardBg, // "#fff"
-    fontSize: FONT_SIZES.smallText, // 14
+  mapButtonText: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.button,
+    color: COLORS.cardBg,
+    textAlign: "center",
   },
   reviewNote: {
-    fontSize: FONT_SIZES.smallText, // 12
-    color: COLORS.textSecondary,     // "#666"
-    marginBottom: 16,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
+    color: COLORS.textSecondary,
     textAlign: "center",
-    lineHeight: 18,
-  },
-  descriptionContainer: {
-    backgroundColor: COLORS.backgroundLight, // "#F3F3F3"
-    padding: 16,
-    borderRadius: RADIUS.card,
     marginBottom: 16,
+    lineHeight: FONT_SIZES.smallText * 1.4,
   },
-  descriptionTitle: {
-    fontSize: FONT_SIZES.body, // 16
-    fontWeight: "bold",
-    marginBottom: 6,
-    color: COLORS.textPrimary,
+  descriptionSection: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    padding: 16,
+    elevation: 2,
+    width: "100%",
   },
-  descriptionText: {
-    fontSize: FONT_SIZES.body, // 14
+  sectionTitle: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.subTitle,
     color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  sectionText: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
+    lineHeight: FONT_SIZES.body * 1.5,
+    textAlign: "justify",
   },
 });

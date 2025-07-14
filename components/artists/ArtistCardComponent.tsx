@@ -1,7 +1,7 @@
-// components/ArtistCardComponent.tsx
+// components/artists/ArtistCardComponent.tsx
 import React from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
-import globalStyles, { FONT_SIZES, COLORS } from "@/styles/globalStyles";
+import { Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
 
 interface ArtistCardProps {
   artistName: string;
@@ -15,32 +15,33 @@ export default function ArtistCard({
   onPress,
 }: ArtistCardProps) {
   return (
-    <TouchableOpacity style={styles.cardContainer} onPress={onPress}>
+    <TouchableOpacity
+      style={styles.cardContainer}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
       <Image source={{ uri: artistImage }} style={styles.image} />
-      <Text style={styles.name}>{artistName}</Text>
+      <Text style={styles.name} numberOfLines={2}>
+        {artistName}
+      </Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   cardContainer: {
-    width: 120,
     alignItems: "center",
     margin: 8,
-    backgroundColor: globalStyles.COLORS.cardBg, // Blanco
-    borderRadius: 8, // Podrías usar globalStyles.RADIUS.card
-    padding: 8,
   },
   image: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 6,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 8,
   },
   name: {
-    fontSize: FONT_SIZES.body,  // 14-16
-    color: COLORS.textPrimary,  // Gris oscuro
-    fontWeight: "bold",
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
     textAlign: "center",
   },
 });

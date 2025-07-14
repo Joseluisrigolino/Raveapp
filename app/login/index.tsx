@@ -1,4 +1,3 @@
-// screens/Index.tsx (ejemplo de LoginScreen)
 import React, { useState } from "react";
 import { View, StyleSheet, Alert } from "react-native";
 import { Text } from "react-native-paper";
@@ -9,25 +8,31 @@ import InputField from "@/components/InputFieldComponent";
 import TitlePers from "@/components/common/TitleComponent";
 import globalStyles from "@/styles/globalStyles";
 
-// <-- Importamos useAuth para acceder al login global
 import { useAuth } from "@/context/AuthContext";
 
 export default function Index() {
   const router = useRouter();
-  const { login } = useAuth();   // <-- aquí obtenemos la función login del contexto
+  const { login } = useAuth();
 
-  // Estados locales
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  // Handler de login
-  const handleLogin = () => {
-    const success = login(username, password);
-    if (success) {
-      // Si es válido, vamos a la pantalla principal
-      router.push("/main/EventsScreens/MenuScreen");
-    } else {
-      Alert.alert("Error", "Usuario o contraseña incorrectos.");
+  const handleLogin = async () => {
+    const u = await login(username, password);
+    if (!u) {
+      return Alert.alert("Error", "Usuario o contraseña incorrectos.");
+    }
+
+    // redirijo según rol:
+    switch (u.role) {
+      case "admin":
+        router.replace("/admin/EventsValidateScreens/EventsToValidateScreen");
+        break;
+      case "owner":
+        router.replace("/main/EventsScreens/CreateEventScreen");
+        break;
+      default:
+        router.replace("/main/EventsScreens/MenuScreen");
     }
   };
 
@@ -36,7 +41,7 @@ export default function Index() {
       <TitlePers text="Bienvenido a Raveapp" />
 
       <InputField
-        label="Usuario"
+        label="Correo"
         value={username}
         onChangeText={setUsername}
       />
@@ -64,15 +69,15 @@ export default function Index() {
         onPress={() => console.log("Ingresar con Google")}
       />
 
-      <View style={styles.registerText}>
+      <View style={styles.linksRow}>
         <Text variant="labelLarge">
           <Link href="/login/RegisterUserScreen">
-            ¿Aun no tenes cuenta?, registrate aqui
+            ¿Aún no tenés cuenta? Registrate aquí
           </Link>
         </Text>
       </View>
 
-      <View style={styles.registerText}>
+      <View style={styles.linksRow}>
         <Text variant="labelLarge">
           <Link href="/main/EventsScreens/MenuScreen">
             Ingresar como invitado
@@ -90,8 +95,7 @@ const styles = StyleSheet.create({
     backgroundColor: globalStyles.COLORS.backgroundLight,
     padding: 16,
   },
-  registerText: {
-    color: globalStyles.COLORS.textPrimary,
+  linksRow: {
     marginTop: 10,
     alignItems: "center",
   },

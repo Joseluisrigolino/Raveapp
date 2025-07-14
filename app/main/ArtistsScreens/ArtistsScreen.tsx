@@ -10,15 +10,16 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
+import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
+import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import ArtistCard from "@/components/artists/ArtistCardComponent";
 import SearchBar from "@/components/common/SearchBarComponent";
-import TabMenuComponent from "@/components/layout/TabMenuComponent";
 
 import { Artist } from "@/interfaces/Artist";
 import { fetchArtistsFromApi } from "@/utils/artists/artistApi";
-import globalStyles, { COLORS, FONT_SIZES } from "@/styles/globalStyles";
+import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 
 export default function ArtistsScreen() {
   const router = useRouter();
@@ -28,109 +29,161 @@ export default function ArtistsScreen() {
 
   useEffect(() => {
     fetchArtistsFromApi()
-      .then((result) => setArtists(result))
-      .catch((error) => console.error("Error fetching artists:", error))
+      .then(setArtists)
+      .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
-  // Filtrar solo artistas activos y luego aplicar búsqueda
   const filteredArtists = useMemo(() => {
-    const lowerSearch = searchText.toLowerCase();
+    const lower = searchText.toLowerCase();
     return artists
-      .filter((artist) => artist.isActivo)
-      .filter((artist) =>
-        artist.name.toLowerCase().includes(lowerSearch)
-      );
+      .filter(a => a.isActivo)
+      .filter(a => a.name.toLowerCase().includes(lower));
   }, [artists, searchText]);
 
-  const alphabet = "abcdefghijklmnopqrstuvwxyz".split("");
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-  const getLetterGroup = (letter: string) =>
-    filteredArtists.filter(
-      (artist) => artist.name[0]?.toLowerCase() === letter.toLowerCase()
-    );
-
-  const handleArtistPress = (artist: Artist) => {
+  const handlePress = (artist: Artist) =>
     router.push(
       `/main/ArtistsScreens/ArtistScreen?id=${encodeURIComponent(
         artist.idArtista
       )}`
     );
-  };
 
   return (
-    <SafeAreaView style={styles.mainContainer}>
-      <Header />
+    <ProtectedRoute allowedRoles={["admin", "owner", "user"]}>
+      <SafeAreaView style={styles.container}>
+        <Header />
 
-      <TabMenuComponent
-        tabs={[
-          { label: "Noticias", route: "/main/NewsScreens/NewsScreen", isActive: false },
-          { label: "Artistas", route: "/main/ArtistsScreens/ArtistsScreen", isActive: true },
-        ]}
-      />
+        <TabMenuComponent
+          tabs={[
+            {
+              label: "Noticias",
+              route: "/main/NewsScreens/NewsScreen",
+              isActive: false,
+            },
+            {
+              label: "Artistas",
+              route: "/main/ArtistsScreens/ArtistsScreen",
+              isActive: true,
+            },
+          ]}
+        />
 
-      <SearchBar
-        value={searchText}
-        onChangeText={setSearchText}
-        placeholder="Buscar artista"
-      />
-
-      {loading ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+        <View style={styles.searchWrapper}>
+          <SearchBar
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholder="Buscar artista"
+          />
         </View>
-      ) : (
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {alphabet.map((letter) => {
-            const group = getLetterGroup(letter);
-            if (group.length === 0) return null;
 
-            return (
-              <View key={letter} style={styles.letterGroup}>
-                <Text style={styles.letterTitle}>{letter.toUpperCase()}</Text>
-                <View style={styles.artistCardsRow}>
-                  {group.map((artist) => (
-                    <ArtistCard
-                      key={artist.idArtista}
-                      artistName={artist.name}
-                      artistImage={artist.image}
-                      onPress={() => handleArtistPress(artist)}
-                    />
-                  ))}
+        {loading ? (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            {filteredArtists.length === 0 && (
+              <Text style={styles.emptyText}>No se encontraron artistas.</Text>
+            )}
+            {alphabet.map((letter, idx) => {
+              const group = filteredArtists.filter(
+                a => a.name[0]?.toUpperCase() === letter
+              );
+              if (!group.length) return null;
+
+              const rowStyle =
+                group.length === 1
+                  ? styles.rowOne
+                  : group.length === 2
+                  ? styles.rowTwo
+                  : styles.rowThree;
+
+              return (
+                <View key={letter} style={styles.letterGroup}>
+                  {idx > 0 && <View style={styles.separator} />}
+
+                  <Text style={styles.letterTitle}>{letter}</Text>
+                  <View style={[styles.cardsRow, rowStyle]}>
+                    {group.map(artist => (
+                      <View key={artist.idArtista} style={styles.cardWrapper}>
+                        <ArtistCard
+                          artistName={artist.name}
+                          artistImage={artist.image}
+                          onPress={() => handlePress(artist)}
+                        />
+                      </View>
+                    ))}
+                  </View>
                 </View>
-              </View>
-            );
-          })}
-        </ScrollView>
-      )}
+              );
+            })}
+          </ScrollView>
+        )}
 
-      <Footer />
-    </SafeAreaView>
+        <Footer />
+      </SafeAreaView>
+    </ProtectedRoute>
   );
 }
 
 const styles = StyleSheet.create({
-  mainContainer: {
+  container: {
     flex: 1,
-    backgroundColor: COLORS.backgroundLight,
+    backgroundColor: COLORS.cardBg,
+  },
+  searchWrapper: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    backgroundColor: COLORS.cardBg,
   },
   loaderContainer: {
     flex: 1,
     justifyContent: "center",
-    alignItems: "center",
   },
-  letterGroup: {
+  scrollContent: {
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+  },
+  emptyText: {
+    textAlign: "center",
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textSecondary,
     marginTop: 20,
   },
-  letterTitle: {
-    fontSize: FONT_SIZES.subTitle,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-    marginLeft: 10,
+  separator: {
+    height: 1,
+    backgroundColor: COLORS.borderInput,
+    marginVertical: 12,
   },
-  artistCardsRow: {
+  letterGroup: {
+    marginTop: 16,
+  },
+  letterTitle: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.subTitle,
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  cardsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
+  },
+  rowOne: {
+    justifyContent: "center",
+  },
+  rowTwo: {
     justifyContent: "space-evenly",
+  },
+  rowThree: {
+    justifyContent: "space-between",
+  },
+  cardWrapper: {
+    width: "30%",
+    marginBottom: 16,
+    marginHorizontal: "1.5%",
   },
 });

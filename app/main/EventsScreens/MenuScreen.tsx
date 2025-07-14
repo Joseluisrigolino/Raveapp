@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
+import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import CardComponent from "@/components/events/CardComponent";
@@ -39,11 +40,10 @@ function getWeekRange() {
 export default function MenuScreen() {
   const router = useRouter();
 
-  // Estados para eventos y carga
+  // Eventos y carga
   const [allEvents, setAllEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Carga de eventos desde API
   useEffect(() => {
     fetchEvents()
       .then(evts => setAllEvents(evts))
@@ -61,11 +61,17 @@ export default function MenuScreen() {
 
   const [locationFilterOpen, setLocationFilterOpen] = useState(false);
   const [provinceText, setProvinceText] = useState("");
-  const [provinceSuggestions, setProvinceSuggestions] = useState<{ id: string; nombre: string }[]>([]);
+  const [provinceSuggestions, setProvinceSuggestions] = useState<
+    { id: string; nombre: string }[]
+  >([]);
   const [municipalityText, setMunicipalityText] = useState("");
-  const [municipalitySuggestions, setMunicipalitySuggestions] = useState<{ id: string; nombre: string }[]>([]);
+  const [municipalitySuggestions, setMunicipalitySuggestions] = useState<
+    { id: string; nombre: string }[]
+  >([]);
   const [localityText, setLocalityText] = useState("");
-  const [localitySuggestions, setLocalitySuggestions] = useState<{ id: string; nombre: string }[]>([]);
+  const [localitySuggestions, setLocalitySuggestions] = useState<
+    { id: string; nombre: string }[]
+  >([]);
 
   const [weekActive, setWeekActive] = useState(false);
   const [afterActive, setAfterActive] = useState(false);
@@ -76,14 +82,13 @@ export default function MenuScreen() {
   // Handlers de ubicación
   async function onProvinceTextChange(value: string) {
     setProvinceText(value);
-    if (value.trim().length < 3) {
-      setProvinceSuggestions([]);
-      return;
-    }
+    if (value.trim().length < 3) return setProvinceSuggestions([]);
     try {
       const results = await fetchProvinces();
       setProvinceSuggestions(
-        results.filter(p => p.nombre.toLowerCase().includes(value.toLowerCase()))
+        results.filter(p =>
+          p.nombre.toLowerCase().includes(value.toLowerCase())
+        )
       );
     } catch {
       setProvinceSuggestions([]);
@@ -96,14 +101,14 @@ export default function MenuScreen() {
 
   async function onMunicipalityTextChange(value: string) {
     setMunicipalityText(value);
-    if (value.trim().length < 3 || !provinceText) {
-      setMunicipalitySuggestions([]);
-      return;
-    }
+    if (value.trim().length < 3 || !provinceText)
+      return setMunicipalitySuggestions([]);
     try {
       const results = await fetchMunicipalities(provinceText);
       setMunicipalitySuggestions(
-        results.filter(m => m.nombre.toLowerCase().includes(value.toLowerCase()))
+        results.filter(m =>
+          m.nombre.toLowerCase().includes(value.toLowerCase())
+        )
       );
     } catch {
       setMunicipalitySuggestions([]);
@@ -116,15 +121,14 @@ export default function MenuScreen() {
 
   async function onLocalityTextChange(value: string) {
     setLocalityText(value);
-    if (value.trim().length < 3) {
-      setLocalitySuggestions([]);
-      return;
-    }
+    if (value.trim().length < 3) return setLocalitySuggestions([]);
     try {
       if (provinceText && municipalityText) {
         const results = await fetchLocalities(provinceText, municipalityText);
         setLocalitySuggestions(
-          results.filter(l => l.nombre.toLowerCase().includes(value.toLowerCase()))
+          results.filter(l =>
+            l.nombre.toLowerCase().includes(value.toLowerCase())
+          )
         );
       } else {
         const results = await fetchLocalitiesByName(value);
@@ -163,38 +167,61 @@ export default function MenuScreen() {
 
     if (searchText.trim()) {
       const lower = searchText.toLowerCase();
-      results = results.filter(ev => ev.title.toLowerCase().includes(lower));
+      results = results.filter(ev =>
+        ev.title.toLowerCase().includes(lower)
+      );
     }
     if (startDate && endDate) {
       results = results.filter(ev => {
-        const [d,m,y] = ev.date.split("/").map(Number);
-        const t = new Date(y, m-1, d).getTime();
+        const [d, m, y] = ev.date.split("/").map(Number);
+        const t = new Date(y, m - 1, d).getTime();
         return t >= startDate.getTime() && t <= endDate.getTime();
       });
     }
     if (provinceText.trim()) {
-      results = results.filter(ev => ev.address.toLowerCase().includes(provinceText.toLowerCase()));
+      results = results.filter(ev =>
+        ev.address.toLowerCase().includes(provinceText.toLowerCase())
+      );
     }
     if (municipalityText.trim()) {
-      results = results.filter(ev => ev.address.toLowerCase().includes(municipalityText.toLowerCase()));
+      results = results.filter(ev =>
+        ev.address.toLowerCase().includes(municipalityText.toLowerCase())
+      );
     }
     if (localityText.trim()) {
-      results = results.filter(ev => ev.address.toLowerCase().includes(localityText.toLowerCase()));
+      results = results.filter(ev =>
+        ev.address.toLowerCase().includes(localityText.toLowerCase())
+      );
     }
     if (weekActive) {
       const { startOfWeek, endOfWeek } = getWeekRange();
       results = results.filter(ev => {
-        const [d,m,y] = ev.date.split("/").map(Number);
-        const t = new Date(y, m-1, d).getTime();
+        const [d, m, y] = ev.date.split("/").map(Number);
+        const t = new Date(y, m - 1, d).getTime();
         return t >= startOfWeek.getTime() && t < endOfWeek.getTime();
       });
     }
     if (afterActive) results = results.filter(ev => (ev as any).isAfter);
     if (lgbtActive) results = results.filter(ev => (ev as any).isLgbt);
-    if (selectedGenres.length) results = results.filter(ev => selectedGenres.includes((ev as any).type));
+    if (selectedGenres.length)
+      results = results.filter(ev =>
+        selectedGenres.includes((ev as any).type)
+      );
 
     return results;
-  }, [allEvents, searchText, startDate, endDate, provinceText, municipalityText, localityText, weekActive, afterActive, lgbtActive, selectedGenres]);
+  }, [
+    allEvents,
+    searchText,
+    startDate,
+    endDate,
+    provinceText,
+    municipalityText,
+    localityText,
+    weekActive,
+    afterActive,
+    lgbtActive,
+    selectedGenres,
+  ]);
 
   // UI Handlers
   const toggleDateFilter = () => {
@@ -218,101 +245,117 @@ export default function MenuScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.mainContainer}>
-      <Header />
-      {loading ? (
-        <ActivityIndicator style={{ flex: 1 }} size="large" />
-      ) : (
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          nestedScrollEnabled
-          keyboardShouldPersistTaps="handled"
-        >
-          <FiltersSection
-            isDateActive={Boolean(startDate && endDate)}
-            isLocationActive={Boolean(provinceText || municipalityText || localityText)}
-            isGenreActive={selectedGenres.length > 0}
-            weekActive={weekActive}
-            afterActive={afterActive}
-            lgbtActive={lgbtActive}
-            onToggleWeek={() => setWeekActive(prev => !prev)}
-            onToggleAfter={() => setAfterActive(prev => !prev)}
-            onToggleLgbt={() => setLgbtActive(prev => !prev)}
-            searchText={searchText}
-            onSearchTextChange={setSearchText}
-            dateFilterOpen={dateFilterOpen}
-            onToggleDateFilter={toggleDateFilter}
-            startDate={startDate}
-            endDate={endDate}
-            showStartPicker={showStartPicker}
-            showEndPicker={showEndPicker}
-            onShowStartPicker={setShowStartPicker}
-            onShowEndPicker={setShowEndPicker}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
-            onClearDates={() => { setStartDate(null); setEndDate(null); }}
-            locationFilterOpen={locationFilterOpen}
-            onToggleLocationFilter={toggleLocationFilter}
-            provinceText={provinceText}
-            onProvinceTextChange={onProvinceTextChange}
-            provinceSuggestions={provinceSuggestions}
-            onPickProvince={onPickProvince}
-            municipalityText={municipalityText}
-            onMunicipalityTextChange={onMunicipalityTextChange}
-            municipalitySuggestions={municipalitySuggestions}
-            onPickMunicipality={onPickMunicipality}
-            localityText={localityText}
-            onLocalityTextChange={onLocalityTextChange}
-            localitySuggestions={localitySuggestions}
-            onPickLocality={onPickLocality}
-            onClearLocation={onClearLocation}
-            genreFilterOpen={genreFilterOpen}
-            onToggleGenreFilter={toggleGenreFilter}
-            selectedGenres={selectedGenres}
-            onToggleGenre={onToggleGenre}
-            onClearGenres={onClearGenres}
-            nestedScrollEnabled
+    <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
+      <SafeAreaView style={styles.mainContainer}>
+        <Header />
+        {loading ? (
+          <ActivityIndicator
+            style={{ flex: 1 }}
+            size="large"
+            color={COLORS.primary}
           />
+        ) : (
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+          >
+            <FiltersSection
+              isDateActive={Boolean(startDate && endDate)}
+              isLocationActive={Boolean(
+                provinceText || municipalityText || localityText
+              )}
+              isGenreActive={selectedGenres.length > 0}
+              weekActive={weekActive}
+              afterActive={afterActive}
+              lgbtActive={lgbtActive}
+              onToggleWeek={() => setWeekActive(prev => !prev)}
+              onToggleAfter={() => setAfterActive(prev => !prev)}
+              onToggleLgbt={() => setLgbtActive(prev => !prev)}
+              searchText={searchText}
+              onSearchTextChange={setSearchText}
+              dateFilterOpen={dateFilterOpen}
+              onToggleDateFilter={toggleDateFilter}
+              startDate={startDate}
+              endDate={endDate}
+              showStartPicker={showStartPicker}
+              showEndPicker={showEndPicker}
+              onShowStartPicker={setShowStartPicker}
+              onShowEndPicker={setShowEndPicker}
+              onStartDateChange={setStartDate}
+              onEndDateChange={setEndDate}
+              onClearDates={() => {
+                setStartDate(null);
+                setEndDate(null);
+              }}
+              locationFilterOpen={locationFilterOpen}
+              onToggleLocationFilter={toggleLocationFilter}
+              provinceText={provinceText}
+              onProvinceTextChange={onProvinceTextChange}
+              provinceSuggestions={provinceSuggestions}
+              onPickProvince={onPickProvince}
+              municipalityText={municipalityText}
+              onMunicipalityTextChange={onMunicipalityTextChange}
+              municipalitySuggestions={municipalitySuggestions}
+              onPickMunicipality={onPickMunicipality}
+              localityText={localityText}
+              onLocalityTextChange={onLocalityTextChange}
+              localitySuggestions={localitySuggestions}
+              onPickLocality={onPickLocality}
+              onClearLocation={onClearLocation}
+              genreFilterOpen={genreFilterOpen}
+              onToggleGenreFilter={toggleGenreFilter}
+              selectedGenres={selectedGenres}
+              onToggleGenre={onToggleGenre}
+              onClearGenres={onClearGenres}
+              nestedScrollEnabled
+            />
 
-          <View style={styles.containerCards}>
-            {filteredEvents.length === 0 ? (
-              <Text style={styles.noEventsText}>No existen eventos con esos filtros.</Text>
-            ) : (
-              filteredEvents.map(ev => (
-                <CardComponent
-                  key={ev.id}
-                  title={ev.title}
-                  text={ev.description}
-                  date={ev.date}
-                  foto={ev.imageUrl}
-                  onPress={() => handleCardPress(ev.title, ev.id)}
-                />
-              ))
-            )}
-          </View>
-        </ScrollView>
-      )}
-      <Footer />
-    </SafeAreaView>
+            <View style={styles.containerCards}>
+              {filteredEvents.length === 0 ? (
+                <Text style={styles.noEventsText}>
+                  No existen eventos con esos filtros.
+                </Text>
+              ) : (
+                filteredEvents.map(ev => (
+                  <CardComponent
+                    key={ev.id}
+                    title={ev.title}
+                    text={ev.description}
+                    date={ev.date}
+                    foto={ev.imageUrl}
+                    onPress={() => handleCardPress(ev.title, ev.id)}
+                  />
+                ))
+              )}
+            </View>
+          </ScrollView>
+        )}
+        <Footer />
+      </SafeAreaView>
+    </ProtectedRoute>
   );
 }
 
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
-    backgroundColor: COLORS.backgroundLight,
+    backgroundColor: COLORS.cardBg,
   },
   scrollContent: {
     paddingBottom: 16,
+    backgroundColor: COLORS.backgroundLight,
   },
   containerCards: {
     marginTop: 10,
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
+    rowGap: 16,
   },
   noEventsText: {
     marginTop: 20,
     fontSize: FONT_SIZES.body,
-    color: COLORS.textPrimary,
+    color: COLORS.textSecondary,
     textAlign: "center",
+    fontFamily: "Roboto-Regular",
   },
 });

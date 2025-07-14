@@ -11,6 +11,7 @@ import {
 import { IconButton } from "react-native-paper";
 import { useRouter } from "expo-router";
 
+import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
@@ -178,7 +179,9 @@ export default function FavEventScreen() {
 
     if (searchText.trim() !== "") {
       const lower = searchText.toLowerCase();
-      results = results.filter((ev) => ev.title.toLowerCase().includes(lower));
+      results = results.filter((ev) =>
+        ev.title.toLowerCase().includes(lower)
+      );
     }
 
     if (startDate && endDate) {
@@ -258,110 +261,112 @@ export default function FavEventScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.mainContainer}>
-      <Header />
+    <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
+      <SafeAreaView style={styles.mainContainer}>
+        <Header />
 
-      <TabMenuComponent
-        tabs={[
-          {
-            label: "Mis tickets",
-            route: "/main/TicketsScreens/TicketPurchasedMenu",
-            isActive: false,
-          },
-          {
-            label: "Eventos favoritos",
-            route: "/main/EventsScreens/FavEventScreen",
-            isActive: true,
-          },
-        ]}
-      />
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        nestedScrollEnabled
-        keyboardShouldPersistTaps="handled"
-      >
-        <FiltersSection
-          isDateActive={Boolean(startDate && endDate)}
-          isLocationActive={Boolean(
-            provinceText || municipalityText || localityText
-          )}
-          isGenreActive={selectedGenres.length > 0}
-          weekActive={weekActive}
-          afterActive={afterActive}
-          lgbtActive={lgbtActive}
-          onToggleWeek={() => setWeekActive(!weekActive)}
-          onToggleAfter={() => setAfterActive(!afterActive)}
-          onToggleLgbt={() => setLgbtActive(!lgbtActive)}
-          searchText={searchText}
-          onSearchTextChange={setSearchText}
-          dateFilterOpen={dateFilterOpen}
-          onToggleDateFilter={handleToggleDateFilter}
-          startDate={startDate}
-          endDate={endDate}
-          showStartPicker={showStartPicker}
-          showEndPicker={showEndPicker}
-          onShowStartPicker={setShowStartPicker}
-          onShowEndPicker={setShowEndPicker}
-          onStartDateChange={setStartDate}
-          onEndDateChange={setEndDate}
-          onClearDates={() => {
-            setStartDate(null);
-            setEndDate(null);
-          }}
-          locationFilterOpen={locationFilterOpen}
-          onToggleLocationFilter={handleToggleLocationFilter}
-          provinceText={provinceText}
-          onProvinceTextChange={onProvinceTextChange}
-          provinceSuggestions={provinceSuggestions}
-          onPickProvince={onPickProvince}
-          municipalityText={municipalityText}
-          onMunicipalityTextChange={onMunicipalityTextChange}
-          municipalitySuggestions={municipalitySuggestions}
-          onPickMunicipality={onPickMunicipality}
-          localityText={localityText}
-          onLocalityTextChange={onLocalityTextChange}
-          localitySuggestions={localitySuggestions}
-          onPickLocality={onPickLocality}
-          onClearLocation={onClearLocation}
-          genreFilterOpen={genreFilterOpen}
-          onToggleGenreFilter={handleToggleGenreFilter}
-          selectedGenres={selectedGenres}
-          onToggleGenre={onToggleGenre}
-          onClearGenres={onClearGenres}
-          nestedScrollEnabled
+        <TabMenuComponent
+          tabs={[
+            {
+              label: "Mis tickets",
+              route: "/main/TicketsScreens/TicketPurchasedMenu",
+              isActive: false,
+            },
+            {
+              label: "Eventos favoritos",
+              route: "/main/EventsScreens/FavEventScreen",
+              isActive: true,
+            },
+          ]}
         />
 
-        <View style={styles.containerCards}>
-          {filteredEvents.length === 0 ? (
-            <Text style={styles.noEventsText}>
-              No existen eventos con esos filtros.
-            </Text>
-          ) : (
-            filteredEvents.map((ev) => (
-              <View key={ev.id} style={styles.cardContainer}>
-                <CardComponent
-                  title={ev.title}
-                  text={ev.description}
-                  date={ev.date}
-                  foto={ev.imageUrl}
-                  onPress={() => handleCardPress(ev.title, ev.id)}
-                />
-                <IconButton
-                  icon="heart"
-                  size={24}
-                  iconColor={COLORS.negative}
-                  style={styles.heartIcon}
-                  onPress={() => console.log("Quitar de favoritos:", ev.id)}
-                />
-              </View>
-            ))
-          )}
-        </View>
-      </ScrollView>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          nestedScrollEnabled
+          keyboardShouldPersistTaps="handled"
+        >
+          <FiltersSection
+            isDateActive={Boolean(startDate && endDate)}
+            isLocationActive={Boolean(
+              provinceText || municipalityText || localityText
+            )}
+            isGenreActive={selectedGenres.length > 0}
+            weekActive={weekActive}
+            afterActive={afterActive}
+            lgbtActive={lgbtActive}
+            onToggleWeek={() => setWeekActive(!weekActive)}
+            onToggleAfter={() => setAfterActive(!afterActive)}
+            onToggleLgbt={() => setLgbtActive(!lgbtActive)}
+            searchText={searchText}
+            onSearchTextChange={setSearchText}
+            dateFilterOpen={dateFilterOpen}
+            onToggleDateFilter={handleToggleDateFilter}
+            startDate={startDate}
+            endDate={endDate}
+            showStartPicker={showStartPicker}
+            showEndPicker={showEndPicker}
+            onShowStartPicker={setShowStartPicker}
+            onShowEndPicker={setShowEndPicker}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+            onClearDates={() => {
+              setStartDate(null);
+              setEndDate(null);
+            }}
+            locationFilterOpen={locationFilterOpen}
+            onToggleLocationFilter={handleToggleLocationFilter}
+            provinceText={provinceText}
+            onProvinceTextChange={onProvinceTextChange}
+            provinceSuggestions={provinceSuggestions}
+            onPickProvince={onPickProvince}
+            municipalityText={municipalityText}
+            onMunicipalityTextChange={onMunicipalityTextChange}
+            municipalitySuggestions={municipalitySuggestions}
+            onPickMunicipality={onPickMunicipality}
+            localityText={localityText}
+            onLocalityTextChange={onLocalityTextChange}
+            localitySuggestions={localitySuggestions}
+            onPickLocality={onPickLocality}
+            onClearLocation={onClearLocation}
+            genreFilterOpen={genreFilterOpen}
+            onToggleGenreFilter={handleToggleGenreFilter}
+            selectedGenres={selectedGenres}
+            onToggleGenre={onToggleGenre}
+            onClearGenres={onClearGenres}
+            nestedScrollEnabled
+          />
 
-      <Footer />
-    </SafeAreaView>
+          <View style={styles.containerCards}>
+            {filteredEvents.length === 0 ? (
+              <Text style={styles.noEventsText}>
+                No existen eventos con esos filtros.
+              </Text>
+            ) : (
+              filteredEvents.map((ev) => (
+                <View key={ev.id} style={styles.cardContainer}>
+                  <CardComponent
+                    title={ev.title}
+                    text={ev.description}
+                    date={ev.date}
+                    foto={ev.imageUrl}
+                    onPress={() => handleCardPress(ev.title, ev.id)}
+                  />
+                  <IconButton
+                    icon="heart"
+                    size={24}
+                    iconColor={COLORS.negative}
+                    style={styles.heartIcon}
+                    onPress={() => console.log("Quitar de favoritos:", ev.id)}
+                  />
+                </View>
+              ))
+            )}
+          </View>
+        </ScrollView>
+
+        <Footer />
+      </SafeAreaView>
+    </ProtectedRoute>
   );
 }
 

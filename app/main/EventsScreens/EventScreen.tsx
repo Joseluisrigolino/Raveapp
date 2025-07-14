@@ -9,11 +9,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Linking,
+  Dimensions,
 } from "react-native";
-import { IconButton } from "react-native-paper";
+import { IconButton, Avatar } from "react-native-paper";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
+import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import ReviewComponent from "@/components/events/ReviewComponent";
@@ -22,7 +23,10 @@ import TicketSelector from "@/components/tickets/TicketSelector";
 import { fetchEvents } from "@/utils/events/eventApi";
 import { ExtendedEventItem } from "@/utils/events/eventHelpers";
 import { ReviewItem } from "@/interfaces/ReviewProps";
-import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
+
+const screenWidth = Dimensions.get("window").width;
+const IMAGE_SIZE = 200;
 
 export default function EventScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -30,209 +34,181 @@ export default function EventScreen() {
 
   const [eventData, setEventData] = useState<ExtendedEventItem | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
-  const [selectedTickets, setSelectedTickets] = useState<
-    Record<string, number>
-  >({});
+  const [selectedTickets, setSelectedTickets] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
   const mockReviews: ReviewItem[] = [
-    {
-      id: 1,
-      user: "Usuario99",
-      comment: "Me gustó mucho la fiesta.",
-      rating: 5,
-      daysAgo: 6,
-    },
-    {
-      id: 2,
-      user: "Usuario27",
-      comment: "Buena organización, pero faltó variedad.",
-      rating: 4,
-      daysAgo: 6,
-    },
+    { id: 1, user: "Usuario99", comment: "Me gustó mucho la fiesta.", rating: 5, daysAgo: 6 },
+    { id: 2, user: "Usuario27", comment: "Buena organización, pero faltó variedad.", rating: 4, daysAgo: 6 },
   ];
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) return setLoading(false);
     fetchEvents()
-      .then((list) => {
-        const found = list.find((e) => e.id === id);
+      .then(list => {
+        const found = list.find(e => e.id === id);
         if (found) {
           setEventData({
             ...found,
-            ticketsByDay: (found as any).ticketsByDay ?? [],
-            days:
-              (found as any).days ?? (found as any).ticketsByDay?.length ?? 0,
-            isRecurrent: (found as any).isRecurrent ?? false,
+            ticketsByDay: (found as any).ticketsByDay || [],
+            days: (found as any).days || (found as any).ticketsByDay?.length || 0,
+            isRecurrent: (found as any).isRecurrent || false,
           } as ExtendedEventItem);
         }
       })
-      .catch((err) => console.error("Error cargando evento:", err))
+      .catch(err => console.error(err))
       .finally(() => setLoading(false));
   }, [id]);
 
-  const toggleFavorite = () => setIsFavorite((prev) => !prev);
-
-  const openMap = (address: string) => {
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-      address
-    )}`;
-    Linking.openURL(url);
-  };
+  const toggleFavorite = () => setIsFavorite(f => !f);
 
   const updateTicketCount = (key: string, delta: number) => {
-    setSelectedTickets((prev) => {
-      const cur = prev[key] || 0;
-      const next = cur + delta;
+    setSelectedTickets(prev => {
+      const next = (prev[key] || 0) + delta;
       if (next < 0) return prev;
       return { ...prev, [key]: next };
     });
   };
 
-  const calculateSubtotal = (): number => {
-    if (!eventData || !Array.isArray(eventData.ticketsByDay)) return 0;
-    let subtotal = 0;
-    eventData.ticketsByDay.forEach((day) => {
-      const base = `day${day.dayNumber}`;
+  const calculateSubtotal = () => {
+    if (!eventData) return 0;
+    let sum = 0;
+    eventData.ticketsByDay.forEach(day => {
       const types = [
-        {
-          qty: day.genEarlyQty,
-          key: `${base}-genEarly`,
-          price: day.genEarlyPrice,
-        },
-        {
-          qty: day.vipEarlyQty,
-          key: `${base}-vipEarly`,
-          price: day.vipEarlyPrice,
-        },
-        { qty: day.genQty, key: `${base}-gen`, price: day.genPrice },
-        { qty: day.vipQty, key: `${base}-vip`, price: day.vipPrice },
-      ];
-      types.forEach((t) => {
-        if (t.qty > 0) {
-          subtotal += (selectedTickets[t.key] || 0) * t.price;
+        ["genEarly", day.genEarlyQty, day.genEarlyPrice],
+        ["vipEarly", day.vipEarlyQty, day.vipEarlyPrice],
+        ["gen", day.genQty, day.genPrice],
+        ["vip", day.vipQty, day.vipPrice],
+      ] as const;
+      types.forEach(([keySuffix, max, price]) => {
+        if (max > 0) {
+          const key = `day${day.dayNumber}-${keySuffix}`;
+          sum += (selectedTickets[key] || 0) * price;
         }
       });
     });
-    return subtotal;
+    return sum;
   };
-
   const subtotal = calculateSubtotal();
 
   const handleBuyPress = () => {
     if (!eventData) return;
     const sel = encodeURIComponent(JSON.stringify(selectedTickets));
-    router.push(
-      `/main/TicketsScreens/BuyTicketScreen?id=${eventData.id}&selection=${sel}`
-    );
+    router.push(`/main/TicketsScreens/BuyTicketScreen?id=${eventData.id}&selection=${sel}`);
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Header />
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" />
-        </View>
-        <Footer />
+      <SafeAreaView style={styles.loaderWrapper}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </SafeAreaView>
     );
   }
-
   if (!eventData) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Header />
-        <View style={styles.loaderContainer}>
-          <Text style={styles.notFoundText}>Evento no encontrado.</Text>
-        </View>
-        <Footer />
+      <SafeAreaView style={styles.loaderWrapper}>
+        <Text style={styles.errorText}>Evento no encontrado.</Text>
       </SafeAreaView>
     );
   }
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <Header />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.imageContainer}>
-          <Image source={{ uri: eventData.imageUrl }} style={styles.img} />
-        </View>
+  // mock avatars:
+  const likeAvatars = Array.from({ length: Math.min(5, eventData.likes || 0) }).map(
+    (_, i) => `https://i.pravatar.cc/150?img=${i + 20}`
+  );
 
-        <View style={styles.eventCard}>
+  return (
+    <ProtectedRoute allowedRoles={["admin",  "user","owner"]}>
+      <SafeAreaView style={styles.container}>
+        <Header />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* Title & favorite */}
           <View style={styles.titleRow}>
-            <Text style={styles.eventTitle}>{eventData.title}</Text>
+            <Text style={styles.title}>{eventData.title}</Text>
             <IconButton
               icon={isFavorite ? "heart" : "heart-outline"}
+              size={28}
               iconColor={isFavorite ? COLORS.negative : COLORS.textPrimary}
-              size={30}
-              style={styles.heartIcon}
               onPress={toggleFavorite}
             />
           </View>
 
+          {/* Date & Location */}
           <View style={styles.infoRow}>
-            <IconButton
-              icon="calendar"
-              size={20}
-              iconColor={COLORS.textPrimary}
-              style={{ margin: 0 }}
-            />
+            <IconButton icon="calendar-month" size={20} iconColor={COLORS.primary} />
             <Text style={styles.infoText}>
-              {eventData.date} de {eventData.timeRange}
+              {eventData.date} • {eventData.timeRange}
+            </Text>
+            <IconButton icon="map-marker" size={20} iconColor={COLORS.primary} />
+            <Text style={styles.infoText}>{eventData.address}</Text>
+          </View>
+
+          {/* Likes */}
+          <View style={styles.likesRow}>
+            <IconButton icon="heart" size={24} iconColor={COLORS.negative} onPress={() => {}} />
+            <View style={styles.avatarGroup}>
+              {likeAvatars.map((uri, idx) => (
+                <Avatar.Image
+                  key={idx}
+                  source={{ uri }}
+                  size={32}
+                  style={[styles.avatar, { marginLeft: idx === 0 ? 0 : -12 }]}
+                />
+              ))}
+            </View>
+            <Text style={styles.likeCount}>
+              {eventData.likes} personas gustan esto
             </Text>
           </View>
 
-          <Text style={styles.addressText}>{eventData.address}</Text>
-          <TouchableOpacity
-            style={styles.mapButton}
-            onPress={() => openMap(eventData.address)}
-          >
-            <Text style={styles.mapButtonText}>Cómo llegar</Text>
-          </TouchableOpacity>
+          {/* Main: image + description */}
+          <View style={styles.mainRow}>
+            <Image source={{ uri: eventData.imageUrl }} style={styles.image} />
+            <Text style={styles.description}>{eventData.description}</Text>
+          </View>
 
-          <Text style={styles.description}>{eventData.description}</Text>
-        </View>
-
-        {Array.isArray(eventData.ticketsByDay) && (
-          <View style={styles.ticketCard}>
-            <Text style={styles.ticketCardTitle}>Selecciona tus entradas:</Text>
-            {eventData.ticketsByDay.map((day) => {
-              const base = `day${day.dayNumber}`;
+          {/* Ticket selector */}
+          <View style={styles.ticketSection}>
+            <Text style={styles.sectionTitle}>Selecciona tus entradas</Text>
+            {eventData.ticketsByDay.map(day => {
               const label =
-                eventData.days === 1
-                  ? "Día único"
-                  : `Día ${day.dayNumber} de ${eventData.days}`;
+                eventData.days > 1
+                  ? `Día ${day.dayNumber} de ${eventData.days}`
+                  : "Día único";
               return (
                 <View key={day.dayNumber} style={styles.dayBlock}>
                   <Text style={styles.dayLabel}>{label}</Text>
                   {day.genEarlyQty > 0 && (
                     <TicketSelector
-                      label={`Generales Early Birds ($${day.genEarlyPrice})`}
+                      label={`General Early ($${day.genEarlyPrice})`}
                       maxQty={day.genEarlyQty}
-                      currentQty={selectedTickets[`${base}-genEarly`] || 0}
-                      onChange={(delta) =>
-                        updateTicketCount(`${base}-genEarly`, delta)
+                      currentQty={
+                        selectedTickets[`day${day.dayNumber}-genEarly`] || 0
+                      }
+                      onChange={d =>
+                        updateTicketCount(`day${day.dayNumber}-genEarly`, d)
                       }
                     />
                   )}
                   {day.vipEarlyQty > 0 && (
                     <TicketSelector
-                      label={`VIP Early Birds ($${day.vipEarlyPrice})`}
+                      label={`VIP Early ($${day.vipEarlyPrice})`}
                       maxQty={day.vipEarlyQty}
-                      currentQty={selectedTickets[`${base}-vipEarly`] || 0}
-                      onChange={(delta) =>
-                        updateTicketCount(`${base}-vipEarly`, delta)
+                      currentQty={
+                        selectedTickets[`day${day.dayNumber}-vipEarly`] || 0
+                      }
+                      onChange={d =>
+                        updateTicketCount(`day${day.dayNumber}-vipEarly`, d)
                       }
                     />
                   )}
                   {day.genQty > 0 && (
                     <TicketSelector
-                      label={`Generales ($${day.genPrice})`}
+                      label={`General ($${day.genPrice})`}
                       maxQty={day.genQty}
-                      currentQty={selectedTickets[`${base}-gen`] || 0}
-                      onChange={(delta) =>
-                        updateTicketCount(`${base}-gen`, delta)
+                      currentQty={selectedTickets[`day${day.dayNumber}-gen`] || 0}
+                      onChange={d =>
+                        updateTicketCount(`day${day.dayNumber}-gen`, d)
                       }
                     />
                   )}
@@ -240,9 +216,9 @@ export default function EventScreen() {
                     <TicketSelector
                       label={`VIP ($${day.vipPrice})`}
                       maxQty={day.vipQty}
-                      currentQty={selectedTickets[`${base}-vip`] || 0}
-                      onChange={(delta) =>
-                        updateTicketCount(`${base}-vip`, delta)
+                      currentQty={selectedTickets[`day${day.dayNumber}-vip`] || 0}
+                      onChange={d =>
+                        updateTicketCount(`day${day.dayNumber}-vip`, d)
                       }
                     />
                   )}
@@ -250,135 +226,155 @@ export default function EventScreen() {
               );
             })}
 
-            <Text style={styles.subtotalText}>
-              Subtotal (sin cargo de servicio): ${subtotal}
-            </Text>
-            <View style={styles.buyButtonContainer}>
-              <TouchableOpacity
-                style={styles.buyButton}
-                onPress={handleBuyPress}
-              >
+            <View style={styles.subtotalRow}>
+              <Text style={styles.subtotalText}>Subtotal: ${subtotal}</Text>
+              <TouchableOpacity style={styles.buyButton} onPress={handleBuyPress}>
                 <Text style={styles.buyButtonText}>Comprar</Text>
               </TouchableOpacity>
             </View>
           </View>
-        )}
 
-        {eventData.isRecurrent && (
-          <View style={styles.reviewCard}>
-            <ReviewComponent reviews={mockReviews} />
-          </View>
-        )}
-      </ScrollView>
-      <Footer />
-    </SafeAreaView>
+          {/* Reviews if recurrent */}
+          {eventData.isRecurrent && (
+            <View style={styles.reviewSection}>
+              <Text style={styles.sectionTitle}>Reseñas</Text>
+              <ReviewComponent reviews={mockReviews} />
+            </View>
+          )}
+        </ScrollView>
+        <Footer />
+      </SafeAreaView>
+    </ProtectedRoute>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.backgroundLight },
-  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  notFoundText: { color: COLORS.textPrimary, fontSize: FONT_SIZES.body },
-  scrollContent: { paddingBottom: 24 },
-  imageContainer: {
-    width: "100%",
-    height: 300,
-    backgroundColor: COLORS.borderInput,
-  },
-  img: { width: "100%", height: "100%", resizeMode: "cover" },
-  eventCard: {
-    backgroundColor: COLORS.cardBg,
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: RADIUS.card,
-    padding: 16,
-    elevation: 2,
-  },
+  loaderWrapper: { flex: 1, justifyContent: "center", alignItems: "center" },
+  scrollContent: { padding: 16, paddingBottom: 32 },
+
   titleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 12,
   },
-  eventTitle: {
-    fontSize: FONT_SIZES.subTitle,
-    fontWeight: "bold",
+  title: {
+    fontFamily: FONTS.titleBold,
+    fontSize: FONT_SIZES.titleMain,
     color: COLORS.textPrimary,
-    marginBottom: 8,
-    maxWidth: "85%",
+    textDecorationLine: "underline",
+    flex: 1,
+    marginRight: 8,
   },
-  heartIcon: { backgroundColor: "transparent" },
-  infoRow: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
-  infoText: { color: COLORS.textPrimary, fontSize: FONT_SIZES.body },
-  addressText: {
-    marginBottom: 8,
+
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginBottom: 16,
+  },
+  infoText: {
+    fontFamily: FONTS.bodyRegular,
     fontSize: FONT_SIZES.body,
     color: COLORS.textSecondary,
+    marginHorizontal: 4,
   },
-  mapButton: {
-    alignSelf: "flex-start",
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.card,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    marginBottom: 8,
+
+  likesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
   },
-  mapButtonText: { color: COLORS.cardBg, fontWeight: "bold" },
+  avatarGroup: {
+    flexDirection: "row",
+    marginLeft: 4,
+  },
+  avatar: {
+    borderWidth: 2,
+    borderColor: COLORS.cardBg,
+  },
+  likeCount: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textSecondary,
+    marginLeft: 8,
+  },
+
+  mainRow: {
+    flexDirection: screenWidth > 600 ? "row" : "column",
+    alignItems: screenWidth > 600 ? "flex-start" : "center",
+    marginBottom: 24,
+  },
+  image: {
+    width: IMAGE_SIZE,
+    height: IMAGE_SIZE,
+    borderRadius: IMAGE_SIZE / 2,
+    marginRight: screenWidth > 600 ? 16 : 0,
+    marginBottom: screenWidth > 600 ? 0 : 16,
+  },
   description: {
-    marginTop: 4,
+    flex: 1,
+    fontFamily: FONTS.bodyRegular,
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
+    lineHeight: FONT_SIZES.body * 1.5,
     textAlign: "justify",
-    lineHeight: 20,
   },
-  ticketCard: {
+
+  ticketSection: {
     backgroundColor: COLORS.cardBg,
-    marginHorizontal: 16,
-    marginTop: 16,
     borderRadius: RADIUS.card,
     padding: 16,
+    marginBottom: 24,
     elevation: 2,
   },
-  ticketCardTitle: {
-    fontSize: FONT_SIZES.body,
-    fontWeight: "bold",
+  sectionTitle: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.subTitle,
     color: COLORS.textPrimary,
     marginBottom: 12,
   },
   dayBlock: { marginBottom: 16 },
   dayLabel: {
+    fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.body,
-    fontWeight: "bold",
     color: COLORS.info,
-    marginBottom: 6,
+    marginBottom: 8,
+  },
+  subtotalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 12,
   },
   subtotalText: {
-    textAlign: "right",
-    marginTop: 8,
+    fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
-    fontWeight: "600",
   },
-  buyButtonContainer: { alignItems: "flex-end", marginTop: 8 },
   buyButton: {
-    backgroundColor: COLORS.textPrimary,
+    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.card,
-    width: 150,
-    height: 45,
-    justifyContent: "center",
-    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
   },
   buyButtonText: {
-    color: COLORS.cardBg,
+    fontFamily: FONTS.bodyRegular,
     fontSize: FONT_SIZES.button,
-    fontWeight: "bold",
+    color: COLORS.cardBg,
   },
-  reviewCard: {
+
+  reviewSection: {
     backgroundColor: COLORS.cardBg,
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 16,
     borderRadius: RADIUS.card,
     padding: 16,
     elevation: 2,
+  },
+
+  errorText: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.negative,
   },
 });

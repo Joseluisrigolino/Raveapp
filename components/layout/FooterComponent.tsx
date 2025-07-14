@@ -1,124 +1,103 @@
-import React from "react";
-import { View, StyleSheet } from "react-native";
+// components/layout/Footer.tsx
+import React, { useMemo } from "react";
+import { View, StyleSheet, Image, TouchableOpacity } from "react-native";
 import { IconButton } from "react-native-paper";
 import { useRouter } from "expo-router";
-
-// Hook o contexto de autenticación que devuelve el user con su rol
 import { useAuth } from "@/context/AuthContext";
-
-// Estilos globales
-import globalStyles, { COLORS } from "@/styles/globalStyles";
+import { COLORS } from "@/styles/globalStyles";
 
 export default function Footer() {
   const router = useRouter();
-  const { user } = useAuth(); // user?.role === "admin" | "owner" | "user", etc.
-
+  const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
-  // Handler para noticias
-  const handleNewsPress = () => {
-    if (isAdmin) {
-      router.push("/admin/NewsScreens/ManageNewScreen");
-    } else {
-      router.push("/main/NewsScreens/NewsScreen");
-    }
-  };
+  const profileImageUrl = useMemo(
+    () => `https://picsum.photos/seed/${Math.floor(Math.random() * 10000)}/200`,
+    []
+  );
 
-  // Handler para artistas (solo admin)
-  const handleArtistsPress = () => {
-    router.push("/admin/ArtistScreens/ManageArtistsScreen");
-  };
+  // ====== RUTAS CORRECTAS ======
+  const handleHomePress = () =>
+    router.replace("/main/EventsScreens/MenuScreen");
 
-  // Handler para tickets (solo visible a user normal, no admin)
-  const handleTicketsPress = () => {
-    router.push("/main/TicketsScreens/TicketPurchasedMenu");
-  };
+  const handleNewsPress = () =>
+    router.replace(
+      isAdmin
+        ? "/admin/NewsScreens/ManageNewScreen"
+        : "/main/NewsScreens/NewsScreen"
+    );
 
-  // Botón para gestión/creación de eventos
-  const handleEventManagementPress = () => {
-    if (isAdmin) {
-      // Admin => Validar / gestionar eventos
-      router.push("/admin/EventsValidateScreens/EventsToValidateScreen");
-    } else {
-      // Usuario normal => crear evento
-      router.push("/main/EventsScreens/CreateEventScreen");
-    }
-  };
+  const handleTicketsPress = () =>
+    router.replace("/main/TicketsScreens/TicketPurchasedMenu");
 
-  const handleHomePress = () => {
-    router.push("/main/EventsScreens/MenuScreen");
-  };
+  const handleEventManagementPress = () =>
+    router.replace(
+      isAdmin
+        ? "/admin/EventsValidateScreens/EventsToValidateScreen"
+        : "/main/EventsScreens/CreateEventScreen"
+    );
 
-  const handleProfilePress = () => {
-    router.push("/main/UserScreens/UserProfileEditScreen");
-  };
+  const handleArtistsPress = () =>
+    router.replace("/admin/ArtistScreens/ManageArtistsScreen");
+
+  const handleProfilePress = () =>
+    router.replace("/main/UserScreens/UserProfileEditScreen");
 
   return (
     <View style={styles.container}>
-      {/* 
-        Si NO es admin => muestra Home
-        Si es admin => lo ocultamos (o lo dejas si prefieres).
-      */}
+      {/* Home (solo usuarios normales) */}
       {!isAdmin && (
         <IconButton
           icon="home"
           size={24}
-          iconColor="white"
+          iconColor={COLORS.textPrimary}
           onPress={handleHomePress}
         />
       )}
 
-      {/* Botón Noticias */}
+      {/* Noticias */}
       <IconButton
         icon="newspaper-variant-multiple"
         size={24}
-        iconColor="white"
+        iconColor={COLORS.textPrimary}
         onPress={handleNewsPress}
       />
 
-      {/* 
-        Si NO es admin => muestra Tickets
-        Si es admin => oculto (opcional).
-      */}
+      {/* Tickets (solo usuarios normales) */}
       {!isAdmin && (
         <IconButton
           icon="ticket"
           size={24}
-          iconColor="white"
+          iconColor={COLORS.textPrimary}
           onPress={handleTicketsPress}
         />
       )}
 
-      {/**
-       * Para admin usamos "calendar-edit" (calendario con lápiz)
-       * Para usuario normal "calendar-plus".
-       */}
+      {/* Gestión de eventos */}
       <IconButton
         icon={isAdmin ? "calendar-edit" : "calendar-plus"}
         size={24}
-        iconColor="white"
+        iconColor={COLORS.textPrimary}
         onPress={handleEventManagementPress}
       />
 
-      {/* 
-        Si es admin, botón para “Artistas”.
-      */}
+      {/* Artistas (solo admin) */}
       {isAdmin && (
         <IconButton
           icon="account-music"
           size={24}
-          iconColor="white"
+          iconColor={COLORS.textPrimary}
           onPress={handleArtistsPress}
         />
       )}
 
-      {/* Botón Perfil (con lapicito => "account-edit") */}
-      <IconButton
-        icon="account-edit"
-        size={24}
-        iconColor="white"
+      {/* Perfil (todos los roles) */}
+      <TouchableOpacity
         onPress={handleProfilePress}
-      />
+        style={styles.avatarWrapper}
+      >
+        <Image source={{ uri: profileImageUrl }} style={styles.avatar} />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -128,9 +107,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    backgroundColor: globalStyles.COLORS.secondary, // color de fondo
+    backgroundColor: COLORS.cardBg,
+    borderTopColor: COLORS.borderInput,
+    borderTopWidth: 2,
     width: "100%",
-    height: 55,
-    marginTop: 10,
+    height: 60,
+  },
+  avatarWrapper: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  avatar: {
+    width: "100%",
+    height: "100%",
   },
 });

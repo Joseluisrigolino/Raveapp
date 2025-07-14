@@ -1,3 +1,4 @@
+// src/screens/BuyTicketScreen.tsx
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -10,6 +11,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 
+import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import { getEventById, ExtendedEventItem } from "@/utils/events/eventHelpers";
@@ -26,7 +28,7 @@ interface BuyerInfo {
   phone: string;
 }
 
-/** 
+/**
  * Ej: {
  *   "day1-genEarly": 2,
  *   "day1-vip": 1,
@@ -38,7 +40,7 @@ interface SelectedTickets {
   [key: string]: number;
 }
 
-export default function BuyTicketScreen() {
+function BuyTicketScreenContent() {
   const { id, selection } = useLocalSearchParams<{
     id?: string;
     selection?: string;
@@ -58,12 +60,10 @@ export default function BuyTicketScreen() {
   const [serviceFee] = useState(320); // cargo de servicio fijo
 
   useEffect(() => {
-    // Cargar el evento
     if (id) {
       const found = getEventById(Number(id));
       setEventData(found);
     }
-    // Parsear la selección de tickets que viene en la URL
     if (selection) {
       try {
         const parsed = JSON.parse(decodeURIComponent(selection));
@@ -86,74 +86,48 @@ export default function BuyTicketScreen() {
     );
   }
 
-  // Manejo de campos del comprador
   const handleChangeBuyerInfo = (field: keyof BuyerInfo, value: string) => {
     setBuyerInfo((prev) => ({ ...prev, [field]: value }));
   };
 
-  /** 
-   * Dado un "dayInfo" y la selección "selectedTickets",
-   * retornamos un arreglo con las líneas que el usuario seleccionó
-   * (ej. "Generales Early Birds x2"), y el subtotal de ese día.
-   */
-  function getDayTicketsSummary(dayInfo: ExtendedEventItem["ticketsByDay"][number], baseKey: string) {
+  function getDayTicketsSummary(
+    dayInfo: ExtendedEventItem["ticketsByDay"][number],
+    baseKey: string
+  ) {
     const lines: { label: string; qty: number }[] = [];
     let daySubtotal = 0;
-
-    // Generales Early Birds
-    if (dayInfo.genEarlyQty > 0) {
-      const key = `${baseKey}-genEarly`;
-      const qty = selectedTickets[key] || 0;
-      if (qty > 0) {
-        lines.push({ label: `Generales Early Birds`, qty });
-        daySubtotal += qty * dayInfo.genEarlyPrice;
+    const mapping: Array<["genEarly"|"vipEarly"|"gen"|"vip", number, number, string]> = [
+      ["genEarly", dayInfo.genEarlyQty, dayInfo.genEarlyPrice, "Generales Early Birds"],
+      ["vipEarly", dayInfo.vipEarlyQty, dayInfo.vipEarlyPrice, "VIP Early Birds"],
+      ["gen", dayInfo.genQty, dayInfo.genPrice, "Generales"],
+      ["vip", dayInfo.vipQty, dayInfo.vipPrice, "VIP"],
+    ];
+    mapping.forEach(([suffix, max, price, label]) => {
+      if (max > 0) {
+        const key = `${baseKey}-${suffix}`;
+        const qty = selectedTickets[key] || 0;
+        if (qty > 0) {
+          lines.push({ label, qty });
+          daySubtotal += qty * price;
+        }
       }
-    }
-    // VIP Early Birds
-    if (dayInfo.vipEarlyQty > 0) {
-      const key = `${baseKey}-vipEarly`;
-      const qty = selectedTickets[key] || 0;
-      if (qty > 0) {
-        lines.push({ label: `VIP Early Birds`, qty });
-        daySubtotal += qty * dayInfo.vipEarlyPrice;
-      }
-    }
-    // Generales
-    if (dayInfo.genQty > 0) {
-      const key = `${baseKey}-gen`;
-      const qty = selectedTickets[key] || 0;
-      if (qty > 0) {
-        lines.push({ label: `Generales`, qty });
-        daySubtotal += qty * dayInfo.genPrice;
-      }
-    }
-    // VIP
-    if (dayInfo.vipQty > 0) {
-      const key = `${baseKey}-vip`;
-      const qty = selectedTickets[key] || 0;
-      if (qty > 0) {
-        lines.push({ label: `VIP`, qty });
-        daySubtotal += qty * dayInfo.vipPrice;
-      }
-    }
+    });
     return { lines, daySubtotal };
   }
 
-  // Calcular subtotal (basado en selectedTickets)
   const calculateSubtotal = (): number => {
-    let subtotal = 0;
-    eventData.ticketsByDay.forEach((dayInfo) => {
-      const baseKey = `day${dayInfo.dayNumber}`;
-      const { lines, daySubtotal } = getDayTicketsSummary(dayInfo, baseKey);
-      subtotal += daySubtotal;
-    });
-    return subtotal;
+    return eventData.ticketsByDay.reduce((sum, dayInfo) => {
+      const { daySubtotal } = getDayTicketsSummary(
+        dayInfo,
+        `day${dayInfo.dayNumber}`
+      );
+      return sum + daySubtotal;
+    }, 0);
   };
 
   const subtotal = calculateSubtotal();
   const total = subtotal + serviceFee;
 
-  // Confirmar compra
   const handleConfirmPurchase = () => {
     console.log("Datos comprador:", buyerInfo);
     console.log("selectedTickets:", selectedTickets);
@@ -161,34 +135,25 @@ export default function BuyTicketScreen() {
     alert("Compra confirmada (ejemplo). Ir a MercadoPago...");
   };
 
-  // Helper para label de día
   function dayLabel(dayNumber: number, totalDays: number) {
-    if (totalDays === 1) return "Día único";
-    return `Día ${dayNumber} de ${totalDays}`;
+    return totalDays === 1
+      ? "Día único"
+      : `Día ${dayNumber} de ${totalDays}`;
   }
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
-
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Título */}
         <Text style={styles.title}>Finalizar compra</Text>
         <Text style={styles.eventName}>{eventData.title}</Text>
 
-        {/* Bloque "Entradas seleccionadas" */}
         <View style={styles.ticketSummary}>
           <Text style={styles.summaryTitle}>Entradas seleccionadas:</Text>
-
           {eventData.ticketsByDay.map((dayInfo) => {
             const baseKey = `day${dayInfo.dayNumber}`;
             const { lines, daySubtotal } = getDayTicketsSummary(dayInfo, baseKey);
-
-            if (lines.length === 0) {
-              // No se seleccionó nada para este día
-              return null;
-            }
-
+            if (!lines.length) return null;
             return (
               <View key={dayInfo.dayNumber} style={styles.daySummaryBlock}>
                 <Text style={styles.daySummaryTitle}>
@@ -199,7 +164,6 @@ export default function BuyTicketScreen() {
                     • {line.label} x {line.qty}
                   </Text>
                 ))}
-                {/* Subtotal del día (opcional, para que sea más claro) */}
                 {eventData.days > 1 && (
                   <Text style={styles.daySubtotal}>
                     Subtotal día {dayInfo.dayNumber}: ${daySubtotal}
@@ -210,10 +174,9 @@ export default function BuyTicketScreen() {
           })}
         </View>
 
-        {/* Datos del comprador */}
         <Text style={styles.sectionTitle}>Datos del comprador:</Text>
         <View style={styles.buyerForm}>
-          {/* Nombre y Apellido */}
+          {/* Nombre / Apellido */}
           <View style={styles.formRow}>
             <View style={styles.halfInputContainer}>
               <Text style={styles.label}>Nombre:</Text>
@@ -234,11 +197,10 @@ export default function BuyTicketScreen() {
               />
             </View>
           </View>
-
-          {/* Tipo y Número de identificación */}
+          {/* ID Type / Number */}
           <View style={styles.formRow}>
             <View style={styles.halfInputContainer}>
-              <Text style={styles.label}>Tipo de identificación:</Text>
+              <Text style={styles.label}>Tipo ID:</Text>
               <TextInput
                 style={styles.input}
                 placeholder="DNI"
@@ -247,7 +209,7 @@ export default function BuyTicketScreen() {
               />
             </View>
             <View style={styles.halfInputContainer}>
-              <Text style={styles.label}>Número de identificación:</Text>
+              <Text style={styles.label}>Número ID:</Text>
               <TextInput
                 style={styles.input}
                 placeholder="12345678"
@@ -257,8 +219,7 @@ export default function BuyTicketScreen() {
               />
             </View>
           </View>
-
-          {/* Email y confirmación */}
+          {/* Email / Confirm */}
           <View style={styles.formRow}>
             <View style={styles.halfInputContainer}>
               <Text style={styles.label}>Email:</Text>
@@ -271,7 +232,7 @@ export default function BuyTicketScreen() {
               />
             </View>
             <View style={styles.halfInputContainer}>
-              <Text style={styles.label}>Confirmación de Email:</Text>
+              <Text style={styles.label}>Confirmar Email:</Text>
               <TextInput
                 style={styles.input}
                 placeholder="mail@mail.com"
@@ -283,8 +244,7 @@ export default function BuyTicketScreen() {
               />
             </View>
           </View>
-
-          {/* Teléfono */}
+          {/* Phone */}
           <View style={styles.formRow}>
             <View style={styles.fullInputContainer}>
               <Text style={styles.label}>Teléfono:</Text>
@@ -299,7 +259,6 @@ export default function BuyTicketScreen() {
           </View>
         </View>
 
-        {/* Resumen de precios */}
         <View style={styles.priceSummary}>
           <Text style={styles.priceLine}>
             Subtotal entradas: <Text style={styles.priceValue}>${subtotal}</Text>
@@ -307,27 +266,33 @@ export default function BuyTicketScreen() {
           <Text style={styles.priceLine}>
             Cargo por servicio: <Text style={styles.serviceFee}>${serviceFee}</Text>
           </Text>
-          <Text style={[styles.priceLine, styles.priceTotal]}>
-            Total: ${total}
-          </Text>
+          <Text style={[styles.priceLine, styles.priceTotal]}>Total: ${total}</Text>
         </View>
 
-        {/* Botón Confirmar */}
-        <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmPurchase}>
+        <TouchableOpacity
+          style={styles.confirmButton}
+          onPress={handleConfirmPurchase}
+        >
           <Text style={styles.confirmButtonText}>CONFIRMAR COMPRA</Text>
         </TouchableOpacity>
 
         <Text style={styles.notice}>
-          ** Al confirmar, serás redirigido a la pasarela de pago para finalizar la compra.
+          ** Al confirmar, serás redirigido a la pasarela de pago...
         </Text>
       </ScrollView>
-
       <Footer />
     </SafeAreaView>
   );
 }
 
-// Estilos
+export default function BuyTicketScreen() {
+  return (
+    <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
+      <BuyTicketScreenContent />
+    </ProtectedRoute>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -359,8 +324,6 @@ const styles = StyleSheet.create({
     color: COLORS.info,
     marginBottom: 16,
   },
-
-  // Bloque de "Entradas seleccionadas"
   ticketSummary: {
     backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.card,
@@ -373,7 +336,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     fontSize: FONT_SIZES.body,
   },
-  // Bloque de cada día
   daySummaryBlock: {
     backgroundColor: COLORS.backgroundLight,
     borderRadius: RADIUS.card,
@@ -397,7 +359,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.smallText,
     textAlign: "right",
   },
-
   sectionTitle: {
     fontWeight: "bold",
     fontSize: FONT_SIZES.body,
@@ -435,8 +396,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     color: COLORS.textPrimary,
   },
-
-  // Resumen de precios
   priceSummary: {
     marginVertical: 12,
     padding: 8,
@@ -460,8 +419,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.subTitle,
     fontWeight: "bold",
   },
-
-  // Botón Confirmar
   confirmButton: {
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.card,

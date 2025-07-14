@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 interface CardProps {
   title: string;
@@ -89,8 +89,8 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     color: COLORS.textPrimary,
-    fontWeight: "bold",
-    fontSize: FONT_SIZES.body,
+    fontFamily: FONTS.titleBold,    // bold como en NewsScreen
+    fontSize: FONT_SIZES.subTitle,   // mismo tamaño de subtítulo
     marginBottom: 4,
   },
   eventSubtitle: {

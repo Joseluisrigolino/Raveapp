@@ -1,26 +1,41 @@
 // styles/globalStyles.ts
 
 export const COLORS = {
-  primary: "#1E88E5",         // Azul oscuro
-  secondary: "#121212",       // Negro
-  positive: "#43A047",        // Verde
-  negative: "#E53935",        // Rojo
-  alternative: "#1E88E5",     // Azul oscuro (edición)
-  backgroundLight: "#F5F5F5", // Gris claro principal
-  cardBg: "#FFFFFF",          // Blanco (tarjetas/input fondo)
-  borderInput: "#BDBDBD",     // Gris claro
-  textPrimary: "#212121",     // Gris oscuro
-  textSecondary: "#757575",   // Gris medio
-  alert: "#E53935",           // Rojo
-  info: "#FF9800",            // Naranja
-  starFilled: "#FFC107",      // Amarillo oro
-  starEmpty: "#BDBDBD",       // Gris claro
+  // Colores principales
+  primary: "#8E2DE2",         // Violeta vibrante para acentos y botones
+  secondary: "#4A00E0",       // Violeta oscuro para estados secundarios
+
+  // Estados
+  positive: "#43A047",        // Verde para estados positivos (éxito)
+  negative: "#E53935",        // Rojo para errores/alertas
+  alternative: "#D93F87",     // Rosa para estados alternativos
+
+  // Fondos & bordes
+  backgroundLight: "#FFFFFF", // Blanco puro para fondo general
+  cardBg: "#F8F8F8",          // Gris muy suave para fondo de tarjetas
+  borderInput: "#E0E0E0",     // Gris claro para bordes de inputs
+
+  // Tipografía
+  textPrimary: "#2C2C2C",     // Gris muy oscuro para textos principales
+  textSecondary: "#6C6C6C",   // Gris medio para subtítulos y textos secundarios
+
+  // Iconos y otros
+  alert: "#E53935",           // Rojo (alertas específicas)
+  info: "#FF9800",            // Naranja para mensajes informativos
+  starFilled: "#FFC107",      // Amarillo oro para estrellas
+  starEmpty: "#BDBDBD",       // Gris claro para estrellas vacías
+
+  // Etiquetas de eventos (tags)
+  tagTechno: "#000000",
+  tagHouse: "#5E5E5E",
+  tagLGBT: "#44C5C0",
+  tagAfter: "#D93F87",
 };
 
 export const FONTS = {
-  titleBold: "Poppins-Bold",     // 22-24px
-  subTitleMedium: "Poppins-Medium", // 18-20px (también Botones/Tabs 16-18px)
-  bodyRegular: "Roboto-Regular", // 14-16px
+  titleBold: "Poppins-Bold",        // Titulares principales
+  subTitleMedium: "Poppins-Medium", // Subtítulos y botones
+  bodyRegular: "Roboto-Regular",    // Texto de párrafo
 };
 
 export const FONT_SIZES = {
@@ -32,19 +47,17 @@ export const FONT_SIZES = {
 };
 
 export const RADIUS = {
-  card: 10, // 10-15px
+  card: 10, // Esquinas redondeadas para tarjetas y botones
 };
 
 export const SHADOWS = {
-  card: "rgba(0,0,0,0.1)", // sombra suave
+  card: "rgba(0, 0, 0, 0.1)", // Sombra suave para tarjetas
 };
 
-const globalStyles = {
+export default {
   COLORS,
   FONTS,
   FONT_SIZES,
   RADIUS,
   SHADOWS,
 };
-
-export default globalStyles;

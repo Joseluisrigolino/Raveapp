@@ -1,30 +1,30 @@
-// HeaderComponent.tsx (ejemplo)
 import React from "react";
-import { View, StyleSheet } from "react-native";
-import { Text } from "react-native-paper";
-import globalStyles from "@/styles/globalStyles";
+import { View, StyleSheet, Text } from "react-native";
+import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 
-const Header = () => {
+export default function HeaderComponent() {
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>RAVE APP</Text>
+      <Text style={styles.title}>RaveApp</Text>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: globalStyles.COLORS.secondary, // Negro
     width: "100%",
     height: 70,
+    backgroundColor: COLORS.cardBg,           // Blanco puro
+    borderBottomWidth: 2,                     // Línea inferior más marcada
+    borderBottomColor: COLORS.borderInput,    // Gris claro
+    justifyContent: "center",                 // Centra verticalmente
+    alignItems: "center",                     // Centra horizontalmente
   },
-  text: {
-    color: "#fff",
-    fontFamily: globalStyles.FONTS.titleBold,  // Poppins-Bold
-    fontSize: globalStyles.FONT_SIZES.titleMain,
+  title: {
+    fontFamily: FONTS.titleBold,              // Poppins-Bold
+    fontSize: FONT_SIZES.titleMain,           // 22px
+    color: COLORS.textPrimary,                // Gris oscuro
+    textAlign: "center",                      // Centra el texto
+    // textTransform y letterSpacing eliminados para respetar mayúsculas/minúsculas
   },
 });
-
-export default Header;

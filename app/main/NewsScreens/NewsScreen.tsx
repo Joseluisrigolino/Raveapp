@@ -1,4 +1,4 @@
-// screens/NewsScreens/NewsScreen.tsx
+// src/screens/NewsScreens/NewsScreen.tsx
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -10,143 +10,170 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
-
-// Importa tu hook o contexto de autenticación:
+import { useRouter, usePathname } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
+import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
-
-// Importa la función getNews del API (no el helper mock)
 import { getNews } from "@/utils/news/newsApi";
 import { NewsItem } from "@/interfaces/NewsProps";
+import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 
-// Estilos globales
-import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+const PLACEHOLDER_IMAGE =
+  "https://via.placeholder.com/400x200?text=Sin+imagen";
 
 export default function NewsScreen() {
   const router = useRouter();
-  const { user } = useAuth();  // Para ver el rol (admin/user)
+  const path = usePathname(); // para detectar la pestaña activa
+  const { user } = useAuth();
+  const isAdmin = user?.roles?.includes("admin");
 
-  // Estado para guardar las noticias que se obtienen de la API
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchNews() {
+    (async () => {
       try {
         const data = await getNews();
         setNewsList(data);
       } catch (err) {
-        console.error("Error fetching news:", err);
+        console.error(err);
         setError("Error al cargar las noticias");
       } finally {
         setLoading(false);
       }
-    }
-    fetchNews();
+    })();
   }, []);
 
-  const handlePress = (item: NewsItem) => {
+  const goToDetail = (item: NewsItem) =>
     router.push(`/main/NewsScreens/NewScreen?id=${item.idNoticia}`);
-  };
-
-  // Función para ir a la pantalla de crear evento (solo si eres admin)
-  const handleCreateEvent = () => {
+  const goToCreateEvent = () =>
     router.push("/main/EventsScreens/CreateEventScreen");
-  };
+  const goToManageNews = () =>
+    router.push("/admin/NewsScreens/ManageNewScreen");
+  const goToManageArtists = () =>
+    router.push("/admin/ArtistScreens/ManageArtistsScreen");
 
-  if (loading) {
+  if (loading || error) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.mainContainer}>
         <Header />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+        <View style={styles.centered}>
+          {loading ? (
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          ) : (
+            <Text style={styles.errorText}>{error}</Text>
+          )}
         </View>
         <Footer />
       </SafeAreaView>
     );
   }
 
-  if (error) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Header />
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-        <Footer />
-      </SafeAreaView>
-    );
-  }
+  // Construcción del array de pestañas:
+  const tabs = [
+    // Si es admin, agrego primero las pestañas de gestión:
+    ...(isAdmin
+      ? [
+          {
+            label: "Administrar Noticias",
+            route: "/admin/NewsScreens/ManageNewScreen",
+            isActive: path === "/admin/NewsScreens/ManageNewScreen",
+          },
+          {
+            label: "Administrar Artistas",
+            route: "/admin/ArtistScreens/ManageArtistsScreen",
+            isActive: path === "/admin/ArtistScreens/ManageArtistsScreen",
+          },
+        ]
+      : []),
+    // Luego las pestañas públicas
+    {
+      label: "Noticias",
+      route: "/main/NewsScreens/NewsScreen",
+      isActive: path === "/main/NewsScreens/NewsScreen",
+    },
+    {
+      label: "Artistas",
+      route: "/main/ArtistsScreens/ArtistsScreen",
+      isActive: path === "/main/ArtistsScreens/ArtistsScreen",
+    },
+  ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header />
+    <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
+      <SafeAreaView style={styles.mainContainer}>
+        <Header />
 
-      <TabMenuComponent
-        tabs={[
-          { label: "Noticias", route: "/main/NewsScreens/NewsScreen", isActive: true },
-          { label: "Artistas", route: "/main/ArtistsScreens/ArtistsScreen", isActive: false },
-        ]}
-      />
+        <TabMenuComponent tabs={tabs} />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {user?.role === "admin" && (
-          <TouchableOpacity
-            style={styles.createEventButton}
-            onPress={handleCreateEvent}
-          >
-            <Text style={styles.createEventButtonText}>Crear evento</Text>
-          </TouchableOpacity>
-        )}
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {isAdmin && (
+            <TouchableOpacity
+              style={styles.createEventButton}
+              onPress={goToCreateEvent}
+            >
+              <Text style={styles.createEventButtonText}>
+                Crear evento
+              </Text>
+            </TouchableOpacity>
+          )}
 
-        {newsList.map((item) => (
-          <TouchableOpacity
-            key={item.idNoticia}
-            style={styles.newsCard}
-            onPress={() => handlePress(item)}
-            activeOpacity={0.7}
-          >
-            {item.imagen ? (
-              <Image
-                source={{ uri: item.imagen }}
-                style={styles.newsImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={[styles.newsImage, styles.noImage]}>
-                <Text style={styles.noImageText}>Sin imagen</Text>
-              </View>
-            )}
-            <Text style={styles.newsTitle}>{item.titulo}</Text>
-            <Text style={styles.newsContent}>{item.contenido}</Text>
-            <Text style={styles.newsDate}>
-              {new Date(item.dtPublicado).toLocaleDateString()}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+          <View style={styles.containerCards}>
+            {newsList.map((item) => (
+              <TouchableOpacity
+                key={item.idNoticia}
+                style={styles.newsCard}
+                onPress={() => goToDetail(item)}
+                activeOpacity={0.8}
+              >
+                <Image
+                  source={{
+                    uri: item.imagen || PLACEHOLDER_IMAGE,
+                  }}
+                  style={styles.newsImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.textRow}>
+                  <Text style={styles.newsTitle} numberOfLines={1}>
+                    {item.titulo}
+                  </Text>
+                  <Text style={styles.readMore}>→</Text>
+                </View>
+                <Text style={styles.newsDate}>
+                  {new Date(item.dtPublicado).toLocaleDateString()}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
 
-      <Footer />
-    </SafeAreaView>
+        <Footer />
+      </SafeAreaView>
+    </ProtectedRoute>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  mainContainer: {
     flex: 1,
-    backgroundColor: globalStyles.COLORS.backgroundLight,
+    backgroundColor: COLORS.cardBg,
   },
   scrollContent: {
-    paddingVertical: 16,
+    paddingBottom: 16,
+    backgroundColor: COLORS.backgroundLight,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   createEventButton: {
     backgroundColor: COLORS.primary,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
     marginBottom: 16,
     borderRadius: RADIUS.card,
     paddingVertical: 10,
@@ -154,59 +181,52 @@ const styles = StyleSheet.create({
   },
   createEventButtonText: {
     color: COLORS.cardBg,
-    fontWeight: "bold",
+    fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.body,
   },
+  containerCards: {
+    marginTop: 10,
+    paddingHorizontal: 12,
+  },
   newsCard: {
-    marginBottom: 20,
-    alignItems: "center",
-    backgroundColor: globalStyles.COLORS.cardBg,
+    backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.card,
-    marginHorizontal: 16,
-    padding: 10,
+    overflow: "hidden",
+    marginBottom: 16,
   },
   newsImage: {
     width: "100%",
-    height: 200,
-    borderRadius: RADIUS.card,
+    height: 180,
   },
-  noImage: {
-    justifyContent: "center",
+  textRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: COLORS.borderInput,
-  },
-  noImageText: {
-    color: COLORS.textSecondary,
+    padding: 12,
   },
   newsTitle: {
-    marginTop: 10,
+    flex: 1,
+    fontFamily: FONTS.titleBold,
     fontSize: FONT_SIZES.subTitle,
-    color: globalStyles.COLORS.textPrimary,
-    fontWeight: "bold",
+    color: COLORS.textPrimary,
   },
-  newsContent: {
-    marginTop: 5,
+  readMore: {
+    marginLeft: 8,
+    fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.body,
-    color: globalStyles.COLORS.textPrimary,
+    color: COLORS.primary,
   },
   newsDate: {
-    marginTop: 5,
-    fontSize: FONT_SIZES.small,
-    color: globalStyles.COLORS.textSecondary,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  errorContainer: {
-    flex: 1,
-    padding: 16,
-    justifyContent: "center",
-    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
+    color: COLORS.textSecondary,
   },
   errorText: {
+    fontFamily: FONTS.bodyRegular,
     fontSize: FONT_SIZES.body,
     color: COLORS.negative,
+    textAlign: "center",
   },
 });

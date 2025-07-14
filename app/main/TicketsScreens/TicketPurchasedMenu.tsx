@@ -1,67 +1,62 @@
 // app/main/TicketsScreens/TicketsPurchasedMenu.tsx
-// (o la ruta que uses en tu proyecto)
-
 import React from "react";
 import {
   SafeAreaView,
-  FlatList,
+  ScrollView,
+  View,
+  Text,
   StyleSheet,
 } from "react-native";
 import { useRouter } from "expo-router";
 
+import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
-import TicketCardComponent from "@/components/tickets/TicketCardComponent";
-import { COLORS } from "@/styles/globalStyles";
+import CardComponent from "@/components/events/CardComponent";
+
+import { COLORS, FONT_SIZES, FONTS } from "@/styles/globalStyles";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
 
-/** Mock local o Helper real (aquí el mock local) */
 const mockTickets: TicketPurchasedMenuItem[] = [
   {
     id: 1,
-    imageUrl: "https://picsum.photos/200?random=1",
+    imageUrl: "https://picsum.photos/400?random=1",
     eventName: "Nombre del evento 1",
-    date: "Fecha del evento 1",
+    date: "25/10/2025",
     description: "Descripción del evento 1, muy interesante.",
     isFinished: false,
   },
   {
     id: 2,
-    imageUrl: "https://picsum.photos/200?random=2",
+    imageUrl: "https://picsum.photos/400?random=2",
     eventName: "Nombre del evento 2",
-    date: "Fecha del evento 2",
+    date: "26/10/2025",
     description: "Descripción del evento 2, está finalizado.",
     isFinished: true,
   },
   {
     id: 3,
-    imageUrl: "https://picsum.photos/200?random=3",
+    imageUrl: "https://picsum.photos/400?random=3",
     eventName: "Nombre del evento 3",
-    date: "Fecha del evento 3",
+    date: "27/10/2025",
     description: "Descripción del evento 3, con DJs locales.",
     isFinished: false,
   },
-  // ... Agrega más si quieres
 ];
 
-export default function TicketsPurchasedMenu() {
+function TicketsPurchasedMenuContent() {
   const router = useRouter();
 
-  // Ordenar: primero los NO finalizados, luego los finalizados
-  const sortedTickets = [...mockTickets].sort((a, b) => {
-    if (a.isFinished && !b.isFinished) return 1;
-    if (!a.isFinished && b.isFinished) return -1;
-    return 0;
-  });
+  const sortedTickets = [...mockTickets].sort((a, b) =>
+    a.isFinished === b.isFinished ? 0 : a.isFinished ? 1 : -1
+  );
 
-  // Manejo del click en un ticket
-  const handleTicketPress = (item: TicketPurchasedMenuItem) => {
-    if (item.isFinished) {
-      router.push(`/main/TicketsScreens/TicketFinalizedScreen?id=${item.id}`);
-    } else {
-      router.push(`/main/TicketsScreens/TicketPurchasedScreen?id=${item.id}`);
-    }
+  const handlePress = (item: TicketPurchasedMenuItem) => {
+    const route = item.isFinished
+      ? `/main/TicketsScreens/TicketFinalizedScreen?id=${item.id}`
+      : `/main/TicketsScreens/TicketPurchasedScreen?id=${item.id}`;
+    router.push(route);
   };
 
   return (
@@ -83,21 +78,37 @@ export default function TicketsPurchasedMenu() {
         ]}
       />
 
-      <FlatList
-        data={sortedTickets}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={1}
-        contentContainerStyle={styles.flatListContent}
-        renderItem={({ item }) => (
-          <TicketCardComponent
-            item={item}
-            onPress={() => handleTicketPress(item)}
-          />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {sortedTickets.length === 0 ? (
+          <Text style={styles.noItemsText}>
+            No tienes tickets comprados.
+          </Text>
+        ) : (
+          <View style={styles.containerCards}>
+            {sortedTickets.map((item) => (
+              <CardComponent
+                key={item.id}
+                title={item.eventName}
+                text={item.description}
+                date={item.date}
+                foto={item.imageUrl}
+                onPress={() => handlePress(item)}
+              />
+            ))}
+          </View>
         )}
-      />
+      </ScrollView>
 
       <Footer />
     </SafeAreaView>
+  );
+}
+
+export default function TicketsPurchasedMenu() {
+  return (
+    <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
+      <TicketsPurchasedMenuContent />
+    </ProtectedRoute>
   );
 }
 
@@ -106,8 +117,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.backgroundLight,
   },
-  flatListContent: {
-    paddingHorizontal: 8,
-    paddingVertical: 16,
+  scrollContent: {
+    paddingTop: 10,
+    paddingBottom: 16,
+    backgroundColor: COLORS.backgroundLight,
+  },
+  containerCards: {
+    marginTop: 0,
+    paddingHorizontal: 12,
+    rowGap: 16,
+  },
+  noItemsText: {
+    marginTop: 20,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textSecondary,
+    textAlign: "center",
+    paddingHorizontal: 16,
   },
 });
