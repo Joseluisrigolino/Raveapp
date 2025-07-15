@@ -8,7 +8,7 @@ import {
   Text,
   ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
@@ -19,10 +19,16 @@ import SearchBar from "@/components/common/SearchBarComponent";
 
 import { Artist } from "@/interfaces/Artist";
 import { fetchArtistsFromApi } from "@/utils/artists/artistApi";
+import { useAuth } from "@/context/AuthContext";
 import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 
 export default function ArtistsScreen() {
   const router = useRouter();
+  const path = usePathname();
+  const { user } = useAuth();
+  const roles = Array.isArray(user?.roles) ? user.roles : [user?.roles];
+  const isAdmin = roles.includes("admin");
+
   const [searchText, setSearchText] = useState("");
   const [artists, setArtists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,25 +56,44 @@ export default function ArtistsScreen() {
       )}`
     );
 
+  // Construyo el array de pestañas según rol:
+  const tabs = [
+    // si es admin, agrego primero las de admin
+    ...(isAdmin
+      ? [
+          {
+            label: "Adm Noticias",
+            route: "/admin/NewsScreens/ManageNewScreen",
+            isActive:
+              path === "/admin/NewsScreens/ManageNewScreen",
+          },
+          {
+            label: "Adm Artistas",
+            route: "/admin/ArtistScreens/ManageArtistsScreen",
+            isActive:
+              path === "/admin/ArtistScreens/ManageArtistsScreen",
+          },
+        ]
+      : []),
+    // luego las estándar
+    {
+      label: "Noticias",
+      route: "/main/NewsScreens/NewsScreen",
+      isActive: path === "/main/NewsScreens/NewsScreen",
+    },
+    {
+      label: "Artistas",
+      route: "/main/ArtistsScreens/ArtistsScreen",
+      isActive: path === "/main/ArtistsScreens/ArtistsScreen",
+    },
+  ];
+
   return (
     <ProtectedRoute allowedRoles={["admin", "owner", "user"]}>
       <SafeAreaView style={styles.container}>
         <Header />
 
-        <TabMenuComponent
-          tabs={[
-            {
-              label: "Noticias",
-              route: "/main/NewsScreens/NewsScreen",
-              isActive: false,
-            },
-            {
-              label: "Artistas",
-              route: "/main/ArtistsScreens/ArtistsScreen",
-              isActive: true,
-            },
-          ]}
-        />
+        <TabMenuComponent tabs={tabs} />
 
         <View style={styles.searchWrapper}>
           <SearchBar
@@ -85,7 +110,9 @@ export default function ArtistsScreen() {
         ) : (
           <ScrollView contentContainerStyle={styles.scrollContent}>
             {filteredArtists.length === 0 && (
-              <Text style={styles.emptyText}>No se encontraron artistas.</Text>
+              <Text style={styles.emptyText}>
+                No se encontraron artistas.
+              </Text>
             )}
             {alphabet.map((letter, idx) => {
               const group = filteredArtists.filter(
@@ -107,7 +134,10 @@ export default function ArtistsScreen() {
                   <Text style={styles.letterTitle}>{letter}</Text>
                   <View style={[styles.cardsRow, rowStyle]}>
                     {group.map(artist => (
-                      <View key={artist.idArtista} style={styles.cardWrapper}>
+                      <View
+                        key={artist.idArtista}
+                        style={styles.cardWrapper}
+                      >
                         <ArtistCard
                           artistName={artist.name}
                           artistImage={artist.image}

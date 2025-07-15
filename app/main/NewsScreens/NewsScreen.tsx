@@ -21,14 +21,16 @@ import { getNews } from "@/utils/news/newsApi";
 import { NewsItem } from "@/interfaces/NewsProps";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 
-const PLACEHOLDER_IMAGE =
-  "https://via.placeholder.com/400x200?text=Sin+imagen";
+const PLACEHOLDER_IMAGE = "https://via.placeholder.com/400x200?text=Sin+imagen";
 
 export default function NewsScreen() {
   const router = useRouter();
-  const path = usePathname(); // para detectar la pestaña activa
+  const path = usePathname();
   const { user } = useAuth();
-  const isAdmin = user?.roles?.includes("admin");
+
+  // Considera admin si entre sus roles está "admin"
+  const roles = Array.isArray(user?.roles) ? user.roles : [user?.roles];
+  const isAdmin = roles.includes("admin");
 
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,23 +41,13 @@ export default function NewsScreen() {
       try {
         const data = await getNews();
         setNewsList(data);
-      } catch (err) {
-        console.error(err);
+      } catch {
         setError("Error al cargar las noticias");
       } finally {
         setLoading(false);
       }
     })();
   }, []);
-
-  const goToDetail = (item: NewsItem) =>
-    router.push(`/main/NewsScreens/NewScreen?id=${item.idNoticia}`);
-  const goToCreateEvent = () =>
-    router.push("/main/EventsScreens/CreateEventScreen");
-  const goToManageNews = () =>
-    router.push("/admin/NewsScreens/ManageNewScreen");
-  const goToManageArtists = () =>
-    router.push("/admin/ArtistScreens/ManageArtistsScreen");
 
   if (loading || error) {
     return (
@@ -73,57 +65,49 @@ export default function NewsScreen() {
     );
   }
 
-  // Construcción del array de pestañas:
+  // Extrae sólo el nombre de la pantalla (último fragmento)
+  const currentScreen = path.split("/").pop() || "";
+
+  // Construcción de pestañas
   const tabs = [
-    // Si es admin, agrego primero las pestañas de gestión:
-    ...(isAdmin
-      ? [
-          {
-            label: "Administrar Noticias",
-            route: "/admin/NewsScreens/ManageNewScreen",
-            isActive: path === "/admin/NewsScreens/ManageNewScreen",
-          },
-          {
-            label: "Administrar Artistas",
-            route: "/admin/ArtistScreens/ManageArtistsScreen",
-            isActive: path === "/admin/ArtistScreens/ManageArtistsScreen",
-          },
-        ]
-      : []),
-    // Luego las pestañas públicas
+    {
+      label: "Adm Noticias",
+      route: "/admin/NewsScreens/ManageNewScreen",
+      isActive: currentScreen === "ManageNewsScreen",
+      visible: isAdmin,
+    },
+    {
+      label: "Adm Artistas",
+      route: "/admin/ArtistScreens/ManageArtistsScreen",
+      isActive: currentScreen === "ManageArtistsScreen",
+      visible: isAdmin,
+    },
     {
       label: "Noticias",
       route: "/main/NewsScreens/NewsScreen",
-      isActive: path === "/main/NewsScreens/NewsScreen",
+      isActive: currentScreen === "NewsScreen",
+      visible: true,
     },
     {
       label: "Artistas",
       route: "/main/ArtistsScreens/ArtistsScreen",
-      isActive: path === "/main/ArtistsScreens/ArtistsScreen",
+      isActive: currentScreen === "ArtistsScreen",
+      visible: true,
     },
-  ];
+  ].filter(tab => tab.visible);
+
+  const goToDetail = (item: NewsItem) =>
+    router.push(`/main/NewsScreens/NewScreen?id=${item.idNoticia}`);
 
   return (
-    <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
+    <ProtectedRoute allowedRoles={["admin", "owner", "user"]}>
       <SafeAreaView style={styles.mainContainer}>
         <Header />
-
         <TabMenuComponent tabs={tabs} />
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {isAdmin && (
-            <TouchableOpacity
-              style={styles.createEventButton}
-              onPress={goToCreateEvent}
-            >
-              <Text style={styles.createEventButtonText}>
-                Crear evento
-              </Text>
-            </TouchableOpacity>
-          )}
-
           <View style={styles.containerCards}>
-            {newsList.map((item) => (
+            {newsList.map(item => (
               <TouchableOpacity
                 key={item.idNoticia}
                 style={styles.newsCard}
@@ -131,9 +115,7 @@ export default function NewsScreen() {
                 activeOpacity={0.8}
               >
                 <Image
-                  source={{
-                    uri: item.imagen || PLACEHOLDER_IMAGE,
-                  }}
+                  source={{ uri: item.imagen || PLACEHOLDER_IMAGE }}
                   style={styles.newsImage}
                   resizeMode="cover"
                 />
@@ -160,10 +142,6 @@ export default function NewsScreen() {
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
-    backgroundColor: COLORS.cardBg,
-  },
-  scrollContent: {
-    paddingBottom: 16,
     backgroundColor: COLORS.backgroundLight,
   },
   centered: {
@@ -171,18 +149,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  createEventButton: {
-    backgroundColor: COLORS.primary,
-    marginHorizontal: 12,
-    marginBottom: 16,
-    borderRadius: RADIUS.card,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  createEventButtonText: {
-    color: COLORS.cardBg,
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.body,
+  scrollContent: {
+    paddingBottom: 16,
   },
   containerCards: {
     marginTop: 10,

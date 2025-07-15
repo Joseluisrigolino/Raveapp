@@ -1,4 +1,4 @@
-// screens/NewsScreens/ManageNewsScreen.tsx
+// src/screens/NewsScreens/ManageNewsScreen.tsx
 import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
@@ -12,50 +12,47 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { IconButton } from "react-native-paper";
-import { useRouter } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 
+import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
+import TabMenuComponent from "@/components/layout/TabMenuComponent";
 
 import { getNews, deleteNews } from "@/utils/news/newsApi";
 import { NewsItem } from "@/interfaces/NewsProps";
-
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function ManageNewsScreen() {
   const router = useRouter();
+  const path = usePathname(); // p.ej. "/main/NewsScreens/ManageNewsScreen"
   const [newsData, setNewsData] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Carga inicial de noticias
+  // carga inicial
   useEffect(() => {
-    fetchAllNews();
+    (async () => {
+      try {
+        const all = await getNews();
+        setNewsData(all);
+      } catch (err) {
+        console.error(err);
+        setError("Error al cargar las noticias");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  async function fetchAllNews() {
-    try {
-      const data = await getNews();
-      setNewsData(data);
-    } catch (err) {
-      console.error("Error fetching news:", err);
-      setError("Error al cargar las noticias");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Navegar a EditNewsScreen
-  const handleEdit = (itemId: string) => {
-    console.log("Editar noticia con ID:", itemId);
-    router.push(`/admin/NewsScreens/EditNewScreen?id=${itemId}`);
+  const handleEdit = (idNoticia: string) => {
+    router.push(`/main/NewsScreens/EditNewScreen?id=${idNoticia}`);
   };
 
-  // Eliminar (con confirmación)
-  const handleDelete = (itemId: string) => {
+  const handleDelete = (idNoticia: string) => {
     Alert.alert(
       "Confirmar eliminación",
-      "¿Estás seguro de que deseas eliminar esta noticia?",
+      "¿Seguro que quieres eliminar esta noticia?",
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -63,13 +60,11 @@ export default function ManageNewsScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              // Llamada a la API para eliminar la noticia
-              await deleteNews(itemId);
-              console.log("Noticia eliminada con ID:", itemId);
-              // Refrescar la lista local
-              setNewsData((prev) => prev.filter((n) => n.idNoticia !== itemId));
-            } catch (err) {
-              console.error("Error deleting news:", err);
+              await deleteNews(idNoticia);
+              setNewsData((prev) =>
+                prev.filter((n) => n.idNoticia !== idNoticia)
+              );
+            } catch {
               Alert.alert("Error al eliminar la noticia");
             }
           },
@@ -78,112 +73,124 @@ export default function ManageNewsScreen() {
     );
   };
 
-  // Renderiza cada noticia
-  const renderItem = ({ item }: { item: NewsItem }) => {
-    // Fecha simulada (si no se dispone de la fecha en la noticia)
-    const fakeDate = "23/02/2025";
-
-    return (
-      <View style={styles.cardContainer}>
-        {/* Cabecera: Texto (fecha y título) a la izquierda, imagen a la derecha */}
-        <View style={styles.cardHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.dateText}>
-              <Text style={styles.label}>Fecha de creación: </Text>
-              {fakeDate}
-            </Text>
-            <Text style={styles.titleText}>
-              <Text style={styles.label}>Título de la noticia: </Text>
-              {item.titulo}
-            </Text>
-          </View>
-
-          {/* Si existe imagen, la muestra; de lo contrario, un recuadro "Sin imagen" */}
-          {item.imagen ? (
-            <Image
-              source={{ uri: item.imagen }}
-              style={styles.thumbnail}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={[styles.thumbnail, styles.noImage]}>
-              <Text style={styles.noImageText}>Sin imagen</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Fila de acciones: Editar / Eliminar */}
-        <View style={styles.actionsRow}>
-          <IconButton
-            icon="pencil"
-            size={20}
-            iconColor="#fff"
-            style={[styles.actionIcon, styles.editIcon]}
-            onPress={() => handleEdit(item.idNoticia)}
-          />
-          <IconButton
-            icon="delete"
-            size={20}
-            iconColor="#fff"
-            style={[styles.actionIcon, styles.deleteIcon]}
-            onPress={() => handleDelete(item.idNoticia)}
-          />
-        </View>
-      </View>
-    );
-  };
-
-  // Botón "Crear noticia"
-  const handleCreateNews = () => {
+  const handleCreate = () => {
     router.push("/admin/NewsScreens/CreateNewScreen");
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Header />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
-        <Footer />
-      </SafeAreaView>
-    );
-  }
+  // pestañas
+  const tabs = [
+    {
+      label: "Adm Noticias",
+      route: "/main/NewsScreens/ManageNewsScreen",
+      isActive: path === "/admin/NewsScreens/ManageNewScreen",
+    },
+    {
+      label: "Adm Artistas",
+      route: "/admin/ArtistScreens/ManageArtistsScreen",
+      isActive: path === "/admin/ArtistScreens/ManageArtistsScreen",
+    },
+    {
+      label: "Noticias",
+      route: "/main/NewsScreens/NewsScreen",
+      isActive: path === "/main/NewsScreens/NewsScreen",
+    },
+    {
+      label: "Artistas",
+      route: "/main/ArtistsScreens/ArtistsScreen",
+      isActive: path === "/main/ArtistsScreens/ArtistsScreen",
+    },
+  ];
 
-  if (error) {
+  if (loading || error) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Header />
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-        <Footer />
-      </SafeAreaView>
+      <ProtectedRoute allowedRoles={["admin"]}>
+        <SafeAreaView style={styles.container}>
+          <Header />
+          <View style={styles.loadingContainer}>
+            {loading ? (
+              <ActivityIndicator size="large" color={COLORS.primary} />
+            ) : (
+              <Text style={styles.errorText}>{error}</Text>
+            )}
+          </View>
+          <Footer />
+        </SafeAreaView>
+      </ProtectedRoute>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header />
+    <ProtectedRoute allowedRoles={["admin"]}>
+      <SafeAreaView style={styles.container}>
+        <Header />
+        <TabMenuComponent tabs={tabs} />
 
-      <View style={styles.content}>
-        {/* Botón "Crear noticia" */}
-        <TouchableOpacity style={styles.createButton} onPress={handleCreateNews}>
-          <Text style={styles.createButtonText}>Crear noticia</Text>
-        </TouchableOpacity>
+        <View style={styles.content}>
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={handleCreate}
+          >
+            <Text style={styles.createButtonText}>Crear noticia</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.screenTitle}>Modificar noticias:</Text>
+          <Text style={styles.screenTitle}>Modificar noticias:</Text>
 
-        <FlatList
-          data={newsData}
-          keyExtractor={(item) => item.idNoticia}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-        />
-      </View>
+          <FlatList
+            data={newsData}
+            keyExtractor={(item) => item.idNoticia}
+            renderItem={({ item }) => {
+              const fakeDate = "23/02/2025";
+              return (
+                <View style={styles.cardContainer}>
+                  <View style={styles.cardHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.dateText}>
+                        <Text style={styles.label}>Fecha de creación: </Text>
+                        {fakeDate}
+                      </Text>
+                      <Text style={styles.titleText}>
+                        <Text style={styles.label}>Título: </Text>
+                        {item.titulo}
+                      </Text>
+                    </View>
+                    {item.imagen ? (
+                      <Image
+                        source={{ uri: item.imagen }}
+                        style={styles.thumbnail}
+                      />
+                    ) : (
+                      <View style={[styles.thumbnail, styles.noImage]}>
+                        <Text style={styles.noImageText}>Sin imagen</Text>
+                      </View>
+                    )}
+                  </View>
 
-      <Footer />
-    </SafeAreaView>
+                  <View style={styles.actionsRow}>
+                    <IconButton
+                      icon="pencil"
+                      size={20}
+                      iconColor="#fff"
+                      style={[styles.actionIcon, styles.editIcon]}
+                      onPress={() => handleEdit(item.idNoticia)}
+                    />
+                    <IconButton
+                      icon="delete"
+                      size={20}
+                      iconColor="#fff"
+                      style={[styles.actionIcon, styles.deleteIcon]}
+                      onPress={() => handleDelete(item.idNoticia)}
+                    />
+                  </View>
+                </View>
+              );
+            }}
+            contentContainerStyle={{ paddingBottom: 20 }}
+          />
+        </View>
+
+        <Footer />
+      </SafeAreaView>
+    </ProtectedRoute>
   );
 }
 
@@ -191,6 +198,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.backgroundLight,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   content: {
     flex: 1,
@@ -215,30 +227,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: COLORS.textPrimary,
   },
-  listContent: {
-    paddingBottom: 20,
-  },
-  // CARD
-  cardContainer: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.card,
-    padding: 12,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  label: {
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-  },
   dateText: {
     color: COLORS.textSecondary,
     marginBottom: 4,
@@ -247,6 +235,21 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 8,
   },
+  label: {
+    fontWeight: "bold",
+    color: COLORS.textPrimary,
+  },
+  cardContainer: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    padding: 12,
+    marginBottom: 12,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   thumbnail: {
     width: 60,
     height: 60,
@@ -254,13 +257,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   noImage: {
+    backgroundColor: COLORS.borderInput,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: COLORS.borderInput,
   },
   noImageText: {
     color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.small,
+    fontSize: FONT_SIZES.smallText,
   },
   actionsRow: {
     flexDirection: "row",
@@ -276,19 +279,9 @@ const styles = StyleSheet.create({
   deleteIcon: {
     backgroundColor: "#d32f2f",
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  errorContainer: {
-    flex: 1,
-    padding: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   errorText: {
-    fontSize: FONT_SIZES.body,
     color: COLORS.negative,
+    fontSize: FONT_SIZES.body,
+    textAlign: "center",
   },
 });

@@ -1,9 +1,10 @@
+// src/context/AuthContext.tsx
 import React, { createContext, useContext, useState } from "react";
 import { loginUser, AuthUser } from "@/utils/auth/authHelpers";
 
 interface AuthContextValue {
   user: AuthUser | null;
-  login: (username: string, password: string) => Promise<AuthUser | null>;
+  login: (u: string, p: string) => Promise<AuthUser | null>;
   logout: () => void;
 }
 
@@ -16,17 +17,10 @@ const AuthContext = createContext<AuthContextValue>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
 
-  async function login(
-    username: string,
-    password: string
-  ): Promise<AuthUser | null> {
-    try {
-      const u = await loginUser(username, password);
-      setUser(u);
-      return u;
-    } catch {
-      return null;
-    }
+  async function login(username: string, password: string) {
+    const u = await loginUser(username, password).catch(() => null);
+    setUser(u);
+    return u;
   }
 
   function logout() {
