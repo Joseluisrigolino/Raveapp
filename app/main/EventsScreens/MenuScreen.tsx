@@ -1,4 +1,5 @@
 // app/main/MenuScreen.tsx
+
 import React, { useState, useEffect, useMemo } from "react";
 import {
   SafeAreaView,
@@ -45,10 +46,16 @@ export default function MenuScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchEvents()
-      .then(evts => setAllEvents(evts))
-      .catch(err => console.error("Error cargando eventos:", err))
-      .finally(() => setLoading(false));
+    (async () => {
+      try {
+        const evts = await fetchEvents(); // fetchEvents ya retorna solo los de estado===2
+        setAllEvents(evts);
+      } catch (err) {
+        console.error("Error cargando eventos:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   // Estados de filtros
@@ -161,7 +168,7 @@ export default function MenuScreen() {
     setSelectedGenres([]);
   }
 
-  // Filtrado de eventos
+  // Filtrado de eventos (sobre allEvents ya filtrados por estado)
   const filteredEvents = useMemo(() => {
     let results = [...allEvents];
 
@@ -248,6 +255,7 @@ export default function MenuScreen() {
     <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
       <SafeAreaView style={styles.mainContainer}>
         <Header />
+
         {loading ? (
           <ActivityIndicator
             style={{ flex: 1 }}
@@ -331,6 +339,7 @@ export default function MenuScreen() {
             </View>
           </ScrollView>
         )}
+
         <Footer />
       </SafeAreaView>
     </ProtectedRoute>

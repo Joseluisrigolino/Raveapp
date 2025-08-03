@@ -1,4 +1,5 @@
 // src/screens/UserProfileEditScreen.tsx
+
 import React, { useState, useEffect, useMemo } from "react";
 import {
   SafeAreaView,
@@ -19,11 +20,14 @@ import Footer from "@/components/layout/FooterComponent";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { useAuth } from "@/context/AuthContext";
 import { getProfile, updateUsuario } from "@/utils/auth/userHelpers";
+import { mediaApi } from "@/utils/mediaApi";
+import { apiClient } from "@/utils/apiConfig";
 
 export default function UserProfileEditScreen() {
   const { user, logout } = useAuth();
   const [apiUser, setApiUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [profileImage, setProfileImage] = useState<string>("");
   const [editMode, setEditMode] = useState<Record<string, boolean>>({
     firstName: false,
     lastName: false,
@@ -53,7 +57,7 @@ export default function UserProfileEditScreen() {
     },
   });
 
-  // URL de imagen aleatoria
+  // Fallback aleatorio mientras cargamos real
   const randomProfileImage = useMemo(
     () => `https://picsum.photos/seed/${Math.floor(Math.random() * 10000)}/100`,
     []
@@ -61,11 +65,16 @@ export default function UserProfileEditScreen() {
 
   useEffect(() => {
     if (!user) return;
-    getProfile(user.username)
-      .then((u) => {
+    (async () => {
+      try {
+        // 1) Perfil básico
+        const u = await getProfile(user.username);
+        console.log("[debug] perfil recibido:", u);
         setApiUser(u);
         const [street, number = "", floorDept = ""] =
-          (u.domicilio.direccion || "").split(/ (\d+)(?: (.*))?/).slice(0, 3);
+          (u.domicilio.direccion || "")
+            .split(/ (\d+)(?: (.*))?/)
+            .slice(0, 3);
         setUserData({
           firstName: u.nombre,
           lastName: u.apellido,
@@ -81,11 +90,27 @@ export default function UserProfileEditScreen() {
             floorDept,
           },
         });
-      })
-      .catch(() => {
+
+        // 2) Intentamos traer la media real:
+        console.log("[debug] solicitando media de usuario:", u.idUsuario);
+        const mediaData: any = await mediaApi.getByEntidad(u.idUsuario);
+        console.log("[debug] mediaApi.getByEntidad respuesta:", mediaData);
+        const m = mediaData.media?.[0];
+        let img = m?.url ?? m?.imagen ?? "";
+        if (img && m?.imagen && !/^https?:\/\//.test(img)) {
+          img = `${apiClient.defaults.baseURL}${
+            img.startsWith("/") ? "" : "/"
+          }${img}`;
+        }
+        setProfileImage(img || randomProfileImage);
+      } catch (err) {
+        console.warn("[debug] no se pudo cargar perfil o media:", err);
+        setProfileImage(randomProfileImage);
         Alert.alert("Error", "No se pudo cargar tu perfil.");
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [user]);
 
   const onChange = (field: string, value: string) =>
@@ -99,7 +124,7 @@ export default function UserProfileEditScreen() {
     setEditMode((m) => ({ ...m, [key]: !m[key] }));
 
   const handleChangePhoto = () => {
-    Alert.alert("Cambiar foto", "Lógica de selección de nueva foto aquí.");
+    Alert.alert("Cambiar foto", "Aquí iría la lógica de selección de imagen.");
   };
 
   const handlePasswordReset = () => {
@@ -155,7 +180,8 @@ export default function UserProfileEditScreen() {
     } catch (err: any) {
       Alert.alert(
         "Error al actualizar",
-        err.response?.data?.title || "Hubo un problema actualizando tus datos."
+        err.response?.data?.title ||
+          "Hubo un problema actualizando tus datos."
       );
     }
   };
@@ -222,7 +248,7 @@ export default function UserProfileEditScreen() {
           {/* Foto de perfil */}
           <View style={styles.photoContainer}>
             <Image
-              source={{ uri: randomProfileImage }}
+              source={{ uri: profileImage }}
               style={styles.profileImage}
             />
             <TouchableOpacity
@@ -373,6 +399,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
+    backgroundColor: "#eee",
   },
   photoEditButton: {
     position: "absolute",

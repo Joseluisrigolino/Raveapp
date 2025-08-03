@@ -16,76 +16,63 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-
-// Importa las funciones de la API para noticias
 import { getNewsById, updateNews } from "@/utils/news/newsApi";
 import { NewsItem } from "@/interfaces/NewsProps";
+import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function EditNewScreen() {
-  // Leer el parámetro "id" (se asume que es el idNoticia)
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
 
-  // Estados para los campos de la noticia
   const [newsTitle, setNewsTitle] = useState("");
   const [newsBody, setNewsBody] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Cargar la noticia desde la API
   useEffect(() => {
     async function fetchNews() {
-      if (id) {
-        try {
-          const found = await getNewsById(id);
-          if (found) {
-            // Precarga la data en los estados
-            setNewsTitle(found.titulo);
-            setSelectedImage(found.imagen);
-            setNewsBody(found.contenido || "");
-            // Si la noticia tiene campo eventId, se carga (ajusta según tu estructura)
-            if (found.eventId) {
-              setSelectedEvent(String(found.eventId));
-            }
-          } else {
-            Alert.alert("Noticia no encontrada");
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const found = await getNewsById(id);
+        if (found) {
+          setNewsTitle(found.titulo);
+          setNewsBody(found.contenido || "");
+          setSelectedImage(found.imagen || null);
+          if (found.eventId) {
+            setSelectedEvent(String(found.eventId));
           }
-        } catch (error) {
-          console.error("Error fetching news:", error);
-          Alert.alert("Error al cargar la noticia");
-        } finally {
-          setLoading(false);
+        } else {
+          Alert.alert("Noticia no encontrada");
         }
-      } else {
+      } catch (error) {
+        console.error("Error fetching news:", error);
+        Alert.alert("Error al cargar la noticia");
+      } finally {
         setLoading(false);
       }
     }
     fetchNews();
   }, [id]);
 
-  // Handler para actualizar la noticia
   const handleUpdateNews = async () => {
     if (!id) return;
 
-    // Crea el objeto con los datos a actualizar.
-    // Se asume que la API espera un objeto con estos campos:
-    // idNoticia, titulo, contenido, imagen y dtPublicado
     const updatedNews: Partial<NewsItem> = {
       idNoticia: id,
       titulo: newsTitle,
       contenido: newsBody,
-      imagen: selectedImage || "",
-      dtPublicado: new Date().toISOString(), // Se actualiza con la fecha actual. Ajusta si es necesario.
-      // Si tienes eventId, puedes incluirlo:
+      imagen: selectedImage ?? "",
+      dtPublicado: new Date().toISOString(),
       eventId: selectedEvent ? Number(selectedEvent) : undefined,
     };
 
     try {
-      const updated = await updateNews(updatedNews);
-      console.log("Noticia actualizada:", updated);
+      await updateNews(updatedNews);
       Alert.alert("Noticia actualizada con éxito");
-      // Redirige a la pantalla de administración de noticias
       router.push("/admin/NewsScreens/ManageNewScreen");
     } catch (error) {
       console.error("Error updating news:", error);
@@ -93,16 +80,12 @@ export default function EditNewScreen() {
     }
   };
 
-  // Handler para seleccionar nueva imagen (puedes integrar expo-image-picker)
   const handleSelectImage = () => {
-    console.log("Seleccionar imagen presionado");
-    // Ejemplo: setSelectedImage("nueva-imagen-url.jpg");
+    Alert.alert("Seleccionar imagen", "Funcionalidad pendiente...");
   };
 
-  // Handler para seleccionar evento (opcional)
   const handleSelectEvent = () => {
-    console.log("Seleccionar evento presionado");
-    // Ejemplo: setSelectedEvent("id-del-evento");
+    Alert.alert("Seleccionar evento", "Funcionalidad pendiente...");
   };
 
   if (loading) {
@@ -110,7 +93,7 @@ export default function EditNewScreen() {
       <SafeAreaView style={styles.container}>
         <Header />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#000" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
         <Footer />
       </SafeAreaView>
@@ -120,104 +103,99 @@ export default function EditNewScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Header />
-
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.contentWrapper}>
-          <Text style={styles.mainTitle}>Editar Noticia</Text>
+        <Text style={styles.mainTitle}>Editar Noticia</Text>
 
-          {/* Campo: Título de la noticia */}
-          <Text style={styles.label}>Título de la noticia:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Título de la noticia aquí"
-            value={newsTitle}
-            onChangeText={setNewsTitle}
-          />
+        <Text style={styles.label}>Título de la noticia:</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Título de la noticia aquí"
+          value={newsTitle}
+          onChangeText={setNewsTitle}
+        />
 
-          {/* Editar imagen */}
-          <Text style={styles.label}>Editar imagen:</Text>
-          <View style={styles.imageRow}>
-            <View style={styles.imagePlaceholder}>
-              {selectedImage ? (
-                <Image
-                  source={{ uri: selectedImage }}
-                  style={{ width: "100%", height: "100%" }}
-                />
-              ) : (
-                <Text style={styles.imagePlaceholderText}>Sin imagen</Text>
-              )}
-            </View>
-
-            <TouchableOpacity
-              style={styles.selectImageButton}
-              onPress={handleSelectImage}
-            >
-              <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
-            </TouchableOpacity>
+        <Text style={styles.label}>Editar imagen:</Text>
+        <View style={styles.imageRow}>
+          <View style={styles.imagePlaceholder}>
+            {selectedImage ? (
+              <Image
+                source={{ uri: selectedImage }}
+                style={styles.image}
+              />
+            ) : (
+              <Text style={styles.imagePlaceholderText}>Sin imagen</Text>
+            )}
           </View>
-
-          {/* Campo: Cuerpo de la noticia */}
-          <Text style={styles.label}>Cuerpo de la noticia:</Text>
-          <View style={styles.textAreaContainer}>
-            <TextInput
-              style={styles.textArea}
-              placeholder="Espacio para escribir la noticia"
-              multiline
-              value={newsBody}
-              onChangeText={setNewsBody}
-            />
-          </View>
-
-          {/* Campo: Noticia asociada a evento (opcional) */}
-          <Text style={styles.label}>Noticia asociada a evento:</Text>
-          <View style={styles.eventRow}>
-            <Text style={styles.eventPlaceholder}>
-              {selectedEvent ? selectedEvent : "No asociado"}
-            </Text>
-            <TouchableOpacity
-              style={styles.selectEventButton}
-              onPress={handleSelectEvent}
-            >
-              <Text style={styles.selectEventButtonText}>Seleccionar evento</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Botón para actualizar la noticia */}
-          <TouchableOpacity style={styles.updateButton} onPress={handleUpdateNews}>
-            <Text style={styles.updateButtonText}>Editar noticia</Text>
+          <TouchableOpacity
+            style={styles.selectImageButton}
+            onPress={handleSelectImage}
+          >
+            <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
 
+        <Text style={styles.label}>Cuerpo de la noticia:</Text>
+        <View style={styles.textAreaContainer}>
+          <TextInput
+            style={styles.textArea}
+            placeholder="Escribe el contenido..."
+            multiline
+            value={newsBody}
+            onChangeText={setNewsBody}
+          />
+        </View>
+
+        <Text style={styles.label}>Noticia asociada a evento:</Text>
+        <View style={styles.eventRow}>
+          <Text style={styles.eventPlaceholder}>
+            {selectedEvent ?? "No asociado"}
+          </Text>
+          <TouchableOpacity
+            style={styles.selectEventButton}
+            onPress={handleSelectEvent}
+          >
+            <Text style={styles.selectEventButtonText}>Seleccionar evento</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={styles.updateButton}
+          onPress={handleUpdateNews}
+        >
+          <Text style={styles.updateButtonText}>Editar noticia</Text>
+        </TouchableOpacity>
+      </ScrollView>
       <Footer />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: COLORS.backgroundLight },
   scrollContent: { padding: 16 },
-  contentWrapper: { flex: 1, alignItems: "flex-start" },
   mainTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontFamily: FONTS.titleBold,
+    fontSize: FONT_SIZES.titleMain,
+    color: COLORS.textPrimary,
+    textAlign: "center",
     marginBottom: 20,
-    alignSelf: "center",
   },
   label: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 6,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.subTitle,
+    color: COLORS.textPrimary,
     marginTop: 12,
+    marginBottom: 6,
   },
   input: {
-    backgroundColor: "#fff",
-    borderColor: "#ccc",
+    backgroundColor: COLORS.cardBg,
+    borderColor: COLORS.borderInput,
     borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    width: "100%",
+    borderRadius: RADIUS.card,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
   },
   imageRow: {
     flexDirection: "row",
@@ -228,38 +206,46 @@ const styles = StyleSheet.create({
   imagePlaceholder: {
     width: 80,
     height: 80,
-    backgroundColor: "#ccc",
-    borderRadius: 8,
+    backgroundColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
   },
   imagePlaceholderText: {
-    color: "#555",
-    fontWeight: "bold",
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
+    color: COLORS.textSecondary,
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+    borderRadius: RADIUS.card,
   },
   selectImageButton: {
-    backgroundColor: "#000",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.card,
   },
   selectImageButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.cardBg,
   },
   textAreaContainer: {
-    backgroundColor: "#fff",
-    borderColor: "#ccc",
+    backgroundColor: COLORS.cardBg,
+    borderColor: COLORS.borderInput,
     borderWidth: 1,
-    borderRadius: 4,
-    width: "100%",
+    borderRadius: RADIUS.card,
     minHeight: 100,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     marginBottom: 8,
   },
   textArea: {
-    flex: 1,
-    padding: 8,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
     textAlignVertical: "top",
   },
   eventRow: {
@@ -270,31 +256,33 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   eventPlaceholder: {
-    fontSize: 14,
-    color: "#666",
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textSecondary,
   },
   selectEventButton: {
-    backgroundColor: "#000",
+    backgroundColor: COLORS.primary,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
   },
   selectEventButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.cardBg,
   },
   updateButton: {
-    backgroundColor: "#9c27b0",
+    backgroundColor: COLORS.positive,
     marginTop: 20,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: RADIUS.card,
     alignItems: "center",
     width: "100%",
   },
   updateButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.subTitle,
+    color: COLORS.cardBg,
   },
   loadingContainer: {
     flex: 1,

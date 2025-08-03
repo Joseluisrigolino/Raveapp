@@ -1,47 +1,57 @@
-// components/artists/ArtistCardComponent.tsx
+// src/components/artists/ArtistCardComponent.tsx
+
 import React from "react";
-import { Text, Image, TouchableOpacity, StyleSheet } from "react-native";
-import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  TouchableOpacity,
+} from "react-native";
+import { Artist } from "@/interfaces/Artist";
 
-interface ArtistCardProps {
-  artistName: string;
-  artistImage: string;
-  onPress?: () => void;
-}
+type Props = {
+  artist: Artist;
+  onPress: () => void;
+};
 
-export default function ArtistCard({
-  artistName,
-  artistImage,
-  onPress,
-}: ArtistCardProps) {
+export default function ArtistCardComponent({ artist, onPress }: Props) {
   return (
-    <TouchableOpacity
-      style={styles.cardContainer}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <Image source={{ uri: artistImage }} style={styles.image} />
-      <Text style={styles.name} numberOfLines={2}>
-        {artistName}
-      </Text>
+    <TouchableOpacity style={styles.card} onPress={onPress}>
+      {artist.image ? (
+        <Image
+          source={{ uri: artist.image }}
+          style={styles.image}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={[styles.image, styles.placeholder]}>
+          {/* Aquí podrías poner un icono de “sin foto” si querés */}
+        </View>
+      )}
+      <Text style={styles.name}>{artist.name}</Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  cardContainer: {
+  card: {
     alignItems: "center",
     margin: 8,
   },
   image: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 8,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#eee",
+  },
+  placeholder: {
+    backgroundColor: "#ccc",  // tono de gris para indicar “sin imagen”
   },
   name: {
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textPrimary,
+    marginTop: 6,
+    fontSize: 14,
+    fontWeight: "600",
     textAlign: "center",
   },
 });

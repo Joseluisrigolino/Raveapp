@@ -1,12 +1,13 @@
 // src/screens/ArtistsScreens/ArtistsScreen.tsx
+
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  View,
-  StyleSheet,
-  ScrollView,
   SafeAreaView,
+  View,
+  ScrollView,
   Text,
   ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 
@@ -26,56 +27,59 @@ export default function ArtistsScreen() {
   const router = useRouter();
   const path = usePathname();
   const { user } = useAuth();
+
   const roles = Array.isArray(user?.roles) ? user.roles : [user?.roles];
   const isAdmin = roles.includes("admin");
 
-  const [searchText, setSearchText] = useState("");
+  const [searchText, setSearchText] = useState<string>("");
   const [artists, setArtists] = useState<Artist[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    fetchArtistsFromApi()
-      .then(setArtists)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    (async () => {
+      try {
+        const data = await fetchArtistsFromApi();
+        setArtists(data);
+      } catch (err) {
+        console.error("Error al traer artistas:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  const filteredArtists = useMemo(() => {
-    const lower = searchText.toLowerCase();
+  const filteredArtists = useMemo<Artist[]>(() => {
+    const q = searchText.toLowerCase();
     return artists
       .filter(a => a.isActivo)
-      .filter(a => a.name.toLowerCase().includes(lower));
+      .filter(a => a.name.toLowerCase().includes(q));
   }, [artists, searchText]);
 
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-  const handlePress = (artist: Artist) =>
+  const handlePress = (artist: Artist) => {
     router.push(
       `/main/ArtistsScreens/ArtistScreen?id=${encodeURIComponent(
         artist.idArtista
       )}`
     );
+  };
 
-  // Construyo el array de pestañas según rol:
   const tabs = [
-    // si es admin, agrego primero las de admin
     ...(isAdmin
       ? [
           {
             label: "Adm Noticias",
             route: "/admin/NewsScreens/ManageNewScreen",
-            isActive:
-              path === "/admin/NewsScreens/ManageNewScreen",
+            isActive: path === "/admin/NewsScreens/ManageNewScreen",
           },
           {
             label: "Adm Artistas",
             route: "/admin/ArtistScreens/ManageArtistsScreen",
-            isActive:
-              path === "/admin/ArtistScreens/ManageArtistsScreen",
+            isActive: path === "/admin/ArtistScreens/ManageArtistsScreen",
           },
         ]
       : []),
-    // luego las estándar
     {
       label: "Noticias",
       route: "/main/NewsScreens/NewsScreen",
@@ -92,7 +96,6 @@ export default function ArtistsScreen() {
     <ProtectedRoute allowedRoles={["admin", "owner", "user"]}>
       <SafeAreaView style={styles.container}>
         <Header />
-
         <TabMenuComponent tabs={tabs} />
 
         <View style={styles.searchWrapper}>
@@ -114,9 +117,9 @@ export default function ArtistsScreen() {
                 No se encontraron artistas.
               </Text>
             )}
-            {alphabet.map((letter, idx) => {
+            {alphabet.map(letter => {
               const group = filteredArtists.filter(
-                a => a.name[0]?.toUpperCase() === letter
+                a => a.name.charAt(0).toUpperCase() === letter
               );
               if (!group.length) return null;
 
@@ -129,8 +132,7 @@ export default function ArtistsScreen() {
 
               return (
                 <View key={letter} style={styles.letterGroup}>
-                  {idx > 0 && <View style={styles.separator} />}
-
+                  {letter !== alphabet[0] && <View style={styles.separator} />}
                   <Text style={styles.letterTitle}>{letter}</Text>
                   <View style={[styles.cardsRow, rowStyle]}>
                     {group.map(artist => (
@@ -139,8 +141,7 @@ export default function ArtistsScreen() {
                         style={styles.cardWrapper}
                       >
                         <ArtistCard
-                          artistName={artist.name}
-                          artistImage={artist.image}
+                          artist={artist}
                           onPress={() => handlePress(artist)}
                         />
                       </View>

@@ -1,4 +1,5 @@
 // src/screens/NewsScreens/NewsScreen.tsx
+
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -28,7 +29,6 @@ export default function NewsScreen() {
   const path = usePathname();
   const { user } = useAuth();
 
-  // Considera admin si entre sus roles está "admin"
   const roles = Array.isArray(user?.roles) ? user.roles : [user?.roles];
   const isAdmin = roles.includes("admin");
 
@@ -40,8 +40,10 @@ export default function NewsScreen() {
     (async () => {
       try {
         const data = await getNews();
+        console.log("[debug] Loaded newsList:", data);
         setNewsList(data);
-      } catch {
+      } catch (err) {
+        console.error("[debug] Error fetching news:", err);
         setError("Error al cargar las noticias");
       } finally {
         setLoading(false);
@@ -49,26 +51,8 @@ export default function NewsScreen() {
     })();
   }, []);
 
-  if (loading || error) {
-    return (
-      <SafeAreaView style={styles.mainContainer}>
-        <Header />
-        <View style={styles.centered}>
-          {loading ? (
-            <ActivityIndicator size="large" color={COLORS.primary} />
-          ) : (
-            <Text style={styles.errorText}>{error}</Text>
-          )}
-        </View>
-        <Footer />
-      </SafeAreaView>
-    );
-  }
-
-  // Extrae sólo el nombre de la pantalla (último fragmento)
-  const currentScreen = path.split("/").pop() || "";
-
   // Construcción de pestañas
+  const currentScreen = path.split("/").pop() || "";
   const tabs = [
     {
       label: "Adm Noticias",
@@ -103,35 +87,50 @@ export default function NewsScreen() {
     <ProtectedRoute allowedRoles={["admin", "owner", "user"]}>
       <SafeAreaView style={styles.mainContainer}>
         <Header />
+        {/* Siempre mostramos el subheader de navegación */}
         <TabMenuComponent tabs={tabs} />
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.containerCards}>
-            {newsList.map(item => (
-              <TouchableOpacity
-                key={item.idNoticia}
-                style={styles.newsCard}
-                onPress={() => goToDetail(item)}
-                activeOpacity={0.8}
-              >
-                <Image
-                  source={{ uri: item.imagen || PLACEHOLDER_IMAGE }}
-                  style={styles.newsImage}
-                  resizeMode="cover"
-                />
-                <View style={styles.textRow}>
-                  <Text style={styles.newsTitle} numberOfLines={1}>
-                    {item.titulo}
-                  </Text>
-                  <Text style={styles.readMore}>→</Text>
-                </View>
-                <Text style={styles.newsDate}>
-                  {new Date(item.dtPublicado).toLocaleDateString()}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        {loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
           </View>
-        </ScrollView>
+        ) : error ? (
+          <View style={styles.centered}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : newsList.length === 0 ? (
+          <View style={styles.centered}>
+            <Text style={styles.errorText}>No hay noticias disponibles.</Text>
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            <View style={styles.containerCards}>
+              {newsList.map(item => (
+                <TouchableOpacity
+                  key={item.idNoticia}
+                  style={styles.newsCard}
+                  onPress={() => goToDetail(item)}
+                  activeOpacity={0.8}
+                >
+                  <Image
+                    source={{ uri: item.imagen || PLACEHOLDER_IMAGE }}
+                    style={styles.newsImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.textRow}>
+                    <Text style={styles.newsTitle} numberOfLines={1}>
+                      {item.titulo}
+                    </Text>
+                    <Text style={styles.readMore}>→</Text>
+                  </View>
+                  <Text style={styles.newsDate}>
+                    {new Date(item.dtPublicado).toLocaleDateString()}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+        )}
 
         <Footer />
       </SafeAreaView>

@@ -1,45 +1,69 @@
 // components/layout/Footer.tsx
-import React, { useMemo } from "react";
+
+import React, { useState, useEffect, useMemo } from "react";
 import { View, StyleSheet, Image, TouchableOpacity } from "react-native";
 import { IconButton } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
+import { mediaApi } from "@/utils/mediaApi";
+import { getProfile } from "@/utils/auth/userHelpers";
+import { apiClient } from "@/utils/apiConfig";
 import { COLORS } from "@/styles/globalStyles";
 
 export default function Footer() {
   const router = useRouter();
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin";  // como estaba originalmente
 
-  const profileImageUrl = useMemo(
+  // fallback aleatorio hasta que cargue la real
+  const randomProfileImage = useMemo(
     () => `https://picsum.photos/seed/${Math.floor(Math.random() * 10000)}/200`,
     []
   );
+  const [profileImageUrl, setProfileImageUrl] = useState<string>(randomProfileImage);
 
-  // ====== RUTAS CORRECTAS ======
-  const handleHomePress = () =>
-    router.replace("/main/EventsScreens/MenuScreen");
+  useEffect(() => {
+    if (!user?.username) return;
+    (async () => {
+      try {
+        // traigo perfil para obtener idUsuario
+        const u = await getProfile(user.username);
+        console.log("[Footer] perfil:", u);
 
+        // traigo media del usuario
+        const data: any = await mediaApi.getByEntidad(u.idUsuario);
+        console.log("[Footer] mediaApi.getByEntidad:", data);
+        const m = data.media?.[0];
+        let img = m?.url ?? m?.imagen ?? "";
+        if (img && m?.imagen && !/^https?:\/\//.test(img)) {
+          img = `${apiClient.defaults.baseURL}${img.startsWith("/") ? "" : "/"}${img}`;
+        }
+        setProfileImageUrl(img || randomProfileImage);
+      } catch (err) {
+        console.warn("[Footer] no pude cargar media perfil:", err);
+        setProfileImageUrl(randomProfileImage);
+      }
+    })();
+  }, [user]);
+
+  // rutas
+  const handleHomePress = () => router.replace("/main/EventsScreens/MenuScreen");
   const handleNewsPress = () =>
     router.replace(
       isAdmin
         ? "/admin/NewsScreens/ManageNewScreen"
         : "/main/NewsScreens/NewsScreen"
     );
-
   const handleTicketsPress = () =>
     router.replace("/main/TicketsScreens/TicketPurchasedMenu");
-
   const handleEventManagementPress = () =>
     router.replace(
       isAdmin
         ? "/admin/EventsValidateScreens/EventsToValidateScreen"
         : "/main/EventsScreens/CreateEventScreen"
     );
-
   const handleArtistsPress = () =>
     router.replace("/admin/ArtistScreens/ManageArtistsScreen");
-
   const handleProfilePress = () =>
     router.replace("/main/UserScreens/UserProfileEditScreen");
 

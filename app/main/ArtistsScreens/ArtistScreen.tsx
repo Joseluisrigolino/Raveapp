@@ -1,4 +1,5 @@
 // src/screens/ArtistsScreens/ArtistScreen.tsx
+
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -20,29 +21,56 @@ import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import { Artist } from "@/interfaces/Artist";
 import { fetchOneArtistFromApi } from "@/utils/artists/artistApi";
+import { mediaApi } from "@/utils/mediaApi";
+import { apiClient } from "@/utils/apiConfig";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 
 export default function ArtistScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [artist, setArtist] = useState<Artist | null>(null);
+  const [media, setMedia] = useState<Array<{ id: string; uri: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
 
+  const baseURL = apiClient.defaults.baseURL;
+
   useEffect(() => {
-    if (!id) return setLoading(false);
-    fetchOneArtistFromApi(id)
-      .then((data) => {
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+
+    (async () => {
+      setLoading(true);
+      try {
+        // 1) Traer datos del artista
+        const data = await fetchOneArtistFromApi(id);
         setArtist(data);
         setLikeCount(data.likes ?? 0);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+
+        // 2) Traer media asociada al artista
+        const raw = await mediaApi.getByEntidad(id);
+        // raw.media es el array que buscas
+        const fotosCrudas: any[] = Array.isArray(raw.media) ? raw.media : [];
+        // 3) Mapear URIs
+        const fotosMapeadas = fotosCrudas.map((m) => {
+          const ruta = m.url ?? m.imagen ?? "";
+          const uri = ruta.startsWith("http") ? ruta : `${baseURL}${ruta}`;
+          return { id: m.idMedia, uri };
+        });
+        setMedia(fotosMapeadas);
+      } catch (error) {
+        console.error("Error en ArtistScreen:", error);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [id]);
 
   const toggleLike = () => {
-    setIsLiked(v => !v);
-    setLikeCount(c => c + (isLiked ? -1 : 1));
+    setIsLiked((v) => !v);
+    setLikeCount((c) => c + (isLiked ? -1 : 1));
   };
 
   if (loading) {
@@ -60,16 +88,16 @@ export default function ArtistScreen() {
     );
   }
 
-  const avatarUrls = Array.from({ length: Math.min(likeCount, 5) })
-    .map((_, i) => `https://i.pravatar.cc/150?img=${i + 10}`);
+  const avatarUrls = Array.from({ length: Math.min(likeCount, 5) }).map(
+    (_, i) => `https://i.pravatar.cc/150?img=${i + 10}`
+  );
 
   return (
     <ProtectedRoute allowedRoles={["admin", "owner", "user"]}>
       <SafeAreaView style={styles.container}>
         <Header />
-
         <ScrollView contentContainerStyle={styles.content}>
-          {/* Título + iconos */}
+          {/* Título + Redes */}
           <View style={styles.headerRow}>
             <Text style={styles.title}>{artist.name}</Text>
             <View style={styles.socialRow}>
@@ -106,7 +134,6 @@ export default function ArtistScreen() {
                 iconColor={isLiked ? COLORS.negative : COLORS.textPrimary}
               />
             </TouchableOpacity>
-
             <View style={styles.avatars}>
               {avatarUrls.map((uri, idx) => (
                 <Avatar.Image
@@ -117,23 +144,35 @@ export default function ArtistScreen() {
                 />
               ))}
             </View>
-
-            <Text style={[styles.likeText, { marginLeft: avatarUrls.length > 0 ? 8 : 0 }]}>
+            <Text
+              style={[styles.likeText, { marginLeft: avatarUrls.length ? 8 : 0 }]}
+            >
               A {likeCount} persona{likeCount !== 1 ? "s" : ""} le gusta esto
             </Text>
           </View>
 
-          {/* Imagen + descripción */}
-          <View style={styles.mainRow}>
-            <Image
-              source={{ uri: artist.image || "https://picsum.photos/200/200" }}
-              style={styles.image}
-            />
-            <Text style={styles.description}>{artist.description}</Text>
+          {/* Galería */}
+          <View style={styles.mediaContainer}>
+            {media.length > 0 ? (
+              media.map((m) => (
+                <Image
+                  key={m.id}
+                  source={{ uri: m.uri }}
+                  style={styles.mediaImage}
+                  resizeMode="cover"
+                />
+              ))
+            ) : (
+              <Image
+                source={{ uri: artist.image || "https://picsum.photos/200/200" }}
+                style={styles.image}
+              />
+            )}
           </View>
 
+          {/* Descripción */}
+          <Text style={styles.description}>{artist.description}</Text>
         </ScrollView>
-
         <Footer />
       </SafeAreaView>
     </ProtectedRoute>
@@ -144,18 +183,9 @@ const screenWidth = Dimensions.get("window").width;
 const IMAGE_SIZE = 200;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.backgroundLight,
-  },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  content: {
-    padding: 20,
-  },
+  container: { flex: 1, backgroundColor: COLORS.backgroundLight },
+  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  content: { padding: 20 },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -168,31 +198,26 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     textDecorationLine: "underline",
   },
-  socialRow: {
-    flexDirection: "row",
-  },
-  likesRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  avatars: {
-    flexDirection: "row",
-    marginLeft: 8,
-  },
-  avatar: {
-    borderWidth: 2,
-    borderColor: COLORS.cardBg,
-  },
+  socialRow: { flexDirection: "row" },
+  likesRow: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
+  avatars: { flexDirection: "row", marginLeft: 8 },
+  avatar: { borderWidth: 2, borderColor: COLORS.cardBg },
   likeText: {
     fontFamily: FONTS.bodyRegular,
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
   },
-  mainRow: {
-    flexDirection: screenWidth > 600 ? "row" : "column",
-    alignItems: screenWidth > 600 ? "flex-start" : "center",
-    justifyContent: "space-between",
+  mediaContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  mediaImage: {
+    width: screenWidth > 600 ? 120 : 100,
+    height: screenWidth > 600 ? 120 : 100,
+    borderRadius: RADIUS.sm,
+    margin: 6,
   },
   image: {
     width: IMAGE_SIZE,
