@@ -1,16 +1,22 @@
-import React, { useState } from "react";
-import { View, StyleSheet, Alert } from "react-native";
-import { Text } from "react-native-paper";
-import { Link, useRouter } from "expo-router";
+// app/login/index.tsx
 
-import ButtonInApp from "@/components/ButtonComponent";
-import InputField from "@/components/InputFieldComponent";
+import React, { useState } from "react";
+import {
+  View,
+  StyleSheet,
+  Alert,
+  TouchableWithoutFeedback,
+  Keyboard,
+} from "react-native";
+import { Text, TextInput, Button } from "react-native-paper";
+import { Link, useRouter } from "expo-router";
+import FontAwesome from "react-native-vector-icons/FontAwesome";
+
 import TitlePers from "@/components/common/TitleComponent";
 import globalStyles from "@/styles/globalStyles";
-
 import { useAuth } from "@/context/AuthContext";
 
-export default function Index() {
+export default function LoginScreen() {
   const router = useRouter();
   const { login } = useAuth();
 
@@ -18,12 +24,10 @@ export default function Index() {
   const [password, setPassword] = useState("");
 
   const handleLogin = async () => {
-    const u = await login(username, password);
+    const u = await login(username.trim(), password);
     if (!u) {
       return Alert.alert("Error", "Usuario o contraseña incorrectos.");
     }
-
-    // redirijo según rol:
     switch (u.role) {
       case "admin":
         router.replace("/admin/EventsValidateScreens/EventsToValidateScreen");
@@ -36,67 +40,149 @@ export default function Index() {
     }
   };
 
+  const handleGoogleLogin = () => {
+    Alert.alert("Google", "Aquí iría el flujo de login con Google.");
+  };
+
   return (
-    <View style={styles.container}>
-      <TitlePers text="Bienvenido a Raveapp" />
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.container}>
+        <TitlePers text="Bienvenido a RaveApp" />
 
-      <InputField
-        label="Correo"
-        value={username}
-        onChangeText={setUsername}
-      />
+        <TextInput
+          mode="outlined"
+          label="Correo"
+          placeholder="email@ejemplo.com"
+          autoCapitalize="none"
+          value={username}
+          onChangeText={setUsername}
+          style={styles.input}
+          theme={{
+            colors: {
+              primary: globalStyles.COLORS.primary,
+              background: "#fff",
+              text: globalStyles.COLORS.textPrimary,
+              placeholder: globalStyles.COLORS.textSecondary,
+            },
+          }}
+        />
 
-      <InputField
-        label="Contraseña"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+        <TextInput
+          mode="outlined"
+          label="Contraseña"
+          placeholder="••••••"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+          style={styles.input}
+          theme={{
+            colors: {
+              primary: globalStyles.COLORS.primary,
+              background: "#fff",
+              text: globalStyles.COLORS.textPrimary,
+              placeholder: globalStyles.COLORS.textSecondary,
+            },
+          }}
+        />
 
-      <ButtonInApp
-        icon=""
-        text="Ingresar con Cuenta"
-        width="75%"
-        height={50}
-        onPress={handleLogin}
-      />
+        <Button
+          mode="contained"
+          onPress={handleLogin}
+          contentStyle={styles.buttonContent}
+          style={styles.loginButton}
+          labelStyle={{ fontWeight: "bold" }}
+        >
+          Ingresar con Cuenta
+        </Button>
 
-      <ButtonInApp
-        icon="google"
-        text="Ingresar con Google"
-        width="75%"
-        height={50}
-        onPress={() => console.log("Ingresar con Google")}
-      />
+        <View style={styles.orRow}>
+          <View style={styles.line} />
+          <Text style={styles.orText}>o</Text>
+          <View style={styles.line} />
+        </View>
 
-      <View style={styles.linksRow}>
-        <Text variant="labelLarge">
-          <Link href="/login/RegisterUserScreen">
-            ¿Aún no tenés cuenta? Registrate aquí
-          </Link>
-        </Text>
+        <TouchableWithoutFeedback onPress={handleGoogleLogin}>
+          <View style={styles.googleButton}>
+            <FontAwesome name="google" size={24} color="#4285F4" />
+            <Text style={styles.googleButtonText}>Continuar con Google</Text>
+          </View>
+        </TouchableWithoutFeedback>
+
+        <View style={styles.linksRow}>
+          <Text variant="bodySmall" style={styles.linkText}>
+            <Link href="/login/RegisterUserScreen">
+              ¿No tenés cuenta? Registrate
+            </Link>
+          </Text>
+        </View>
+
+        <View style={styles.linksRow}>
+          <Text variant="bodySmall" style={styles.linkText}>
+            <Link href="/main/EventsScreens/MenuScreen">
+              Entrar como invitado
+            </Link>
+          </Text>
+        </View>
       </View>
-
-      <View style={styles.linksRow}>
-        <Text variant="labelLarge">
-          <Link href="/main/EventsScreens/MenuScreen">
-            Ingresar como invitado
-          </Link>
-        </Text>
-      </View>
-    </View>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
     backgroundColor: globalStyles.COLORS.backgroundLight,
-    padding: 16,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  input: {
+    marginBottom: 16,
+    backgroundColor: "#fff",
+  },
+  loginButton: {
+    borderRadius: 25,
+    height: 50,
+    justifyContent: "center",
+  },
+  buttonContent: {
+    height: 50,
+  },
+  orRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 16,
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: globalStyles.COLORS.borderInput,
+  },
+  orText: {
+    marginHorizontal: 8,
+    color: globalStyles.COLORS.textSecondary,
+  },
+  googleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+    borderRadius: 25,
+    height: 50,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  googleButtonText: {
+    marginLeft: 8,
+    fontSize: globalStyles.FONT_SIZES.button,
+    color: "#444",
+    fontWeight: "600",
   },
   linksRow: {
-    marginTop: 10,
+    marginTop: 16,
     alignItems: "center",
+  },
+  linkText: {
+    color: globalStyles.COLORS.primary,
   },
 });
