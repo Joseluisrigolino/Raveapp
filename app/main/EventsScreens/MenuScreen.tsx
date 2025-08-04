@@ -44,158 +44,137 @@ export default function MenuScreen() {
   // Eventos y carga
   const [allEvents, setAllEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
     (async () => {
       try {
-        const evts = await fetchEvents(); // fetchEvents ya retorna solo los de estado===2
-        setAllEvents(evts);
+        const evts = await fetchEvents();
+        // Ordenar ascendente por fecha (dd/mm/yyyy)
+        const sorted = evts
+          .map(e => ({
+            ...e,
+            _ts: (() => {
+              const [d, m, y] = e.date.split("/").map(Number);
+              return new Date(y, m - 1, d).getTime();
+            })(),
+          }))
+          .sort((a, b) => a._ts - b._ts)
+          .map(({ _ts, ...rest }) => rest);
+
+        if (mounted) setAllEvents(sorted);
       } catch (err) {
-        console.error("Error cargando eventos:", err);
+        console.error("[MenuScreen] Error cargando eventos:", err);
+        if (mounted) setError("Error al cargar los eventos");
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     })();
+    return () => { mounted = false; };
   }, []);
 
-  // Estados de filtros
+  // --- aquí van tus estados y handlers de filtros (idénticos a antes) ---
   const [searchText, setSearchText] = useState("");
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-
   const [locationFilterOpen, setLocationFilterOpen] = useState(false);
   const [provinceText, setProvinceText] = useState("");
-  const [provinceSuggestions, setProvinceSuggestions] = useState<
-    { id: string; nombre: string }[]
-  >([]);
+  const [provinceSuggestions, setProvinceSuggestions] = useState<{ id: string; nombre: string }[]>([]);
   const [municipalityText, setMunicipalityText] = useState("");
-  const [municipalitySuggestions, setMunicipalitySuggestions] = useState<
-    { id: string; nombre: string }[]
-  >([]);
+  const [municipalitySuggestions, setMunicipalitySuggestions] = useState<{ id: string; nombre: string }[]>([]);
   const [localityText, setLocalityText] = useState("");
-  const [localitySuggestions, setLocalitySuggestions] = useState<
-    { id: string; nombre: string }[]
-  >([]);
-
+  const [localitySuggestions, setLocalitySuggestions] = useState<{ id: string; nombre: string }[]>([]);
   const [weekActive, setWeekActive] = useState(false);
   const [afterActive, setAfterActive] = useState(false);
   const [lgbtActive, setLgbtActive] = useState(false);
   const [genreFilterOpen, setGenreFilterOpen] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
 
-  // Handlers de ubicación
-  async function onProvinceTextChange(value: string) {
-    setProvinceText(value);
-    if (value.trim().length < 3) return setProvinceSuggestions([]);
+  // Location helpers...
+  async function onProvinceTextChange(v: string) {
+    setProvinceText(v);
+    if (v.trim().length < 3) return setProvinceSuggestions([]);
     try {
       const results = await fetchProvinces();
-      setProvinceSuggestions(
-        results.filter(p =>
-          p.nombre.toLowerCase().includes(value.toLowerCase())
-        )
-      );
+      setProvinceSuggestions(results.filter(p =>
+        p.nombre.toLowerCase().includes(v.toLowerCase())
+      ));
     } catch {
       setProvinceSuggestions([]);
     }
   }
-  function onPickProvince(name: string) {
-    setProvinceText(name);
-    setProvinceSuggestions([]);
-  }
+  function onPickProvince(name: string) { setProvinceText(name); setProvinceSuggestions([]); }
 
-  async function onMunicipalityTextChange(value: string) {
-    setMunicipalityText(value);
-    if (value.trim().length < 3 || !provinceText)
-      return setMunicipalitySuggestions([]);
+  async function onMunicipalityTextChange(v: string) {
+    setMunicipalityText(v);
+    if (v.trim().length < 3 || !provinceText) return setMunicipalitySuggestions([]);
     try {
       const results = await fetchMunicipalities(provinceText);
-      setMunicipalitySuggestions(
-        results.filter(m =>
-          m.nombre.toLowerCase().includes(value.toLowerCase())
-        )
-      );
+      setMunicipalitySuggestions(results.filter(m =>
+        m.nombre.toLowerCase().includes(v.toLowerCase())
+      ));
     } catch {
       setMunicipalitySuggestions([]);
     }
   }
-  function onPickMunicipality(name: string) {
-    setMunicipalityText(name);
-    setMunicipalitySuggestions([]);
-  }
+  function onPickMunicipality(name: string) { setMunicipalityText(name); setMunicipalitySuggestions([]); }
 
-  async function onLocalityTextChange(value: string) {
-    setLocalityText(value);
-    if (value.trim().length < 3) return setLocalitySuggestions([]);
+  async function onLocalityTextChange(v: string) {
+    setLocalityText(v);
+    if (v.trim().length < 3) return setLocalitySuggestions([]);
     try {
-      if (provinceText && municipalityText) {
-        const results = await fetchLocalities(provinceText, municipalityText);
-        setLocalitySuggestions(
-          results.filter(l =>
-            l.nombre.toLowerCase().includes(value.toLowerCase())
-          )
-        );
-      } else {
-        const results = await fetchLocalitiesByName(value);
-        setLocalitySuggestions(results);
-      }
+      const results = provinceText && municipalityText
+        ? await fetchLocalities(provinceText, municipalityText)
+        : await fetchLocalitiesByName(v);
+      setLocalitySuggestions(results.filter(l =>
+        l.nombre.toLowerCase().includes(v.toLowerCase())
+      ));
     } catch {
       setLocalitySuggestions([]);
     }
   }
-  function onPickLocality(name: string) {
-    setLocalityText(name);
-    setLocalitySuggestions([]);
-  }
-
+  function onPickLocality(name: string) { setLocalityText(name); setLocalitySuggestions([]); }
   function onClearLocation() {
-    setProvinceText("");
-    setMunicipalityText("");
-    setLocalityText("");
-    setProvinceSuggestions([]);
-    setMunicipalitySuggestions([]);
-    setLocalitySuggestions([]);
+    setProvinceText(""); setMunicipalityText(""); setLocalityText("");
+    setProvinceSuggestions([]); setMunicipalitySuggestions([]); setLocalitySuggestions([]);
   }
 
   function onToggleGenre(g: string) {
     setSelectedGenres(prev =>
-      prev.includes(g) ? prev.filter(item => item !== g) : [...prev, g]
+      prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g]
     );
   }
-  function onClearGenres() {
-    setSelectedGenres([]);
-  }
+  function onClearGenres() { setSelectedGenres([]); }
 
-  // Filtrado de eventos (sobre allEvents ya filtrados por estado)
+  // Filtrado de eventos
   const filteredEvents = useMemo(() => {
     let results = [...allEvents];
-
     if (searchText.trim()) {
       const lower = searchText.toLowerCase();
-      results = results.filter(ev =>
-        ev.title.toLowerCase().includes(lower)
-      );
+      results = results.filter(ev => ev.title.toLowerCase().includes(lower));
     }
     if (startDate && endDate) {
       results = results.filter(ev => {
-        const [d, m, y] = ev.date.split("/").map(Number);
-        const t = new Date(y, m - 1, d).getTime();
+        const [d,m,y] = ev.date.split("/").map(Number);
+        const t = new Date(y,m-1,d).getTime();
         return t >= startDate.getTime() && t <= endDate.getTime();
       });
     }
-    if (provinceText.trim()) {
+    if (provinceText) {
       results = results.filter(ev =>
         ev.address.toLowerCase().includes(provinceText.toLowerCase())
       );
     }
-    if (municipalityText.trim()) {
+    if (municipalityText) {
       results = results.filter(ev =>
         ev.address.toLowerCase().includes(municipalityText.toLowerCase())
       );
     }
-    if (localityText.trim()) {
+    if (localityText) {
       results = results.filter(ev =>
         ev.address.toLowerCase().includes(localityText.toLowerCase())
       );
@@ -203,143 +182,132 @@ export default function MenuScreen() {
     if (weekActive) {
       const { startOfWeek, endOfWeek } = getWeekRange();
       results = results.filter(ev => {
-        const [d, m, y] = ev.date.split("/").map(Number);
-        const t = new Date(y, m - 1, d).getTime();
+        const [d,m,y] = ev.date.split("/").map(Number);
+        const t = new Date(y,m-1,d).getTime();
         return t >= startOfWeek.getTime() && t < endOfWeek.getTime();
       });
     }
     if (afterActive) results = results.filter(ev => (ev as any).isAfter);
     if (lgbtActive) results = results.filter(ev => (ev as any).isLgbt);
-    if (selectedGenres.length)
-      results = results.filter(ev =>
-        selectedGenres.includes((ev as any).type)
-      );
-
+    if (selectedGenres.length) {
+      results = results.filter(ev => selectedGenres.includes((ev as any).type));
+    }
     return results;
   }, [
     allEvents,
     searchText,
-    startDate,
-    endDate,
-    provinceText,
-    municipalityText,
-    localityText,
-    weekActive,
-    afterActive,
-    lgbtActive,
-    selectedGenres,
+    startDate, endDate,
+    provinceText, municipalityText, localityText,
+    weekActive, afterActive, lgbtActive, selectedGenres
   ]);
 
-  // UI Handlers
-  const toggleDateFilter = () => {
-    setDateFilterOpen(prev => !prev);
-    setLocationFilterOpen(false);
-    setGenreFilterOpen(false);
-  };
-  const toggleLocationFilter = () => {
-    setLocationFilterOpen(prev => !prev);
-    setDateFilterOpen(false);
-    setGenreFilterOpen(false);
-  };
-  const toggleGenreFilter = () => {
-    setGenreFilterOpen(prev => !prev);
-    setDateFilterOpen(false);
-    setLocationFilterOpen(false);
-  };
+  // UI handlers
+  const toggleDateFilter = () => { setDateFilterOpen(v => !v); setLocationFilterOpen(false); setGenreFilterOpen(false); };
+  const toggleLocationFilter = () => { setLocationFilterOpen(v => !v); setDateFilterOpen(false); setGenreFilterOpen(false); };
+  const toggleGenreFilter = () => { setGenreFilterOpen(v => !v); setDateFilterOpen(false); setLocationFilterOpen(false); };
 
   const handleCardPress = (_: string, id?: string) => {
     if (id) router.push(`/main/EventsScreens/EventScreen?id=${id}`);
   };
 
-  return (
-    <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
+  if (loading) {
+    return (
       <SafeAreaView style={styles.mainContainer}>
         <Header />
+        <View style={{ flex: 1, justifyContent: "center" }}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+        <Footer />
+      </SafeAreaView>
+    );
+  }
 
-        {loading ? (
-          <ActivityIndicator
-            style={{ flex: 1 }}
-            size="large"
-            color={COLORS.primary}
-          />
-        ) : (
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
+  if (error) {
+    return (
+      <SafeAreaView style={styles.mainContainer}>
+        <Header />
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Text style={{ color: COLORS.negative }}>{error}</Text>
+        </View>
+        <Footer />
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <ProtectedRoute allowedRoles={["admin","user","owner"]}>
+      <SafeAreaView style={styles.mainContainer}>
+        <Header />
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          nestedScrollEnabled
+          keyboardShouldPersistTaps="handled"
+        >
+          <FiltersSection
+            isDateActive={Boolean(startDate && endDate)}
+            isLocationActive={Boolean(provinceText||municipalityText||localityText)}
+            isGenreActive={selectedGenres.length>0}
+            weekActive={weekActive}
+            afterActive={afterActive}
+            lgbtActive={lgbtActive}
+            onToggleWeek={() => setWeekActive(v=>!v)}
+            onToggleAfter={() => setAfterActive(v=>!v)}
+            onToggleLgbt={() => setLgbtActive(v=>!v)}
+            searchText={searchText}
+            onSearchTextChange={setSearchText}
+            dateFilterOpen={dateFilterOpen}
+            onToggleDateFilter={toggleDateFilter}
+            startDate={startDate}
+            endDate={endDate}
+            showStartPicker={showStartPicker}
+            showEndPicker={showEndPicker}
+            onShowStartPicker={setShowStartPicker}
+            onShowEndPicker={setShowEndPicker}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
+            onClearDates={() => { setStartDate(null); setEndDate(null); }}
+            locationFilterOpen={locationFilterOpen}
+            onToggleLocationFilter={toggleLocationFilter}
+            provinceText={provinceText}
+            onProvinceTextChange={onProvinceTextChange}
+            provinceSuggestions={provinceSuggestions}
+            onPickProvince={onPickProvince}
+            municipalityText={municipalityText}
+            onMunicipalityTextChange={onMunicipalityTextChange}
+            municipalitySuggestions={municipalitySuggestions}
+            onPickMunicipality={onPickMunicipality}
+            localityText={localityText}
+            onLocalityTextChange={onLocalityTextChange}
+            localitySuggestions={localitySuggestions}
+            onPickLocality={onPickLocality}
+            onClearLocation={onClearLocation}
+            genreFilterOpen={genreFilterOpen}
+            onToggleGenreFilter={toggleGenreFilter}
+            selectedGenres={selectedGenres}
+            onToggleGenre={onToggleGenre}
+            onClearGenres={onClearGenres}
             nestedScrollEnabled
-            keyboardShouldPersistTaps="handled"
-          >
-            <FiltersSection
-              isDateActive={Boolean(startDate && endDate)}
-              isLocationActive={Boolean(
-                provinceText || municipalityText || localityText
-              )}
-              isGenreActive={selectedGenres.length > 0}
-              weekActive={weekActive}
-              afterActive={afterActive}
-              lgbtActive={lgbtActive}
-              onToggleWeek={() => setWeekActive(prev => !prev)}
-              onToggleAfter={() => setAfterActive(prev => !prev)}
-              onToggleLgbt={() => setLgbtActive(prev => !prev)}
-              searchText={searchText}
-              onSearchTextChange={setSearchText}
-              dateFilterOpen={dateFilterOpen}
-              onToggleDateFilter={toggleDateFilter}
-              startDate={startDate}
-              endDate={endDate}
-              showStartPicker={showStartPicker}
-              showEndPicker={showEndPicker}
-              onShowStartPicker={setShowStartPicker}
-              onShowEndPicker={setShowEndPicker}
-              onStartDateChange={setStartDate}
-              onEndDateChange={setEndDate}
-              onClearDates={() => {
-                setStartDate(null);
-                setEndDate(null);
-              }}
-              locationFilterOpen={locationFilterOpen}
-              onToggleLocationFilter={toggleLocationFilter}
-              provinceText={provinceText}
-              onProvinceTextChange={onProvinceTextChange}
-              provinceSuggestions={provinceSuggestions}
-              onPickProvince={onPickProvince}
-              municipalityText={municipalityText}
-              onMunicipalityTextChange={onMunicipalityTextChange}
-              municipalitySuggestions={municipalitySuggestions}
-              onPickMunicipality={onPickMunicipality}
-              localityText={localityText}
-              onLocalityTextChange={onLocalityTextChange}
-              localitySuggestions={localitySuggestions}
-              onPickLocality={onPickLocality}
-              onClearLocation={onClearLocation}
-              genreFilterOpen={genreFilterOpen}
-              onToggleGenreFilter={toggleGenreFilter}
-              selectedGenres={selectedGenres}
-              onToggleGenre={onToggleGenre}
-              onClearGenres={onClearGenres}
-              nestedScrollEnabled
-            />
+          />
 
-            <View style={styles.containerCards}>
-              {filteredEvents.length === 0 ? (
-                <Text style={styles.noEventsText}>
-                  No existen eventos con esos filtros.
-                </Text>
-              ) : (
-                filteredEvents.map(ev => (
-                  <CardComponent
-                    key={ev.id}
-                    title={ev.title}
-                    text={ev.description}
-                    date={ev.date}
-                    foto={ev.imageUrl}
-                    onPress={() => handleCardPress(ev.title, ev.id)}
-                  />
-                ))
-              )}
-            </View>
-          </ScrollView>
-        )}
-
+          <View style={styles.containerCards}>
+            {filteredEvents.length === 0 ? (
+              <Text style={styles.noEventsText}>
+                No existen eventos con esos filtros.
+              </Text>
+            ) : (
+              filteredEvents.map(ev => (
+                <CardComponent
+                  key={ev.id}
+                  title={ev.title}
+                  text={ev.description}
+                  date={ev.date}
+                  foto={ev.imageUrl}
+                  onPress={() => handleCardPress(ev.title, ev.id)}
+                />
+              ))
+            )}
+          </View>
+        </ScrollView>
         <Footer />
       </SafeAreaView>
     </ProtectedRoute>

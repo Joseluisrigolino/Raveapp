@@ -33,7 +33,7 @@ function mapGenre(code: number): string {
   return names[code] ?? "Otros";
 }
 
-const PLACEHOLDER_IMAGE = ""; // vacío para fallback en el front
+const PLACEHOLDER_IMAGE = "";
 
 async function fetchEventMediaUrl(idEvento: string): Promise<string> {
   try {
@@ -49,22 +49,30 @@ async function fetchEventMediaUrl(idEvento: string): Promise<string> {
   }
 }
 
+/**
+ * Obtiene solamente eventos con estado===2, pasando Estado=2 en la query string,
+ * y les enriquece la primera imagen.
+ */
 export async function fetchEvents(): Promise<EventItem[]> {
   const token = await login();
+  // Llamada con ?Estado=2
   const resp = await apiClient.get<{ eventos: any[] }>(
     "/v1/Evento/GetEventos",
-    { headers: { Authorization: `Bearer ${token}` } }
+    {
+      params: { Estado: 2 },
+      headers: { Authorization: `Bearer ${token}` },
+    }
   );
+
+  console.log("[debug|fetchEvents] respuesta completa:", resp.data);
+
   const list = resp.data.eventos ?? [];
+  // Si tu API devuelve directamente un array:
+  // const list = Array.isArray(resp.data) ? resp.data : resp.data.eventos;
 
-  // Filtrar solo eventos cuyo primer objeto fechas.estado === 2
-  const activos = list.filter(e => {
-    const f = Array.isArray(e.fechas) ? e.fechas[0] : null;
-    return f?.estado === 2;
-  });
-
+  // Enriquecemos y formateamos
   const enriched = await Promise.all(
-    activos.map(async e => {
+    list.map(async e => {
       const inicioIso = e.fechas?.[0]?.inicio ?? e.inicioEvento;
       const finIso    = e.fechas?.[0]?.fin    ?? e.finEvento;
 
@@ -81,9 +89,12 @@ export async function fetchEvents(): Promise<EventItem[]> {
         description: e.descripcion,
         imageUrl,
         type:        mapGenre(Array.isArray(e.genero) ? e.genero[0] : 0),
-      } as EventItem;
+        // opcional:
+        estado:      e.fechas?.[0]?.estado,
+      } as EventItem & { estado: number };
     })
   );
 
+  console.log("[debug|fetchEvents] eventos formateados:", enriched);
   return enriched;
 }

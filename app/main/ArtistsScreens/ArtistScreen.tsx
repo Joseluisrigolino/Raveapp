@@ -1,5 +1,3 @@
-// src/screens/ArtistsScreens/ArtistScreen.tsx
-
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -10,7 +8,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
-  Linking,
   Dimensions,
 } from "react-native";
 import { IconButton, Avatar } from "react-native-paper";
@@ -20,48 +17,54 @@ import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import { Artist } from "@/interfaces/Artist";
-import { fetchOneArtistFromApi } from "@/utils/artists/artistApi";
-import { mediaApi } from "@/utils/mediaApi";
+import {
+  fetchOneArtistFromApi,
+  fetchAllArtistMedia,
+  fetchLikedImageIds,
+} from "@/utils/artists/artistApi";
 import { apiClient } from "@/utils/apiConfig";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 
 export default function ArtistScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [artist, setArtist] = useState<Artist | null>(null);
-  const [media, setMedia] = useState<Array<{ id: string; uri: string }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
+  const [artist,   setArtist]   = useState<Artist|null>(null);
+  const [allMedia, setAllMedia] = useState<{ idMedia: string; uri: string }[]>([]);
+  const [likesMedia, setLikesMedia] = useState<{ idMedia: string; uri: string }[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [isLiked,  setIsLiked]  = useState(false);
+  const [likeCount,setLikeCount]= useState(0);
 
   const baseURL = apiClient.defaults.baseURL;
+  const screenWidth = Dimensions.get("window").width;
+  const IMAGE_SIZE  = 250;
 
   useEffect(() => {
-    if (!id) {
-      setLoading(false);
-      return;
-    }
-
+    if (!id) { setLoading(false); return; }
     (async () => {
       setLoading(true);
       try {
-        // 1) Traer datos del artista
+        // 1) datos del artista
         const data = await fetchOneArtistFromApi(id);
         setArtist(data);
-        setLikeCount(data.likes ?? 0);
 
-        // 2) Traer media asociada al artista
-        const raw = await mediaApi.getByEntidad(id);
-        // raw.media es el array que buscas
-        const fotosCrudas: any[] = Array.isArray(raw.media) ? raw.media : [];
-        // 3) Mapear URIs
-        const fotosMapeadas = fotosCrudas.map((m) => {
-          const ruta = m.url ?? m.imagen ?? "";
-          const uri = ruta.startsWith("http") ? ruta : `${baseURL}${ruta}`;
-          return { id: m.idMedia, uri };
+        // 2) todas las medias
+        const mediaArr = await fetchAllArtistMedia(id);
+        const mappedAll = mediaArr.map(m => {
+          const raw = m.url ?? m.imagen ?? "";
+          const uri = raw.startsWith("http") ? raw : `${baseURL}${raw}`;
+          return { idMedia: m.idMedia, uri };
         });
-        setMedia(fotosMapeadas);
-      } catch (error) {
-        console.error("Error en ArtistScreen:", error);
+        setAllMedia(mappedAll);
+
+        // 3) likes
+        const likedIds = await fetchLikedImageIds(id);
+        setLikeCount(likedIds.length);
+        // machear IDs con el array completo
+        const mappedLikes = mappedAll.filter(m => likedIds.includes(m.idMedia));
+        setLikesMedia(mappedLikes);
+
+      } catch (err) {
+        console.error("Error en ArtistScreen:", err);
       } finally {
         setLoading(false);
       }
@@ -69,8 +72,8 @@ export default function ArtistScreen() {
   }, [id]);
 
   const toggleLike = () => {
-    setIsLiked((v) => !v);
-    setLikeCount((c) => c + (isLiked ? -1 : 1));
+    setIsLiked(v => !v);
+    setLikeCount(c => c + (isLiked ? -1 : 1));
   };
 
   if (loading) {
@@ -88,89 +91,85 @@ export default function ArtistScreen() {
     );
   }
 
-  const avatarUrls = Array.from({ length: Math.min(likeCount, 5) }).map(
-    (_, i) => `https://i.pravatar.cc/150?img=${i + 10}`
-  );
-
   return (
-    <ProtectedRoute allowedRoles={["admin", "owner", "user"]}>
+    <ProtectedRoute allowedRoles={["admin","owner","user"]}>
       <SafeAreaView style={styles.container}>
         <Header />
         <ScrollView contentContainerStyle={styles.content}>
-          {/* Título + Redes */}
+          {/* Cabecera: nombre + redes */}
           <View style={styles.headerRow}>
             <Text style={styles.title}>{artist.name}</Text>
             <View style={styles.socialRow}>
               <IconButton
-                icon="spotify"
-                size={24}
-                iconColor={artist.spotifyURL ? "#1DB954" : COLORS.textSecondary}
+                icon="spotify"   size={24}
+                iconColor={artist.spotifyURL?"#1DB954":COLORS.textSecondary}
                 onPress={() => artist.spotifyURL && Linking.openURL(artist.spotifyURL)}
                 disabled={!artist.spotifyURL}
               />
               <IconButton
-                icon="soundcloud"
-                size={24}
-                iconColor={artist.soundcloudURL ? "#FF5500" : COLORS.textSecondary}
-                onPress={() => artist.soundcloudURL && Linking.openURL(artist.soundcloudURL)}
+                icon="soundcloud" size={24}
+                iconColor={artist.soundcloudURL?"#FF5500":COLORS.textSecondary}
+                onPress={() => artist.soundcloudURL&&Linking.openURL(artist.soundcloudURL)}
                 disabled={!artist.soundcloudURL}
               />
               <IconButton
-                icon="instagram"
-                size={24}
-                iconColor={artist.instagramURL ? "#C13584" : COLORS.textSecondary}
-                onPress={() => artist.instagramURL && Linking.openURL(artist.instagramURL)}
+                icon="instagram" size={24}
+                iconColor={artist.instagramURL?"#C13584":COLORS.textSecondary}
+                onPress={() => artist.instagramURL&&Linking.openURL(artist.instagramURL)}
                 disabled={!artist.instagramURL}
               />
             </View>
           </View>
 
-          {/* Likes */}
+          {/* Likes + Avatares superpuestos */}
           <View style={styles.likesRow}>
             <TouchableOpacity onPress={toggleLike}>
               <IconButton
-                icon={isLiked ? "heart" : "heart-outline"}
+                icon={isLiked?"heart":"heart-outline"}
                 size={28}
-                iconColor={isLiked ? COLORS.negative : COLORS.textPrimary}
+                iconColor={isLiked?COLORS.negative:COLORS.textPrimary}
               />
             </TouchableOpacity>
             <View style={styles.avatars}>
-              {avatarUrls.map((uri, idx) => (
+              {likesMedia.map((m,idx) => (
                 <Avatar.Image
-                  key={idx}
-                  source={{ uri }}
+                  key={m.idMedia}
+                  source={{ uri: m.uri }}
                   size={32}
-                  style={[styles.avatar, { marginLeft: idx === 0 ? 0 : -12 }]}
+                  style={[styles.avatar, { marginLeft: idx===0?0:-12 }]}
                 />
               ))}
             </View>
-            <Text
-              style={[styles.likeText, { marginLeft: avatarUrls.length ? 8 : 0 }]}
-            >
-              A {likeCount} persona{likeCount !== 1 ? "s" : ""} le gusta esto
+            <Text style={[styles.likeText, { marginLeft: likesMedia.length?8:0 }]}>
+              A {likeCount} persona{likeCount!==1?"s":""} le gusta esto
             </Text>
           </View>
 
-          {/* Galería */}
+          {/* Galería completa */}
           <View style={styles.mediaContainer}>
-            {media.length > 0 ? (
-              media.map((m) => (
-                <Image
-                  key={m.id}
-                  source={{ uri: m.uri }}
-                  style={styles.mediaImage}
-                  resizeMode="cover"
-                />
-              ))
-            ) : (
-              <Image
-                source={{ uri: artist.image || "https://picsum.photos/200/200" }}
-                style={styles.image}
-              />
-            )}
+            {allMedia.length>0
+              ? allMedia.map(m => (
+                  <Image
+                    key={m.idMedia}
+                    source={{ uri: m.uri }}
+                    style={styles.mediaImage}
+                    resizeMode="cover"
+                  />
+                ))
+              : (
+                  <Image
+                    source={{ uri: artist.image }}
+                    style={{
+                      width: IMAGE_SIZE, height: IMAGE_SIZE,
+                      borderRadius: IMAGE_SIZE/2,
+                      alignSelf:"center", marginBottom:screenWidth>600?0:16
+                    }}
+                  />
+                )
+            }
           </View>
 
-          {/* Descripción */}
+          {/* Biografía */}
           <Text style={styles.description}>{artist.description}</Text>
         </ScrollView>
         <Footer />
@@ -180,63 +179,52 @@ export default function ArtistScreen() {
 }
 
 const screenWidth = Dimensions.get("window").width;
-const IMAGE_SIZE = 200;
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.backgroundLight },
-  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  content: { padding: 20 },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
+  container:       { flex:1, backgroundColor: COLORS.backgroundLight },
+  loaderContainer: { flex:1,justifyContent:"center",alignItems:"center" },
+  content:         { padding:20 },
+  headerRow:       {
+    flexDirection:"row",
+    justifyContent:"space-between",
+    alignItems:"center",
+    marginBottom:12
   },
-  title: {
-    fontFamily: FONTS.titleBold,
-    fontSize: FONT_SIZES.titleMain,
-    color: COLORS.textPrimary,
-    textDecorationLine: "underline",
+  title:           {
+    fontFamily:        FONTS.titleBold,
+    fontSize:          FONT_SIZES.titleMain,
+    color:             COLORS.textPrimary,
+    textDecorationLine:"underline"
   },
-  socialRow: { flexDirection: "row" },
-  likesRow: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
-  avatars: { flexDirection: "row", marginLeft: 8 },
-  avatar: { borderWidth: 2, borderColor: COLORS.cardBg },
-  likeText: {
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textPrimary,
+  socialRow:       { flexDirection:"row" },
+  likesRow:        { flexDirection:"row",alignItems:"center",marginBottom:20 },
+  avatars:         { flexDirection:"row", marginLeft:8 },
+  avatar:          { borderWidth:2, borderRadius:16, borderColor:COLORS.cardBg },
+  likeText:        {
+    fontFamily:FONTS.bodyRegular,
+    fontSize:  FONT_SIZES.body,
+    color:     COLORS.textPrimary
   },
-  mediaContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    marginBottom: 20,
+  mediaContainer:  {
+    flexDirection:"row",
+    flexWrap:"wrap",
+    justifyContent:"center",
+    marginBottom:20
   },
-  mediaImage: {
-    width: screenWidth > 600 ? 120 : 100,
-    height: screenWidth > 600 ? 120 : 100,
-    borderRadius: RADIUS.sm,
-    margin: 6,
+  mediaImage:      {
+    width: screenWidth>600?140:120,
+    height:screenWidth>600?140:120,
+    borderRadius:RADIUS.sm,
+    margin:6
   },
-  image: {
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
-    borderRadius: IMAGE_SIZE / 2,
-    alignSelf: "center",
-    marginBottom: screenWidth > 600 ? 0 : 16,
-    marginRight: screenWidth > 600 ? 20 : 0,
+  description:     {
+    fontFamily:FONTS.bodyRegular,
+    fontSize:  FONT_SIZES.body,
+    color:     COLORS.textPrimary,
+    lineHeight:FONT_SIZES.body*1.4
   },
-  description: {
-    flex: 1,
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textPrimary,
-    lineHeight: FONT_SIZES.body * 1.4,
-  },
-  errorText: {
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.negative,
-  },
+  errorText:       {
+    fontFamily:FONTS.bodyRegular,
+    fontSize:  FONT_SIZES.body,
+    color:     COLORS.negative
+  }
 });

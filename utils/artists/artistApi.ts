@@ -31,66 +31,102 @@ interface ApiArtist {
 
 const PLACEHOLDER = "https://picsum.photos/200/200?random=999";
 
-/** 
- * Obtiene la URL de la primera imagen para un artista 
- */
-async function fetchArtistMediaUrl(idArtista: string): Promise<string> {
-  try {
-    const raw = await mediaApi.getByEntidad(idArtista);
-    const arr = Array.isArray((raw as any).media) ? (raw as any).media : [];
-    const m = arr[0];
-    let img = m?.url ?? m?.imagen ?? "";
-    if (m?.imagen && !/^https?:\/\//.test(img)) {
-      const base = apiClient.defaults.baseURL ?? "";
-      img = `${base}${m.imagen.startsWith("/") ? "" : "/"}${m.imagen}`;
+/** 1) Trae las IDs de las imágenes liked */
+async function fetchLikedImageIds(idArtista: string): Promise<string[]> {
+  const token = await login();
+  const resp = await apiClient.get<string[]>(
+    `/v1/Artista/GetImgLikesArtista`,
+    {
+      params: { id: idArtista },
+      headers: { Authorization: `Bearer ${token}` },
     }
-    return img || "";
-  } catch {
-    return "";
-  }
+  );
+  return Array.isArray(resp.data) ? resp.data : [];
 }
 
-/** Mapea la API al modelo local sin imagen aún */
-function parseApiArtist(api: ApiArtist): Omit<Artist, "image"> & { image: string } {
+/** 2) Trae todo el array de media de un artista */
+async function fetchAllArtistMedia(idArtista: string): Promise<ApiMedia[]> {
+  const raw = await mediaApi.getByEntidad(idArtista);
+  // raw puede venir como array o como { media: [...] }
+  return Array.isArray(raw)
+    ? raw as ApiMedia[]
+    : (raw as any).media ?? [];
+}
+
+/** Mapea la API al modelo local (sin aún asignar imagen ni likes) */
+function parseApiArtist(api: ApiArtist): Omit<Artist, "image" | "likes"> & {
+  image: string;
+  likes: number;
+} {
   return {
-    idArtista: api.idArtista,
-    idSocial: api.socials.idSocial,
-    name: api.nombre,
-    description: api.bio,
-    creationDate: api.dtAlta,
-    isActivo: api.isActivo === 1,
-    instagramURL: api.socials.mdInstagram ?? "",
-    spotifyURL: api.socials.mdSpotify ?? "",
+    idArtista:     api.idArtista,
+    idSocial:      api.socials.idSocial ?? "",
+    name:          api.nombre,
+    description:   api.bio,
+    creationDate:  api.dtAlta,
+    isActivo:      api.isActivo === 1,
+    instagramURL:  api.socials.mdInstagram ?? "",
+    spotifyURL:    api.socials.mdSpotify ?? "",
     soundcloudURL: api.socials.mdSoundcloud ?? "",
-    image: PLACEHOLDER,
-    likes: undefined,
+    image:         PLACEHOLDER,
+    likes:         0,
   };
 }
 
-/** Obtiene todos los artistas, enriqueciendo su `image` desde mediaApi */
+/**
+ * Obtiene todos los artistas y enriquece su imagen y likes
+ */
 export async function fetchArtistsFromApi(): Promise<Artist[]> {
   const token = await login();
-  const resp = await apiClient.get<{ artistas: ApiArtist[] }>(
-    "/v1/Artista/GetArtista",
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+  let resp;
+  // Intento principal: GetArtistas
+  try {
+    resp = await apiClient.get<{ artistas: ApiArtist[] }>(
+      "/v1/Artista/GetArtistas",
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+  } catch (err: any) {
+    if (err.response?.status === 404) {
+      // Fallback si la ruta es distinta
+      resp = await apiClient.get<{ artistas: ApiArtist[] }>(
+        "/v1/Artista/GetArtista",
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } else {
+      throw err;
+    }
+  }
+
   const list = resp.data.artistas ?? [];
 
-  const enriched = await Promise.all(
+  return Promise.all(
     list.map(async apiArt => {
       const base = parseApiArtist(apiArt);
-      const mediaUrl = await fetchArtistMediaUrl(apiArt.idArtista);
+
+      // — media principal —
+      const mediaArr = await fetchAllArtistMedia(apiArt.idArtista);
+      const m = mediaArr[0];
+      let img = m?.url ?? m?.imagen ?? "";
+      if (m?.imagen && !/^https?:\/\//.test(img)) {
+        const baseUrl = apiClient.defaults.baseURL ?? "";
+        img = `${baseUrl}${m.imagen.startsWith("/") ? "" : "/"}${m.imagen}`;
+      }
+
+      // — likes —
+      const likedIds = await fetchLikedImageIds(apiArt.idArtista);
+
       return {
         ...base,
-        image: mediaUrl || base.image,
+        image: img || base.image,
+        likes: likedIds.length,
       };
     })
   );
-
-  return enriched;
 }
 
-/** Obtiene un artista por ID */
+/**
+ * Obtiene un único artista filtrando por ID en la lista completa
+ */
 export async function fetchOneArtistFromApi(idArtista: string): Promise<Artist> {
   const all = await fetchArtistsFromApi();
   const found = all.find(a => a.idArtista === idArtista);
@@ -102,15 +138,15 @@ export async function fetchOneArtistFromApi(idArtista: string): Promise<Artist> 
 export async function createArtistOnApi(newArtist: Partial<Artist>): Promise<void> {
   const token = await login();
   const socialsBody = {
-    idSocial: "",
-    mdInstagram: newArtist.instagramURL ?? "",
-    mdSpotify: newArtist.spotifyURL ?? "",
-    mdSoundcloud: newArtist.soundcloudURL ?? "",
+    idSocial:   "",
+    mdInstagram:newArtist.instagramURL ?? "",
+    mdSpotify:  newArtist.spotifyURL   ?? "",
+    mdSoundcloud:newArtist.soundcloudURL?? "",
   };
   const body = {
-    nombre: newArtist.name,
-    bio: newArtist.description,
-    socials: socialsBody,
+    nombre:   newArtist.name,
+    bio:      newArtist.description,
+    socials:  socialsBody,
     isActivo: true,
   };
   await apiClient.post(
@@ -124,17 +160,17 @@ export async function createArtistOnApi(newArtist: Partial<Artist>): Promise<voi
 export async function updateArtistOnApi(artist: Partial<Artist>): Promise<void> {
   const token = await login();
   const socialsBody = {
-    idSocial: artist.idSocial ?? "",
-    mdInstagram: artist.instagramURL ?? "",
-    mdSpotify: artist.spotifyURL ?? "",
-    mdSoundcloud: artist.soundcloudURL ?? "",
+    idSocial:   artist.idSocial ?? "",
+    mdInstagram:artist.instagramURL ?? "",
+    mdSpotify:  artist.spotifyURL   ?? "",
+    mdSoundcloud:artist.soundcloudURL?? "",
   };
   const body = {
     idArtista: artist.idArtista,
-    nombre: artist.name,
-    bio: artist.description,
-    socials: socialsBody,
-    isActivo: artist.isActivo === true,
+    nombre:    artist.name,
+    bio:       artist.description,
+    socials:   socialsBody,
+    isActivo:  artist.isActivo === true,
   };
   await apiClient.put(
     "/v1/Artista/UpdateArtista",
