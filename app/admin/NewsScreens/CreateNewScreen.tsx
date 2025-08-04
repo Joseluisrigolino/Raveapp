@@ -1,6 +1,6 @@
 // src/screens/admin/NewsScreens/CreateNewScreen.tsx
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -18,7 +18,8 @@ import { useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import { createNews, getNews } from "@/utils/news/newsApi";
+import { createNews } from "@/utils/news/newsApi";
+import { fetchEvents } from "@/utils/events/eventApi";
 import { mediaApi } from "@/utils/mediaApi";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
@@ -27,6 +28,24 @@ export default function CreateNewScreen() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [eventos, setEventos] = useState<
+    { idEvento: string; nombre: string; imageUrl?: string }[]
+  >([]);
+  const [eventoSeleccionado, setEventoSeleccionado] = useState<string | null>(null);
+  const [showEventos, setShowEventos] = useState(false);
+
+  useEffect(() => {
+    fetchEvents()
+      .then((res) => {
+        const simples = res.map((e) => ({
+          idEvento: e.id,
+          nombre: e.title,
+          imageUrl: e.imageUrl,
+        }));
+        setEventos(simples);
+      })
+      .catch((err) => console.error("Error al cargar eventos:", err));
+  }, []);
 
   const handleSelectImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -53,19 +72,20 @@ export default function CreateNewScreen() {
 
   const handleCreateNews = async () => {
     if (!title.trim() || !body.trim()) {
-      return Alert.alert("Error", "Título y cuerpo son obligatorios.");
+      return Alert.alert("Error", "Título y contenido son obligatorios.");
     }
 
     try {
-      await createNews({
+      const nueva = await createNews({
         titulo: title,
         contenido: body,
         dtPublicado: new Date().toISOString(),
+        urlEvento: eventoSeleccionado
+          ? `https://raveapp.com.ar/evento/${eventoSeleccionado}`
+          : null,
       });
 
-      const noticias = await getNews();
-      const creada = noticias.find((n) => n.titulo === title);
-      if (!creada) throw new Error("No se pudo identificar la noticia creada.");
+      if (!nueva?.idNoticia) throw new Error("No se pudo crear la noticia correctamente.");
 
       if (imageUri) {
         const fileName = imageUri.split("/").pop() ?? "image.jpg";
@@ -75,7 +95,7 @@ export default function CreateNewScreen() {
           name: fileName,
           type: fileType,
         };
-        await mediaApi.upload(creada.idNoticia, file);
+        await mediaApi.upload(nueva.idNoticia, file);
       }
 
       Alert.alert("Éxito", "Noticia creada correctamente.");
@@ -142,6 +162,42 @@ export default function CreateNewScreen() {
           value={body}
           onChangeText={setBody}
         />
+
+        <Text style={styles.label}>Evento relacionado (opcional):</Text>
+        <TouchableOpacity
+          style={styles.dropdownButton}
+          onPress={() => setShowEventos(!showEventos)}
+        >
+          <Text style={styles.dropdownText}>
+            {eventoSeleccionado
+              ? eventos.find((e) => e.idEvento === eventoSeleccionado)?.nombre || "Evento seleccionado"
+              : "Seleccioná un evento..."}
+          </Text>
+        </TouchableOpacity>
+
+        {showEventos && (
+          <View style={styles.dropdownContainer}>
+            {eventos.map((e, index) => (
+              <TouchableOpacity
+                key={e.idEvento || `evento-${index}`}
+                style={styles.dropdownItem}
+                onPress={() => {
+                  setEventoSeleccionado(e.idEvento);
+                  setShowEventos(false);
+                }}
+              >
+                <View style={styles.eventItem}>
+                  {e.imageUrl ? (
+                    <Image source={{ uri: e.imageUrl }} style={styles.eventImage} />
+                  ) : (
+                    <View style={[styles.eventImage, { backgroundColor: "#ccc" }]} />
+                  )}
+                  <Text style={styles.eventName}>{e.nombre}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         <TouchableOpacity style={styles.btn} onPress={handleCreateNews}>
           <Text style={styles.btnText}>Crear Noticia</Text>
@@ -235,6 +291,46 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontFamily: FONTS.bodyRegular,
     textAlign: "center",
+  },
+  dropdownButton: {
+    backgroundColor: COLORS.cardBg,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: RADIUS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    marginBottom: 8,
+  },
+  dropdownText: {
+    fontFamily: FONTS.bodyRegular,
+    color: COLORS.textPrimary,
+  },
+  dropdownContainer: {
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.cardBg,
+    marginBottom: 16,
+  },
+  dropdownItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  eventItem: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  eventImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  eventName: {
+    fontFamily: FONTS.bodyRegular,
+    color: COLORS.textPrimary,
   },
   btn: {
     backgroundColor: COLORS.primary,

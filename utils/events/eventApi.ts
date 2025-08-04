@@ -95,6 +95,9 @@ export async function fetchEvents(): Promise<EventItem[]> {
     })
   );
 
+
+  
   console.log("[debug|fetchEvents] eventos formateados:", enriched);
   return enriched;
 }
+

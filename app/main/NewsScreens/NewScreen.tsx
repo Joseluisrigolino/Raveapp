@@ -19,43 +19,69 @@ import Footer from "@/components/layout/FooterComponent";
 import TitlePers from "@/components/common/TitleComponent";
 import { NewsItem } from "@/interfaces/NewsProps";
 import { getNewsById } from "@/utils/news/newsApi";
-import { getEventById, ExtendedEventItem } from "@/utils/events/eventHelpers";
+import { getEventById } from "@/utils/events/eventHelpers";
+import { fetchEvents } from "@/utils/events/eventApi";
 import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function NewScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [newsItem, setNewsItem] = useState<NewsItem | null>(null);
-  const [linkedEvent, setLinkedEvent] = useState<ExtendedEventItem | null>(null);
+  const [linkedEventId, setLinkedEventId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // controla si se muestra el botón "Ver evento"
-  const [showEventButton, setShowEventButton] = useState(true);
 
   const router = useRouter();
 
   useEffect(() => {
-    async function fetchNews() {
-      if (!id) {
-        setLoading(false);
-        return;
-      }
+    async function fetchNewsAndEvent() {
+      if (!id) return setLoading(false);
+
       try {
         const found = await getNewsById(id);
-        if (found) {
-          setNewsItem(found);
-          if (found.eventId) {
-            const ev = getEventById(found.eventId);
-            if (ev) setLinkedEvent(ev);
+        if (!found) return;
+
+        setNewsItem(found);
+
+        if (found.urlEvento && found.urlEvento.includes("/evento/")) {
+          const eventId = found.urlEvento.split("/evento/")[1];
+          const events = await fetchEvents();
+          const eventExists = events.find(e => e.id === eventId);
+
+          if (eventExists) {
+            setLinkedEventId(eventId);
           }
         }
-      } catch (error) {
-        console.error("Error fetching news by id:", error);
+      } catch (err) {
+        console.error("Error al cargar noticia o evento:", err);
       } finally {
         setLoading(false);
       }
     }
-    fetchNews();
+
+    fetchNewsAndEvent();
   }, [id]);
+
+  const linkifyText = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const tokens = text.split(urlRegex);
+    return tokens.map((token, i) =>
+      urlRegex.test(token) ? (
+        <Text
+          key={i}
+          style={styles.link}
+          onPress={() => Linking.openURL(token)}
+        >
+          {token}
+        </Text>
+      ) : (
+        token
+      )
+    );
+  };
+
+  const handleGoToEvent = () => {
+    if (!linkedEventId) return;
+    router.push(`/main/EventsScreens/EventScreen?id=${linkedEventId}`);
+  };
 
   if (loading) {
     return (
@@ -80,27 +106,6 @@ export default function NewScreen() {
       </SafeAreaView>
     );
   }
-
-  const linkifyText = (text: string) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const tokens = text.split(urlRegex);
-    return tokens.map((token, i) =>
-      urlRegex.test(token) ? (
-        <Text
-          key={i}
-          style={styles.link}
-          onPress={() => Linking.openURL(token)}
-        >
-          {token}
-        </Text>
-      ) : (
-        token
-      )
-    );
-  };
-
-  const handleGoToEvent = (eventId: number) =>
-    router.push(`/main/EventsScreens/EventScreen?id=${eventId}`);
 
   return (
     <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
@@ -128,32 +133,13 @@ export default function NewScreen() {
               </Text>
             )}
 
-            {/* botón "Ver evento" controlado solo por showEventButton */}
-            {showEventButton && (
+            {linkedEventId && (
               <TouchableOpacity
                 style={styles.verEventoButton}
-                onPress={() =>
-                  linkedEvent && handleGoToEvent(linkedEvent.id)
-                }
+                onPress={handleGoToEvent}
               >
                 <Text style={styles.verEventoButtonText}>Ver evento</Text>
               </TouchableOpacity>
-            )}
-
-            {/* detalles del evento relacionado */}
-            {linkedEvent && (
-              <View style={styles.eventContainer}>
-                <Text style={styles.eventLabel}>Evento relacionado:</Text>
-                <Text style={styles.eventTitle}>{linkedEvent.title}</Text>
-                <Text style={styles.eventDate}>
-                  {linkedEvent.date} – {linkedEvent.timeRange}
-                </Text>
-                <Image
-                  source={{ uri: linkedEvent.imageUrl }}
-                  style={styles.eventImage}
-                  resizeMode="cover"
-                />
-              </View>
             )}
           </View>
         </ScrollView>
@@ -211,40 +197,6 @@ const styles = StyleSheet.create({
     color: COLORS.cardBg,
     fontWeight: "bold",
     fontSize: FONT_SIZES.body,
-  },
-  eventContainer: {
-    width: "100%",
-    backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.card,
-    padding: 12,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  eventLabel: {
-    fontWeight: "bold",
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textPrimary,
-    marginBottom: 6,
-  },
-  eventTitle: {
-    fontSize: FONT_SIZES.subTitle,
-    color: COLORS.textPrimary,
-    fontWeight: "bold",
-  },
-  eventDate: {
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textSecondary,
-    marginBottom: 8,
-  },
-  eventImage: {
-    width: "100%",
-    height: 150,
-    borderRadius: RADIUS.card,
-    marginBottom: 12,
   },
   loadingContainer: {
     flex: 1,
