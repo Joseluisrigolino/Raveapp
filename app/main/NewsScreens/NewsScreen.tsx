@@ -51,7 +51,7 @@ export default function NewsScreen() {
   const currentScreen = path.split("/").pop() || "";
   const tabs = [
     {
-      label: "Adm Noticias",
+      label: "Administrar Noticias",
       route: "/admin/NewsScreens/ManageNewScreen",
       isActive: currentScreen === "ManageNewsScreen",
       visible: isAdmin,

@@ -1,5 +1,3 @@
-// src/utils/events/eventApi.ts
-
 import { EventItem } from "@/interfaces/EventItem";
 import { apiClient, login } from "@/utils/apiConfig";
 import { mediaApi } from "@/utils/mediaApi";
@@ -41,7 +39,9 @@ async function fetchEventMediaUrl(idEvento: string): Promise<string> {
     const m = data.media?.[0];
     let img = m?.url ?? m?.imagen ?? "";
     if (img && m?.imagen && !/^https?:\/\//.test(img)) {
-      img = `${apiClient.defaults.baseURL}${img.startsWith("/") ? "" : "/"}${img}`;
+      img = `${apiClient.defaults.baseURL}${
+        img.startsWith("/") ? "" : "/"
+      }${img}`;
     }
     return img;
   } catch {
@@ -50,54 +50,53 @@ async function fetchEventMediaUrl(idEvento: string): Promise<string> {
 }
 
 /**
- * Obtiene solamente eventos con estado===2, pasando Estado=2 en la query string,
- * y les enriquece la primera imagen.
+ * Trae eventos según el Estado indicado (por defecto Estado = 2)
  */
-export async function fetchEvents(): Promise<EventItem[]> {
+export async function fetchEvents(estado: number = 2): Promise<EventItem[]> {
   const token = await login();
-  // Llamada con ?Estado=2
   const resp = await apiClient.get<{ eventos: any[] }>(
     "/v1/Evento/GetEventos",
     {
-      params: { Estado: 2 },
+      params: { Estado: estado },
       headers: { Authorization: `Bearer ${token}` },
     }
   );
 
-  console.log("[debug|fetchEvents] respuesta completa:", resp.data);
+  console.log(
+    `[debug|fetchEvents Estado=${estado}] respuesta completa:`,
+    resp.data
+  );
 
   const list = resp.data.eventos ?? [];
-  // Si tu API devuelve directamente un array:
-  // const list = Array.isArray(resp.data) ? resp.data : resp.data.eventos;
 
-  // Enriquecemos y formateamos
   const enriched = await Promise.all(
-    list.map(async e => {
+    list.map(async (e) => {
       const inicioIso = e.fechas?.[0]?.inicio ?? e.inicioEvento;
-      const finIso    = e.fechas?.[0]?.fin    ?? e.finEvento;
+      const finIso = e.fechas?.[0]?.fin ?? e.finEvento;
 
       const mediaUrl = await fetchEventMediaUrl(e.idEvento);
       const fallback = e.media?.[0]?.imagen ?? "";
       const imageUrl = mediaUrl || fallback;
 
       return {
-        id:          e.idEvento,
-        title:       e.nombre,
-        date:        formatDate(inicioIso),
-        timeRange:   formatTimeRange(inicioIso, finIso),
-        address:     e.domicilio?.direccion ?? "",
+        id: e.idEvento,
+        title: e.nombre,
+        date: formatDate(inicioIso),
+        timeRange: formatTimeRange(inicioIso, finIso),
+        address: e.domicilio?.direccion ?? "",
         description: e.descripcion,
         imageUrl,
-        type:        mapGenre(Array.isArray(e.genero) ? e.genero[0] : 0),
-        // opcional:
-        estado:      e.fechas?.[0]?.estado,
+        type: mapGenre(Array.isArray(e.genero) ? e.genero[0] : 0),
+        estado: e.fechas?.[0]?.estado,
+        ownerName: e.propietario?.nombre,
+        ownerEmail: e.propietario?.correo,
       } as EventItem & { estado: number };
     })
   );
 
-
-  
-  console.log("[debug|fetchEvents] eventos formateados:", enriched);
+  console.log(
+    `[debug|fetchEvents Estado=${estado}] eventos formateados:`,
+    enriched
+  );
   return enriched;
 }
-

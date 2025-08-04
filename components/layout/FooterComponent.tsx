@@ -13,14 +13,15 @@ export default function Footer() {
   const { user } = useAuth();
 
   const isAdmin = Array.isArray(user?.roles)
-    ? user?.roles.includes("admin")
+    ? user.roles.includes("admin")
     : user?.roles === "admin";
 
   const randomProfileImage = useMemo(
     () => `https://picsum.photos/seed/${Math.floor(Math.random() * 10000)}/200`,
     []
   );
-  const [profileImageUrl, setProfileImageUrl] = useState<string>(randomProfileImage);
+  const [profileImageUrl, setProfileImageUrl] =
+    useState<string>(randomProfileImage);
 
   useEffect(() => {
     if (!user?.username) return;
@@ -31,7 +32,9 @@ export default function Footer() {
         const m = data.media?.[0];
         let img = m?.url ?? m?.imagen ?? "";
         if (img && m?.imagen && !/^https?:\/\//.test(img)) {
-          img = `${apiClient.defaults.baseURL}${img.startsWith("/") ? "" : "/"}${img}`;
+          img = `${apiClient.defaults.baseURL}${
+            img.startsWith("/") ? "" : "/"
+          }${img}`;
         }
         setProfileImageUrl(img || randomProfileImage);
       } catch (err) {
@@ -42,11 +45,12 @@ export default function Footer() {
   }, [user]);
 
   // Rutas
-  const handleHomePress = () => router.replace("/main/EventsScreens/MenuScreen");
+  const handleHomePress = () =>
+    router.replace("/main/EventsScreens/MenuScreen");
   const handleNewsPress = () =>
     router.replace(
       isAdmin
-        ? "/admin/NewsScreens/ManageNewScreen"
+        ? "/admin/NewsScreens/ManageNewsScreen"
         : "/main/NewsScreens/NewsScreen"
     );
   const handleTicketsPress = () =>
@@ -61,6 +65,7 @@ export default function Footer() {
     router.replace("/admin/ArtistScreens/ManageArtistsScreen");
   const handleProfilePress = () =>
     router.replace("/main/UserScreens/UserProfileEditScreen");
+  const handleTycPress = () => router.replace("/admin/Tyc");
 
   return (
     <View style={styles.container}>
@@ -107,6 +112,16 @@ export default function Footer() {
           size={24}
           iconColor={COLORS.textPrimary}
           onPress={handleArtistsPress}
+        />
+      )}
+
+      {/* Términos y condiciones (solo admin) */}
+      {isAdmin && (
+        <IconButton
+          icon="shield-document-outline"
+          size={24}
+          iconColor={COLORS.textPrimary}
+          onPress={handleTycPress}
         />
       )}
 

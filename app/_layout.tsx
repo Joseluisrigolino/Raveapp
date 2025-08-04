@@ -39,6 +39,7 @@ export default function RootLayout() {
         <Stack.Screen name="ValidateEventScreen" />
         <Stack.Screen name="ManageEventsScreen" />
         <Stack.Screen name="ModifyEventScreen" />
+        <Stack.Screen name="Tyc" />
       </Stack>
     </AuthProvider>
   );

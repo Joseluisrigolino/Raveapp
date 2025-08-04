@@ -34,7 +34,7 @@ export default function EventsToValidateScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await fetchEvents();
+        const data = await fetchEvents(0); // ahora pedimos Estado = 0
         setEvents(data);
       } catch (e) {
         console.error("Error al cargar eventos:", e);
@@ -44,11 +44,10 @@ export default function EventsToValidateScreen() {
     })();
   }, []);
 
-  const filtered = events.filter(ev => {
+  const filtered = events.filter((ev) => {
     const q = searchText.toLowerCase();
     return (
-      ev.title.toLowerCase().includes(q) ||
-      ev.address.toLowerCase().includes(q)
+      ev.title.toLowerCase().includes(q) || ev.address.toLowerCase().includes(q)
     );
   });
 
@@ -66,18 +65,18 @@ export default function EventsToValidateScreen() {
       <View style={styles.cardContent}>
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.label}>
-          <Text style={styles.bold}>Fecha(s): </Text>{item.date}
+          <Text style={styles.bold}>Fecha(s): </Text>
+          {item.date}
         </Text>
         <Text style={styles.label}>
-          <Text style={styles.bold}>Género(s): </Text>{item.type}
+          <Text style={styles.bold}>Género(s): </Text>
+          {item.type}
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>Propietario: </Text>
           {item.ownerName ?? "N/D"}
         </Text>
-        {item.ownerEmail && (
-          <Text style={styles.label}>{item.ownerEmail}</Text>
-        )}
+        {item.ownerEmail && <Text style={styles.label}>{item.ownerEmail}</Text>}
 
         <TouchableOpacity
           style={styles.button}
@@ -109,7 +108,7 @@ export default function EventsToValidateScreen() {
           ) : (
             <FlatList
               data={filtered}
-              keyExtractor={item => item.id}
+              keyExtractor={(item) => item.id}
               renderItem={renderItem}
               contentContainerStyle={{ paddingBottom: 40 }}
             />
