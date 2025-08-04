@@ -1,99 +1,124 @@
+// src/screens/admin/EventsValidateScreens/EventsToValidateScreen.tsx
+
 import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
   View,
   Text,
-  StyleSheet,
   FlatList,
+  Image,
+  TextInput,
   TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
 } from "react-native";
 import { useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import { getAllEventsToValidate } from "@/utils/events/validationEventHelpers";
-import { EventToValidate } from "@/interfaces/EventToValidateProps";
+import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 
-import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { fetchEvents } from "@/utils/events/eventApi";
+import { EventItem } from "@/interfaces/EventItem";
+import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+
+const PLACEHOLDER_IMAGE = "https://via.placeholder.com/400x200?text=Sin+imagen";
 
 export default function EventsToValidateScreen() {
   const router = useRouter();
-  const [events, setEvents] = useState<EventToValidate[]>([]);
+
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchText, setSearchText] = useState("");
 
   useEffect(() => {
-    const data = getAllEventsToValidate();
-    setEvents(data);
+    (async () => {
+      try {
+        const data = await fetchEvents();
+        setEvents(data);
+      } catch (e) {
+        console.error("Error al cargar eventos:", e);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  // Navegar a la pantalla de verificación
-  const handleVerify = (id: number) => {
+  const filtered = events.filter(ev => {
+    const q = searchText.toLowerCase();
+    return (
+      ev.title.toLowerCase().includes(q) ||
+      ev.address.toLowerCase().includes(q)
+    );
+  });
+
+  const handleVerify = (id: string) => {
     router.push(`/admin/EventsValidateScreens/ValidateEventScreen?id=${id}`);
   };
 
-  // Botón para crear evento
-  const handleCreateEvent = () => {
-    router.push("/main/EventsScreens/CreateEventScreen");
-  };
+  const renderItem = ({ item }: { item: EventItem }) => (
+    <View style={styles.card}>
+      <Image
+        source={{ uri: item.imageUrl || PLACEHOLDER_IMAGE }}
+        style={styles.image}
+        resizeMode="cover"
+      />
+      <View style={styles.cardContent}>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.label}>
+          <Text style={styles.bold}>Fecha(s): </Text>{item.date}
+        </Text>
+        <Text style={styles.label}>
+          <Text style={styles.bold}>Género(s): </Text>{item.type}
+        </Text>
+        <Text style={styles.label}>
+          <Text style={styles.bold}>Propietario: </Text>
+          {item.ownerName ?? "N/D"}
+        </Text>
+        {item.ownerEmail && (
+          <Text style={styles.label}>{item.ownerEmail}</Text>
+        )}
 
-  // Render de cada item
-  const renderItem = ({ item }: { item: EventToValidate }) => (
-    <View style={styles.cardContainer}>
-      <Text style={styles.eventDate}>
-        <Text style={styles.label}>Fecha del evento: </Text>
-        {item.eventDate}
-      </Text>
-
-      <Text style={styles.creationDate}>
-        <Text style={styles.label}>Fecha de creación: </Text>
-        {item.creationDate}
-      </Text>
-
-      <Text style={styles.titleText}>
-        <Text style={styles.label}>Nombre del evento: </Text>
-        {item.title}
-      </Text>
-
-      <Text style={styles.typeText}>
-        <Text style={styles.label}>Género: </Text>
-        {item.type}
-      </Text>
-
-      <Text style={styles.ownerText}>
-        <Text style={styles.label}>Propietario: </Text>
-        {item.ownerUser}
-      </Text>
-
-      <TouchableOpacity
-        style={styles.verifyButton}
-        onPress={() => handleVerify(item.id)}
-      >
-        <Text style={styles.verifyButtonText}>Verificar</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => handleVerify(item.id)}
+        >
+          <Text style={styles.buttonText}>VERIFICAR</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header />
+    <ProtectedRoute allowedRoles={["admin"]}>
+      <SafeAreaView style={styles.container}>
+        <Header />
 
-      <View style={styles.content}>
-        {/* Botón "Crear evento" al principio, con estilo alargado */}
-        <TouchableOpacity style={styles.createButton} onPress={handleCreateEvent}>
-          <Text style={styles.createButtonText}>Crear evento</Text>
-        </TouchableOpacity>
+        <View style={styles.content}>
+          <Text style={styles.titleScreen}>Eventos a validar:</Text>
 
-        <Text style={styles.screenTitle}>Eventos a validar:</Text>
+          <TextInput
+            placeholder="Buscar por nombre del evento o propietario"
+            style={styles.search}
+            value={searchText}
+            onChangeText={setSearchText}
+          />
 
-        <FlatList
-          data={events}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-        />
-      </View>
+          {loading ? (
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          ) : (
+            <FlatList
+              data={filtered}
+              keyExtractor={item => item.id}
+              renderItem={renderItem}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            />
+          )}
+        </View>
 
-      <Footer />
-    </SafeAreaView>
+        <Footer />
+      </SafeAreaView>
+    </ProtectedRoute>
   );
 }
 
@@ -106,77 +131,62 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  // === Botón "Crear evento" alargado (similar a ManageNewsScreen) ===
-  createButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.card,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    alignItems: "center",
+  titleScreen: {
+    fontFamily: FONTS.titleBold,
+    fontSize: FONT_SIZES.title,
+    color: COLORS.textPrimary,
     marginBottom: 12,
   },
-  createButtonText: {
-    color: COLORS.cardBg,
-    fontWeight: "bold",
+  search: {
+    backgroundColor: COLORS.cardBg,
+    borderColor: COLORS.borderInput,
+    borderWidth: 1,
+    borderRadius: RADIUS.card,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
+    fontFamily: FONTS.bodyRegular,
     fontSize: FONT_SIZES.body,
   },
-  // ===============================================================
-
-  screenTitle: {
-    fontSize: FONT_SIZES.subTitle,
-    fontWeight: "bold",
-    marginBottom: 12,
-    color: COLORS.textPrimary,
-  },
-  listContent: {
-    paddingBottom: 20,
-  },
-
-  cardContainer: {
+  card: {
     backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.card,
-    padding: 12,
-    marginBottom: 12,
-    // Sombra suave (opcional)
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    marginBottom: 16,
+    overflow: "hidden",
     elevation: 2,
   },
+  image: {
+    width: "100%",
+    height: 160,
+    backgroundColor: COLORS.borderInput,
+  },
+  cardContent: {
+    padding: 12,
+  },
+  title: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.subTitle,
+    color: COLORS.textPrimary,
+    marginBottom: 6,
+  },
   label: {
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-  },
-  eventDate: {
-    marginBottom: 4,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
     color: COLORS.textSecondary,
+    marginBottom: 2,
   },
-  creationDate: {
-    marginBottom: 4,
-    color: COLORS.textSecondary,
-  },
-  titleText: {
-    marginBottom: 4,
-    color: COLORS.textPrimary,
-    fontWeight: "600",
-  },
-  typeText: {
-    marginBottom: 4,
+  bold: {
+    fontFamily: FONTS.subTitleMedium,
     color: COLORS.textPrimary,
   },
-  ownerText: {
-    marginBottom: 8,
-    color: COLORS.textPrimary,
-  },
-  verifyButton: {
-    alignSelf: "flex-start",
-    backgroundColor: COLORS.alternative, // color para "Verificar"
+  button: {
+    marginTop: 10,
+    backgroundColor: COLORS.alternative,
     borderRadius: RADIUS.card,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignItems: "center",
   },
-  verifyButtonText: {
+  buttonText: {
     color: COLORS.cardBg,
     fontWeight: "bold",
     fontSize: FONT_SIZES.body,

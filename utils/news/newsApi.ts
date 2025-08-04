@@ -1,8 +1,9 @@
 // src/utils/news/newsApi.ts
 import { apiClient, login } from "../apiConfig";
 import { NewsItem } from "@/interfaces/NewsProps";
+import { mediaApi } from "@/utils/mediaApi";
 
-/** Obtiene todas las noticias */
+/** Obtiene todas las noticias y les asocia la imagen desde mediaApi */
 export async function getNews(): Promise<NewsItem[]> {
   const token = await login();
   const response = await apiClient.get<{
@@ -15,48 +16,83 @@ export async function getNews(): Promise<NewsItem[]> {
     },
   });
 
-  console.log("[debug] getNews response.data:", response.data);
-
-  // toma uno u otro campo según llegue
   const list = response.data.noticias ?? response.data.Noticia ?? [];
-  return Array.isArray(list) ? list : [];
+  if (!Array.isArray(list)) return [];
+
+  const newsWithMedia = await Promise.all(
+    list.map(async (noticia) => {
+      try {
+        const media = await mediaApi.getByEntidad(noticia.idNoticia);
+        if (media?.media?.length > 0) {
+          return {
+            ...noticia,
+            imagen: media.media[0].url,
+          };
+        }
+      } catch (err) {
+        console.error(
+          "Error al obtener media para noticia",
+          noticia.idNoticia,
+          err
+        );
+      }
+      return noticia;
+    })
+  );
+
+  return newsWithMedia;
 }
 
-/** Obtiene una noticia por su idNoticia */
+/** Obtiene una noticia por su idNoticia, incluyendo su media */
 export async function getNewsById(id: string): Promise<NewsItem | null> {
-  const all = await getNews();
-  return all.find(item => item.idNoticia === id) || null;
+  const token = await login();
+  const response = await apiClient.get<{
+    noticias?: NewsItem[];
+    Noticia?: NewsItem[];
+  }>("/v1/Noticia", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "*/*",
+    },
+  });
+
+  const list = response.data.noticias ?? response.data.Noticia ?? [];
+  const noticia = list.find((n) => n.idNoticia === id);
+  if (!noticia) return null;
+
+  try {
+    const media = await mediaApi.getByEntidad(noticia.idNoticia);
+    if (media?.media?.length > 0) {
+      noticia.imagen = media.media[0].url;
+    }
+  } catch (err) {
+    console.warn("[newsApi] No se pudo cargar imagen de la noticia", err);
+  }
+
+  return noticia;
 }
 
 /** Crea una noticia */
 export async function createNews(news: Partial<NewsItem>): Promise<NewsItem> {
   const token = await login();
-  const response = await apiClient.post<NewsItem>(
-    "/v1/Noticia",
-    news,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
+  const response = await apiClient.post<NewsItem>("/v1/Noticia", news, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
   return response.data;
 }
 
 /** Actualiza (PUT) una noticia */
 export async function updateNews(news: Partial<NewsItem>): Promise<NewsItem> {
   const token = await login();
-  const response = await apiClient.put<NewsItem>(
-    "/v1/Noticia",
-    news,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
+  const response = await apiClient.put<NewsItem>("/v1/Noticia", news, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
   return response.data;
 }
 

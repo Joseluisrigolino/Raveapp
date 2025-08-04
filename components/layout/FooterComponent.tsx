@@ -1,5 +1,3 @@
-// components/layout/Footer.tsx
-
 import React, { useState, useEffect, useMemo } from "react";
 import { View, StyleSheet, Image, TouchableOpacity } from "react-native";
 import { IconButton } from "react-native-paper";
@@ -13,9 +11,11 @@ import { COLORS } from "@/styles/globalStyles";
 export default function Footer() {
   const router = useRouter();
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";  // como estaba originalmente
 
-  // fallback aleatorio hasta que cargue la real
+  const isAdmin = Array.isArray(user?.roles)
+    ? user?.roles.includes("admin")
+    : user?.roles === "admin";
+
   const randomProfileImage = useMemo(
     () => `https://picsum.photos/seed/${Math.floor(Math.random() * 10000)}/200`,
     []
@@ -26,13 +26,8 @@ export default function Footer() {
     if (!user?.username) return;
     (async () => {
       try {
-        // traigo perfil para obtener idUsuario
         const u = await getProfile(user.username);
-        console.log("[Footer] perfil:", u);
-
-        // traigo media del usuario
         const data: any = await mediaApi.getByEntidad(u.idUsuario);
-        console.log("[Footer] mediaApi.getByEntidad:", data);
         const m = data.media?.[0];
         let img = m?.url ?? m?.imagen ?? "";
         if (img && m?.imagen && !/^https?:\/\//.test(img)) {
@@ -46,7 +41,7 @@ export default function Footer() {
     })();
   }, [user]);
 
-  // rutas
+  // Rutas
   const handleHomePress = () => router.replace("/main/EventsScreens/MenuScreen");
   const handleNewsPress = () =>
     router.replace(
@@ -69,7 +64,7 @@ export default function Footer() {
 
   return (
     <View style={styles.container}>
-      {/* Home (solo usuarios normales) */}
+      {/* Home (usuarios comunes) */}
       {!isAdmin && (
         <IconButton
           icon="home"
@@ -79,7 +74,7 @@ export default function Footer() {
         />
       )}
 
-      {/* Noticias */}
+      {/* Noticias (todos los roles) */}
       <IconButton
         icon="newspaper-variant-multiple"
         size={24}
@@ -87,7 +82,7 @@ export default function Footer() {
         onPress={handleNewsPress}
       />
 
-      {/* Tickets (solo usuarios normales) */}
+      {/* Tickets (usuarios comunes) */}
       {!isAdmin && (
         <IconButton
           icon="ticket"

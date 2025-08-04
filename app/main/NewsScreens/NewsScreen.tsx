@@ -1,5 +1,3 @@
-// src/screens/NewsScreens/NewsScreen.tsx
-
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -40,7 +38,6 @@ export default function NewsScreen() {
     (async () => {
       try {
         const data = await getNews();
-        console.log("[debug] Loaded newsList:", data);
         setNewsList(data);
       } catch (err) {
         console.error("[debug] Error fetching news:", err);
@@ -51,7 +48,6 @@ export default function NewsScreen() {
     })();
   }, []);
 
-  // Construcción de pestañas
   const currentScreen = path.split("/").pop() || "";
   const tabs = [
     {
@@ -61,21 +57,9 @@ export default function NewsScreen() {
       visible: isAdmin,
     },
     {
-      label: "Adm Artistas",
-      route: "/admin/ArtistScreens/ManageArtistsScreen",
-      isActive: currentScreen === "ManageArtistsScreen",
-      visible: isAdmin,
-    },
-    {
       label: "Noticias",
       route: "/main/NewsScreens/NewsScreen",
       isActive: currentScreen === "NewsScreen",
-      visible: true,
-    },
-    {
-      label: "Artistas",
-      route: "/main/ArtistsScreens/ArtistsScreen",
-      isActive: currentScreen === "ArtistsScreen",
       visible: true,
     },
   ].filter(tab => tab.visible);
@@ -87,7 +71,6 @@ export default function NewsScreen() {
     <ProtectedRoute allowedRoles={["admin", "owner", "user"]}>
       <SafeAreaView style={styles.mainContainer}>
         <Header />
-        {/* Siempre mostramos el subheader de navegación */}
         <TabMenuComponent tabs={tabs} />
 
         {loading ? (

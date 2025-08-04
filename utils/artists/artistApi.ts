@@ -1,5 +1,3 @@
-// src/utils/artists/artistApi.ts
-
 import { apiClient, login } from "@/utils/apiConfig";
 import { mediaApi } from "@/utils/mediaApi";
 import { Artist } from "@/interfaces/Artist";
@@ -7,9 +5,8 @@ import { Artist } from "@/interfaces/Artist";
 interface ApiMedia {
   idMedia: string;
   idEntidadMedia: string;
-  imagen?: string;
-  url?: string;
-  mdVideo: string | null;
+  imagen?: string | null;
+  url?: string | null;
 }
 
 interface ApiSocials {
@@ -25,165 +22,156 @@ interface ApiArtist {
   bio: string;
   dtAlta: string;
   isActivo: number;
-  media: ApiMedia[];
+  media: ApiMedia[] | null;
   socials: ApiSocials;
-}
-
-const PLACEHOLDER = "https://picsum.photos/200/200?random=999";
-
-/** 1) Trae las IDs de las imágenes liked */
-async function fetchLikedImageIds(idArtista: string): Promise<string[]> {
-  const token = await login();
-  const resp = await apiClient.get<string[]>(
-    `/v1/Artista/GetImgLikesArtista`,
-    {
-      params: { id: idArtista },
-      headers: { Authorization: `Bearer ${token}` },
-    }
-  );
-  return Array.isArray(resp.data) ? resp.data : [];
-}
-
-/** 2) Trae todo el array de media de un artista */
-async function fetchAllArtistMedia(idArtista: string): Promise<ApiMedia[]> {
-  const raw = await mediaApi.getByEntidad(idArtista);
-  // raw puede venir como array o como { media: [...] }
-  return Array.isArray(raw)
-    ? raw as ApiMedia[]
-    : (raw as any).media ?? [];
-}
-
-/** Mapea la API al modelo local (sin aún asignar imagen ni likes) */
-function parseApiArtist(api: ApiArtist): Omit<Artist, "image" | "likes"> & {
-  image: string;
+  isFavorito: number;
   likes: number;
-} {
-  return {
-    idArtista:     api.idArtista,
-    idSocial:      api.socials.idSocial ?? "",
-    name:          api.nombre,
-    description:   api.bio,
-    creationDate:  api.dtAlta,
-    isActivo:      api.isActivo === 1,
-    instagramURL:  api.socials.mdInstagram ?? "",
-    spotifyURL:    api.socials.mdSpotify ?? "",
-    soundcloudURL: api.socials.mdSoundcloud ?? "",
-    image:         PLACEHOLDER,
-    likes:         0,
-  };
 }
 
-/**
- * Obtiene todos los artistas y enriquece su imagen y likes
- */
+async function fetchArtistImage(idArtista: string): Promise<string> {
+  try {
+    const raw = await mediaApi.getByEntidad(idArtista);
+    const arr = Array.isArray(raw) ? raw : raw.media || [];
+    const m = arr[0];
+    let img = m?.url ?? m?.imagen ?? "";
+    if (img && !/^https?:\/\//.test(img)) {
+      const base = apiClient.defaults.baseURL ?? "";
+      img = `${base}${img.startsWith("/") ? "" : "/"}${img}`;
+    }
+    return img || "";
+  } catch (e) {
+    console.warn("fetchArtistImage error", e);
+    return "";
+  }
+}
+
+export async function fetchOneArtistFromApi(
+  idArtista: string,
+  idUsuario?: string
+): Promise<Artist> {
+  try {
+    const token = await login();
+    const params: Record<string, string> = { idArtista };
+    if (idUsuario) params.idUsuario = idUsuario;
+
+    const resp = await apiClient.get<{ artistas: ApiArtist[] }>(
+      "/v1/Artista/GetArtista",
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        params,
+      }
+    );
+
+    const apiList = resp.data.artistas ?? [];
+    const api = apiList[0];
+
+    if (!api) {
+      // fallback si no devuelve nada, probablemente por no tener media
+      return {
+        idArtista,
+        name: "Artista (sin media)",
+        description: "",
+        creationDate: "",
+        isActivo: false,
+        instagramURL: "",
+        spotifyURL: "",
+        soundcloudURL: "",
+        image: "",
+        likes: 0,
+        isFavorito: false,
+        likedByIds: [],
+        likedByImages: [],
+      };
+    }
+
+    const artist: Artist = {
+      idArtista: api.idArtista,
+      name: api.nombre,
+      description: api.bio,
+      creationDate: api.dtAlta,
+      isActivo: api.isActivo === 1,
+      instagramURL: api.socials.mdInstagram ?? "",
+      spotifyURL: api.socials.mdSpotify ?? "",
+      soundcloudURL: api.socials.mdSoundcloud ?? "",
+      image: await fetchArtistImage(api.idArtista),
+      likes: api.likes,
+      isFavorito: api.isFavorito === 1,
+      likedByIds: [],
+      likedByImages: [],
+    };
+
+    return artist;
+  } catch (err: any) {
+    console.error("❌ fetchOneArtistFromApi ERROR:", err?.response?.data || err);
+    throw err;
+  }
+}
+
 export async function fetchArtistsFromApi(): Promise<Artist[]> {
   const token = await login();
-  let resp;
-  // Intento principal: GetArtistas
-  try {
-    resp = await apiClient.get<{ artistas: ApiArtist[] }>(
-      "/v1/Artista/GetArtistas",
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-  } catch (err: any) {
-    if (err.response?.status === 404) {
-      // Fallback si la ruta es distinta
-      resp = await apiClient.get<{ artistas: ApiArtist[] }>(
-        "/v1/Artista/GetArtista",
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-    } else {
-      throw err;
-    }
-  }
-
+  const resp = await apiClient.get<{ artistas: ApiArtist[] }>(
+    "/v1/Artista/GetArtista",
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
   const list = resp.data.artistas ?? [];
-
   return Promise.all(
-    list.map(async apiArt => {
-      const base = parseApiArtist(apiArt);
-
-      // — media principal —
-      const mediaArr = await fetchAllArtistMedia(apiArt.idArtista);
-      const m = mediaArr[0];
-      let img = m?.url ?? m?.imagen ?? "";
-      if (m?.imagen && !/^https?:\/\//.test(img)) {
-        const baseUrl = apiClient.defaults.baseURL ?? "";
-        img = `${baseUrl}${m.imagen.startsWith("/") ? "" : "/"}${m.imagen}`;
-      }
-
-      // — likes —
-      const likedIds = await fetchLikedImageIds(apiArt.idArtista);
-
-      return {
-        ...base,
-        image: img || base.image,
-        likes: likedIds.length,
-      };
+    list.map(async (api) => {
+      const a = await fetchOneArtistFromApi(api.idArtista);
+      return a;
     })
   );
 }
 
-/**
- * Obtiene un único artista filtrando por ID en la lista completa
- */
-export async function fetchOneArtistFromApi(idArtista: string): Promise<Artist> {
-  const all = await fetchArtistsFromApi();
-  const found = all.find(a => a.idArtista === idArtista);
-  if (!found) throw new Error("Artista no encontrado: " + idArtista);
-  return found;
-}
-
-/** Crea un nuevo artista */
-export async function createArtistOnApi(newArtist: Partial<Artist>): Promise<void> {
+export async function createArtistOnApi(
+  newArtist: Partial<Artist>
+): Promise<void> {
   const token = await login();
-  const socialsBody = {
-    idSocial:   "",
-    mdInstagram:newArtist.instagramURL ?? "",
-    mdSpotify:  newArtist.spotifyURL   ?? "",
-    mdSoundcloud:newArtist.soundcloudURL?? "",
-  };
   const body = {
-    nombre:   newArtist.name,
-    bio:      newArtist.description,
-    socials:  socialsBody,
+    nombre: newArtist.name,
+    bio: newArtist.description,
+    socials: {
+      idSocial: "",
+      mdInstagram: newArtist.instagramURL ?? "",
+      mdSpotify: newArtist.spotifyURL ?? "",
+      mdSoundcloud: newArtist.soundcloudURL ?? "",
+    },
     isActivo: true,
   };
-  await apiClient.post(
-    "/v1/Artista/CreateArtista",
-    body,
-    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
-  );
+  await apiClient.post("/v1/Artista/CreateArtista", body, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
 }
 
-/** Actualiza un artista existente */
-export async function updateArtistOnApi(artist: Partial<Artist>): Promise<void> {
+export async function updateArtistOnApi(
+  artist: Partial<Artist>
+): Promise<void> {
   const token = await login();
-  const socialsBody = {
-    idSocial:   artist.idSocial ?? "",
-    mdInstagram:artist.instagramURL ?? "",
-    mdSpotify:  artist.spotifyURL   ?? "",
-    mdSoundcloud:artist.soundcloudURL?? "",
-  };
   const body = {
     idArtista: artist.idArtista,
-    nombre:    artist.name,
-    bio:       artist.description,
-    socials:   socialsBody,
-    isActivo:  artist.isActivo === true,
+    nombre: artist.name,
+    bio: artist.description,
+    socials: {
+      idSocial: artist.idSocial ?? "",
+      mdInstagram: artist.instagramURL ?? "",
+      mdSpotify: artist.spotifyURL ?? "",
+      mdSoundcloud: artist.soundcloudURL ?? "",
+    },
+    isActivo: artist.isActivo === true,
   };
-  await apiClient.put(
-    "/v1/Artista/UpdateArtista",
-    body,
-    { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
-  );
+  await apiClient.put("/v1/Artista/UpdateArtista", body, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
 }
 
-/** Elimina un artista */
 export async function deleteArtistFromApi(idArtista: string): Promise<void> {
   const token = await login();
-  await apiClient.delete(
-    `/v1/Artista/DeleteArtista/${idArtista}`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+  await apiClient.delete(`/v1/Artista/DeleteArtista/${idArtista}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 }

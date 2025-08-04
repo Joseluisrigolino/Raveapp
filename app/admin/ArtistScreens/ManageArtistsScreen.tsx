@@ -24,6 +24,7 @@ import {
   fetchArtistsFromApi,
   deleteArtistFromApi,
 } from "@/utils/artists/artistApi";
+import { mediaApi } from "@/utils/mediaApi";
 import { Artist } from "@/interfaces/Artist";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
@@ -43,7 +44,12 @@ export default function ManageArtistsScreen() {
     setLoading(true);
     try {
       const data = await fetchArtistsFromApi();
-      setArtists(data);
+
+      const sorted = data.sort((a, b) =>
+        a.name.localeCompare(b.name, "es", { sensitivity: "base" })
+      );
+
+      setArtists(sorted);
     } catch (error) {
       console.error("Error al cargar artistas:", error);
       Alert.alert("Error", "No se pudieron cargar los artistas.");
@@ -67,7 +73,10 @@ export default function ManageArtistsScreen() {
   };
 
   const handleEdit = (idArtista: string) => {
-    router.push(`/admin/ArtistScreens/EditArtistScreen?id=${idArtista}`);
+    router.push({
+      pathname: "/admin/ArtistScreens/EditArtistScreen",
+      params: { id: idArtista },
+    });
   };
 
   const handleDelete = (idArtista: string) => {
@@ -81,10 +90,21 @@ export default function ManageArtistsScreen() {
           style: "destructive",
           onPress: async () => {
             try {
+              const media = await mediaApi.getByEntidad(idArtista);
+              if (media?.media?.length > 0) {
+                for (const m of media.media) {
+                  await mediaApi.delete(m.idMedia);
+                }
+              }
+
               await deleteArtistFromApi(idArtista);
-              setArtists(prev => prev.filter(a => a.idArtista !== idArtista));
+
+              setArtists((prev) =>
+                prev.filter((a) => a.idArtista !== idArtista)
+              );
               Alert.alert("Éxito", "Artista eliminado.");
-            } catch {
+            } catch (err) {
+              console.error("Error al eliminar artista o media:", err);
               Alert.alert("Error", "No se pudo eliminar el artista.");
             }
           },
@@ -97,7 +117,7 @@ export default function ManageArtistsScreen() {
     router.push("/admin/ArtistScreens/NewArtistScreen");
   };
 
-  const filtered = artists.filter(a =>
+  const filtered = artists.filter((a) =>
     a.name.toLowerCase().includes(searchText.toLowerCase())
   );
 
@@ -105,32 +125,18 @@ export default function ManageArtistsScreen() {
     ...(isAdmin
       ? [
           {
-            label: "Adm Noticias",
-            route: "/admin/NewsScreens/ManageNewScreen",
-            isActive: path === "/admin/NewsScreens/ManageNewScreen",
-            visible: true,
-          },
-          {
             label: "Adm Artistas",
             route: "/admin/ArtistScreens/ManageArtistsScreen",
             isActive: path === "/admin/ArtistScreens/ManageArtistsScreen",
-            visible: true,
           },
         ]
       : []),
     {
-      label: "Noticias",
-      route: "/main/NewsScreens/NewsScreen",
-      isActive: path === "/main/NewsScreens/NewsScreen",
-      visible: true,
-    },
-    {
       label: "Artistas",
       route: "/main/ArtistsScreens/ArtistsScreen",
       isActive: path === "/main/ArtistsScreens/ArtistsScreen",
-      visible: true,
     },
-  ].filter(tab => tab.visible);
+  ];
 
   const renderItem = ({ item }: { item: Artist }) => (
     <View style={styles.card}>
@@ -147,21 +153,20 @@ export default function ManageArtistsScreen() {
           resizeMode="cover"
         />
       </View>
-      <View style={styles.actions}>
-        <IconButton
-          icon="pencil"
-          size={20}
-          iconColor="#fff"
-          style={[styles.actionButton, { backgroundColor: COLORS.primary }]}
+
+      <View style={styles.buttonsRow}>
+        <TouchableOpacity
+          style={[styles.fullButton, { backgroundColor: COLORS.primary }]}
           onPress={() => handleEdit(item.idArtista)}
-        />
-        <IconButton
-          icon="delete"
-          size={20}
-          iconColor="#fff"
-          style={[styles.actionButton, { backgroundColor: COLORS.negative }]}
+        >
+          <Text style={styles.fullButtonText}>Modificar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.fullButton, { backgroundColor: COLORS.negative }]}
           onPress={() => handleDelete(item.idArtista)}
-        />
+        >
+          <Text style={styles.fullButtonText}>Eliminar</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -172,10 +177,7 @@ export default function ManageArtistsScreen() {
       <TabMenuComponent tabs={tabs} />
 
       <View style={styles.content}>
-        <TouchableOpacity
-          style={styles.createBtn}
-          onPress={handleCreateArtist}
-        >
+        <TouchableOpacity style={styles.createBtn} onPress={handleCreateArtist}>
           <Text style={styles.createText}>+ Crear artista</Text>
         </TouchableOpacity>
 
@@ -197,7 +199,7 @@ export default function ManageArtistsScreen() {
         ) : (
           <FlatList
             data={filtered}
-            keyExtractor={item => item.idArtista}
+            keyExtractor={(item) => item.idArtista}
             renderItem={renderItem}
             contentContainerStyle={styles.list}
           />
@@ -286,9 +288,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
   },
   actions: {
     flexDirection: "row",
@@ -297,5 +299,23 @@ const styles = StyleSheet.create({
   actionButton: {
     marginLeft: 8,
     borderRadius: RADIUS.sm,
+  },
+  buttonsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+    gap: 8,
+  },
+  fullButton: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 6, // más bajo
+    alignItems: "center",
+    
+  },
+  fullButtonText: {
+    color: COLORS.cardBg,
+    fontFamily: FONTS.bodyRegular, // menos pesado
+    fontSize: FONT_SIZES.smallText, // más chico
   },
 });

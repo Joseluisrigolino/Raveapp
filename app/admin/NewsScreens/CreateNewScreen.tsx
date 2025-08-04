@@ -1,4 +1,5 @@
-// src/screens/NewsScreens/CreateNewScreen.tsx
+// src/screens/admin/NewsScreens/CreateNewScreen.tsx
+
 import React, { useState } from "react";
 import {
   SafeAreaView,
@@ -11,121 +12,141 @@ import {
   Image,
   Alert,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import { useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import { createNews } from "@/utils/news/newsApi";
-import { NewsItem } from "@/interfaces/NewsProps";
+import { createNews, getNews } from "@/utils/news/newsApi";
+import { mediaApi } from "@/utils/mediaApi";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function CreateNewScreen() {
-  const [newsTitle, setNewsTitle] = useState("");
-  const [newsBody, setNewsBody] = useState("");
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const router = useRouter();
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [imageUri, setImageUri] = useState<string | null>(null);
 
-  const handleSelectImage = () => {
-    // TODO: integrar expo-image-picker
-    Alert.alert("Seleccionar imagen", "Funcionalidad pendiente...");
+  const handleSelectImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      const asset = result.assets[0];
+      const fileInfo = await FileSystem.getInfoAsync(asset.uri);
+
+      if (fileInfo.size && fileInfo.size > 2 * 1024 * 1024) {
+        Alert.alert("Error", "La imagen supera los 2MB permitidos.");
+        return;
+      }
+
+      setImageUri(asset.uri);
+    }
   };
 
-  const handleSelectEvent = () => {
-    // TODO: mostrar modal o lista de eventos
-    Alert.alert("Seleccionar evento", "Funcionalidad pendiente...");
+  const handleDeleteImage = () => {
+    setImageUri(null);
   };
 
   const handleCreateNews = async () => {
-    if (!newsTitle.trim() || !newsBody.trim()) {
-      Alert.alert("Error", "Título y contenido son obligatorios.");
-      return;
+    if (!title.trim() || !body.trim()) {
+      return Alert.alert("Error", "Título y cuerpo son obligatorios.");
     }
 
-    const newNews: Partial<NewsItem> = {
-      titulo: newsTitle,
-      contenido: newsBody,
-      imagen: selectedImage ?? "",
-      dtPublicado: new Date().toISOString(),
-      eventId: selectedEvent ? Number(selectedEvent) : undefined,
-    };
-
     try {
-      await createNews(newNews);
+      await createNews({
+        titulo: title,
+        contenido: body,
+        dtPublicado: new Date().toISOString(),
+      });
+
+      const noticias = await getNews();
+      const creada = noticias.find((n) => n.titulo === title);
+      if (!creada) throw new Error("No se pudo identificar la noticia creada.");
+
+      if (imageUri) {
+        const fileName = imageUri.split("/").pop() ?? "image.jpg";
+        const fileType = fileName.endsWith(".png") ? "image/png" : "image/jpeg";
+        const file: any = {
+          uri: imageUri,
+          name: fileName,
+          type: fileType,
+        };
+        await mediaApi.upload(creada.idNoticia, file);
+      }
+
       Alert.alert("Éxito", "Noticia creada correctamente.");
-      router.push("/admin/NewsScreens/ManageNewScreen");
-    } catch (err) {
+      router.back();
+    } catch (err: any) {
       console.error("Error al crear noticia:", err);
-      Alert.alert("Error", "No se pudo crear la noticia.");
+      const msg =
+        typeof err?.response?.data === "string"
+          ? err.response.data
+          : JSON.stringify(err?.response?.data || err, null, 2);
+      Alert.alert("Error al crear noticia", msg);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Crear nueva noticia</Text>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Crear Noticia</Text>
-
-        {/* Título */}
         <Text style={styles.label}>Título:</Text>
         <TextInput
           style={styles.input}
-          placeholder="Ingresa el título"
-          value={newsTitle}
-          onChangeText={setNewsTitle}
+          placeholder="Título"
+          value={title}
+          onChangeText={setTitle}
         />
 
-        {/* Cuerpo */}
-        <Text style={styles.label}>Cuerpo:</Text>
-        <View style={styles.textAreaContainer}>
-          <TextInput
-            style={styles.textArea}
-            placeholder="Escribe el contenido..."
-            multiline
-            value={newsBody}
-            onChangeText={setNewsBody}
-          />
-        </View>
-
-        {/* Imagen */}
         <Text style={styles.label}>Imagen:</Text>
-        <View style={styles.row}>
-          <View style={styles.imagePlaceholder}>
-            {selectedImage ? (
-              <Image source={{ uri: selectedImage }} style={styles.image} />
-            ) : (
-              <Text style={styles.placeholderText}>Sin imagen</Text>
-            )}
-          </View>
+        <View style={styles.imageContainer}>
+          {imageUri ? (
+            <>
+              <Image source={{ uri: imageUri }} style={styles.newsImage} />
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={handleDeleteImage}
+              >
+                <Text style={styles.deleteButtonText}>Eliminar imagen</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={[styles.newsImage, styles.imageFallback]}>
+              <Text style={styles.imagePlaceholderText}>Sin imagen</Text>
+            </View>
+          )}
+
           <TouchableOpacity
-            style={styles.buttonSecondary}
+            style={styles.selectImageButton}
             onPress={handleSelectImage}
           >
-            <Text style={styles.buttonSecondaryText}>Seleccionar</Text>
+            <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
           </TouchableOpacity>
-        </View>
 
-        {/* Evento */}
-        <Text style={styles.label}>Asociar a evento:</Text>
-        <View style={styles.row}>
-          <Text style={styles.eventText}>
-            {selectedEvent ?? "Ninguno"}
+          <Text style={styles.imageNotice}>
+            Se permiten imágenes JPG, JPEG o PNG. Peso máximo: 2MB.
           </Text>
-          <TouchableOpacity
-            style={styles.buttonSecondary}
-            onPress={handleSelectEvent}
-          >
-            <Text style={styles.buttonSecondaryText}>Seleccionar</Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Crear */}
-        <TouchableOpacity style={styles.buttonPrimary} onPress={handleCreateNews}>
-          <Text style={styles.buttonPrimaryText}>Crear Noticia</Text>
+        <Text style={styles.label}>Contenido:</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Escribí el contenido de la noticia"
+          multiline
+          value={body}
+          onChangeText={setBody}
+        />
+
+        <TouchableOpacity style={styles.btn} onPress={handleCreateNews}>
+          <Text style={styles.btnText}>Crear Noticia</Text>
         </TouchableOpacity>
       </ScrollView>
-
       <Footer />
     </SafeAreaView>
   );
@@ -136,7 +157,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.backgroundLight,
   },
-  scrollContent: {
+  content: {
     padding: 16,
   },
   title: {
@@ -144,90 +165,87 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.titleMain,
     color: COLORS.textPrimary,
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 16,
+    textDecorationLine: "underline",
   },
   label: {
     fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.subTitle,
+    fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
     marginTop: 12,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   input: {
-    backgroundColor: COLORS.cardBg,
-    borderColor: COLORS.borderInput,
     borderWidth: 1,
+    borderColor: COLORS.borderInput,
     borderRadius: RADIUS.card,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    padding: 10,
+    backgroundColor: COLORS.cardBg,
     fontFamily: FONTS.bodyRegular,
     fontSize: FONT_SIZES.body,
-  },
-  textAreaContainer: {
-    backgroundColor: COLORS.cardBg,
-    borderColor: COLORS.borderInput,
-    borderWidth: 1,
-    borderRadius: RADIUS.card,
-    minHeight: 100,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
   },
   textArea: {
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
+    minHeight: 100,
     textAlignVertical: "top",
   },
-  row: {
-    flexDirection: "row",
+  imageContainer: {
     alignItems: "center",
-    marginBottom: 8,
+    marginVertical: 16,
   },
-  imagePlaceholder: {
-    width: 80,
-    height: 80,
-    backgroundColor: COLORS.borderInput,
+  newsImage: {
+    width: "100%",
+    height: 180,
     borderRadius: RADIUS.card,
+    marginBottom: 12,
+  },
+  imageFallback: {
+    backgroundColor: COLORS.borderInput,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 16,
   },
-  placeholderText: {
+  imagePlaceholderText: {
     fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.smallText,
     color: COLORS.textSecondary,
+    fontSize: 14,
   },
-  image: {
-    width: "100%",
-    height: "100%",
+  deleteButton: {
+    backgroundColor: COLORS.negative,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: RADIUS.card,
+    marginBottom: 12,
   },
-  eventText: {
-    flex: 1,
+  deleteButtonText: {
+    color: "#fff",
     fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textPrimary,
   },
-  buttonSecondary: {
+  selectImageButton: {
     backgroundColor: COLORS.primary,
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     borderRadius: RADIUS.card,
   },
-  buttonSecondaryText: {
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.body,
+  selectImageButtonText: {
     color: COLORS.cardBg,
+    fontFamily: FONTS.subTitleMedium,
   },
-  buttonPrimary: {
-    backgroundColor: COLORS.positive,
+  imageNotice: {
+    marginTop: 8,
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontFamily: FONTS.bodyRegular,
+    textAlign: "center",
+  },
+  btn: {
+    backgroundColor: COLORS.primary,
     paddingVertical: 14,
     borderRadius: RADIUS.card,
+    marginTop: 24,
     alignItems: "center",
-    marginTop: 20,
   },
-  buttonPrimaryText: {
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.subTitle,
+  btnText: {
     color: COLORS.cardBg,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
   },
 });

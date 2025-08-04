@@ -21,7 +21,7 @@ import SearchBar from "@/components/common/SearchBarComponent";
 import { Artist } from "@/interfaces/Artist";
 import { fetchArtistsFromApi } from "@/utils/artists/artistApi";
 import { useAuth } from "@/context/AuthContext";
-import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
+import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function ArtistsScreen() {
   const router = useRouter();
@@ -69,22 +69,12 @@ export default function ArtistsScreen() {
     ...(isAdmin
       ? [
           {
-            label: "Adm Noticias",
-            route: "/admin/NewsScreens/ManageNewScreen",
-            isActive: path === "/admin/NewsScreens/ManageNewScreen",
-          },
-          {
             label: "Adm Artistas",
             route: "/admin/ArtistScreens/ManageArtistsScreen",
             isActive: path === "/admin/ArtistScreens/ManageArtistsScreen",
           },
         ]
       : []),
-    {
-      label: "Noticias",
-      route: "/main/NewsScreens/NewsScreen",
-      isActive: path === "/main/NewsScreens/NewsScreen",
-    },
     {
       label: "Artistas",
       route: "/main/ArtistsScreens/ArtistsScreen",
