@@ -1,3 +1,5 @@
+// src/components/layout/Footer.tsx
+
 import React, { useState, useEffect, useMemo } from "react";
 import { View, StyleSheet, Image, TouchableOpacity } from "react-native";
 import { IconButton } from "react-native-paper";
@@ -20,8 +22,9 @@ export default function Footer() {
     () => `https://picsum.photos/seed/${Math.floor(Math.random() * 10000)}/200`,
     []
   );
-  const [profileImageUrl, setProfileImageUrl] =
-    useState<string>(randomProfileImage);
+  const [profileImageUrl, setProfileImageUrl] = useState<string>(
+    randomProfileImage
+  );
 
   useEffect(() => {
     if (!user?.username) return;
@@ -37,8 +40,7 @@ export default function Footer() {
           }${img}`;
         }
         setProfileImageUrl(img || randomProfileImage);
-      } catch (err) {
-        console.warn("[Footer] no pude cargar media perfil:", err);
+      } catch {
         setProfileImageUrl(randomProfileImage);
       }
     })();
@@ -50,7 +52,7 @@ export default function Footer() {
   const handleNewsPress = () =>
     router.replace(
       isAdmin
-        ? "/admin/NewsScreens/ManageNewsScreen"
+        ? "/admin/NewsScreens/ManageNewScreen"
         : "/main/NewsScreens/NewsScreen"
     );
   const handleTicketsPress = () =>
@@ -118,7 +120,7 @@ export default function Footer() {
       {/* Términos y condiciones (solo admin) */}
       {isAdmin && (
         <IconButton
-          icon="shield-document-outline"
+          icon="file-document"
           size={24}
           iconColor={COLORS.textPrimary}
           onPress={handleTycPress}

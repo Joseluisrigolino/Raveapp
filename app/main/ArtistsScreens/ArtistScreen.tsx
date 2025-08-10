@@ -44,20 +44,28 @@ export default function ArtistScreen() {
     (async () => {
       setLoading(true);
       try {
-        // 1) Datos del artista + isFavorito
         const data = await fetchOneArtistFromApi(id, user?.idUsuario);
+        if (!data) {
+          setArtist(null);
+          return;
+        }
+
         setArtist(data);
         setLikeCount(data.likes);
         setIsLiked(data.isFavorito);
 
-        // 2) IDs de usuarios que dieron like
-        const resp = await apiClient.get<string[]>(
-          "/v1/Artista/GetImgLikesArtista",
-          { params: { id } }
-        );
-        const likeIds = Array.isArray(resp.data) ? resp.data : [];
+        let likeIds: string[] = [];
+        try {
+          const resp = await apiClient.get<string[]>(
+            "/v1/Artista/GetImgLikesArtista",
+            { params: { id } }
+          );
+          likeIds = Array.isArray(resp.data) ? resp.data : [];
+        } catch (e) {
+          console.warn("No se pudieron obtener los likes:", e?.response?.status);
+          likeIds = [];
+        }
 
-        // 3) Para cada userId, obtenemos su media (primera imagen)
         const uris = await Promise.all(
           likeIds.map(async (userId) => {
             try {
@@ -74,7 +82,7 @@ export default function ArtistScreen() {
             }
           })
         );
-        // filtramos uris válidas
+
         setAvatarUris(uris.filter((u) => u));
       } catch (err) {
         console.error("Error en ArtistScreen:", err);
@@ -85,7 +93,6 @@ export default function ArtistScreen() {
   }, [id, user]);
 
   const toggleLike = () => {
-    // aquí podrías llamar a tu endpoint de like/unlike
     setIsLiked((v) => !v);
     setLikeCount((c) => c + (isLiked ? -1 : 1));
   };
@@ -110,7 +117,6 @@ export default function ArtistScreen() {
       <SafeAreaView style={styles.container}>
         <Header />
         <ScrollView contentContainerStyle={styles.content}>
-          {/* Título + redes */}
           <View style={styles.headerRow}>
             <Text style={styles.title}>{artist.name}</Text>
             <View style={styles.socialRow}>
@@ -148,7 +154,6 @@ export default function ArtistScreen() {
             </View>
           </View>
 
-          {/* Likes */}
           <View style={styles.likesRow}>
             <TouchableOpacity onPress={toggleLike}>
               <IconButton
@@ -177,14 +182,12 @@ export default function ArtistScreen() {
             </Text>
           </View>
 
-          {/* Imagen redondeada del artista */}
           <Image
             source={{ uri: artist.image }}
             style={styles.image}
             resizeMode="cover"
           />
 
-          {/* Descripción */}
           <Text style={styles.description}>{artist.description}</Text>
         </ScrollView>
         <Footer />
