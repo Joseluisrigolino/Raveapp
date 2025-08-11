@@ -1,5 +1,5 @@
 // components/FiltersSection/FiltersSection.tsx
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,9 +12,8 @@ import { IconButton } from "react-native-paper";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 import SearchBarComponent from "@/components/common/SearchBarComponent";
-import { ELECTRONIC_GENRES } from "@/utils/electronicGenresHelper";
-
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { fetchGenres, ApiGenero } from "@/utils/events/eventApi";
 
 interface FiltersSectionProps {
   // --- Estados y callbacks para los chips horizontales ---
@@ -133,6 +132,21 @@ export default function FiltersSection(props: FiltersSectionProps) {
 
     nestedScrollEnabled,
   } = props;
+
+  // ------- Géneros desde API -------
+  const [genres, setGenres] = useState<ApiGenero[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const gs = await fetchGenres();
+        if (mounted) setGenres(gs);
+      } catch {
+        if (mounted) setGenres([]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -281,17 +295,14 @@ export default function FiltersSection(props: FiltersSectionProps) {
       {/* Panel de fechas */}
       {dateFilterOpen && (
         <View style={styles.dateFilterContainer}>
-          <Text style={styles.dateFilterLabel}>
-            Seleccionar rango de fechas:
-          </Text>
+          <Text style={styles.dateFilterLabel}>Seleccionar rango de fechas:</Text>
+
           <TouchableOpacity
             style={styles.dateInput}
             onPress={() => onShowStartPicker(true)}
           >
             <Text style={styles.dateInputText}>
-              {startDate
-                ? `Desde: ${startDate.toLocaleDateString()}`
-                : "Desde: --/--/----"}
+              {startDate ? `Desde: ${startDate.toLocaleDateString()}` : "Desde: --/--/----"}
             </Text>
           </TouchableOpacity>
           {showStartPicker && (
@@ -302,14 +313,13 @@ export default function FiltersSection(props: FiltersSectionProps) {
               onChange={onStartDateChange}
             />
           )}
+
           <TouchableOpacity
             style={styles.dateInput}
             onPress={() => onShowEndPicker(true)}
           >
             <Text style={styles.dateInputText}>
-              {endDate
-                ? `Hasta: ${endDate.toLocaleDateString()}`
-                : "Hasta: --/--/----"}
+              {endDate ? `Hasta: ${endDate.toLocaleDateString()}` : "Hasta: --/--/----"}
             </Text>
           </TouchableOpacity>
           {showEndPicker && (
@@ -320,6 +330,7 @@ export default function FiltersSection(props: FiltersSectionProps) {
               onChange={onEndDateChange}
             />
           )}
+
           <TouchableOpacity style={styles.clearButton} onPress={onClearDates}>
             <Text style={styles.clearButtonText}>Limpiar fechas</Text>
           </TouchableOpacity>
@@ -330,8 +341,8 @@ export default function FiltersSection(props: FiltersSectionProps) {
       {locationFilterOpen && (
         <View style={styles.locationFilterContainer}>
           <Text style={styles.dateFilterLabel}>Filtrar por ubicación:</Text>
-          
-          {/* Input para Provincia */}
+
+          {/* Provincia */}
           <TextInput
             style={styles.locationInput}
             placeholder="Provincia"
@@ -359,7 +370,7 @@ export default function FiltersSection(props: FiltersSectionProps) {
             </View>
           )}
 
-          {/* Input para Municipio */}
+          {/* Municipio */}
           <TextInput
             style={styles.locationInput}
             placeholder="Municipio"
@@ -387,7 +398,7 @@ export default function FiltersSection(props: FiltersSectionProps) {
             </View>
           )}
 
-          {/* Input para Localidad */}
+          {/* Localidad */}
           <TextInput
             style={styles.locationInput}
             placeholder="Localidad"
@@ -421,24 +432,26 @@ export default function FiltersSection(props: FiltersSectionProps) {
         </View>
       )}
 
-      {/* Panel de géneros */}
+      {/* Panel de géneros (dinámico) */}
       {genreFilterOpen && (
         <View style={styles.genreFilterContainer}>
           <Text style={styles.dateFilterLabel}>Seleccionar géneros:</Text>
+
           <ScrollView
             style={styles.genreScroll}
             nestedScrollEnabled={nestedScrollEnabled}
             keyboardShouldPersistTaps="handled"
           >
-            {ELECTRONIC_GENRES.map((g) => {
-              const isSelected = selectedGenres.includes(g);
+            {genres.map((g) => {
+              const name = g.dsGenero;
+              const isSelected = selectedGenres.includes(name);
               return (
                 <TouchableOpacity
-                  key={g}
+                  key={`${g.cdGenero}-${name}`}
                   style={[styles.genreItem, isSelected && styles.genreItemSelected]}
-                  onPress={() => onToggleGenre(g)}
+                  onPress={() => onToggleGenre(name)}
                 >
-                  <Text style={styles.genreItemText}>{g}</Text>
+                  <Text style={styles.genreItemText}>{name}</Text>
                   {isSelected && (
                     <IconButton
                       icon="check"
@@ -450,7 +463,13 @@ export default function FiltersSection(props: FiltersSectionProps) {
                 </TouchableOpacity>
               );
             })}
+            {genres.length === 0 && (
+              <Text style={{ color: COLORS.textSecondary }}>
+                No se pudieron cargar los géneros.
+              </Text>
+            )}
           </ScrollView>
+
           <TouchableOpacity style={styles.clearButton} onPress={onClearGenres}>
             <Text style={styles.clearButtonText}>Limpiar géneros</Text>
           </TouchableOpacity>

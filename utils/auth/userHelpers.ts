@@ -72,3 +72,33 @@ export async function createUsuario(
 ): Promise<void> {
   await apiClient.post("/v1/Usuario/CreateUsuario", payload);
 }
+
+/**
+ * 4) Marcar/Desmarcar evento como favorito
+ * Body: { idUsuario, idEvento }
+ */
+export async function putEventoFavorito(params: {
+  idUsuario: string;
+  idEvento: string;
+}): Promise<void> {
+  await apiClient.put("/v1/Usuario/EventoFavorito", {
+    idUsuario: params.idUsuario,
+    idEvento: params.idEvento,
+  });
+}
+
+/**
+ * 5) Listar IDs de eventos favoritos del usuario
+ * GET /v1/Usuario/GetEventosFavoritos?idUsuario={...}
+ * Respuesta esperada:
+ * { "eventos": ["uuid-1","uuid-2", ...] }
+ */
+export async function getEventosFavoritos(
+  idUsuario: string
+): Promise<string[]> {
+  const { data } = await apiClient.get<{ eventos: string[] }>(
+    "/v1/Usuario/GetEventosFavoritos",
+    { params: { idUsuario } }
+  );
+  return Array.isArray(data?.eventos) ? data.eventos : [];
+}

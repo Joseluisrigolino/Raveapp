@@ -6,7 +6,9 @@ import {
   Image,
   TouchableOpacity,
   StyleSheet,
+  GestureResponderEvent,
 } from "react-native";
+import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 interface CardProps {
@@ -15,6 +17,11 @@ interface CardProps {
   foto: string;
   date: string;
   onPress?: () => void;
+
+  // Favoritos
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
+  disableFavorite?: boolean;
 }
 
 export default function CardComponent({
@@ -23,15 +30,43 @@ export default function CardComponent({
   foto,
   date,
   onPress,
+  isFavorite = false,
+  onToggleFavorite,
+  disableFavorite = false,
 }: CardProps) {
+  const handleHeartPress = (e: GestureResponderEvent) => {
+    e.stopPropagation();
+    if (!disableFavorite && onToggleFavorite) onToggleFavorite();
+  };
+
   return (
-    <TouchableOpacity style={styles.cardContainer} onPress={onPress}>
+    <TouchableOpacity
+      style={styles.cardContainer}
+      onPress={onPress}
+      activeOpacity={0.9}
+    >
       <View style={styles.imageWrapper}>
         <Image source={{ uri: foto }} style={styles.image} />
-        {/* Badge de fecha en la esquina inferior izquierda */}
+
+        {/* Fecha */}
         <View style={styles.dateBadge}>
           <Text style={styles.dateBadgeText}>{date}</Text>
         </View>
+
+        {/* Corazón sin fondo: outline rojo si no está marcado, sólido rojo si marcado */}
+        <TouchableOpacity
+          onPress={handleHeartPress}
+          disabled={disableFavorite || !onToggleFavorite}
+          style={styles.heartBtn}
+          hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons
+            name={isFavorite ? "heart" : "heart-outline"}
+            size={28}
+            color={COLORS.negative} // siempre rojo; cambia el ícono (relleno vs contorno)
+          />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.infoContainer}>
@@ -51,18 +86,18 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.card,
     marginVertical: 10,
-    // Sombra suave:
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
-    elevation: 3, // para Android
+    elevation: 3,
     overflow: "hidden",
   },
   imageWrapper: {
     position: "relative",
     width: "100%",
     height: 200,
+    backgroundColor: COLORS.backgroundLight,
   },
   image: {
     width: "100%",
@@ -83,14 +118,21 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 14,
   },
+  heartBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    // sin fondo ni borde: el “borde” lo da el ícono outline rojo
+    // se deja sólo el ícono para el look “limpio”
+  },
   infoContainer: {
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
   eventTitle: {
     color: COLORS.textPrimary,
-    fontFamily: FONTS.titleBold,    // bold como en NewsScreen
-    fontSize: FONT_SIZES.subTitle,   // mismo tamaño de subtítulo
+    fontFamily: FONTS.titleBold,
+    fontSize: FONT_SIZES.subTitle,
     marginBottom: 4,
   },
   eventSubtitle: {
