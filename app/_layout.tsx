@@ -40,6 +40,7 @@ export default function RootLayout() {
         <Stack.Screen name="ManageEventsScreen" />
         <Stack.Screen name="ModifyEventScreen" />
         <Stack.Screen name="Tyc" />
+        <Stack.Screen name="PartyScreen" />
       </Stack>
     </AuthProvider>
   );

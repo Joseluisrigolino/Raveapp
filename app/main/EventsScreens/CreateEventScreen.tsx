@@ -9,17 +9,25 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
+  Image,
+  Modal,
+  ActivityIndicator,
+  Linking,
+  Platform,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
+import TabMenuComponent from "@/components/layout/TabMenuComponent"; // ⬅️ SUBHEADER
 import TitlePers from "@/components/common/TitleComponent";
 import DateTimeInputComponent from "@/components/common/DateTimeInputComponent";
 
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { ApiGenero, fetchGenres } from "@/utils/events/eventApi";
+import { getTycPdfUrl } from "@/utils/tycApi";
+import { fetchArtistsFromApi } from "@/utils/artists/artistApi";
 import { Artist } from "@/interfaces/Artist";
 import {
   fetchProvinces,
@@ -52,6 +60,7 @@ interface DaySaleConfig {
 
 /* ========== Utils ========== */
 const GREEN = "#17a34a";
+
 const createEmptyDayTickets = (): DayTickets => ({
   genQty: "0",
   genPrice: "",
@@ -71,11 +80,13 @@ const createEmptySaleConfig = (): DaySaleConfig => ({
   sellUntil: new Date(),
 });
 
-const fakeArtistDB: Artist[] = [
-  { name: "Artista 1", image: "" },
-  { name: "Artista 2", image: "" },
-  { name: "Artista 3", image: "" },
-];
+// normalizador simple para comparar sin acentos ni may/min
+const norm = (s: string) =>
+  (s || "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
 
 export default function CreateEventScreen() {
   /* ========== Auth ========== */
@@ -91,6 +102,7 @@ export default function CreateEventScreen() {
 
   /* ========== Datos base ========== */
   const [eventName, setEventName] = useState("");
+  const [isRecurring, setIsRecurring] = useState(false);
   const [eventType, setEventType] = useState<EventType>("1d");
   const dayCount = useMemo(
     () => (eventType === "1d" ? 1 : eventType === "2d" ? 2 : 3),
@@ -104,6 +116,9 @@ export default function CreateEventScreen() {
   /* ========== Artistas ========== */
   const [artistInput, setArtistInput] = useState("");
   const [selectedArtists, setSelectedArtists] = useState<Artist[]>([]);
+  const [allArtists, setAllArtists] = useState<Artist[] | null>(null);
+  const [artistLoading, setArtistLoading] = useState(false);
+  const [showArtistSuggestions, setShowArtistSuggestions] = useState(false);
 
   /* ========== Ubicación (NO TOCAR) ========== */
   const [provinces, setProvinces] = useState<{ id: string; nombre: string }[]>(
@@ -152,6 +167,35 @@ export default function CreateEventScreen() {
   /* ========== T&C ========== */
   const [acceptedTC, setAcceptedTC] = useState(false);
 
+  /* ========== Modal TyC ========== */
+  const [tycVisible, setTycVisible] = useState(false);
+  const [tycUrl, setTycUrl] = useState<string | null>(null);
+  const [tycLoading, setTycLoading] = useState(false);
+  const [tycError, setTycError] = useState<string | null>(null);
+
+  const buildViewerUrl = (url: string) => {
+    if (Platform.OS === "ios" || Platform.OS === "android") {
+      return `https://drive.google.com/viewerng/viewer?embedded=true&url=${encodeURIComponent(
+        url
+      )}`;
+    }
+    return url;
+  };
+
+  const openTycModal = async () => {
+    setTycVisible(true);
+    setTycError(null);
+    try {
+      setTycLoading(true);
+      const url = await getTycPdfUrl();
+      setTycUrl(url);
+    } catch (e: any) {
+      setTycError(e?.message || "No se pudo cargar el archivo.");
+    } finally {
+      setTycLoading(false);
+    }
+  };
+
   /* ========== Effects ========== */
   useEffect(() => {
     setDaySchedules(Array.from({ length: dayCount }, createEmptySchedule));
@@ -179,6 +223,26 @@ export default function CreateEventScreen() {
       mounted = false;
     };
   }, []);
+
+  // Cargar artistas una vez cuando el usuario empieza a tipear
+  useEffect(() => {
+    const q = norm(artistInput);
+    if (q.length === 0) {
+      setShowArtistSuggestions(false);
+      return;
+    }
+    setShowArtistSuggestions(true);
+    if (allArtists === null && !artistLoading) {
+      setArtistLoading(true);
+      fetchArtistsFromApi()
+        .then((arr) => setAllArtists(arr))
+        .catch((e) => {
+          console.error("fetchArtistsFromApi", e);
+          setAllArtists([]);
+        })
+        .finally(() => setArtistLoading(false));
+    }
+  }, [artistInput, allArtists, artistLoading]);
 
   /* ========== Handlers ubicación (NO TOCAR) ========== */
   const handleSelectProvince = async (id: string, name: string) => {
@@ -224,16 +288,26 @@ export default function CreateEventScreen() {
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
-  const handleAddArtist = () => {
-    const name = artistInput.trim();
+
+  const addArtistByName = (nameRaw: string) => {
+    const name = nameRaw.trim();
     if (!name) return;
-    const found = fakeArtistDB.find(
-      (x) => x.name.toLowerCase() === name.toLowerCase()
-    );
-    const art = found || { name, image: "" };
-    setSelectedArtists((prev) => [...prev, art]);
+    if (selectedArtists.some((a) => norm(a.name) === norm(name))) {
+      setArtistInput("");
+      return;
+    }
+    setSelectedArtists((prev) => [...prev, { name, image: "" } as Artist]);
     setArtistInput("");
+    setShowArtistSuggestions(false);
   };
+
+  const handleSelectArtistFromSuggestions = (a: Artist) => {
+    if (selectedArtists.some((s) => norm(s.name) === norm(a.name))) return;
+    setSelectedArtists((prev) => [...prev, a]);
+    setArtistInput("");
+    setShowArtistSuggestions(false);
+  };
+
   const handleRemoveArtist = (name: string) => {
     setSelectedArtists((prev) => prev.filter((x) => x.name !== name));
   };
@@ -293,8 +367,9 @@ export default function CreateEventScreen() {
     }
     const payload = {
       eventName,
+      isRecurring,
       eventType,
-      selectedGenres, // IDs de la API
+      selectedGenres,
       selectedArtists,
       provinceId,
       provinceName,
@@ -319,10 +394,30 @@ export default function CreateEventScreen() {
     Alert.alert("Éxito", "Evento creado");
   };
 
+  /* ========== Derivados Artistas ========== */
+  const artistSuggestions: Artist[] = useMemo(() => {
+    const q = norm(artistInput);
+    if (!q || !allArtists) return [];
+    const selectedSet = new Set(selectedArtists.map((a) => norm(a.name)));
+    return allArtists
+      .filter((a) => !selectedSet.has(norm(a.name)) && norm(a.name).includes(q))
+      .slice(0, 8);
+  }, [artistInput, allArtists, selectedArtists]);
+
   /* ========== Render ========== */
   return (
     <SafeAreaView style={styles.container}>
       <Header />
+
+      {/* ===== SUBHEADER (tabs) ===== */}
+      <TabMenuComponent
+        tabs={[
+          
+          { label: "Crear evento", route: "/main/CreateEventScreen", isActive: true },
+          { label: "Mis fiestas recurrentes", route: "owner/PartysScreen", isActive: false },
+        ]}
+      />
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {mustShowLogin ? (
           <View style={styles.notLoggedContainer}>
@@ -376,6 +471,20 @@ export default function CreateEventScreen() {
                 value={eventName}
                 onChangeText={setEventName}
               />
+
+              {/* Evento recurrente */}
+              <View style={[styles.flagsRow, { marginTop: 10 }]}>
+                <TouchableOpacity
+                  style={styles.checkRow}
+                  onPress={() => setIsRecurring(!isRecurring)}
+                >
+                  <View
+                    style={[styles.checkBox, isRecurring && styles.checkBoxOn]}
+                  />
+                  <Text style={styles.checkText}>Este evento es recurrente</Text>
+                </TouchableOpacity>
+              </View>
+
               <View style={styles.line} />
 
               <Text style={[styles.label, { marginBottom: 10 }]}>
@@ -387,10 +496,7 @@ export default function CreateEventScreen() {
                   return (
                     <TouchableOpacity
                       key={v}
-                      style={[
-                        styles.segmentItem,
-                        active && styles.segmentItemOn,
-                      ]}
+                      style={[styles.segmentItem, active && styles.segmentItemOn]}
                       onPress={() => setEventType(v)}
                     >
                       <Text
@@ -399,11 +505,7 @@ export default function CreateEventScreen() {
                           active && styles.segmentTextOn,
                         ]}
                       >
-                        {v === "1d"
-                          ? "1 día"
-                          : v === "2d"
-                          ? "2 días"
-                          : "3 días"}
+                        {v === "1d" ? "1 día" : v === "2d" ? "2 días" : "3 días"}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -441,26 +543,75 @@ export default function CreateEventScreen() {
             {/* Artistas */}
             <Text style={styles.h2}>Artista/s</Text>
             <View style={styles.card}>
-              <TextInput
-                style={styles.input}
-                placeholder="Escribe el nombre del artista"
-                value={artistInput}
-                onChangeText={setArtistInput}
-              />
-              <TouchableOpacity style={styles.addBtn} onPress={handleAddArtist}>
-                <Text style={styles.addBtnText}>Agregar artista</Text>
-              </TouchableOpacity>
+              <View style={{ position: "relative" }}>
+                <View style={styles.artistRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 1 }]}
+                    placeholder="Escribe el nombre del artista"
+                    value={artistInput}
+                    onChangeText={(t) => setArtistInput(t)}
+                    onFocus={() => {
+                      if (artistInput) setShowArtistSuggestions(true);
+                    }}
+                  />
+                  <TouchableOpacity
+                    style={styles.addIconBtn}
+                    onPress={() => addArtistByName(artistInput)}
+                  >
+                    <Text style={styles.addIconText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {showArtistSuggestions && (
+                  <View className="shadow" style={styles.dropdownContainer}>
+                    {artistLoading && (
+                      <View style={styles.dropdownItem}>
+                        <Text style={styles.hint}>Buscando…</Text>
+                      </View>
+                    )}
+
+                    {!artistLoading && artistSuggestions.length === 0 && (
+                      <View style={styles.dropdownItem}>
+                        <Text style={styles.hint}>Sin resultados</Text>
+                      </View>
+                    )}
+
+                    {!artistLoading &&
+                      artistSuggestions.map((a) => (
+                        <TouchableOpacity
+                          key={`${a.idArtista ?? ""}-${a.name}`}
+                          style={styles.dropdownItem}
+                          onPress={() => handleSelectArtistFromSuggestions(a)}
+                        >
+                          <Text>{a.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                  </View>
+                )}
+              </View>
+
               {selectedArtists.length > 0 && (
                 <>
                   <View style={styles.line} />
-                  <View style={styles.tags}>
+                  <View style={{ gap: 8 }}>
                     {selectedArtists.map((a) => (
-                      <View key={a.name} style={styles.tag}>
-                        <Text style={styles.tagText}>{a.name}</Text>
+                      <View key={a.name} style={styles.artistPickedRow}>
+                        <MaterialCommunityIcons
+                          name="check"
+                          size={18}
+                          color={GREEN}
+                          style={{ marginRight: 8 }}
+                        />
+                        <Text style={styles.artistPickedName}>{a.name}</Text>
                         <TouchableOpacity
+                          style={styles.removeBubble}
                           onPress={() => handleRemoveArtist(a.name)}
                         >
-                          <Text style={styles.tagRemove}>✕</Text>
+                          <MaterialCommunityIcons
+                            name="close"
+                            size={14}
+                            color="#fff"
+                          />
                         </TouchableOpacity>
                       </View>
                     ))}
@@ -575,18 +726,14 @@ export default function CreateEventScreen() {
                   style={styles.checkRow}
                   onPress={() => setIsAfter(!isAfter)}
                 >
-                  <View
-                    style={[styles.checkBox, isAfter && styles.checkBoxOn]}
-                  />
+                  <View style={[styles.checkBox, isAfter && styles.checkBoxOn]} />
                   <Text style={styles.checkText}>¿Es after?</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.checkRow}
                   onPress={() => setIsLGBT(!isLGBT)}
                 >
-                  <View
-                    style={[styles.checkBox, isLGBT && styles.checkBoxOn]}
-                  />
+                  <View style={[styles.checkBox, isLGBT && styles.checkBoxOn]} />
                   <Text style={styles.checkText}>¿Es LGBT?</Text>
                 </TouchableOpacity>
               </View>
@@ -626,100 +773,131 @@ export default function CreateEventScreen() {
 
             {/* Entradas por día */}
             <Text style={styles.h2}>Entradas</Text>
-            {daysTickets.map((d, i) => (
-              <View key={`tk-${i}`} style={styles.card}>
-                <Text style={styles.dayTitle}>Día {i + 1}</Text>
+            {daysTickets.map((d, i) => {
+              const enableEBGen = (parseInt(d.genQty || "0", 10) || 0) > 0;
+              const enableEBVip = (parseInt(d.vipQty || "0", 10) || 0) > 0;
+              return (
+                <View key={`tk-${i}`} style={styles.card}>
+                  <Text style={styles.dayTitle}>Día {i + 1}</Text>
 
-                <Text style={styles.fieldTitle}>Entradas Generales *</Text>
-                <View style={styles.row}>
-                  <TextInput
-                    style={[styles.input, styles.inputSm]}
-                    keyboardType="numeric"
-                    value={d.genQty}
-                    onChangeText={(v) => setTicket(i, "genQty", v)}
-                    placeholder="0"
-                  />
-                  <TextInput
-                    style={[styles.input, styles.inputSm]}
-                    keyboardType="numeric"
-                    value={d.genPrice}
-                    onChangeText={(v) => setTicket(i, "genPrice", v)}
-                    placeholder="Precio"
-                  />
-                </View>
-                <Text style={styles.hint}>
-                  Los EarlyBirds generales forman parte del total general (no se
-                  suman aparte).
-                </Text>
-
-                <Text style={styles.fieldTitle}>
-                  Early Bird General (opcional)
-                </Text>
-                <View style={styles.row}>
-                  <TextInput
-                    style={[styles.input, styles.inputSm]}
-                    keyboardType="numeric"
-                    value={d.ebGenQty}
-                    onChangeText={(v) => setTicket(i, "ebGenQty", v)}
-                    placeholder="0"
-                  />
-                  <TextInput
-                    style={[styles.input, styles.inputSm]}
-                    keyboardType="numeric"
-                    value={d.ebGenPrice}
-                    onChangeText={(v) => setTicket(i, "ebGenPrice", v)}
-                    placeholder="Precio EarlyBird"
-                  />
-                </View>
-
-                <Text style={styles.fieldTitle}>Entradas VIP (opcional)</Text>
-                <View style={styles.row}>
-                  <TextInput
-                    style={[styles.input, styles.inputSm]}
-                    keyboardType="numeric"
-                    value={d.vipQty}
-                    onChangeText={(v) => setTicket(i, "vipQty", v)}
-                    placeholder="0"
-                  />
-                  <TextInput
-                    style={[styles.input, styles.inputSm]}
-                    keyboardType="numeric"
-                    value={d.vipPrice}
-                    onChangeText={(v) => setTicket(i, "vipPrice", v)}
-                    placeholder="Precio"
-                  />
-                </View>
-                <Text style={styles.hint}>
-                  Los EarlyBirds VIP forman parte del total VIP (no se suman
-                  aparte).
-                </Text>
-
-                <Text style={styles.fieldTitle}>Early Bird VIP (opcional)</Text>
-                <View style={styles.row}>
-                  <TextInput
-                    style={[styles.input, styles.inputSm]}
-                    keyboardType="numeric"
-                    value={d.ebVipQty}
-                    onChangeText={(v) => setTicket(i, "ebVipQty", v)}
-                    placeholder="0"
-                  />
-                  <TextInput
-                    style={[styles.input, styles.inputSm]}
-                    keyboardType="numeric"
-                    value={d.ebVipPrice}
-                    onChangeText={(v) => setTicket(i, "ebVipPrice", v)}
-                    placeholder="Precio EarlyBird"
-                  />
-                </View>
-
-                <Text style={[styles.totalLine]}>
-                  Total de entradas del día:{" "}
-                  <Text style={{ color: GREEN, fontWeight: "700" }}>
-                    {totalPerDay(d)}
+                  <Text style={styles.fieldTitle}>Entradas Generales *</Text>
+                  <View style={styles.row}>
+                    <TextInput
+                      style={[styles.input, styles.inputSm]}
+                      keyboardType="numeric"
+                      value={d.genQty}
+                      onChangeText={(v) => setTicket(i, "genQty", v)}
+                      placeholder="0"
+                    />
+                    <TextInput
+                      style={[styles.input, styles.inputSm]}
+                      keyboardType="numeric"
+                      value={d.genPrice}
+                      onChangeText={(v) => setTicket(i, "genPrice", v)}
+                      placeholder="Precio"
+                    />
+                  </View>
+                  <Text style={styles.hint}>
+                    La cantidad ingresada es el total de entradas generales.{"\n"}
+                    Si agregas entradas EarlyBirds Generales, estas ya forman
+                    parte del total de entradas Generales, no se suman a la
+                    cantidad total.{"\n"}
+                    Ejemplo: Si ingresas 900 entradas Generales, y 100 Early
+                    Birds, el total es 900, no 1000.
                   </Text>
-                </Text>
-              </View>
-            ))}
+
+                  <Text style={styles.fieldTitle}>
+                    Early Bird General (opcional)
+                  </Text>
+                  <View style={styles.row}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        styles.inputSm,
+                        !enableEBGen && styles.inputDisabled,
+                      ]}
+                      keyboardType="numeric"
+                      value={d.ebGenQty}
+                      onChangeText={(v) => setTicket(i, "ebGenQty", v)}
+                      placeholder="0"
+                      editable={enableEBGen}
+                    />
+                    <TextInput
+                      style={[
+                        styles.input,
+                        styles.inputSm,
+                        !enableEBGen && styles.inputDisabled,
+                      ]}
+                      keyboardType="numeric"
+                      value={d.ebGenPrice}
+                      onChangeText={(v) => setTicket(i, "ebGenPrice", v)}
+                      placeholder="Precio EarlyBird"
+                      editable={enableEBGen}
+                    />
+                  </View>
+
+                  <Text style={styles.fieldTitle}>Entradas VIP (opcional)</Text>
+                  <View style={styles.row}>
+                    <TextInput
+                      style={[styles.input, styles.inputSm]}
+                      keyboardType="numeric"
+                      value={d.vipQty}
+                      onChangeText={(v) => setTicket(i, "vipQty", v)}
+                      placeholder="0"
+                    />
+                    <TextInput
+                      style={[styles.input, styles.inputSm]}
+                      keyboardType="numeric"
+                      value={d.vipPrice}
+                      onChangeText={(v) => setTicket(i, "vipPrice", v)}
+                      placeholder="Precio"
+                    />
+                  </View>
+                  <Text style={styles.hint}>
+                    La cantidad ingresada es el total de entradas vip.{"\n"}
+                    Si agregas entradas EarlyBirds Vip, no se suman a la
+                    cantidad total.{"\n"}
+                    Ejemplo: Si ingresas 800 entradas Vip, y 200 Early Birds, el
+                    total es 800, no 1000.
+                  </Text>
+
+                  <Text style={styles.fieldTitle}>Early Bird VIP (opcional)</Text>
+                  <View style={styles.row}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        styles.inputSm,
+                        !enableEBVip && styles.inputDisabled,
+                      ]}
+                      keyboardType="numeric"
+                      value={d.ebVipQty}
+                      onChangeText={(v) => setTicket(i, "ebVipQty", v)}
+                      placeholder="0"
+                      editable={enableEBVip}
+                    />
+                    <TextInput
+                      style={[
+                        styles.input,
+                        styles.inputSm,
+                        !enableEBVip && styles.inputDisabled,
+                      ]}
+                      keyboardType="numeric"
+                      value={d.ebVipPrice}
+                      onChangeText={(v) => setTicket(i, "ebVipPrice", v)}
+                      placeholder="Precio EarlyBird"
+                      editable={enableEBVip}
+                    />
+                  </View>
+
+                  <Text style={[styles.totalLine]}>
+                    Total de entradas del día:{" "}
+                    <Text style={{ color: GREEN, fontWeight: "700" }}>
+                      {totalPerDay(d)}
+                    </Text>
+                  </Text>
+                </View>
+              );
+            })}
 
             {/* Config de entradas por día */}
             <Text style={styles.h2}>Configuración de entradas</Text>
@@ -745,28 +923,31 @@ export default function CreateEventScreen() {
             <Text style={styles.h2}>Multimedia</Text>
             <View style={styles.card}>
               <Text style={styles.label}>
-                Foto{" "}
-                <Text style={{ color: COLORS.negative }}>(obligatoria)</Text>
+                Foto <Text style={{ color: COLORS.negative }}>(obligatoria)</Text>
               </Text>
               <View style={[styles.row, { justifyContent: "space-between" }]}>
-                <TouchableOpacity
-                  style={styles.fileBtn}
-                  onPress={handleSelectPhoto}
-                >
+                <TouchableOpacity style={styles.fileBtn} onPress={handleSelectPhoto}>
                   <Text style={styles.fileBtnText}>SELECCIONAR ARCHIVO</Text>
                 </TouchableOpacity>
                 <Text style={styles.fileName}>
                   {photoFile ? "Archivo seleccionado" : "Ninguno…"}
                 </Text>
               </View>
-              <Text style={styles.hint}>JPG/JPEG/PNG – máx. 2MB.</Text>
-
-              <Text style={[styles.label, { marginTop: 12 }]}>
-                Video (opcional)
+              <Text style={styles.hint}>
+                La imagen debe pesar menos de 2MB y ser JPG, JPEG o PNG
               </Text>
+
+              {photoFile && (
+                <View style={{ marginTop: 10 }}>
+                  <Text style={styles.label}>Previsualización:</Text>
+                  <Image source={{ uri: photoFile }} style={styles.previewImage} />
+                </View>
+              )}
+
+              <Text style={[styles.label, { marginTop: 12 }]}>Video (opcional)</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Link de YouTube"
+                placeholder="Pega el link de YouTube aquí"
                 value={videoLink}
                 onChangeText={setVideoLink}
               />
@@ -776,7 +957,7 @@ export default function CreateEventScreen() {
               </Text>
               <TextInput
                 style={styles.input}
-                placeholder="Link de SoundCloud"
+                placeholder="Pega el link de SoundCloud aquí"
                 value={musicLink}
                 onChangeText={setMusicLink}
               />
@@ -788,34 +969,111 @@ export default function CreateEventScreen() {
                 style={styles.checkRow}
                 onPress={() => setAcceptedTC(!acceptedTC)}
               >
-                <View
-                  style={[styles.checkBox, acceptedTC && styles.checkBoxOn]}
-                />
+                <View style={[styles.checkBox, acceptedTC && styles.checkBoxOn]} />
                 <Text style={styles.checkText}>
                   Acepto{" "}
-                  <Text style={{ color: COLORS.info }}>
+                  <Text style={styles.link} onPress={openTycModal}>
                     términos y condiciones
                   </Text>
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.submitButton}
-                onPress={handleSubmit}
-              >
+              <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
                 <Text style={styles.submitButtonText}>CREAR EVENTO</Text>
               </TouchableOpacity>
 
               <Text style={[styles.totalLine, { textAlign: "center" }]}>
                 Total general de entradas:{" "}
-                <Text style={{ color: GREEN, fontWeight: "700" }}>
-                  {grandTotal}
-                </Text>
+                <Text style={{ color: GREEN, fontWeight: "700" }}>{grandTotal}</Text>
               </Text>
             </View>
           </View>
         )}
       </ScrollView>
+
+      {/* ===== Modal Términos y Condiciones ===== */}
+      <Modal
+        visible={tycVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setTycVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Términos y Condiciones</Text>
+              <TouchableOpacity onPress={() => setTycVisible(false)}>
+                <MaterialCommunityIcons name="close" size={22} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              {tycLoading && (
+                <View style={styles.center}>
+                  <ActivityIndicator />
+                  <Text style={{ marginTop: 8, color: COLORS.textSecondary }}>
+                    Cargando…
+                  </Text>
+                </View>
+              )}
+
+              {!tycLoading && tycError && (
+                <View style={styles.center}>
+                  <Text style={{ color: COLORS.negative, marginBottom: 8 }}>
+                    {tycError}
+                  </Text>
+                  <TouchableOpacity style={styles.fileBtn} onPress={openTycModal}>
+                    <Text style={styles.fileBtnText}>Reintentar</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {!tycLoading && !tycError && tycUrl && (
+                <>
+                  {(() => {
+                    let WebViewComp: any = null;
+                    try {
+                      WebViewComp = require("react-native-webview").WebView;
+                    } catch {}
+                    if (WebViewComp) {
+                      return (
+                        <WebViewComp
+                          source={{ uri: buildViewerUrl(tycUrl!) }}
+                          style={{ flex: 1, borderRadius: RADIUS.card }}
+                        />
+                      );
+                    }
+                    if (Platform.OS === "web") {
+                      return (
+                        // @ts-ignore – iframe sólo web
+                        <iframe
+                          src={buildViewerUrl(tycUrl!)}
+                          style={{ width: "100%", height: "100%", border: "none" }}
+                          title="Términos y Condiciones"
+                        />
+                      );
+                    }
+                    return (
+                      <View style={styles.center}>
+                        <Text style={{ color: COLORS.textSecondary, marginBottom: 10 }}>
+                          No se pudo incrustar el PDF en este dispositivo.
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.fileBtn}
+                          onPress={() => Linking.openURL(tycUrl!)}
+                        >
+                          <Text style={styles.fileBtnText}>Abrir en el navegador</Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })()}
+                </>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Footer />
     </SafeAreaView>
   );
@@ -881,7 +1139,14 @@ const styles = StyleSheet.create({
   },
   textarea: { minHeight: 90, textAlignVertical: "top" },
   inputSm: { width: 140, marginRight: 10 },
+  inputDisabled: {
+    backgroundColor: COLORS.borderInput,
+    color: COLORS.textSecondary,
+  },
   hint: { color: COLORS.textSecondary, fontSize: 12, marginTop: 6 },
+
+  /* links */
+  link: { color: COLORS.info, textDecorationLine: "underline" },
 
   /* segment (tipo de evento) */
   segment: {
@@ -924,28 +1189,46 @@ const styles = StyleSheet.create({
   chipTextOn: { color: COLORS.cardBg },
 
   /* artistas */
-  addBtn: {
-    alignSelf: "flex-start",
-    backgroundColor: COLORS.textPrimary,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: RADIUS.card,
-    marginTop: 8,
+  artistRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
   },
-  addBtnText: { color: "#fff", fontWeight: "700" },
-  tags: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  tag: {
+  addIconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.textPrimary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addIconText: { color: "#fff", fontSize: 22, fontWeight: "800", marginTop: -2 },
+
+  artistPickedRow: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: COLORS.backgroundLight,
     borderRadius: RADIUS.card,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
     borderWidth: 1,
     borderColor: COLORS.borderInput,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
-  tagText: { color: COLORS.textPrimary },
-  tagRemove: { color: COLORS.negative, marginLeft: 6, fontWeight: "800" },
+  artistPickedName: {
+    color: COLORS.textPrimary,
+    fontWeight: "600",
+    flex: 1,
+  },
+  removeBubble: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: COLORS.negative,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
 
   /* flags */
   flagsRow: { flexDirection: "row", alignItems: "center", marginTop: 12 },
@@ -961,7 +1244,7 @@ const styles = StyleSheet.create({
   checkBoxOn: { backgroundColor: COLORS.primary },
   checkText: { color: COLORS.textPrimary },
 
-  /* dropdowns (ubicación) */
+  /* dropdowns (ubicación + sugerencias artistas) */
   dropdownButton: {
     width: "100%",
     backgroundColor: COLORS.backgroundLight,
@@ -982,6 +1265,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBg,
     marginBottom: 8,
     alignSelf: "center",
+    overflow: "hidden",
   },
   dropdownItem: {
     padding: 10,
@@ -1017,6 +1301,12 @@ const styles = StyleSheet.create({
   },
   fileBtnText: { color: "#fff", fontWeight: "700" },
   fileName: { color: COLORS.textSecondary },
+  previewImage: {
+    width: "100%",
+    height: 160,
+    borderRadius: RADIUS.card,
+    resizeMode: "cover",
+  },
 
   /* submit */
   submitButton: {
@@ -1032,6 +1322,32 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: FONT_SIZES.body,
   },
+
+  /* modal TYC */
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    padding: 16,
+  },
+  modalCard: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    overflow: "hidden",
+    maxHeight: "90%",
+  },
+  modalHeader: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderInput,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  modalTitle: { color: COLORS.textPrimary, fontWeight: "700" },
+  modalBody: { width: 320, height: 460, padding: 6 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
 
   /* estado no logueado */
   notLoggedContainer: { width: "100%", alignItems: "center", marginTop: 24 },
