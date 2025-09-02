@@ -102,7 +102,10 @@ export async function fetchOneArtistFromApi(
 
     return artist;
   } catch (err: any) {
-    console.error("❌ fetchOneArtistFromApi ERROR:", err?.response?.data || err);
+    console.error(
+      "❌ fetchOneArtistFromApi ERROR:",
+      err?.response?.data || err
+    );
     throw err;
   }
 }
@@ -173,5 +176,18 @@ export async function deleteArtistFromApi(idArtista: string): Promise<void> {
   const token = await login();
   await apiClient.delete(`/v1/Artista/DeleteArtista/${idArtista}`, {
     headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function createArtistInactive(payload: {
+  nombre: string;
+  isActivo: 0 | 1;
+}) {
+  const token = await login();
+  await apiClient.post("/v1/Artista/CrearArtista", payload, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
   });
 }

@@ -62,7 +62,13 @@ export default function NewsScreen() {
       isActive: currentScreen === "NewsScreen",
       visible: true,
     },
-  ].filter(tab => tab.visible);
+    {
+      label: "Artistas",
+      route: "/main/ArtistsScreens/ArtistsScreen",
+      isActive: currentScreen === "ArtistsScreen",
+      visible: true,
+    },
+  ].filter((tab) => tab.visible);
 
   const goToDetail = (item: NewsItem) =>
     router.push(`/main/NewsScreens/NewScreen?id=${item.idNoticia}`);
@@ -88,7 +94,7 @@ export default function NewsScreen() {
         ) : (
           <ScrollView contentContainerStyle={styles.scrollContent}>
             <View style={styles.containerCards}>
-              {newsList.map(item => (
+              {newsList.map((item) => (
                 <TouchableOpacity
                   key={item.idNoticia}
                   style={styles.newsCard}

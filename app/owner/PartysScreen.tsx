@@ -167,7 +167,7 @@ export default function PartysScreen() {
         <Header />
         <TabMenuComponent
           tabs={[
-            { label: "Crear evento", route: "/main/CreateEventScreen", isActive: false },
+            { label: "Crear evento", route: "/main/EventsScreens/CreateEventScreen", isActive: false },
             { label: "Fiestas recurrentes", route: "/owner/PartysScreen", isActive: true },
           ]}
         />
@@ -186,7 +186,7 @@ export default function PartysScreen() {
       {/* SubHeader para volver a Crear evento */}
       <TabMenuComponent
         tabs={[
-          { label: "Crear evento", route: "/main/CreateEventScreen", isActive: false },
+          { label: "Crear evento", route: "/main/EventsScreens/CreateEventScreen", isActive: false },
           { label: "Fiestas recurrentes", route: "/owner/PartysScreen", isActive: true },
         ]}
       />

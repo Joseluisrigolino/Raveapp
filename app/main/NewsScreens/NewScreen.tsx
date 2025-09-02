@@ -18,9 +18,7 @@ import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import TitlePers from "@/components/common/TitleComponent";
 import { NewsItem } from "@/interfaces/NewsProps";
-import { getNewsById } from "@/utils/news/newsApi";
-import { getEventById } from "@/utils/events/eventHelpers";
-import { fetchEvents } from "@/utils/events/eventApi";
+import { getNewsById, extractEventIdFromUrl } from "@/utils/news/newsApi";
 import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function NewScreen() {
@@ -32,32 +30,38 @@ export default function NewScreen() {
   const router = useRouter();
 
   useEffect(() => {
-    async function fetchNewsAndEvent() {
-      if (!id) return setLoading(false);
+    let isMounted = true;
+
+    async function fetchNews() {
+      if (!id) {
+        if (isMounted) setLoading(false);
+        return;
+      }
 
       try {
-        const found = await getNewsById(id);
-        if (!found) return;
-
-        setNewsItem(found);
-
-        if (found.urlEvento && found.urlEvento.includes("/evento/")) {
-          const eventId = found.urlEvento.split("/evento/")[1];
-          const events = await fetchEvents();
-          const eventExists = events.find(e => e.id === eventId);
-
-          if (eventExists) {
-            setLinkedEventId(eventId);
-          }
+        const found = await getNewsById(String(id));
+        if (!found) {
+          if (isMounted) setLoading(false);
+          return;
+        }
+        if (isMounted) {
+          setNewsItem(found);
+          // Preferimos el id ya enriquecido por newsApi; si no, extraemos acá (defensivo)
+          const fromApi = (found as any).urlEventoId as string | undefined;
+          const fallback = extractEventIdFromUrl((found as any).urlEvento);
+          setLinkedEventId(fromApi ?? fallback ?? null);
         }
       } catch (err) {
-        console.error("Error al cargar noticia o evento:", err);
+        console.error("Error al cargar noticia:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
 
-    fetchNewsAndEvent();
+    fetchNews();
+    return () => {
+      isMounted = false;
+    };
   }, [id]);
 
   const linkifyText = (text: string) => {
@@ -66,21 +70,28 @@ export default function NewScreen() {
     return tokens.map((token, i) =>
       urlRegex.test(token) ? (
         <Text
-          key={i}
+          key={`url-${i}`}
           style={styles.link}
           onPress={() => Linking.openURL(token)}
         >
           {token}
         </Text>
       ) : (
-        token
+        <Text key={`txt-${i}`} style={styles.descriptionTextChunk}>
+          {token}
+        </Text>
       )
     );
   };
 
   const handleGoToEvent = () => {
     if (!linkedEventId) return;
-    router.push(`/main/EventsScreens/EventScreen?id=${linkedEventId}`);
+    // Pasamos SOLO el UUID (no la URL)
+    // Además, por compatibilidad, EventScreen puede leer 'id' o 'idEvento'
+    router.push({
+      pathname: "/main/EventsScreens/EventScreen",
+      params: { id: linkedEventId, idEvento: linkedEventId },
+    });
   };
 
   if (loading) {
@@ -115,9 +126,9 @@ export default function NewScreen() {
           <View style={styles.contentContainer}>
             <TitlePers text={newsItem.titulo} />
 
-            {newsItem.imagen ? (
+            {(newsItem as any).imagen ? (
               <Image
-                source={{ uri: newsItem.imagen }}
+                source={{ uri: (newsItem as any).imagen }}
                 style={styles.newsImage}
                 resizeMode="cover"
               />
@@ -128,9 +139,7 @@ export default function NewScreen() {
             )}
 
             {newsItem.contenido && (
-              <Text style={styles.description}>
-                {linkifyText(newsItem.contenido)}
-              </Text>
+              <Text style={styles.description}>{linkifyText(newsItem.contenido)}</Text>
             )}
 
             {linkedEventId && (
@@ -180,6 +189,11 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     textAlign: "left",
     marginBottom: 16,
+    alignSelf: "stretch",
+  },
+  descriptionTextChunk: {
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
   },
   link: {
     color: COLORS.info,

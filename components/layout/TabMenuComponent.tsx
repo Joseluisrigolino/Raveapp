@@ -1,78 +1,88 @@
 // components/layout/TabMenuComponent.tsx
-import React from "react";
-import {
-  View,
-  TouchableOpacity,
-  Text,
-  StyleSheet,
-  ScrollView,
-} from "react-native";
+import React, { useMemo } from "react";
+import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { TabMenuProps } from "@/interfaces/TabMenuProps";
-import globalStyles, { COLORS, FONT_SIZES } from "@/styles/globalStyles";
+import { COLORS } from "@/styles/globalStyles";
 
 export default function TabMenuComponent({ tabs }: TabMenuProps) {
   const router = useRouter();
-  const centerIfTwo = tabs.length === 2;
+  const activeIndex = useMemo(
+    () => Math.max(0, tabs.findIndex((t) => t.isActive)),
+    [tabs]
+  );
+  const count = tabs.length || 1;
+  const segmentWidthPct = 100 / count;
 
   return (
     <View style={styles.wrapper}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.tabScroll,
-          centerIfTwo && styles.centerTabs,
-        ]}
-      >
+      <View style={styles.row}>
         {tabs.map((tab, i) => (
           <TouchableOpacity
-            key={i}
-            style={[styles.tabButton, tab.isActive && styles.activeTab]}
+            key={`${tab.label}-${i}`}
+            style={styles.tabButton}
+            activeOpacity={0.7}
             onPress={() => !tab.isActive && router.push(tab.route)}
           >
-            <Text style={[styles.tabText, tab.isActive && styles.activeText]}>
-              {tab.label}
+            <Text style={[styles.tabText, tab.isActive && styles.tabTextActive]}>
+              {tab.label.toUpperCase()}
             </Text>
           </TouchableOpacity>
         ))}
-      </ScrollView>
+      </View>
+      <View style={styles.baseline} />
+      <View
+        style={[
+          styles.indicator,
+          { width: `${segmentWidthPct}%`, left: `${segmentWidthPct * activeIndex}%` },
+        ]}
+      />
     </View>
   );
 }
 
+const INACTIVE = "#9CA3AF";
+const BASELINE = "#E5E7EB";
+const INDICATOR = "#BFC3C9";
+
 const styles = StyleSheet.create({
   wrapper: {
-    backgroundColor: globalStyles.COLORS.backgroundLight,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    borderBottomColor: BASELINE,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderInput,
-    zIndex: 1000,
-    elevation: 4,
   },
-  tabScroll: {
+  row: {
     flexDirection: "row",
-    paddingHorizontal: 8,
-    flexGrow: 1,           // <— para que ocupe todo el ancho
-  },
-  centerTabs: {
-    justifyContent: "center",  // <— ahora sí centra si son solo 2
+    alignItems: "center",
   },
   tabButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginHorizontal: 4,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,   // ↓ más bajo
   },
   tabText: {
-    fontSize: FONT_SIZES.body,
-    fontWeight: "500",
-    color: globalStyles.COLORS.textSecondary,
-  },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: COLORS.primary,
-  },
-  activeText: {
-    color: COLORS.primary,
+    fontSize: 13,          // ↓ texto mucho más chico
+    lineHeight: 16,
+    letterSpacing: 0.2,
     fontWeight: "700",
+    color: INACTIVE,
+  },
+  tabTextActive: {
+    color: COLORS.textPrimary,
+  },
+  baseline: {
+    height: 2,
+    backgroundColor: BASELINE,
+    width: "100%",
+  },
+  indicator: {
+    position: "absolute",
+    bottom: 0,
+    height: 3,
+    backgroundColor: INDICATOR,
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 2,
   },
 });

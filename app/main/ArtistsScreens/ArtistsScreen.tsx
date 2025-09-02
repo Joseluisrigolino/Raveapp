@@ -65,20 +65,26 @@ export default function ArtistsScreen() {
     );
   };
 
+  const currentScreen = path.split("/").pop() || "";
   const tabs = [
     ...(isAdmin
       ? [
           {
             label: "Adm Artistas",
             route: "/admin/ArtistScreens/ManageArtistsScreen",
-            isActive: path === "/admin/ArtistScreens/ManageArtistsScreen",
+            isActive: currentScreen === "ManageArtistsScreen",
           },
         ]
       : []),
     {
       label: "Artistas",
       route: "/main/ArtistsScreens/ArtistsScreen",
-      isActive: path === "/main/ArtistsScreens/ArtistsScreen",
+      isActive: currentScreen === "ArtistsScreen",
+    },
+    {
+      label: "Noticias",
+      route: "/main/NewsScreens/NewsScreen",
+      isActive: currentScreen === "NewsScreen",
     },
   ];
 

@@ -14,20 +14,21 @@ import {
   ActivityIndicator,
   Linking,
   Platform,
+  useColorScheme,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import TabMenuComponent from "@/components/layout/TabMenuComponent"; // ⬅️ SUBHEADER
+import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import TitlePers from "@/components/common/TitleComponent";
-import DateTimeInputComponent from "@/components/common/DateTimeInputComponent";
 
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { ApiGenero, fetchGenres } from "@/utils/events/eventApi";
 import { getTycPdfUrl } from "@/utils/tycApi";
-import { fetchArtistsFromApi } from "@/utils/artists/artistApi";
+import { fetchArtistsFromApi, createArtist } from "@/utils/artists/artistApi";
 import { Artist } from "@/interfaces/Artist";
 import {
   fetchProvinces,
@@ -36,8 +37,12 @@ import {
 } from "@/utils/georef/georefHelpers";
 import { useAuth } from "@/context/AuthContext";
 
+// Fiestas (recurrentes)
+import { getPartiesByUser, createParty, Party } from "@/utils/partysApi";
+
 /* ========== Tipos ========== */
 type EventType = "1d" | "2d" | "3d";
+type ArtistSel = Artist & { __isNew?: boolean };
 
 interface DayTickets {
   genQty: string;
@@ -88,21 +93,142 @@ const norm = (s: string) =>
     .toLowerCase()
     .trim();
 
+/* ========== Campo directo Fecha+Hora (con tema visible) ========== */
+function DirectDateTimeField({
+  value,
+  onChange,
+  placeholder = "Seleccionar fecha y hora",
+}: {
+  value: Date;
+  onChange: (d: Date) => void;
+  placeholder?: string;
+}) {
+  const colorScheme = useColorScheme();
+  const [showDate, setShowDate] = useState(false);
+  const [showTime, setShowTime] = useState(false);
+  const [tmpDate, setTmpDate] = useState<Date>(value || new Date());
+
+  const open = () => {
+    setTmpDate(value || new Date());
+    setShowDate(true);
+  };
+
+  const fmt = (d?: Date) =>
+    d
+      ? d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+      : placeholder;
+
+  const pickerCommonPropsDate: any =
+    Platform.OS === "ios"
+      ? { textColor: "#111111" }
+      : { themeVariant: "light" };
+
+  const pickerCommonPropsTime: any =
+    Platform.OS === "ios"
+      ? { textColor: "#111111" }
+      : { themeVariant: "light", is24Hour: true };
+
+  return (
+    <>
+      <TouchableOpacity style={styles.dtButton} onPress={open}>
+        <MaterialCommunityIcons
+          name="calendar-clock"
+          size={18}
+          color={"#111"}
+          style={{ marginRight: 6 }}
+        />
+        <Text style={styles.dtButtonText}>{fmt(value)}</Text>
+      </TouchableOpacity>
+
+      {/* FECHA */}
+      <Modal visible={showDate} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, styles.modalInner, { backgroundColor: "#fff" }]}>
+            <Text style={styles.modalTitle}>Seleccionar fecha</Text>
+            <DateTimePicker
+              value={tmpDate}
+              mode="date"
+              display={Platform.OS === "ios" ? "spinner" : "calendar"}
+              {...pickerCommonPropsDate}
+              onChange={(_, d) => {
+                if (d) setTmpDate(d);
+              }}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: "#E5E7EB" }]}
+                onPress={() => setShowDate(false)}
+              >
+                <Text style={[styles.actionText, { color: "#111" }]}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: GREEN }]}
+                onPress={() => {
+                  setShowDate(false);
+                  setShowTime(true);
+                }}
+              >
+                <Text style={styles.actionText}>Continuar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* HORA */}
+      <Modal visible={showTime} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, styles.modalInner, { backgroundColor: "#fff" }]}>
+            <Text style={styles.modalTitle}>Seleccionar hora</Text>
+            <DateTimePicker
+              value={tmpDate}
+              mode="time"
+              display={Platform.OS === "ios" ? "spinner" : "clock"}
+              {...pickerCommonPropsTime}
+              onChange={(_, d) => {
+                if (d) {
+                  const merged = new Date(tmpDate);
+                  merged.setHours(d.getHours(), d.getMinutes(), 0, 0);
+                  setTmpDate(merged);
+                }
+              }}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: "#E5E7EB" }]}
+                onPress={() => setShowTime(false)}
+              >
+                <Text style={[styles.actionText, { color: "#111" }]}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: GREEN }]}
+                onPress={() => {
+                  setShowTime(false);
+                  onChange(tmpDate);
+                }}
+              >
+                <Text style={styles.actionText}>Aceptar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
 export default function CreateEventScreen() {
   /* ========== Auth ========== */
   const { user } = useAuth();
-  const mustShowLogin = !user || user.role === "guest";
-
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const handleLogin = () => console.log("Iniciar sesión");
-  const handleRegister = () => console.log("Registrarme");
-  const handleGoogleLogin = () => console.log("Login con Google");
-  const simulateLogin = () => setIsLoggedIn(true);
-  const handleLogout = () => setIsLoggedIn(false);
+  const userId: string | null =
+    (user as any)?.idUsuario ?? (user as any)?.id ?? null;
+  const mustShowLogin = !user || (user as any)?.role === "guest";
 
   /* ========== Datos base ========== */
   const [eventName, setEventName] = useState("");
+  const [eventDescription, setEventDescription] = useState("");
   const [isRecurring, setIsRecurring] = useState(false);
+
   const [eventType, setEventType] = useState<EventType>("1d");
   const dayCount = useMemo(
     () => (eventType === "1d" ? 1 : eventType === "2d" ? 2 : 3),
@@ -115,10 +241,20 @@ export default function CreateEventScreen() {
 
   /* ========== Artistas ========== */
   const [artistInput, setArtistInput] = useState("");
-  const [selectedArtists, setSelectedArtists] = useState<Artist[]>([]);
+  const [selectedArtists, setSelectedArtists] = useState<ArtistSel[]>([]);
   const [allArtists, setAllArtists] = useState<Artist[] | null>(null);
   const [artistLoading, setArtistLoading] = useState(false);
   const [showArtistSuggestions, setShowArtistSuggestions] = useState(false);
+
+  /* ========== Fiestas recurrentes ========== */
+  const [myParties, setMyParties] = useState<Party[]>([]);
+  const [partyLoading, setPartyLoading] = useState(false);
+  const [showPartyDropdown, setShowPartyDropdown] = useState(false);
+  const [selectedPartyId, setSelectedPartyId] = useState<string | null>(null);
+
+  // Crear nueva (pendiente hasta enviar)
+  const [newPartyName, setNewPartyName] = useState("");
+  const [newPartyLocked, setNewPartyLocked] = useState(false);
 
   /* ========== Ubicación (NO TOCAR) ========== */
   const [provinces, setProvinces] = useState<{ id: string; nombre: string }[]>(
@@ -144,9 +280,6 @@ export default function CreateEventScreen() {
   /* ========== Flags ========== */
   const [isAfter, setIsAfter] = useState(false);
   const [isLGBT, setIsLGBT] = useState(false);
-
-  /* ========== Descripción ========== */
-  const [eventDescription, setEventDescription] = useState("");
 
   /* ========== Estructuras por día ========== */
   const [daySchedules, setDaySchedules] = useState<DaySchedule[]>([
@@ -244,6 +377,26 @@ export default function CreateEventScreen() {
     }
   }, [artistInput, allArtists, artistLoading]);
 
+  // Cargar fiestas del usuario cuando marca "evento recurrente"
+  useEffect(() => {
+    if (!isRecurring || !userId) return;
+    setPartyLoading(true);
+    getPartiesByUser(String(userId))
+      .then((arr) => setMyParties(arr))
+      .catch(() => setMyParties([]))
+      .finally(() => setPartyLoading(false));
+  }, [isRecurring, userId]);
+
+  // Si desactiva "recurrente", limpio selección / pendiente
+  useEffect(() => {
+    if (!isRecurring) {
+      setSelectedPartyId(null);
+      setNewPartyName("");
+      setNewPartyLocked(false);
+      setShowPartyDropdown(false);
+    }
+  }, [isRecurring]);
+
   /* ========== Handlers ubicación (NO TOCAR) ========== */
   const handleSelectProvince = async (id: string, name: string) => {
     setProvinceId(id);
@@ -282,7 +435,7 @@ export default function CreateEventScreen() {
     setShowLocalities(false);
   };
 
-  /* ========== Handlers UI ========== */
+  /* ========== Handlers: géneros y artistas ========== */
   const toggleGenre = (id: number) => {
     setSelectedGenres((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -296,7 +449,7 @@ export default function CreateEventScreen() {
       setArtistInput("");
       return;
     }
-    setSelectedArtists((prev) => [...prev, { name, image: "" } as Artist]);
+    setSelectedArtists((prev) => [...prev, { name, image: "" } as ArtistSel]);
     setArtistInput("");
     setShowArtistSuggestions(false);
   };
@@ -312,6 +465,22 @@ export default function CreateEventScreen() {
     setSelectedArtists((prev) => prev.filter((x) => x.name !== name));
   };
 
+  /* ========== Handlers: fiestas ========== */
+  const onPickParty = (p: Party) => {
+    setSelectedPartyId(p.idFiesta);
+    setShowPartyDropdown(false);
+    setNewPartyName("");
+    setNewPartyLocked(false);
+  };
+
+  const onPressAddNewParty = () => {
+    const name = newPartyName.trim();
+    if (!name) return;
+    setNewPartyLocked(true); // confirma y bloquea edición
+    setSelectedPartyId(null);
+  };
+
+  /* ========== Totales entradas ========== */
   const setSchedule = (i: number, key: keyof DaySchedule, val: Date) => {
     setDaySchedules((prev) => {
       const arr = [...prev];
@@ -355,8 +524,40 @@ export default function CreateEventScreen() {
     if (!res.canceled && res.assets.length) setPhotoFile(res.assets[0].uri);
   };
 
+  /* ========== Submit helpers (creaciones diferidas) ========== */
+  async function createPendingEntities() {
+    // 1) Fiesta nueva (si corresponde)
+    if (isRecurring && newPartyLocked && newPartyName.trim() && userId) {
+      try {
+        await createParty({
+          idUsuario: String(userId),
+          nombre: newPartyName.trim(),
+          isActivo: true,
+        });
+      } catch (e) {
+        console.error("[createParty] error:", e);
+        throw new Error("No se pudo crear la nueva fiesta.");
+      }
+    }
+
+    // 2) Artistas nuevos (si escribiste nombres a mano con +)
+    const newOnes = selectedArtists.filter(
+      (a) => !a.idArtista && a.name?.trim()
+    );
+    if (newOnes.length) {
+      try {
+        await Promise.all(
+          newOnes.map((a) => createArtist(a.name.trim(), 0)) // isActivo = 0
+        );
+      } catch (e) {
+        console.error("[createArtist] error:", e);
+        throw new Error("No se pudieron crear algunos artistas.");
+      }
+    }
+  }
+
   /* ========== Submit ========== */
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!photoFile) {
       Alert.alert("Foto obligatoria", "Seleccioná una imagen del evento.");
       return;
@@ -365,33 +566,43 @@ export default function CreateEventScreen() {
       Alert.alert("Términos", "Debés aceptar los términos y condiciones.");
       return;
     }
-    const payload = {
-      eventName,
-      isRecurring,
-      eventType,
-      selectedGenres,
-      selectedArtists,
-      provinceId,
-      provinceName,
-      municipalityId,
-      municipalityName,
-      localityId,
-      localityName,
-      street,
-      isAfter,
-      isLGBT,
-      eventDescription,
-      daySchedules,
-      daySaleConfigs,
-      daysTickets,
-      photoFile,
-      videoLink,
-      musicLink,
-      grandTotal,
-      acceptedTC,
-    };
-    console.log("Evento creado:", payload);
-    Alert.alert("Éxito", "Evento creado");
+
+    try {
+      await createPendingEntities();
+
+      const payload = {
+        eventName,
+        eventDescription,
+        isRecurring,
+        selectedPartyId,
+        newPartyName: newPartyLocked ? newPartyName.trim() : null,
+        eventType,
+        selectedGenres,
+        selectedArtists: selectedArtists.map((a) => a.name),
+        provinceId,
+        provinceName,
+        municipalityId,
+        municipalityName,
+        localityId,
+        localityName,
+        street,
+        isAfter,
+        isLGBT,
+        daySchedules,
+        daySaleConfigs,
+        daysTickets,
+        photoFile,
+        videoLink,
+        musicLink,
+        grandTotal,
+        acceptedTC,
+      };
+
+      console.log("Evento creado:", payload);
+      Alert.alert("Éxito", "Evento creado");
+    } catch (e: any) {
+      Alert.alert("Error", e?.message || "No se pudo crear el evento.");
+    }
   };
 
   /* ========== Derivados Artistas ========== */
@@ -412,9 +623,16 @@ export default function CreateEventScreen() {
       {/* ===== SUBHEADER (tabs) ===== */}
       <TabMenuComponent
         tabs={[
-          
-          { label: "Crear evento", route: "/main/CreateEventScreen", isActive: true },
-          { label: "Mis fiestas recurrentes", route: "owner/PartysScreen", isActive: false },
+          {
+            label: "Crear evento",
+            route: "/main/CreateEventScreen",
+            isActive: true,
+          },
+          {
+            label: "Mis fiestas recurrentes",
+            route: "/owner/PartysScreen",
+            isActive: false,
+          },
         ]}
       />
 
@@ -428,19 +646,19 @@ export default function CreateEventScreen() {
             </Text>
             <TouchableOpacity
               style={[styles.button, styles.loginButton]}
-              onPress={handleLogin}
+              onPress={() => console.log("Iniciar sesión")}
             >
               <Text style={styles.buttonText}>Iniciar sesión</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.registerButton]}
-              onPress={handleRegister}
+              onPress={() => console.log("Registrarme")}
             >
               <Text style={styles.buttonText}>Registrarme</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.googleButton]}
-              onPress={handleGoogleLogin}
+              onPress={() => console.log("Login con Google")}
             >
               <View style={styles.googleButtonContent}>
                 <MaterialCommunityIcons
@@ -451,9 +669,6 @@ export default function CreateEventScreen() {
                 />
                 <Text style={styles.googleButtonText}>Login con Google</Text>
               </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.demoButton} onPress={simulateLogin}>
-              <Text style={styles.demoButtonText}>[Simular login]</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -481,9 +696,100 @@ export default function CreateEventScreen() {
                   <View
                     style={[styles.checkBox, isRecurring && styles.checkBoxOn]}
                   />
-                  <Text style={styles.checkText}>Este evento es recurrente</Text>
+                  <Text style={styles.checkText}>
+                    Este evento es recurrente
+                  </Text>
                 </TouchableOpacity>
               </View>
+
+              {/* Desplegable de fiestas */}
+              {isRecurring && (
+                <View style={[styles.recurringBox]}>
+                  <Text style={styles.recurringTitle}>
+                    Selecciona una fiesta recurrente:
+                  </Text>
+
+                  {/* Selector de fiestas */}
+                  <TouchableOpacity
+                    style={styles.dropdownButton}
+                    onPress={() => setShowPartyDropdown((v) => !v)}
+                  >
+                    <Text style={styles.dropdownText}>
+                      {partyLoading
+                        ? "Cargando…"
+                        : selectedPartyId
+                        ? myParties.find((p) => p.idFiesta === selectedPartyId)
+                            ?.nombre || "Sin nombre"
+                        : "Selecciona una opción"}
+                    </Text>
+                    <MaterialCommunityIcons
+                      name={showPartyDropdown ? "chevron-up" : "chevron-down"}
+                      size={20}
+                      color={COLORS.textPrimary}
+                      style={{ position: "absolute", right: 10 }}
+                    />
+                  </TouchableOpacity>
+
+                  {showPartyDropdown && (
+                    <View style={styles.dropdownContainer}>
+                      {partyLoading && (
+                        <View style={styles.dropdownItem}>
+                          <Text style={styles.hint}>Cargando…</Text>
+                        </View>
+                      )}
+                      {!partyLoading && myParties.length === 0 && (
+                        <View style={styles.dropdownItem}>
+                          <Text style={styles.hint}>No tenés fiestas aún.</Text>
+                        </View>
+                      )}
+                      {!partyLoading &&
+                        myParties.map((p) => (
+                          <TouchableOpacity
+                            key={p.idFiesta}
+                            style={styles.dropdownItem}
+                            onPress={() => onPickParty(p)}
+                          >
+                            <Text>{p.nombre || "(sin nombre)"}</Text>
+                          </TouchableOpacity>
+                        ))}
+                    </View>
+                  )}
+
+                  <Text style={[styles.recurringTitle, { marginTop: 12 }]}>
+                    O crea una nueva:
+                  </Text>
+
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        { flex: 1 },
+                        newPartyLocked && styles.inputDisabled,
+                      ]}
+                      placeholder="Nombre de la nueva fiesta"
+                      value={newPartyName}
+                      onChangeText={setNewPartyName}
+                      editable={!newPartyLocked}
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.addIconBtn,
+                        { marginLeft: 8, opacity: newPartyLocked ? 0.5 : 1 },
+                      ]}
+                      onPress={onPressAddNewParty}
+                      disabled={newPartyLocked || !newPartyName.trim()}
+                    >
+                      <Text style={styles.addIconText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {newPartyLocked && (
+                    <Text style={[styles.hint, { marginTop: 6 }]}>
+                      Se creará con ese nombre al enviar el evento.
+                    </Text>
+                  )}
+                </View>
+              )}
 
               <View style={styles.line} />
 
@@ -563,7 +869,7 @@ export default function CreateEventScreen() {
                 </View>
 
                 {showArtistSuggestions && (
-                  <View className="shadow" style={styles.dropdownContainer}>
+                  <View style={styles.dropdownContainer}>
                     {artistLoading && (
                       <View style={styles.dropdownItem}>
                         <Text style={styles.hint}>Buscando…</Text>
@@ -726,14 +1032,18 @@ export default function CreateEventScreen() {
                   style={styles.checkRow}
                   onPress={() => setIsAfter(!isAfter)}
                 >
-                  <View style={[styles.checkBox, isAfter && styles.checkBoxOn]} />
+                  <View
+                    style={[styles.checkBox, isAfter && styles.checkBoxOn]}
+                  />
                   <Text style={styles.checkText}>¿Es after?</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.checkRow}
                   onPress={() => setIsLGBT(!isLGBT)}
                 >
-                  <View style={[styles.checkBox, isLGBT && styles.checkBoxOn]} />
+                  <View
+                    style={[styles.checkBox, isLGBT && styles.checkBoxOn]}
+                  />
                   <Text style={styles.checkText}>¿Es LGBT?</Text>
                 </TouchableOpacity>
               </View>
@@ -751,20 +1061,18 @@ export default function CreateEventScreen() {
               />
             </View>
 
-            {/* Fechas por día */}
+            {/* Fechas por día (directo) */}
             <Text style={styles.h2}>Fecha y hora del evento</Text>
             {daySchedules.map((d, i) => (
               <View key={`sch-${i}`} style={styles.card}>
                 <Text style={styles.dayTitle}>Día {i + 1}</Text>
                 <Text style={styles.label}>Inicio</Text>
-                <DateTimeInputComponent
-                  label=""
+                <DirectDateTimeField
                   value={d.start}
                   onChange={(val) => setSchedule(i, "start", val)}
                 />
-                <Text style={styles.label}>Finalización</Text>
-                <DateTimeInputComponent
-                  label=""
+                <Text style={[styles.label, { marginTop: 8 }]}>Finalización</Text>
+                <DirectDateTimeField
                   value={d.end}
                   onChange={(val) => setSchedule(i, "end", val)}
                 />
@@ -861,7 +1169,9 @@ export default function CreateEventScreen() {
                     total es 800, no 1000.
                   </Text>
 
-                  <Text style={styles.fieldTitle}>Early Bird VIP (opcional)</Text>
+                  <Text style={styles.fieldTitle}>
+                    Early Bird VIP (opcional)
+                  </Text>
                   <View style={styles.row}>
                     <TextInput
                       style={[
@@ -899,20 +1209,20 @@ export default function CreateEventScreen() {
               );
             })}
 
-            {/* Config de entradas por día */}
+            {/* Config de entradas por día (directo) */}
             <Text style={styles.h2}>Configuración de entradas</Text>
             {daySaleConfigs.map((cfg, i) => (
               <View key={`cfg-${i}`} style={styles.card}>
                 <Text style={styles.dayTitle}>Día {i + 1}</Text>
                 <Text style={styles.label}>Inicio de venta</Text>
-                <DateTimeInputComponent
-                  label=""
+                <DirectDateTimeField
                   value={cfg.saleStart}
                   onChange={(val) => setSaleCfg(i, "saleStart", val)}
                 />
-                <Text style={styles.label}>Vender Generales/VIP hasta</Text>
-                <DateTimeInputComponent
-                  label=""
+                <Text style={[styles.label, { marginTop: 8 }]}>
+                  Vender Generales/VIP hasta
+                </Text>
+                <DirectDateTimeField
                   value={cfg.sellUntil}
                   onChange={(val) => setSaleCfg(i, "sellUntil", val)}
                 />
@@ -1017,6 +1327,14 @@ export default function CreateEventScreen() {
                 </View>
               )}
 
+              {!tycLoading && !tycError && !tycUrl && (
+                <View style={styles.center}>
+                  <Text style={{ color: COLORS.textSecondary }}>
+                    No hay archivo disponible.
+                  </Text>
+                </View>
+              )}
+
               {!tycLoading && tycError && (
                 <View style={styles.center}>
                   <Text style={{ color: COLORS.negative, marginBottom: 8 }}>
@@ -1028,7 +1346,7 @@ export default function CreateEventScreen() {
                 </View>
               )}
 
-              {!tycLoading && !tycError && tycUrl && (
+              {!tycLoading && tycUrl && (
                 <>
                   {(() => {
                     let WebViewComp: any = null;
@@ -1044,8 +1362,8 @@ export default function CreateEventScreen() {
                       );
                     }
                     if (Platform.OS === "web") {
+                      // @ts-ignore – iframe sólo web
                       return (
-                        // @ts-ignore – iframe sólo web
                         <iframe
                           src={buildViewerUrl(tycUrl!)}
                           style={{ width: "100%", height: "100%", border: "none" }}
@@ -1168,26 +1486,6 @@ const styles = StyleSheet.create({
   segmentText: { color: COLORS.textPrimary, fontWeight: "600" },
   segmentTextOn: { color: COLORS.cardBg },
 
-  /* géneros chips */
-  genreGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  chip: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: RADIUS.card,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.cardBg,
-  },
-  chipOn: {
-    backgroundColor: COLORS.primary,
-  },
-  chipText: { color: COLORS.primary, fontWeight: "600" },
-  chipTextOn: { color: COLORS.cardBg },
-
   /* artistas */
   artistRow: {
     flexDirection: "row",
@@ -1203,7 +1501,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  addIconText: { color: "#fff", fontSize: 22, fontWeight: "800", marginTop: -2 },
+  addIconText: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "800",
+    marginTop: -2,
+  },
 
   artistPickedRow: {
     flexDirection: "row",
@@ -1244,7 +1547,7 @@ const styles = StyleSheet.create({
   checkBoxOn: { backgroundColor: COLORS.primary },
   checkText: { color: COLORS.textPrimary },
 
-  /* dropdowns (ubicación + sugerencias artistas) */
+  /* dropdowns (listas + selector fiestas/artistas) */
   dropdownButton: {
     width: "100%",
     backgroundColor: COLORS.backgroundLight,
@@ -1252,7 +1555,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.textPrimary,
     borderRadius: RADIUS.card,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     marginBottom: 8,
     justifyContent: "center",
   },
@@ -1271,6 +1574,21 @@ const styles = StyleSheet.create({
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
+  },
+
+  /* bloque recurrente */
+  recurringBox: {
+    marginTop: 12,
+    backgroundColor: COLORS.backgroundLight,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    padding: 10,
+  },
+  recurringTitle: {
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+    marginBottom: 6,
   },
 
   /* filas */
@@ -1323,7 +1641,7 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.body,
   },
 
-  /* modal TYC */
+  /* modal común (reutilizado) */
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
@@ -1345,7 +1663,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  modalTitle: { color: COLORS.textPrimary, fontWeight: "700" },
+  modalTitle: {
+    color: COLORS.textPrimary,
+    fontWeight: "700",
+    fontFamily: Platform.select({
+      ios: "Helvetica Neue",
+      android: "Roboto",
+      default: "System",
+    }),
+  },
   modalBody: { width: 320, height: 460, padding: 6 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
 
@@ -1374,13 +1700,81 @@ const styles = StyleSheet.create({
   googleButtonContent: { flexDirection: "row", alignItems: "center" },
   googleButtonText: { color: COLORS.textPrimary, fontWeight: "bold" },
   buttonText: { color: COLORS.cardBg, fontWeight: "bold" },
-  demoButton: {
-    marginTop: 16,
-    backgroundColor: COLORS.borderInput,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: RADIUS.card,
-    alignSelf: "center",
+
+  /* chips géneros (visual “píldora”) */
+  genreGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 2,
   },
-  demoButtonText: { color: COLORS.textSecondary },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.cardBg,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  chipOn: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  chipText: {
+    color: COLORS.primary,
+    fontWeight: "600",
+  },
+  chipTextOn: {
+    color: COLORS.cardBg,
+    fontWeight: "700",
+  },
+
+  /* DateTime botón + modal acciones */
+  dtButton: {
+    width: "100%",
+    backgroundColor: COLORS.backgroundLight,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  dtButtonText: {
+    color: COLORS.textPrimary,
+    fontWeight: "600",
+    fontFamily: Platform.select({
+      ios: "Helvetica Neue",
+      android: "Roboto",
+      default: "System",
+    }),
+  },
+  modalInner: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 10,
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  actionBtn: {
+    borderRadius: RADIUS.card,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  actionText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontFamily: Platform.select({
+      ios: "Helvetica Neue",
+      android: "Roboto",
+      default: "System",
+    }),
+  },
 });
