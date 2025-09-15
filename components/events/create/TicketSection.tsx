@@ -1,0 +1,220 @@
+// components/events/create/TicketSection.tsx
+import React from "react";
+import { View, Text, TextInput, StyleSheet } from "react-native";
+import { COLORS, RADIUS } from "@/styles/globalStyles";
+
+type DayTickets = {
+  genQty: string;
+  genPrice: string;
+  ebGenQty: string;
+  ebGenPrice: string;
+  vipQty: string;
+  vipPrice: string;
+  ebVipQty: string;
+  ebVipPrice: string;
+};
+
+interface Props {
+  daysTickets: DayTickets[];
+  setTicket: (index: number, key: keyof DayTickets, val: string) => void;
+  totalPerDay: (d: DayTickets) => number;
+}
+
+export default function TicketsSection({
+  daysTickets,
+  setTicket,
+  totalPerDay,
+}: Props) {
+  return (
+    <>
+      {daysTickets.map((d, i) => {
+        const enableEBGen = (parseInt(d.genQty || "0", 10) || 0) > 0;
+        const enableEBVip = (parseInt(d.vipQty || "0", 10) || 0) > 0;
+
+        return (
+          <View key={`tk-${i}`} style={styles.card}>
+            <Text style={styles.dayTitle}>Día {i + 1}</Text>
+
+            {/* Generales */}
+            <Text style={styles.fieldTitle}>Entradas Generales *</Text>
+            <View style={styles.row}>
+              <TextInput
+                style={[styles.input, styles.inputSm]}
+                keyboardType="numeric"
+                value={d.genQty}
+                onChangeText={(v) => setTicket(i, "genQty", v)}
+                placeholder="0"
+                placeholderTextColor={COLORS.textSecondary}
+              />
+              <TextInput
+                style={[styles.input, styles.inputSm]}
+                keyboardType="numeric"
+                value={d.genPrice}
+                onChangeText={(v) => setTicket(i, "genPrice", v)}
+                placeholder="Precio"
+                placeholderTextColor={COLORS.textSecondary}
+              />
+            </View>
+            <Text style={styles.hint}>
+              La cantidad ingresada es el total de entradas generales.{"\n"}
+              Si agregas entradas EarlyBirds Generales, estas ya forman parte
+              del total de entradas Generales, no se suman a la cantidad total.
+              {"\n"}
+              Ejemplo: Si ingresas 900 entradas Generales, y 100 Early Birds, el
+              total es 900, no 1000.
+            </Text>
+
+            {/* Early Bird General */}
+            <Text style={styles.fieldTitle}>Early Bird General (opcional)</Text>
+            <View style={styles.row}>
+              <TextInput
+                style={[
+                  styles.input,
+                  styles.inputSm,
+                  !enableEBGen && styles.inputDisabled,
+                ]}
+                keyboardType="numeric"
+                value={d.ebGenQty}
+                onChangeText={(v) => setTicket(i, "ebGenQty", v)}
+                placeholder="0"
+                placeholderTextColor={COLORS.textSecondary}
+                editable={enableEBGen}
+              />
+              <TextInput
+                style={[
+                  styles.input,
+                  styles.inputSm,
+                  !enableEBGen && styles.inputDisabled,
+                ]}
+                keyboardType="numeric"
+                value={d.ebGenPrice}
+                onChangeText={(v) => setTicket(i, "ebGenPrice", v)}
+                placeholder="Precio EarlyBird"
+                placeholderTextColor={COLORS.textSecondary}
+                editable={enableEBGen}
+              />
+            </View>
+
+            {/* VIP */}
+            <Text style={styles.fieldTitle}>Entradas VIP (opcional)</Text>
+            <View style={styles.row}>
+              <TextInput
+                style={[styles.input, styles.inputSm]}
+                keyboardType="numeric"
+                value={d.vipQty}
+                onChangeText={(v) => setTicket(i, "vipQty", v)}
+                placeholder="0"
+                placeholderTextColor={COLORS.textSecondary}
+              />
+              <TextInput
+                style={[styles.input, styles.inputSm]}
+                keyboardType="numeric"
+                value={d.vipPrice}
+                onChangeText={(v) => setTicket(i, "vipPrice", v)}
+                placeholder="Precio"
+                placeholderTextColor={COLORS.textSecondary}
+              />
+            </View>
+            <Text style={styles.hint}>
+              La cantidad ingresada es el total de entradas VIP.{"\n"}
+              Si agregas entradas EarlyBirds VIP, no se suman a la cantidad
+              total.{"\n"}
+              Ejemplo: Si ingresas 800 entradas VIP, y 200 Early Birds, el total
+              es 800, no 1000.
+            </Text>
+
+            {/* Early Bird VIP */}
+            <Text style={styles.fieldTitle}>Early Bird VIP (opcional)</Text>
+            <View style={styles.row}>
+              <TextInput
+                style={[
+                  styles.input,
+                  styles.inputSm,
+                  !enableEBVip && styles.inputDisabled,
+                ]}
+                keyboardType="numeric"
+                value={d.ebVipQty}
+                onChangeText={(v) => setTicket(i, "ebVipQty", v)}
+                placeholder="0"
+                placeholderTextColor={COLORS.textSecondary}
+                editable={enableEBVip}
+              />
+              <TextInput
+                style={[
+                  styles.input,
+                  styles.inputSm,
+                  !enableEBVip && styles.inputDisabled,
+                ]}
+                keyboardType="numeric"
+                value={d.ebVipPrice}
+                onChangeText={(v) => setTicket(i, "ebVipPrice", v)}
+                placeholder="Precio EarlyBird"
+                placeholderTextColor={COLORS.textSecondary}
+                editable={enableEBVip}
+              />
+            </View>
+
+            {/* Total del día */}
+            <Text style={styles.totalLine}>
+              Total de entradas del día:{" "}
+              <Text style={{ color: "#17a34a", fontWeight: "700" }}>
+                {totalPerDay(d)}
+              </Text>
+            </Text>
+          </View>
+        );
+      })}
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    width: "100%",
+    backgroundColor: COLORS.cardBg,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    padding: 14,
+    marginBottom: 14,
+  },
+
+  row: { flexDirection: "row", alignItems: "center" },
+
+  // textos
+  fieldTitle: {
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  dayTitle: {
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  totalLine: {
+    marginTop: 10,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+  },
+
+  // inputs
+  input: {
+    width: "100%",
+    backgroundColor: COLORS.backgroundLight,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: COLORS.textPrimary,
+  },
+  inputSm: { width: 140, marginRight: 10 },
+  inputDisabled: {
+    backgroundColor: COLORS.borderInput,
+    color: COLORS.textSecondary,
+  },
+
+  hint: { color: COLORS.textSecondary, fontSize: 12, marginTop: 6 },
+});
