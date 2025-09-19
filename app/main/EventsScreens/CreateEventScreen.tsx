@@ -1,4 +1,6 @@
-// app/main/CreateEventScreen.tsx
+// app/main/EventsScreens/CreateEventScreen.tsx
+import * as ImagePicker from "expo-image-picker";
+
 import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
@@ -25,13 +27,13 @@ import TitlePers from "@/components/common/TitleComponent";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 /** API / helpers */
-import { ApiGenero, fetchGenres } from "@/utils/events/eventApi";
+import { ApiGenero, fetchGenres, createEvent } from "@/utils/events/eventApi";
 import { getTycPdfUrl } from "@/utils/tycApi";
 import { fetchArtistsFromApi, createArtist } from "@/utils/artists/artistApi";
 import { Artist } from "@/interfaces/Artist";
 import { useAuth } from "@/context/AuthContext";
 
-/** Georef (NO TOCAR lógicas base, sólo pasamos a componente) */
+/** Georef */
 import {
   fetchProvinces,
   fetchMunicipalities,
@@ -41,7 +43,14 @@ import {
 /** Recurrentes (parties) */
 import { getPartiesByUser, createParty, Party } from "@/utils/partysApi";
 
-/** Componentes de la pantalla (carpeta components/events/create) */
+/** Entradas */
+import {
+  createEntradasBulk,
+  resolveTipoCodes,
+  CreateEntradaBody,
+} from "@/utils/events/entradaApi";
+
+/** Componentes (crear) */
 import EventBasicData from "@/components/events/create/EventBasicData";
 import GenreSelector from "@/components/events/create/GenreSelector";
 import ArtistSelector from "@/components/events/create/ArtistSelector";
@@ -101,7 +110,7 @@ const createEmptySaleConfig = (): DaySaleConfig => ({
 const norm = (s: string) =>
   (s || "")
     .normalize("NFD")
-    // @ts-ignore - property supported por RegExp unicode
+    // @ts-ignore - unicode property
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
     .trim();
@@ -145,7 +154,7 @@ export default function CreateEventScreen() {
   const [newPartyName, setNewPartyName] = useState("");
   const [newPartyLocked, setNewPartyLocked] = useState(false);
 
-  /* --- Ubicación (NO TOCAR lógicas, sólo propagar) --- */
+  /* --- Ubicación --- */
   const [provinces, setProvinces] = useState<{ id: string; nombre: string }[]>(
     []
   );
@@ -282,7 +291,7 @@ export default function CreateEventScreen() {
     }
   }, [isRecurring]);
 
-  /* ================= Handlers (pasan a los subcomponentes) ================= */
+  /* ================= Handlers ================= */
   // Géneros
   const toggleGenre = (id: number) => {
     setSelectedGenres((prev) =>
@@ -358,26 +367,52 @@ export default function CreateEventScreen() {
   );
 
   // Multimedia
+  // arriba del archivo (o dentro de la función con dynamic import):
+  // ✅ Import correcto (sin default)
+
   const handleSelectPhoto = async () => {
     try {
-      const { default: ImagePicker } = await import("expo-image-picker");
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (perm.status !== "granted") {
-        Alert.alert("Permiso denegado", "Necesitamos permiso de galería.");
+      // 1) Permisos
+      const current = await ImagePicker.getMediaLibraryPermissionsAsync();
+      if (current.status !== "granted" && current.status !== "limited") {
+        const req = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (req.status !== "granted" && req.status !== "limited") {
+          Alert.alert(
+            "Permiso denegado",
+            "Necesitamos permiso para acceder a tus fotos."
+          );
+          return;
+        }
+      }
+
+      // 2) Web no soportado nativo
+      if (Platform.OS === "web") {
+        Alert.alert(
+          "No soportado en Web",
+          "En Web usá el botón 'Subir archivo' (input type=file)."
+        );
         return;
       }
+
+      // 3) Abrir galería
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
         quality: 1,
+        selectionLimit: 1,
       });
-      if (!res.canceled && res.assets.length) setPhotoFile(res.assets[0].uri);
+
+      if (!res.canceled && res.assets?.length) {
+        setPhotoFile(res.assets[0].uri);
+        console.log("[ImagePicker] Imagen seleccionada:", res.assets[0].uri);
+      }
     } catch (e) {
       console.error("ImagePicker error", e);
       Alert.alert("Error", "No se pudo abrir la galería.");
     }
   };
 
-  // Creaciones diferidas
+  // Creaciones diferidas (fiesta + artistas manuales)
   async function createPendingEntities() {
     // 1) Fiesta nueva
     if (isRecurring && newPartyLocked && newPartyName.trim() && userId) {
@@ -409,8 +444,52 @@ export default function CreateEventScreen() {
     }
   }
 
-  // Submit
+  // Helpers de fechas al schema de API
+  const toIso = (d?: Date) => (d ? new Date(d).toISOString() : undefined);
+
+  // Arma las entradas (general, vip y sus early) desde los campos por día.
+  async function buildEntradasForEvent(
+    eventId: string
+  ): Promise<CreateEntradaBody[]> {
+    // Resolver códigos de tipos (tolerante a nombres en backend)
+    const codes = await resolveTipoCodes();
+
+    // Para no crear entradas "vacías": precio > 0 y cantidad > 0
+    const list: CreateEntradaBody[] = [];
+
+    const pushItem = (tipo: number, qtyStr: string, priceStr: string) => {
+      const cantidad = parseInt(qtyStr || "0", 10) || 0;
+      const precio = parseInt(priceStr || "0", 10) || 0;
+      if (cantidad > 0 && precio > 0) {
+        list.push({
+          idFecha: eventId, // según especificación: va el id del evento
+          tipo,
+          estado: 0,
+          precio,
+          cantidad,
+        });
+      }
+    };
+
+    for (const d of daysTickets) {
+      pushItem(codes.general, d.genQty, d.genPrice);
+      pushItem(codes.vip, d.vipQty, d.vipPrice);
+      pushItem(codes.earlyGeneral, d.ebGenQty, d.ebGenPrice);
+      pushItem(codes.earlyVip, d.ebVipQty, d.ebVipPrice);
+    }
+    return list;
+  }
+
+  // Submit final: POST + upload imagen + crear entradas
   const handleSubmit = async () => {
+    if (!userId) {
+      Alert.alert("Sesión", "Debés iniciar sesión para crear un evento.");
+      return;
+    }
+    if (!eventName.trim()) {
+      Alert.alert("Nombre", "Completá el nombre del evento.");
+      return;
+    }
     if (!photoFile) {
       Alert.alert("Foto obligatoria", "Seleccioná una imagen del evento.");
       return;
@@ -421,42 +500,121 @@ export default function CreateEventScreen() {
     }
 
     try {
+      // crear fiesta/artistas si quedaron pendientes
       await createPendingEntities();
 
-      const payload = {
-        eventName,
-        eventDescription,
-        isRecurring,
-        selectedPartyId,
-        newPartyName: newPartyLocked ? newPartyName.trim() : null,
-        eventType,
-        selectedGenres,
-        selectedArtists: selectedArtists.map((a) => a.name),
-        provinceId,
-        provinceName,
-        municipalityId,
-        municipalityName,
-        localityId,
-        localityName,
-        street,
-        isAfter,
-        isLGBT,
-        daySchedules,
-        daySaleConfigs,
-        daysTickets,
-        photoFile,
-        videoLink,
-        musicLink,
-        grandTotal,
-        acceptedTC,
+      // artistas: sólo IDs conocidos
+      const artistIds = selectedArtists
+        .map((a) => a.idArtista || (a as any).id || (a as any).IdArtista)
+        .filter(Boolean)
+        .map(String);
+
+      // fechas
+      const fechas = daySchedules.map((sch, i) => ({
+        fechaInicio: toIso(sch.start),
+        fechaFin: toIso(sch.end),
+        // swagger trae "fechaIncioVenta" con errata; respetamos la clave
+        fechaIncioVenta: toIso(daySaleConfigs[i]?.saleStart),
+        fechaFinVenta: toIso(daySaleConfigs[i]?.sellUntil),
+        estado: 0,
+      }));
+
+      const inicioEvento = fechas[0]?.fechaInicio;
+      const finEvento = fechas[fechas.length - 1]?.fechaFin;
+
+      // domicilio
+      const domicilio = {
+        localidad: { nombre: localityName, codigo: localityId },
+        municipio: { nombre: municipalityName, codigo: municipalityId },
+        provincia: { nombre: provinceName, codigo: provinceId },
+        direccion: street,
+        latitud: 0,
+        longitud: 0,
       };
 
-      console.log("Evento creado:", payload);
-      Alert.alert("Éxito", "Evento creado");
+      // cuerpo exacto según schema
+      const body = {
+        idUsuario: String(userId),
+        idArtistas: artistIds as string[],
+        domicilio,
+        nombre: eventName.trim(),
+        descripcion: eventDescription?.trim() ?? "",
+        genero: selectedGenres,
+        isAfter,
+        isLgbt: isLGBT,
+        inicioVenta: toIso(daySaleConfigs[0]?.saleStart),
+        finVenta: toIso(daySaleConfigs[daySaleConfigs.length - 1]?.sellUntil),
+        inicioEvento,
+        finEvento,
+        estado: 0,
+        fechas,
+        idFiesta: selectedPartyId || "",
+        soundCloud: musicLink?.trim() || "",
+      };
+
+      // 1) Crear evento
+      const rawResponse = await createEvent(body);
+
+      // === LOG DEL ID DEL EVENTO (defensivo) ===
+      const idEvento =
+        typeof rawResponse === "string"
+          ? rawResponse
+          : rawResponse?.idEvento ??
+            rawResponse?.id ??
+            rawResponse?.Id ??
+            rawResponse?.Id_Evento ??
+            rawResponse?.data?.idEvento ??
+            rawResponse?.data?.id;
+
+      console.log(
+        "[CreateEvent] Evento creado. ID:",
+        idEvento,
+        "Respuesta cruda:",
+        tryStringify(rawResponse)
+      );
+
+      if (!idEvento) {
+        throw new Error(
+          "El evento se creó pero no se pudo resolver el ID en la respuesta."
+        );
+      }
+
+      // 2) Subir imagen principal
+      if (photoFile) {
+        const filename = photoFile.split("/").pop() || "evento.jpg";
+        const ext = filename.includes(".") ? filename.split(".").pop() : "jpg";
+        const type = `image/${ext?.toLowerCase() === "png" ? "png" : "jpeg"}`;
+        // @ts-ignore - RN FormData file shape
+        const file: any = { uri: photoFile, name: filename, type };
+        const { mediaApi } = await import("@/utils/mediaApi");
+        await mediaApi.upload(idEvento, file);
+      }
+
+      // 3) Crear entradas (si corresponde)
+      const entradas = await buildEntradasForEvent(idEvento);
+      if (entradas.length) {
+        await createEntradasBulk(entradas);
+      }
+
+      Alert.alert("Éxito", "Evento y entradas creados correctamente.");
+      // TODO: reset del formulario si lo necesitás
     } catch (e: any) {
-      Alert.alert("Error", e?.message || "No se pudo crear el evento.");
+      console.error("[CreateEvent] error:", e);
+      Alert.alert(
+        "Error",
+        e?.message || "No se pudo crear el evento o las entradas."
+      );
     }
   };
+
+  // util para loguear objetos sin romper si hay referencias circulares
+  function tryStringify(v: any) {
+    try {
+      return JSON.stringify(v);
+    } catch {
+      return String(v);
+    }
+  }
 
   /* ================= Derivados ================= */
   const artistSuggestions: Artist[] = useMemo(() => {
@@ -526,7 +684,7 @@ export default function CreateEventScreen() {
         ) : (
           <View style={{ width: "100%" }}>
             <TitlePers text="Crear Evento" />
-            <View style={styles.divider} />
+            <View className="divider" style={styles.divider} />
 
             {/* 1) Datos del evento */}
             <Text style={styles.h2}>Datos del evento</Text>

@@ -1,3 +1,4 @@
+// utils/mediaApi.ts
 import { apiClient } from "@/utils/apiConfig";
 
 /**
@@ -20,7 +21,6 @@ export const mediaApi = {
         headers: { Accept: "*/*" },
       });
 
-      // Siempre devolver en el formato esperado
       if (!data || !Array.isArray(data.media)) {
         return { media: [] };
       }

@@ -2,7 +2,17 @@
 import { EventItem } from "@/interfaces/EventItem";
 import { apiClient, login } from "@/utils/apiConfig";
 import { mediaApi } from "@/utils/mediaApi";
-import { fetchArtistsFromApi } from "@/utils/artists/artistApi";
+
+/** ---------- constantes de estados ---------- */
+export const ESTADO_CODES = {
+  POR_APROBAR: 0,
+  APROBADO: 1,
+  EN_VENTA: 2,
+  FIN_VENTA: 3,
+  FINALIZADO: 4,
+  CANCELADO: 5,
+  RECHAZADO: 6,
+} as const;
 
 /** ---------- util fechas ---------- */
 function formatDate(iso: string): string {
@@ -196,25 +206,44 @@ export async function fetchEventsByEstado(
   return normalized;
 }
 
+/**
+ * Barrido por múltiples estados con tolerancia:
+ * - Si un estado devuelve 404 (o cualquier error), se ignora ese lote.
+ * - Se deduplica por id.
+ */
 export async function fetchEventsByEstados(
   estados: number[]
 ): Promise<EventItemWithExtras[]> {
-  const batches = await Promise.all(estados.map((st) => fetchEventsByEstado(st)));
-  const flat = ([] as EventItemWithExtras[]).concat(...batches);
+  const acc: EventItemWithExtras[] = [];
+  await Promise.all(
+    estados.map(async (st) => {
+      try {
+        const arr = await fetchEventsByEstado(st);
+        acc.push(...arr);
+      } catch (e: any) {
+        console.warn(
+          `[fetchEventsByEstados] Estado=${st} ->`,
+          e?.response?.status || e?.message
+        );
+      }
+    })
+  );
   const map = new Map<string, EventItemWithExtras>();
-  for (const e of flat) map.set(String(e.id), e);
+  for (const e of acc) map.set(String(e.id), e);
   return Array.from(map.values());
 }
 
 /** alias compat */
 export async function fetchEvents(
-  estado: number = 2
+  estado: number = ESTADO_CODES.EN_VENTA
 ): Promise<EventItemWithExtras[]> {
   return fetchEventsByEstado(estado);
 }
 
 /** ---------- DETALLE por ID (robusto con fallback) ---------- */
-export async function fetchEventById(idEvento: string): Promise<EventItemWithExtras> {
+export async function fetchEventById(
+  idEvento: string
+): Promise<EventItemWithExtras> {
   const id = String(idEvento || "").trim();
   if (!id) {
     const err: any = new Error("ID de evento vacío.");
@@ -226,9 +255,16 @@ export async function fetchEventById(idEvento: string): Promise<EventItemWithExt
   const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
   const attempts: Array<() => Promise<any>> = [
-    () => apiClient.get("/v1/Evento/GetEvento", { params: { idEvento: id }, headers }),
+    () =>
+      apiClient.get("/v1/Evento/GetEvento", {
+        params: { idEvento: id },
+        headers,
+      }),
     () => apiClient.get("/v1/Evento/GetEvento", { params: { id }, headers }),
-    () => apiClient.get(`/v1/Evento/GetEvento/${encodeURIComponent(id)}`, { headers }),
+    () =>
+      apiClient.get(`/v1/Evento/GetEvento/${encodeURIComponent(id)}`, {
+        headers,
+      }),
   ];
 
   for (const fn of attempts) {
@@ -239,15 +275,28 @@ export async function fetchEventById(idEvento: string): Promise<EventItemWithExt
       return await normalizeEvento(data);
     } catch (e: any) {
       const status = e?.response?.status;
-      if (status && status !== 404) {
-        console.warn("[fetchEventById] intento fallido:", status);
-      }
+      if (status && status !== 404) console.warn("[fetchEventById] intento fallido:", status);
+      continue;
     }
   }
 
+  // Fallback: barrer estados, ignorando 404s
   try {
-    const all = await fetchEventsByEstados([0, 1, 2, 3, 4, 5, 6]);
-    const found = all.find((e) => String(e.id) === id);
+    const all = await fetchEventsByEstados([
+      ESTADO_CODES.POR_APROBAR,
+      ESTADO_CODES.APROBADO,
+      ESTADO_CODES.EN_VENTA,
+      ESTADO_CODES.FIN_VENTA,
+      ESTADO_CODES.FINALIZADO,
+      ESTADO_CODES.CANCELADO,
+      ESTADO_CODES.RECHAZADO,
+    ]);
+    const found =
+      all.find((e) => String(e.id) === id) ||
+      all.find(
+        (e: any) =>
+          String(e?.idEvento ?? "").toLowerCase() === id.toLowerCase()
+      );
     if (found) return found;
   } catch (e) {
     console.warn("[fetchEventById] fallback estados falló:", e);
@@ -258,8 +307,47 @@ export async function fetchEventById(idEvento: string): Promise<EventItemWithExt
   throw err;
 }
 
+/** ---------- CREATE (POST /v1/Evento/CrearEvento) ---------- */
+export type CreateEventResponse = {
+  idEvento?: string;
+  IdEvento?: string;
+  evento?: { idEvento?: string; IdEvento?: string };
+  [k: string]: any;
+};
+
+export async function createEvent(body: any): Promise<string> {
+  const token = await login();
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+
+  const resp = await apiClient.post<CreateEventResponse>(
+    "/v1/Evento/CrearEvento",
+    body,
+    { headers }
+  );
+
+  const data = resp?.data ?? {};
+  const id =
+    data.idEvento ??
+    data.IdEvento ??
+    data?.evento?.idEvento ??
+    data?.evento?.IdEvento ??
+    "";
+
+  if (!id) {
+    console.warn("[createEvent] respuesta sin id, data:", data);
+    throw new Error("La API no devolvió el id del evento.");
+  }
+  return String(id);
+}
+
 /** ---------- UPDATE (PUT/PATCH tolerante) ---------- */
-export async function updateEvent(idEvento: string, payload: any): Promise<void> {
+export async function updateEvent(
+  idEvento: string,
+  payload: any
+): Promise<void> {
   const id = String(idEvento || "").trim();
   if (!id) throw new Error("ID de evento vacío para actualizar.");
 
@@ -267,10 +355,28 @@ export async function updateEvent(idEvento: string, payload: any): Promise<void>
   const headers = { Authorization: `Bearer ${token}` };
 
   const attempts: Array<() => Promise<any>> = [
-    () => apiClient.put("/v1/Evento/UpdateEvento", { idEvento: id, ...payload }, { headers }),
-    () => apiClient.put("/v1/Evento/Update", { idEvento: id, ...payload }, { headers }),
-    () => apiClient.put("/v1/Evento/PutEvento", { idEvento: id, ...payload }, { headers }),
-    () => apiClient.put(`/v1/Evento/${encodeURIComponent(id)}`, payload, { headers }),
+    () =>
+      apiClient.put(
+        "/v1/Evento/UpdateEvento",
+        { idEvento: id, ...payload },
+        { headers }
+      ),
+    () =>
+      apiClient.put(
+        "/v1/Evento/Update",
+        { idEvento: id, ...payload },
+        { headers }
+      ),
+    () =>
+      apiClient.put(
+        "/v1/Evento/PutEvento",
+        { idEvento: id, ...payload },
+        { headers }
+      ),
+    () =>
+      apiClient.put(`/v1/Evento/${encodeURIComponent(id)}`, payload, {
+        headers,
+      }),
   ];
 
   let lastErr: any = null;
@@ -290,171 +396,64 @@ export async function updateEvent(idEvento: string, payload: any): Promise<void>
   throw new Error(msg);
 }
 
-/* =========================================================================================
- *                                      CREATE
- * =========================================================================================
- */
-
-export type CreateEventUI = {
-  // Datos base
-  idUsuario: string;
-  nombre: string;
-  descripcion: string;
-  genero: number[]; // ids
-  isAfter: boolean;
-  isLgbt: boolean;
-
-  // Artistas (nombres elegidos en UI)
-  selectedArtistNames: string[];
-
-  // Fiesta recurrente
-  idFiesta?: string | null;
-
-  // Ubicación
-  provinciaId?: string;
-  provinciaNombre?: string;
-  municipioId?: string;
-  municipioNombre?: string;
-  localidadId?: string;
-  localidadNombre?: string;
-  direccion?: string;
-  latitud?: number;
-  longitud?: number;
-
-  // Fechas por día
-  daySchedules: { start: Date; end: Date }[];
-  daySaleConfigs: { saleStart: Date; sellUntil: Date }[];
-
-  // Multimedia (opcional, se sube luego de crear el evento)
-  photoFileUri?: string | null;
-  musicLink?: string; // soundCloud
-};
-
-function toIso(d?: Date | string | null): string | undefined {
-  if (!d) return undefined;
-  try {
-    const x = typeof d === "string" ? new Date(d) : d;
-    return x.toISOString();
-  } catch {
-    return undefined;
-  }
+/** ---------- Cambiar estado (helper genérico) ---------- */
+export async function setEventStatus(
+  idEvento: string,
+  estado: number,
+  extra?: Record<string, any>
+): Promise<void> {
+  // Mandamos varias claves para ser compatibles con distintos backends
+  const payload = {
+    estado,
+    cdEstado: estado,
+    estadoEvento: estado,
+    ...extra,
+  };
+  await updateEvent(idEvento, payload);
 }
 
-async function resolveArtistIdsByName(names: string[]): Promise<string[]> {
-  if (!names?.length) return [];
-  const list = await fetchArtistsFromApi().catch(() => []);
-  const norm = (s: string) =>
-    (s || "")
-      .normalize("NFD")
-      // @ts-ignore
-      .replace(/\p{Diacritic}/gu, "")
-      .toLowerCase()
-      .trim();
-  const byName = new Map(list.map((a: any) => [norm(a.name), a]));
-  const ids: string[] = [];
-  for (const n of names) {
-    const a = byName.get(norm(n));
-    if (a?.idArtista) ids.push(String(a.idArtista));
-  }
-  return ids;
-}
-
-/**
- * Crea el evento en /v1/Evento/CrearEvento
- * Devuelve el idEvento creado (si el backend lo retorna) y el body usado.
- */
-export async function createEvent(ui: CreateEventUI): Promise<{ idEvento?: string; usedBody: any }> {
-  if (!ui?.idUsuario) throw new Error("Falta idUsuario");
-  if (!ui?.nombre?.trim()) throw new Error("Falta nombre del evento");
-  if (!ui?.daySchedules?.length) throw new Error("Falta al menos 1 fecha de evento");
-
-  // Fechas agregadas (inicio/fin globales y ventas globales)
-  const startList = ui.daySchedules.map(d => d.start).filter(Boolean) as Date[];
-  const endList = ui.daySchedules.map(d => d.end).filter(Boolean) as Date[];
-  const ventaStartList = ui.daySaleConfigs.map(d => d.saleStart).filter(Boolean) as Date[];
-  const ventaEndList = ui.daySaleConfigs.map(d => d.sellUntil).filter(Boolean) as Date[];
-
-  const minDate = (arr: Date[]) => new Date(Math.min(...arr.map(x => x.getTime())));
-  const maxDate = (arr: Date[]) => new Date(Math.max(...arr.map(x => x.getTime())));
-
-  const inicioEvento = startList.length ? toIso(minDate(startList)) : undefined;
-  const finEvento = endList.length ? toIso(maxDate(endList)) : undefined;
-  const inicioVenta = ventaStartList.length ? toIso(minDate(ventaStartList)) : undefined;
-  const finVenta = ventaEndList.length ? toIso(maxDate(ventaEndList)) : undefined;
-
-  // Fechas detalle (respetando la clave con y sin typo, por compatibilidad)
-  const fechas = ui.daySchedules.map((sch, i) => {
-    const venta = ui.daySaleConfigs[i];
-    const fechaInicio = toIso(sch.start);
-    const fechaFin = toIso(sch.end);
-    const fechaInicioVenta = toIso(venta?.saleStart);
-    const fechaFinVenta = toIso(venta?.sellUntil);
-    return {
-      fechaInicio,
-      fechaFin,
-      // dos claves por si el backend espera la tipiada "fechaIncioVenta"
-      fechaInicioVenta,
-      fechaIncioVenta: fechaInicioVenta,
-      fechaFinVenta,
-      estado: 0,
-    };
-  });
-
-  // Domicilio
-  const domicilio = {
-    localidad: ui.localidadNombre
-      ? { nombre: ui.localidadNombre, codigo: ui.localidadId ?? "" }
-      : undefined,
-    municipio: ui.municipioNombre
-      ? { nombre: ui.municipioNombre, codigo: ui.municipioId ?? "" }
-      : undefined,
-    provincia: ui.provinciaNombre
-      ? { nombre: ui.provinciaNombre, codigo: ui.provinciaId ?? "" }
-      : undefined,
-    direccion: ui.direccion ?? "",
-    latitud: typeof ui.latitud === "number" ? ui.latitud : 0,
-    longitud: typeof ui.longitud === "number" ? ui.longitud : 0,
-  };
-
-  // Artistas → IDs
-  const idArtistas = await resolveArtistIdsByName(ui.selectedArtistNames);
-
-  const body = {
-    idUsuario: String(ui.idUsuario),
-    idArtistas,
-    domicilio,
-    nombre: ui.nombre,
-    descripcion: ui.descripcion ?? "",
-    genero: Array.isArray(ui.genero) ? ui.genero : [],
-    isAfter: !!ui.isAfter,
-    isLgbt: !!ui.isLgbt,
-    inicioVenta,
-    finVenta,
-    inicioEvento,
-    finEvento,
-    estado: 0, // por defecto "Por aprobar"
-    fechas,
-    idFiesta: ui.idFiesta || undefined,
-    soundCloud: ui.musicLink || "",
-  };
-
+/** ---------- Cancelar evento (intenta endpoint específico y si no, update) ---------- */
+export async function cancelEvent(
+  idEvento: string,
+  motivo?: string
+): Promise<void> {
+  const id = String(idEvento || "").trim();
   const token = await login();
-  const { data } = await apiClient.post("/v1/Evento/CrearEvento", body, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      Accept: "*/*",
-    },
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+
+  // 1) Intentar endpoint dedicado si existe
+  const tryCancelEndpoints: Array<() => Promise<any>> = [
+    () =>
+      apiClient.post(
+        "/v1/Evento/CancelarEvento",
+        { idEvento: id, motivo: motivo ?? "" },
+        { headers }
+      ),
+    () =>
+      apiClient.put(
+        "/v1/Evento/CancelarEvento",
+        { idEvento: id, motivo: motivo ?? "" },
+        { headers }
+      ),
+  ];
+
+  for (const fn of tryCancelEndpoints) {
+    try {
+      await fn();
+      return; // listo
+    } catch (e: any) {
+      // si 404/405/501 seguimos con el fallback
+      continue;
+    }
+  }
+
+  // 2) Fallback: setear estado = CANCELADO con campos compatibles
+  await setEventStatus(id, ESTADO_CODES.CANCELADO, {
+    motivoCancelacion: motivo ?? "",
+    cancelado: true,
+    isCancelado: true,
   });
-
-  // Intentamos extraer el idEvento devuelto por distintas formas comunes
-  const idEvento =
-    data?.idEvento ??
-    data?.evento?.idEvento ??
-    data?.IdEvento ??
-    data?.Evento?.IdEvento ??
-    data?.id ??
-    undefined;
-
-  return { idEvento: idEvento ? String(idEvento) : undefined, usedBody: body };
 }

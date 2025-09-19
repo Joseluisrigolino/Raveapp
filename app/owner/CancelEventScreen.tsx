@@ -1,5 +1,5 @@
-// owner/CancelEventScreen.tsx
-import React, { useState, useEffect } from "react";
+// app/owner/CancelEventScreen.tsx
+import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -8,130 +8,190 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-
-import {
-  OwnerEventCancelItem,
-  TicketSoldInfo,
-} from "@/interfaces/OwnerEventCancelItem";
-import { getEventCancellationDataById } from "@/utils/owners/ownerEventsCancelHelper";
-
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
+import { fetchEventById, EventItemWithExtras, cancelEvent } from "@/utils/events/eventApi";
+
+type TicketSoldInfo = { type: string; quantity: number; price: number };
+type OwnerEventCancelItem = {
+  id: string | number;
+  eventName: string;
+  ticketsSold: TicketSoldInfo[];
+  totalRefund: number;
+};
+
 export default function CancelEventScreen() {
-  // 1. Leemos el param "id" de la URL
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const router = useRouter();
+  const params = useLocalSearchParams<{ id?: string | string[] }>();
+  const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const id = rawId ? decodeURIComponent(String(rawId)) : "";
 
-  // 2. Estado para la data del evento a cancelar
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [cancelData, setCancelData] = useState<OwnerEventCancelItem | null>(null);
-
-  // 3. Estado para el motivo de la cancelación
   const [reason, setReason] = useState("");
 
-  // 4. Al montar o cambiar "id", buscamos la data en el helper
   useEffect(() => {
-    if (id) {
-      const found = getEventCancellationDataById(Number(id));
-      if (found) {
-        setCancelData(found);
+    let mounted = true;
+
+    (async () => {
+      setLoading(true);
+      setErrorMsg(null);
+      setCancelData(null);
+
+      try {
+        if (!id) throw new Error("No llegó el ID del evento en la URL.");
+        const ev = await fetchEventById(id);
+        if (!ev) throw new Error("Evento no encontrado.");
+
+        const mapped: OwnerEventCancelItem = mapToCancel(ev);
+        if (mounted) setCancelData(mapped);
+      } catch (e: any) {
+        if (mounted) setErrorMsg(e?.message || "No se pudo obtener el evento.");
+      } finally {
+        if (mounted) setLoading(false);
       }
-    }
+    })();
+
+    return () => {
+      mounted = false;
+    };
   }, [id]);
 
-  // 5. Si no se encontró el evento
-  if (!cancelData) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Header />
-        <View style={styles.notFoundWrapper}>
-          <Text style={styles.notFoundText}>
-            No se encontró la información del evento a cancelar.
-          </Text>
-        </View>
-        <Footer />
-      </SafeAreaView>
-    );
-  }
+  const mapToCancel = (ev: EventItemWithExtras): OwnerEventCancelItem => ({
+    id: ev.id,
+    eventName: ev.title || "Evento",
+    // TODO: poblar con tu endpoint real de vendidas
+    ticketsSold: [],
+    totalRefund: 0,
+  });
 
-  // Función al presionar "Cancelar Evento"
-  const handleCancelEvent = () => {
-    console.log("Cancelando evento ID:", cancelData.id);
-    console.log("Motivo:", reason);
-    // Aquí podrías llamar a tu API para procesar la cancelación
-    alert("Evento cancelado (ejemplo).");
+  const handleCancelEvent = async () => {
+    if (!cancelData || !id) return;
+    if (!reason.trim()) {
+      Alert.alert("Motivo requerido", "Por favor, ingresá el motivo de cancelación.");
+      return;
+    }
+    try {
+      setSubmitting(true);
+      await cancelEvent(String(id), reason.trim());
+      Alert.alert("Evento cancelado", "El evento fue marcado como cancelado correctamente.", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message || "No se pudo cancelar el evento.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Título */}
-        <View style={styles.formGroup}>
-          <Text style={styles.title}>Cancelación de evento</Text>
+      {loading ? (
+        <View style={styles.loaderBox}>
+          <ActivityIndicator />
+          <Text style={styles.loaderText}>Cargando evento…</Text>
         </View>
-
-        {/* Info general */}
-        <View style={styles.formGroup}>
-          <Text style={styles.infoText}>
-            La cancelación de este evento es una acción que{" "}
-            <Text style={styles.infoTextBold}>no se puede revertir</Text>. Se avisará
-            vía mail a las personas que hayan comprado una entrada, junto con el
-            motivo que describas, y se procederá a realizar la devolución del dinero
-            de las entradas.
-          </Text>
-        </View>
-
-        {/* Nombre del evento */}
-        <View style={styles.formGroup}>
-          <Text style={styles.sectionLabel}>
-            Evento a cancelar: <Text style={styles.eventName}>{cancelData.eventName}</Text>
-          </Text>
-        </View>
-
-        {/* Listado de tickets */}
-        <View style={styles.formGroup}>
-          <View style={styles.ticketListContainer}>
-            <Text style={styles.ticketSubtitle}>
-              Se reembolsarán un total de X entradas:
+      ) : errorMsg ? (
+        <View style={styles.notFoundWrapper}>
+          <Text style={styles.notFoundText}>{errorMsg}</Text>
+          {!!id && (
+            <Text style={[styles.notFoundText, { marginTop: 6, opacity: 0.7 }]}>
+              ID recibido: {id}
             </Text>
-            {cancelData.ticketsSold.map((ticket: TicketSoldInfo, index: number) => (
-              <Text key={index} style={styles.ticketItem}>
-                • {ticket.quantity} {ticket.type} de $
-                {ticket.price.toLocaleString()}.00 c/u
-              </Text>
-            ))}
-            <Text style={styles.totalRefund}>
-              Total a devolver: ${cancelData.totalRefund.toLocaleString()}
+          )}
+        </View>
+      ) : !cancelData ? (
+        <View style={styles.notFoundWrapper}>
+          <Text style={styles.notFoundText}>
+            No se encontró la información del evento a cancelar.
+          </Text>
+          {!!id && (
+            <Text style={[styles.notFoundText, { marginTop: 6, opacity: 0.7 }]}>
+              ID recibido: {id}
+            </Text>
+          )}
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.formGroup}>
+            <Text style={styles.title}>Cancelación de evento</Text>
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.infoText}>
+              La cancelación de este evento es una acción que{" "}
+              <Text style={styles.infoTextBold}>no se puede revertir</Text>. Se
+              avisará vía mail a las personas que hayan comprado una entrada,
+              junto con el motivo que describas, y se procederá a realizar la
+              devolución del dinero de las entradas.
             </Text>
           </View>
-        </View>
 
-        {/* Motivo */}
-        <View style={styles.formGroup}>
-          <Text style={styles.motivoLabel}>Motivo de la cancelación</Text>
-          <TextInput
-            style={styles.motivoInput}
-            placeholder="Describe el motivo de la cancelación..."
-            placeholderTextColor={COLORS.textSecondary}
-            multiline
-            value={reason}
-            onChangeText={setReason}
-          />
-          <Text style={styles.warningText}>
-            * Esta operación no puede ser revertida.
-          </Text>
-        </View>
+          <View style={styles.formGroup}>
+            <Text style={styles.sectionLabel}>
+              Evento a cancelar: <Text style={styles.eventName}>{cancelData.eventName}</Text>
+            </Text>
+          </View>
 
-        {/* Botón "Cancelar Evento" */}
-        <TouchableOpacity style={styles.cancelButton} onPress={handleCancelEvent}>
-          <Text style={styles.cancelButtonText}>Cancelar Evento</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <View style={styles.formGroup}>
+            <View style={styles.ticketListContainer}>
+              <Text style={styles.ticketSubtitle}>
+                Se reembolsarán un total de {cancelData.ticketsSold.length} entradas:
+              </Text>
+
+              {cancelData.ticketsSold.length === 0 ? (
+                <Text style={styles.ticketItem}>
+                  (No se encontraron entradas vendidas para este evento)
+                </Text>
+              ) : (
+                cancelData.ticketsSold.map((t, i) => (
+                  <Text key={i} style={styles.ticketItem}>
+                    • {t.quantity} {t.type} de ${t.price.toLocaleString()}.00 c/u
+                  </Text>
+                ))
+              )}
+
+              <Text style={styles.totalRefund}>
+                Total a devolver: ${cancelData.totalRefund.toLocaleString()}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.motivoLabel}>Motivo de la cancelación</Text>
+            <TextInput
+              style={styles.motivoInput}
+              placeholder="Describe el motivo de la cancelación..."
+              placeholderTextColor={COLORS.textSecondary}
+              multiline
+              value={reason}
+              onChangeText={setReason}
+            />
+            <Text style={styles.warningText}>* Esta operación no puede ser revertida.</Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.cancelButton, submitting && { opacity: 0.7 }]}
+            onPress={handleCancelEvent}
+            disabled={submitting}
+          >
+            <Text style={styles.cancelButtonText}>
+              {submitting ? "Cancelando..." : "Cancelar Evento"}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
 
       <Footer />
     </SafeAreaView>
@@ -139,30 +199,17 @@ export default function CancelEventScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.backgroundLight,
-  },
-  notFoundWrapper: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  notFoundText: {
-    color: COLORS.textPrimary,
-    fontSize: FONT_SIZES.body,
-  },
-  scrollContent: {
-    padding: 16,
-  },
+  container: { flex: 1, backgroundColor: COLORS.backgroundLight },
+  loaderBox: { flex: 1, alignItems: "center", justifyContent: "center" },
+  loaderText: { marginTop: 8, color: COLORS.textSecondary },
 
-  // Agrupaciones visuales
-  formGroup: {
-    marginBottom: 16,
-    width: "100%",
-  },
+  notFoundWrapper: { flex: 1, justifyContent: "center", alignItems: "center" },
+  notFoundText: { color: COLORS.textPrimary, fontSize: FONT_SIZES.body },
 
-  // Título principal
+  scrollContent: { padding: 16 },
+
+  formGroup: { marginBottom: 16, width: "100%" },
+
   title: {
     fontSize: FONT_SIZES.subTitle,
     fontWeight: "bold",
@@ -171,18 +218,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  // Info general
   infoText: {
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
     textAlign: "justify",
     lineHeight: 20,
   },
-  infoTextBold: {
-    fontWeight: "bold",
-  },
+  infoTextBold: { fontWeight: "bold" },
 
-  // Nombre del evento
   sectionLabel: {
     fontSize: FONT_SIZES.body,
     fontWeight: "bold",
@@ -190,11 +233,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     paddingHorizontal: 4,
   },
-  eventName: {
-    color: COLORS.info,
-  },
+  eventName: { color: COLORS.info },
 
-  // Tickets
   ticketListContainer: {
     backgroundColor: COLORS.cardBg,
     padding: 12,
@@ -219,7 +259,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
-  // Motivo
   motivoLabel: {
     fontSize: FONT_SIZES.body,
     fontWeight: "bold",
@@ -245,7 +284,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
 
-  // Botón
   cancelButton: {
     backgroundColor: COLORS.negative,
     paddingVertical: 14,

@@ -1,3 +1,4 @@
+// utils/partysApi.ts
 import { apiClient, login } from "@/utils/apiConfig";
 
 export type Party = {
@@ -16,11 +17,9 @@ function lowerize(obj: any): Record<string, any> {
 
 function extractArray(data: any): any[] {
   if (!data) return [];
-  // Lo que devuelve tu swagger:
   if (Array.isArray((data as any).fiestas)) return (data as any).fiestas;
   if (Array.isArray((data as any).Fiestas)) return (data as any).Fiestas;
 
-  // fallback
   for (const k of Object.keys(data)) {
     const v = (data as any)[k];
     if (Array.isArray(v)) return v;
@@ -30,20 +29,16 @@ function extractArray(data: any): any[] {
 
 function normalizeParty(raw: any): Party {
   const base = lowerize(raw);
-  // soporta anidado tipo { Fiesta: {...} }
   const nested =
-    base.fiesta && typeof base.fiesta === "object"
-      ? lowerize(base.fiesta)
-      : {};
+    base.fiesta && typeof base.fiesta === "object" ? lowerize(base.fiesta) : {};
   const m = { ...base, ...nested };
 
   const id =
     m.idfiesta ?? m.id ?? m.fiestaid ?? m.id_evento ?? m.idevento ?? "";
 
-  // ⚠️ acá agregamos dsnombre
   const nameRaw =
     m.nombre ??
-    m.dsnombre ?? // <-- dsNombre
+    m.dsnombre ?? // dsNombre
     m.ds_nombre ??
     m.titulo ??
     m.descripcion ??
