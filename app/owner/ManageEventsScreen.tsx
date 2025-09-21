@@ -35,6 +35,31 @@ const FALLBACK_STATE_LABEL: Record<number, string> = {
   6: "Rechazado",
 };
 
+/**
+ * Orden de prioridad requerido:
+ * 1) Aprobado (1)
+ * 2) En venta (2)
+ * 3) Por Aprobar (0)
+ * 4) Fin Venta (3)
+ * 5) Finalizado (4)
+ * 6) Cancelado (5)
+ * 7) Rechazado (6)
+ */
+const STATUS_ORDER = [1, 2, 0, 3, 4, 5, 6];
+const statusPriority = (code: number) => {
+  const idx = STATUS_ORDER.indexOf(code);
+  return idx === -1 ? 999 : idx;
+};
+
+/** Helper: compara fechas dd/mm/yyyy asc */
+const compareDatesAsc = (a: string, b: string) => {
+  const [dA, mA, yA] = (a || "01/01/1970").split("/").map(Number);
+  const [dB, mB, yB] = (b || "01/01/1970").split("/").map(Number);
+  const tA = new Date(yA, mA - 1, dA).getTime();
+  const tB = new Date(yB, mB - 1, dB).getTime();
+  return tA - tB;
+};
+
 export default function ManageEventsScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -123,7 +148,7 @@ export default function ManageEventsScreen() {
             ev?.__raw?.idUsuarioPropietario ??
             null;
 
-        const ownerEmail = (
+          const ownerEmail = (
             ev?.__raw?.ownerEmail ?? ev?.__raw?.propietario?.correo ?? ""
           )
             .toString()
@@ -148,26 +173,28 @@ export default function ManageEventsScreen() {
     };
   }, [user, eventStates]);
 
-  /** Aplicación de filtros y búsqueda */
+  /** Aplicación de filtros, búsqueda y ORDEN personalizado */
   const filteredEvents = useMemo(() => {
     let events = [...allEvents];
 
+    // Filtro por estado seleccionado
     if (selectedFilter !== "all") {
       events = events.filter((ev) => ev.statusCode === selectedFilter);
     }
 
+    // Búsqueda por texto
     if (searchText.trim()) {
       const q = searchText.toLowerCase();
       events = events.filter((ev) => ev.eventName.toLowerCase().includes(q));
     }
 
-    // Orden por fecha asc (formato dd/mm/yyyy)
+    // Orden principal por prioridad de estado (según STATUS_ORDER)
+    // y, a igualdad de prioridad, por fecha ascendente (dd/mm/yyyy).
     events.sort((a, b) => {
-      const [dA, mA, yA] = (a.date || "01/01/1970").split("/").map(Number);
-      const [dB, mB, yB] = (b.date || "01/01/1970").split("/").map(Number);
-      return (
-        new Date(yA, mA - 1, dA).getTime() - new Date(yB, mB - 1, dB).getTime()
-      );
+      const pa = statusPriority(a.statusCode);
+      const pb = statusPriority(b.statusCode);
+      if (pa !== pb) return pa - pb;
+      return compareDatesAsc(a.date, b.date);
     });
 
     return events;
@@ -175,25 +202,18 @@ export default function ManageEventsScreen() {
 
   /** Navegaciones */
   const handleTicketsSold = (eventId: string | number) => {
-    router.push({
-      pathname: "/owner/TicketSoldScreen",
-      params: { id: String(eventId) },
-    });
+    const id = String(eventId);
+    router.push({ pathname: "/owner/TicketSoldScreen", params: { id } });
   };
 
   const handleModify = (eventId: string | number) => {
-    router.push({
-      pathname: "/owner/ModifyEventScreen",
-      params: { id: String(eventId) },
-    });
+    const id = String(eventId);
+    router.push({ pathname: "/owner/ModifyEventScreen", params: { id } });
   };
 
   const handleCancel = (eventId: string | number) => {
-    // ✅ Navegación robusta: id siempre como string + encoding
-    router.push({
-      pathname: "/owner/CancelEventScreen",
-      params: { id: String(eventId) },
-    });
+    const id = String(eventId);
+    router.push({ pathname: "/owner/CancelEventScreen", params: { id } });
   };
 
   return (

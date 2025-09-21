@@ -3,7 +3,7 @@ import React from "react";
 import { View, Text, TextInput, StyleSheet } from "react-native";
 import { COLORS, RADIUS } from "@/styles/globalStyles";
 
-type DayTickets = {
+export type DayTickets = {
   genQty: string;
   genPrice: string;
   ebGenQty: string;
@@ -18,13 +18,28 @@ interface Props {
   daysTickets: DayTickets[];
   setTicket: (index: number, key: keyof DayTickets, val: string) => void;
   totalPerDay: (d: DayTickets) => number;
+  /** Nombres que llegan desde la BD (GetTiposEntrada) */
+  labels?: {
+    general?: string;
+    earlyGeneral?: string;
+    vip?: string;
+    earlyVip?: string;
+  };
 }
 
 export default function TicketsSection({
   daysTickets,
   setTicket,
   totalPerDay,
+  labels,
 }: Props) {
+  const L = {
+    general: labels?.general || "Entradas Generales",
+    earlyGeneral: labels?.earlyGeneral || "Early Bird General",
+    vip: labels?.vip || "Entradas VIP",
+    earlyVip: labels?.earlyVip || "Early Bird VIP",
+  };
+
   return (
     <>
       {daysTickets.map((d, i) => {
@@ -36,7 +51,7 @@ export default function TicketsSection({
             <Text style={styles.dayTitle}>Día {i + 1}</Text>
 
             {/* Generales */}
-            <Text style={styles.fieldTitle}>Entradas Generales *</Text>
+            <Text style={styles.fieldTitle}>{L.general} *</Text>
             <View style={styles.row}>
               <TextInput
                 style={[styles.input, styles.inputSm]}
@@ -56,16 +71,13 @@ export default function TicketsSection({
               />
             </View>
             <Text style={styles.hint}>
-              La cantidad ingresada es el total de entradas generales.{"\n"}
-              Si agregas entradas EarlyBirds Generales, estas ya forman parte
-              del total de entradas Generales, no se suman a la cantidad total.
-              {"\n"}
-              Ejemplo: Si ingresas 900 entradas Generales, y 100 Early Birds, el
-              total es 900, no 1000.
+              La cantidad ingresada es el total de {L.general}.{"\n"}
+              Si agregás {L.earlyGeneral}, esas ya forman parte del total de{" "}
+              {L.general}, no se suman.
             </Text>
 
             {/* Early Bird General */}
-            <Text style={styles.fieldTitle}>Early Bird General (opcional)</Text>
+            <Text style={styles.fieldTitle}>{L.earlyGeneral} (opcional)</Text>
             <View style={styles.row}>
               <TextInput
                 style={[
@@ -96,7 +108,7 @@ export default function TicketsSection({
             </View>
 
             {/* VIP */}
-            <Text style={styles.fieldTitle}>Entradas VIP (opcional)</Text>
+            <Text style={styles.fieldTitle}>{L.vip} (opcional)</Text>
             <View style={styles.row}>
               <TextInput
                 style={[styles.input, styles.inputSm]}
@@ -116,15 +128,13 @@ export default function TicketsSection({
               />
             </View>
             <Text style={styles.hint}>
-              La cantidad ingresada es el total de entradas VIP.{"\n"}
-              Si agregas entradas EarlyBirds VIP, no se suman a la cantidad
-              total.{"\n"}
-              Ejemplo: Si ingresas 800 entradas VIP, y 200 Early Birds, el total
-              es 800, no 1000.
+              La cantidad ingresada es el total de {L.vip}.{"\n"}
+              Si agregás {L.earlyVip}, no se suman al total (son parte de {L.vip}
+              ).
             </Text>
 
             {/* Early Bird VIP */}
-            <Text style={styles.fieldTitle}>Early Bird VIP (opcional)</Text>
+            <Text style={styles.fieldTitle}>{L.earlyVip} (opcional)</Text>
             <View style={styles.row}>
               <TextInput
                 style={[

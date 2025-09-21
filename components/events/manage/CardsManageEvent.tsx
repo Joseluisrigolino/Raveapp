@@ -144,9 +144,9 @@ const styles = StyleSheet.create({
   },
 
   cover: {
-    width: 132,
-    height: 96,
-    borderRadius: 14,
+    width: 120,
+    height: 88,
+    borderRadius: 12,
     marginLeft: 12,
   },
   coverPlaceholder: {
@@ -172,18 +172,19 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 12,
+    marginTop: 10,
   },
 
   actionBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 24,
-    marginRight: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    marginRight: 8,
   },
   actionText: {
     color: "#fff",
-    fontWeight: "700",
+    fontWeight: "600",
+    fontSize: 13,
   },
   soldBtn: {
     backgroundColor: "#f59e0b",
@@ -193,15 +194,16 @@ const styles = StyleSheet.create({
   },
 
   cancelBtn: {
-    marginTop: 10,
+    marginTop: 8,
     backgroundColor: COLORS.negative ?? "#ef4444",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
   },
   cancelText: {
     color: "#fff",
-    fontWeight: "800",
-    textAlign: "left",
+    fontWeight: "700",
+    textAlign: "center",
+    fontSize: 13,
   },
 });

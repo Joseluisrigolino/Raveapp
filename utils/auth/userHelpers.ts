@@ -10,6 +10,7 @@ export interface DomicilioApi {
   latitud: number;
   longitud: number;
 }
+
 export interface ApiUserFull {
   idUsuario: string;
   nombre: string;
@@ -20,7 +21,7 @@ export interface ApiUserFull {
   cbu: string;
   nombreFantasia: string;
   bio: string;
-  dtNacimiento: string;
+  dtNacimiento: string; // ISO string
   domicilio: DomicilioApi;
   cdRoles: number[];
   socials: {
@@ -64,7 +65,7 @@ export interface CreateUsuarioPayload {
     mdSpotify: string;
     mdSoundcloud: string;
   };
-  dtNacimiento: string;
+  dtNacimiento: string; // ISO string
 }
 
 export async function createUsuario(

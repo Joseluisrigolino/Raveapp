@@ -50,6 +50,9 @@ import {
   CreateEntradaBody,
 } from "@/utils/events/entradaApi";
 
+/** Usuarios (PERFIL COMPLETO para poblar el evento) */
+import { getProfile, ApiUserFull } from "@/utils/auth/userHelpers";
+
 /** Componentes (crear) */
 import EventBasicData from "@/components/events/create/EventBasicData";
 import GenreSelector from "@/components/events/create/GenreSelector";
@@ -367,9 +370,6 @@ export default function CreateEventScreen() {
   );
 
   // Multimedia
-  // arriba del archivo (o dentro de la función con dynamic import):
-  // ✅ Import correcto (sin default)
-
   const handleSelectPhoto = async () => {
     try {
       // 1) Permisos
@@ -451,7 +451,7 @@ export default function CreateEventScreen() {
   async function buildEntradasForEvent(
     eventId: string
   ): Promise<CreateEntradaBody[]> {
-    // Resolver códigos de tipos (tolerante a nombres en backend)
+    // Resolver códigos de tipos
     const codes = await resolveTipoCodes();
 
     // Para no crear entradas "vacías": precio > 0 y cantidad > 0
@@ -462,9 +462,9 @@ export default function CreateEventScreen() {
       const precio = parseInt(priceStr || "0", 10) || 0;
       if (cantidad > 0 && precio > 0) {
         list.push({
-          idFecha: eventId, // según especificación: va el id del evento
+          idFecha: eventId, // backend: id del EVENTO
           tipo,
-          estado: 0,
+          estado: 0, // cdEstado = 0
           precio,
           cantidad,
         });
@@ -503,6 +503,22 @@ export default function CreateEventScreen() {
       // crear fiesta/artistas si quedaron pendientes
       await createPendingEntities();
 
+      // ===== Perfil completo del usuario (para poblar evento) =====
+      let userFull: ApiUserFull | null = null;
+      try {
+        const correoUsr =
+          (user as any)?.correo ??
+          (user as any)?.email ??
+          (user as any)?.user?.email ??
+          "";
+        if (correoUsr) {
+          userFull = await getProfile(String(correoUsr));
+        }
+      } catch (e) {
+        console.warn("[Usuarios] No se pudo resolver el perfil por correo:", e);
+        userFull = null;
+      }
+
       // artistas: sólo IDs conocidos
       const artistIds = selectedArtists
         .map((a) => a.idArtista || (a as any).id || (a as any).IdArtista)
@@ -522,7 +538,7 @@ export default function CreateEventScreen() {
       const inicioEvento = fechas[0]?.fechaInicio;
       const finEvento = fechas[fechas.length - 1]?.fechaFin;
 
-      // domicilio
+      // domicilio del evento
       const domicilio = {
         localidad: { nombre: localityName, codigo: localityId },
         municipio: { nombre: municipalityName, codigo: municipalityId },
@@ -532,9 +548,11 @@ export default function CreateEventScreen() {
         longitud: 0,
       };
 
-      // cuerpo exacto según schema
-      const body = {
-        idUsuario: String(userId),
+      // cuerpo exacto (incluye usuario completo para que no quede null)
+      const body: any = {
+        idUsuario: String(userFull?.idUsuario ?? userId),
+        usuario: userFull || undefined, // <<--- importante
+
         idArtistas: artistIds as string[],
         domicilio,
         nombre: eventName.trim(),
@@ -555,7 +573,7 @@ export default function CreateEventScreen() {
       // 1) Crear evento
       const rawResponse = await createEvent(body);
 
-      // === LOG DEL ID DEL EVENTO (defensivo) ===
+      // === Resolver ID del evento de forma defensiva ===
       const idEvento =
         typeof rawResponse === "string"
           ? rawResponse
@@ -590,7 +608,7 @@ export default function CreateEventScreen() {
         await mediaApi.upload(idEvento, file);
       }
 
-      // 3) Crear entradas (si corresponde)
+      // 3) Crear entradas (estado=0)
       const entradas = await buildEntradasForEvent(idEvento);
       if (entradas.length) {
         await createEntradasBulk(entradas);
@@ -812,7 +830,6 @@ export default function CreateEventScreen() {
               daysTickets={daysTickets}
               setTicket={setTicket}
               totalPerDay={totalPerDay}
-              accentColor={GREEN}
             />
 
             {/* 8) Configuración de entradas */}

@@ -1,14 +1,119 @@
 // utils/entradas/entradaApi.ts
 import { apiClient, login } from "@/utils/apiConfig";
 
+/** =========================================================================
+ *                               TIPOS
+ *  ======================================================================= */
+
 /** ---------- Tipos de entrada ---------- */
 export interface ApiTipoEntrada {
   cdTipo: number;
   dsTipo: string;
 }
 
+/** ---------- Estados de entrada ---------- */
+export interface ApiEstadoEntrada {
+  cdEstado: number;
+  dsEstado: string | null;
+}
+
+/** ---------- Item crudo devuelto por GetEntradasFecha ---------- */
+export interface ApiEntradaFechaRaw {
+  idEntrada: string | null;
+  mdQR?: string | null;
+  fecha?: {
+    idFecha: string;
+    inicio?: string | null;
+    fin?: string | null;
+    inicioVenta?: string | null;
+    finVenta?: string | null;
+    estado?: number | null;
+  } | null;
+  estado?: {
+    cdEstado: number;
+    dsEstado: string | null;
+  } | null;
+  precio: number;
+  cantidad: number;
+  tipo?: {
+    cdTipo: number;
+    dsTipo: string;
+  } | null;
+}
+
+/** ---------- Forma “flatten” usada por la UI ---------- */
+export interface ApiEntradaFecha {
+  idEntrada: string;
+  idFecha: string;
+  cdTipo: number;
+  precio: number;
+  /** disponible actual si tu API lo expone; si no, queda undefined */
+  stock?: number;
+  /** tope por usuario si aplica; si no, queda undefined */
+  maxPorUsuario?: number;
+}
+
+/** ---------- Forma de merge para la UI ---------- */
+export interface UiEntrada extends ApiEntradaFecha {
+  nombreTipo: string; // dsTipo
+  maxCompra: number; // cantidad máxima (stock / tope / default)
+}
+
+/** ---------- Crear entradas ---------- */
+export type CreateEntradaBody = {
+  idFecha: string; // en tu backend: id de la FECHA/EVENTO
+  tipo: number; // cdTipo
+  estado: number; // cdEstado
+  precio: number;
+  cantidad: number;
+};
+
+/** ---------- Update entrada ---------- */
+export type UpdateEntradaBody = {
+  idFecha: string;
+  precio: number;
+  tipo: number; // cdTipo
+};
+
+/** ---------- Reservar entradas ---------- */
+export type ReservarEntradasBody = {
+  entradas: Array<{ tipoEntrada: number; cantidad: number }>;
+  idUsuario: string;
+  idFecha: string;
+};
+
+export type ReservarEntradasResponse = {
+  /** muchas APIs devuelven idCompra; si no, será unknown */
+  idCompra?: string;
+  [k: string]: any;
+};
+
+/** ---------- Reserva activa ---------- */
+export type ReservaActiva = {
+  idCompra: string;
+  idUsuario: string;
+  idFecha: string;
+  vencimiento?: string;
+  items: Array<{
+    tipoEntrada: number;
+    cantidad: number;
+    precio?: number;
+  }>;
+} | null;
+
+/** =========================================================================
+ *                         CACHES EN MEMORIA
+ *  ======================================================================= */
+
 let _tiposCache: ApiTipoEntrada[] | null = null;
 let _tipoMapCache: Map<number, string> | null = null;
+
+let _estadosCache: ApiEstadoEntrada[] | null = null;
+let _estadoMapCache: Map<number, string> | null = null;
+
+/** =========================================================================
+ *                           ENDPOINTS: TIPOS
+ *  ======================================================================= */
 
 export async function fetchTiposEntrada(): Promise<ApiTipoEntrada[]> {
   try {
@@ -29,51 +134,101 @@ export async function fetchTiposEntrada(): Promise<ApiTipoEntrada[]> {
 }
 
 export async function getTipoMap(): Promise<Map<number, string>> {
-  if (_tipoMapCache) return _tipoMapCache!;
+  if (_tipoMapCache) return _tipoMapCache;
   await fetchTiposEntrada();
   return _tipoMapCache ?? new Map();
 }
 
-/** ---------- Entradas por fecha ---------- */
-export interface ApiEntradaFecha {
-  idEntrada: string;
-  idFecha: string;
-  cdTipo: number;
-  precio: number;
-  stock?: number; // disponible actual
-  maxPorUsuario?: number; // tope por usuario si aplica
+/** =========================================================================
+ *                         ENDPOINTS: ESTADOS
+ *  ======================================================================= */
+
+export async function fetchEstadosEntrada(): Promise<ApiEstadoEntrada[]> {
+  try {
+    if (_estadosCache) return _estadosCache;
+    const token = await login().catch(() => null);
+    const { data } = await apiClient.get<ApiEstadoEntrada[]>(
+      "/v1/Entrada/GetEstadosEntrada",
+      { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+    );
+    _estadosCache = Array.isArray(data) ? data : [];
+    _estadoMapCache = new Map(
+      _estadosCache.map((e) => [
+        e.cdEstado,
+        e.dsEstado ?? `Estado ${e.cdEstado}`,
+      ])
+    );
+    return _estadosCache;
+  } catch {
+    _estadosCache = [];
+    _estadoMapCache = new Map();
+    return [];
+  }
 }
 
-export async function fetchEntradasByFecha(
-  idFecha: string
-): Promise<ApiEntradaFecha[]> {
+export async function getEstadoMap(): Promise<Map<number, string>> {
+  if (_estadoMapCache) return _estadoMapCache;
+  await fetchEstadosEntrada();
+  return _estadoMapCache ?? new Map();
+}
+
+/** =========================================================================
+ *                 ENDPOINTS: ENTRADAS POR FECHA (RAW + FLATTEN)
+ *  ======================================================================= */
+
+/**
+ * RAW: devuelve exactamente la forma del backend.
+ * GET /v1/Entrada/GetEntradasFecha?IdFecha=...&Estado=...
+ */
+export async function fetchEntradasFechaRaw(
+  idFecha: string,
+  estado?: number
+): Promise<ApiEntradaFechaRaw[]> {
   const token = await login();
-  const { data } = await apiClient.get<any[]>("/v1/Entrada/GetEntradasFecha", {
-    params: { IdFecha: idFecha },
-    headers: { Authorization: `Bearer ${token}` },
+  const { data } = await apiClient.get<ApiEntradaFechaRaw[]>(
+    "/v1/Entrada/GetEntradasFecha",
+    {
+      params: {
+        IdFecha: idFecha,
+        ...(typeof estado === "number" ? { Estado: estado } : {}),
+      },
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * FLATTEN para la UI actual (compatible con el código existente).
+ * Toma el RAW y lo mappea a una forma más simple.
+ */
+export async function fetchEntradasByFecha(
+  idFecha: string,
+  estado?: number
+): Promise<ApiEntradaFecha[]> {
+  const raw = await fetchEntradasFechaRaw(idFecha, estado);
+
+  return raw.map((e) => {
+    const f = e.fecha ?? null;
+    const t = e.tipo ?? null;
+
+    return {
+      idEntrada: String(e.idEntrada ?? ""),
+      idFecha: String(f?.idFecha ?? idFecha),
+      cdTipo: Number(t?.cdTipo ?? 0),
+      precio: Number(e.precio ?? 0),
+
+      // Estos campos no están explícitos en el swagger; los dejo por si tu API
+      // los llega a enviar a futuro (o los agregás).
+      stock: undefined,
+      maxPorUsuario: undefined,
+    } as ApiEntradaFecha;
   });
-
-  return (Array.isArray(data) ? data : []).map((e: any) => ({
-    idEntrada: String(e.idEntrada ?? e.id ?? ""),
-    idFecha: String(e.idFecha ?? idFecha),
-    cdTipo: Number(e.cdTipo ?? e.tipo ?? 0),
-    precio: Number(e.precio ?? e.importe ?? 0),
-    stock:
-      typeof e.stock === "number"
-        ? e.stock
-        : typeof e.disponible === "number"
-        ? e.disponible
-        : undefined,
-    maxPorUsuario:
-      typeof e.maxPorUsuario === "number" ? e.maxPorUsuario : undefined,
-  }));
 }
 
-/** ---------- Merge UI ---------- */
-export interface UiEntrada extends ApiEntradaFecha {
-  nombreTipo: string; // dsTipo
-  maxCompra: number; // cantidad máxima (stock / tope / default)
-}
+/** =========================================================================
+ *                    HELPERS DE MERGE PARA LA UI
+ *  ======================================================================= */
 
 export function mergeEntradasConTipos(
   entradas: ApiEntradaFecha[],
@@ -94,25 +249,17 @@ export function mergeEntradasConTipos(
 }
 
 /** =========================================================================
- *                               CREACIÓN
+ *                                CREACIÓN
  *  POST /v1/Entrada/CrearEntradas
  *  body:
  *  {
- *    "idFecha": "string",   // en tu backend: va el id del EVENTO
+ *    "idFecha": "string",
  *    "tipo": 0,
  *    "estado": 0,
  *    "precio": 0,
  *    "cantidad": 0
  *  }
  *  ======================================================================= */
-
-export type CreateEntradaBody = {
-  idFecha: string;
-  tipo: number; // cdTipo
-  estado: number;
-  precio: number;
-  cantidad: number;
-};
 
 export async function createEntrada(body: CreateEntradaBody): Promise<void> {
   const token = await login();
@@ -124,9 +271,7 @@ export async function createEntrada(body: CreateEntradaBody): Promise<void> {
   });
 }
 
-/**
- * Crea en serie varias entradas. Si alguna falla, lanza error con detalle.
- */
+/** Crea en serie varias entradas. Si alguna falla, continúa y reporta el último error. */
 export async function createEntradasBulk(
   items: CreateEntradaBody[]
 ): Promise<void> {
@@ -136,7 +281,7 @@ export async function createEntradasBulk(
       await createEntrada(it);
     } catch (e: any) {
       lastErr = e;
-      // seguimos intentando las demás para no dejar todo a medias
+      // seguimos con las demás
     }
   }
   if (lastErr) {
@@ -148,15 +293,93 @@ export async function createEntradasBulk(
   }
 }
 
-/** ---------- Resolución flexible de tipos por nombre ---------- */
+/** =========================================================================
+ *                                  UPDATE
+ *  PUT /v1/Entrada/UpdateEntrada
+ *  body:
+ *  {
+ *    "idFecha": "string",
+ *    "precio": 0,
+ *    "tipo": 0
+ *  }
+ *  ======================================================================= */
+
+export async function updateEntrada(body: UpdateEntradaBody): Promise<void> {
+  const token = await login();
+  await apiClient.put("/v1/Entrada/UpdateEntrada", body, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+}
+
+/** =========================================================================
+ *                               RESERVAS
+ *  ======================================================================= */
+
 /**
- * Intenta mapear nombres a cdTipo según `dsTipo` que devuelva el backend.
- * Busca matches por normalización:
- *  - "general"    -> cdTipoGeneral
- *  - "vip"        -> cdTipoVip
- *  - "early"/"anticipada"/"preventa" + "general"/"vip"
- * Si no encuentra, usa fallback 1..4.
+ * PUT /v1/Entrada/ReservarEntradas
+ * body:
+ * {
+ *   "entradas": [{ "tipoEntrada": 0, "cantidad": 0 }],
+ *   "idUsuario": "string",
+ *   "idFecha": "string"
+ * }
  */
+export async function reservarEntradas(
+  body: ReservarEntradasBody
+): Promise<ReservarEntradasResponse> {
+  const token = await login();
+  const { data } = await apiClient.put<ReservarEntradasResponse>(
+    "/v1/Entrada/ReservarEntradas",
+    body,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  return data ?? {};
+}
+
+/**
+ * PUT /v1/Entrada/CancelarReserva?idCompra=...
+ */
+export async function cancelarReserva(idCompra: string): Promise<void> {
+  const token = await login();
+  await apiClient.put("/v1/Entrada/CancelarReserva", null, {
+    params: { idCompra },
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/**
+ * GET /v1/Entrada/GetReservaActiva?idUsuario=...
+ * Devuelve la reserva activa del usuario (si existe).
+ */
+export async function fetchReservaActiva(
+  idUsuario: string
+): Promise<ReservaActiva> {
+  const token = await login();
+  try {
+    const { data } = await apiClient.get<any>("/v1/Entrada/GetReservaActiva", {
+      params: { idUsuario },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data ?? null;
+  } catch (e: any) {
+    // si devuelve 400 cuando no hay reserva, lo normalizamos a null
+    if (e?.response?.status === 400 || e?.response?.status === 404) return null;
+    throw e;
+  }
+}
+
+/** =========================================================================
+ *                 RESOLUCIÓN FLEXIBLE DE TIPOS POR NOMBRE
+ *  ======================================================================= */
+
 const norm = (s: string) =>
   (s || "")
     .normalize("NFD")
@@ -202,7 +425,6 @@ export async function resolveTipoCodes(): Promise<TipoCodes> {
     else if (isVip && !vip) vip = t.cdTipo;
   }
 
-  // Fallback ordenado
   const fallback = (v: number, def: number) => (v > 0 ? v : def);
 
   return {
