@@ -1,4 +1,3 @@
-// components/events/create/EventBasicData.tsx
 import React from "react";
 import {
   View,

@@ -1,4 +1,3 @@
-// components/events/MediaSection.tsx
 import React from "react";
 import {
   View,

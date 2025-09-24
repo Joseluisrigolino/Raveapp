@@ -17,7 +17,11 @@ import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-import { fetchEventById, EventItemWithExtras, cancelEvent } from "@/utils/events/eventApi";
+import {
+  fetchEventById,
+  EventItemWithExtras,
+  cancelEvent,
+} from "@/utils/events/eventApi";
 
 type TicketSoldInfo = { type: string; quantity: number; price: number };
 type OwnerEventCancelItem = {
@@ -69,28 +73,48 @@ export default function CancelEventScreen() {
   const mapToCancel = (ev: EventItemWithExtras): OwnerEventCancelItem => ({
     id: ev.id,
     eventName: ev.title || "Evento",
-    // TODO: poblar con tu endpoint real de vendidas
-    ticketsSold: [],
+    ticketsSold: [], // TODO: poblar con tu endpoint real de vendidas
     totalRefund: 0,
   });
 
+  const backendMsg = (e: any) =>
+    e?.response?.data?.message ||
+    e?.response?.data?.Message ||
+    e?.response?.data?.error ||
+    e?.message ||
+    "Ocurrió un error al cancelar el evento.";
+
   const handleCancelEvent = async () => {
-    if (!cancelData || !id) return;
-    if (!reason.trim()) {
-      Alert.alert("Motivo requerido", "Por favor, ingresá el motivo de cancelación.");
+    if (!cancelData || !id) {
+      Alert.alert("Error", "No se pudo resolver el ID del evento.");
       return;
     }
-    try {
-      setSubmitting(true);
-      await cancelEvent(String(id), reason.trim());
-      Alert.alert("Evento cancelado", "El evento fue marcado como cancelado correctamente.", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
-    } catch (e: any) {
-      Alert.alert("Error", e?.message || "No se pudo cancelar el evento.");
-    } finally {
-      setSubmitting(false);
-    }
+
+    Alert.alert(
+      "Confirmar cancelación",
+      "Esta acción no se puede deshacer. ¿Querés cancelar el evento?",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Sí, cancelar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setSubmitting(true);
+              // El endpoint solo recibe 'id' como query param
+              await cancelEvent(String(id));
+              Alert.alert("Evento cancelado", "El evento se canceló correctamente.", [
+                { text: "OK", onPress: () => router.back() },
+              ]);
+            } catch (e: any) {
+              Alert.alert("Error", backendMsg(e));
+            } finally {
+              setSubmitting(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -132,9 +156,8 @@ export default function CancelEventScreen() {
             <Text style={styles.infoText}>
               La cancelación de este evento es una acción que{" "}
               <Text style={styles.infoTextBold}>no se puede revertir</Text>. Se
-              avisará vía mail a las personas que hayan comprado una entrada,
-              junto con el motivo que describas, y se procederá a realizar la
-              devolución del dinero de las entradas.
+              avisará vía mail a las personas que hayan comprado una entrada, y se
+              procederá a realizar la devolución del dinero correspondiente.
             </Text>
           </View>
 
@@ -169,10 +192,10 @@ export default function CancelEventScreen() {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.motivoLabel}>Motivo de la cancelación</Text>
+            <Text style={styles.motivoLabel}>Motivo (opcional)</Text>
             <TextInput
               style={styles.motivoInput}
-              placeholder="Describe el motivo de la cancelación..."
+              placeholder="Podés dejar un mensaje para tu equipo interno…"
               placeholderTextColor={COLORS.textSecondary}
               multiline
               value={reason}

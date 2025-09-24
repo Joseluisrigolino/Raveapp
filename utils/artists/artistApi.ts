@@ -1,3 +1,12 @@
+// Marca o desmarca un artista como favorito para un usuario
+export async function toggleArtistFavoriteOnApi(idUsuario: string, idArtista: string): Promise<void> {
+  const token = await login();
+  await apiClient.post(
+    "/v1/Usuario/ArtistaFavorito",
+    { idUsuario, idArtista },
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+}
 import { apiClient, login } from "@/utils/apiConfig";
 import { mediaApi } from "@/utils/mediaApi";
 import { Artist } from "@/interfaces/Artist";
@@ -48,7 +57,7 @@ async function fetchArtistImage(idArtista: string): Promise<string> {
 export async function fetchOneArtistFromApi(
   idArtista: string,
   idUsuario?: string
-): Promise<Artist> {
+): Promise<Artist & { isLiked?: boolean }> {
   try {
     const token = await login();
     const params: Record<string, string> = { idArtista };
@@ -78,13 +87,44 @@ export async function fetchOneArtistFromApi(
         soundcloudURL: "",
         image: "",
         likes: 0,
-        isFavorito: false,
         likedByIds: [],
         likedByImages: [],
+        isLiked: false,
       };
     }
 
-    const artist: Artist = {
+    // Obtener los IDs de usuarios que dieron like
+    let likedByIds: string[] = [];
+    try {
+      const respLikes = await apiClient.get<string[]>(
+        "/v1/Artista/GetImgLikesArtista",
+        { params: { id: api.idArtista } }
+      );
+      likedByIds = Array.isArray(respLikes.data) ? respLikes.data : [];
+    } catch {
+      likedByIds = [];
+    }
+
+    // Obtener las imágenes de perfil de esos usuarios
+    const base = apiClient.defaults.baseURL ?? "";
+    const likedByImages: string[] = await Promise.all(
+      likedByIds.map(async (userId) => {
+        try {
+          const raw = await mediaApi.getByEntidad(userId);
+          const arr = Array.isArray(raw.media) ? raw.media : [];
+          const m = arr[0];
+          let ruta = m?.url ?? m?.imagen ?? "";
+          if (ruta && !/^https?:\/\//.test(ruta)) {
+            ruta = `${base}${ruta.startsWith("/") ? "" : "/"}${ruta}`;
+          }
+          return ruta || "";
+        } catch {
+          return "";
+        }
+      })
+    );
+
+    const artist: Artist & { isLiked?: boolean } = {
       idArtista: api.idArtista,
       name: api.nombre,
       description: api.bio,
@@ -95,9 +135,9 @@ export async function fetchOneArtistFromApi(
       soundcloudURL: api.socials.mdSoundcloud ?? "",
       image: await fetchArtistImage(api.idArtista),
       likes: api.likes,
-      isFavorito: api.isFavorito === 1,
-      likedByIds: [],
-      likedByImages: [],
+      likedByIds,
+      likedByImages: likedByImages.filter(Boolean),
+      isLiked: api.isFavorito === 1,
     };
 
     return artist;
@@ -157,7 +197,6 @@ export async function updateArtistOnApi(
     nombre: artist.name,
     bio: artist.description,
     socials: {
-      idSocial: artist.idSocial ?? "",
       mdInstagram: artist.instagramURL ?? "",
       mdSpotify: artist.spotifyURL ?? "",
       mdSoundcloud: artist.soundcloudURL ?? "",

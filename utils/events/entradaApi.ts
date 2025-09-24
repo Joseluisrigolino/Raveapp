@@ -1,81 +1,76 @@
-// utils/entradas/entradaApi.ts
 import { apiClient, login } from "@/utils/apiConfig";
 
 /** =========================================================================
  *                               TIPOS
  *  ======================================================================= */
 
-/** ---------- Tipos de entrada ---------- */
 export interface ApiTipoEntrada {
   cdTipo: number;
   dsTipo: string;
 }
 
-/** ---------- Estados de entrada ---------- */
 export interface ApiEstadoEntrada {
   cdEstado: number;
   dsEstado: string | null;
 }
 
-/** ---------- Item crudo devuelto por GetEntradasFecha ---------- */
 export interface ApiEntradaFechaRaw {
   idEntrada: string | null;
   mdQR?: string | null;
-  fecha?: {
-    idFecha: string;
-    inicio?: string | null;
-    fin?: string | null;
-    inicioVenta?: string | null;
-    finVenta?: string | null;
-    estado?: number | null;
-  } | null;
-  estado?: {
-    cdEstado: number;
-    dsEstado: string | null;
-  } | null;
+  fecha?:
+    | {
+        idFecha: string;
+        inicio?: string | null;
+        fin?: string | null;
+        inicioVenta?: string | null;
+        finVenta?: string | null;
+        estado?: number | null;
+      }
+    | null;
+  estado?:
+    | {
+        cdEstado: number;
+        dsEstado: string | null;
+      }
+    | null;
   precio: number;
   cantidad: number;
-  tipo?: {
-    cdTipo: number;
-    dsTipo: string;
-  } | null;
+  tipo?:
+    | {
+        cdTipo: number;
+        dsTipo: string;
+      }
+    | null;
 }
 
-/** ---------- Forma “flatten” usada por la UI ---------- */
 export interface ApiEntradaFecha {
   idEntrada: string;
   idFecha: string;
   cdTipo: number;
   precio: number;
-  /** disponible actual si tu API lo expone; si no, queda undefined */
   stock?: number;
-  /** tope por usuario si aplica; si no, queda undefined */
   maxPorUsuario?: number;
 }
 
-/** ---------- Forma de merge para la UI ---------- */
 export interface UiEntrada extends ApiEntradaFecha {
-  nombreTipo: string; // dsTipo
-  maxCompra: number; // cantidad máxima (stock / tope / default)
+  nombreTipo: string;
+  maxCompra: number;
 }
 
-/** ---------- Crear entradas ---------- */
 export type CreateEntradaBody = {
-  idFecha: string; // en tu backend: id de la FECHA/EVENTO
-  tipo: number; // cdTipo
-  estado: number; // cdEstado
+  idFecha: string;
+  tipo: number;
+  estado: number;
   precio: number;
   cantidad: number;
 };
 
-/** ---------- Update entrada ---------- */
 export type UpdateEntradaBody = {
   idFecha: string;
   precio: number;
-  tipo: number; // cdTipo
+  tipo: number;
 };
 
-/** ---------- Reservar entradas ---------- */
 export type ReservarEntradasBody = {
   entradas: Array<{ tipoEntrada: number; cantidad: number }>;
   idUsuario: string;
@@ -83,23 +78,23 @@ export type ReservarEntradasBody = {
 };
 
 export type ReservarEntradasResponse = {
-  /** muchas APIs devuelven idCompra; si no, será unknown */
   idCompra?: string;
   [k: string]: any;
 };
 
-/** ---------- Reserva activa ---------- */
-export type ReservaActiva = {
-  idCompra: string;
-  idUsuario: string;
-  idFecha: string;
-  vencimiento?: string;
-  items: Array<{
-    tipoEntrada: number;
-    cantidad: number;
-    precio?: number;
-  }>;
-} | null;
+export type ReservaActiva =
+  | {
+      idCompra: string;
+      idUsuario: string;
+      idFecha: string;
+      vencimiento?: string;
+      items: Array<{
+        tipoEntrada: number;
+        cantidad: number;
+        precio?: number;
+      }>;
+    }
+  | null;
 
 /** =========================================================================
  *                         CACHES EN MEMORIA
@@ -173,13 +168,9 @@ export async function getEstadoMap(): Promise<Map<number, string>> {
 }
 
 /** =========================================================================
- *                 ENDPOINTS: ENTRADAS POR FECHA (RAW + FLATTEN)
+ *                 ENTRADAS POR FECHA (RAW + FLATTEN)
  *  ======================================================================= */
 
-/**
- * RAW: devuelve exactamente la forma del backend.
- * GET /v1/Entrada/GetEntradasFecha?IdFecha=...&Estado=...
- */
 export async function fetchEntradasFechaRaw(
   idFecha: string,
   estado?: number
@@ -189,37 +180,28 @@ export async function fetchEntradasFechaRaw(
     "/v1/Entrada/GetEntradasFecha",
     {
       params: {
-        IdFecha: idFecha,
+        IdFecha: idFecha, // ojo: acá el back usa PascalCase en query
         ...(typeof estado === "number" ? { Estado: estado } : {}),
       },
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, Accept: "*/*" },
     }
   );
   return Array.isArray(data) ? data : [];
 }
 
-/**
- * FLATTEN para la UI actual (compatible con el código existente).
- * Toma el RAW y lo mappea a una forma más simple.
- */
 export async function fetchEntradasByFecha(
   idFecha: string,
   estado?: number
 ): Promise<ApiEntradaFecha[]> {
   const raw = await fetchEntradasFechaRaw(idFecha, estado);
-
   return raw.map((e) => {
     const f = e.fecha ?? null;
     const t = e.tipo ?? null;
-
     return {
       idEntrada: String(e.idEntrada ?? ""),
       idFecha: String(f?.idFecha ?? idFecha),
       cdTipo: Number(t?.cdTipo ?? 0),
       precio: Number(e.precio ?? 0),
-
-      // Estos campos no están explícitos en el swagger; los dejo por si tu API
-      // los llega a enviar a futuro (o los agregás).
       stock: undefined,
       maxPorUsuario: undefined,
     } as ApiEntradaFecha;
@@ -227,81 +209,146 @@ export async function fetchEntradasByFecha(
 }
 
 /** =========================================================================
- *                    HELPERS DE MERGE PARA LA UI
+ *              SINCRONIZACIÓN / “FECHA LISTA” (POLLING CON RETRY)
  *  ======================================================================= */
 
-export function mergeEntradasConTipos(
-  entradas: ApiEntradaFecha[],
-  tipoMap: Map<number, string>,
-  defaultMax: number = 10
-): UiEntrada[] {
-  return entradas.map((e) => {
-    const nombreTipo = tipoMap.get(e.cdTipo) ?? `Tipo ${e.cdTipo}`;
-    const maxCompra =
-      typeof e.maxPorUsuario === "number" && e.maxPorUsuario > 0
-        ? e.maxPorUsuario
-        : typeof e.stock === "number" && e.stock > 0
-        ? e.stock
-        : defaultMax;
-
-    return { ...e, nombreTipo, maxCompra };
-  });
+export async function ensureFechaListo(
+  idFecha: string,
+  { tries = 6, delayMs = 400 }: { tries?: number; delayMs?: number } = {}
+): Promise<void> {
+  for (let i = 0; i < tries; i++) {
+    try {
+      // si responde 200 (aunque sea []), consideramos que la fecha ya es “visible”
+      await fetchEntradasFechaRaw(idFecha);
+      if (i > 0) console.log(`[ensureFechaListo] OK en intento ${i + 1}`);
+      return;
+    } catch (e: any) {
+      const st = e?.response?.status;
+      console.log(
+        `[ensureFechaListo] intento ${i + 1}/${tries} fallo (status=${st}). Esperando ${delayMs}ms…`
+      );
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  console.log("[ensureFechaListo] seguimos igual; continuamos con creación.");
 }
 
 /** =========================================================================
  *                                CREACIÓN
- *  POST /v1/Entrada/CrearEntradas
- *  body:
- *  {
- *    "idFecha": "string",
- *    "tipo": 0,
- *    "estado": 0,
- *    "precio": 0,
- *    "cantidad": 0
- *  }
+ *  - intenta camelCase y si falla, reintenta PascalCase
+ *  - reintenta con backoff si 5xx
  *  ======================================================================= */
 
-export async function createEntrada(body: CreateEntradaBody): Promise<void> {
+async function postCrearEntradasCamel(body: CreateEntradaBody) {
   const token = await login();
-  await apiClient.post("/v1/Entrada/CrearEntradas", body, {
+  return apiClient.post("/v1/Entrada/CrearEntradas", body, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
+      Accept: "*/*",
     },
   });
 }
 
-/** Crea en serie varias entradas. Si alguna falla, continúa y reporta el último error. */
+async function postCrearEntradasPascal(body: CreateEntradaBody) {
+  const token = await login();
+  const pascal = {
+    IdFecha: body.idFecha,
+    Tipo: body.tipo,
+    Estado: body.estado,
+    Precio: body.precio,
+    Cantidad: body.cantidad,
+  };
+  return apiClient.post("/v1/Entrada/CrearEntradas", pascal, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "*/*",
+    },
+  });
+}
+
+export async function createEntrada(body: CreateEntradaBody): Promise<void> {
+  let lastErr: any = null;
+
+  // hasta 2 intentos por formato (camel -> pascal)
+  try {
+    console.debug("[CrearEntrada] camelCase =>", body);
+    await postCrearEntradasCamel(body);
+    return;
+  } catch (e) {
+    lastErr = e;
+    console.debug("[CrearEntrada] camelCase falló, probando PascalCase…");
+  }
+
+  try {
+    await postCrearEntradasPascal(body);
+    return;
+  } catch (e) {
+    lastErr = e;
+  }
+
+  // si llegó acá, falló ambos formatos
+  const status = lastErr?.response?.status;
+  const msg =
+    lastErr?.response?.data?.message ||
+    lastErr?.response?.data?.Message ||
+    lastErr?.message ||
+    "Error creando entrada.";
+  throw Object.assign(new Error(msg), { status, payload: body });
+}
+
+/** Bulk con retry/backoff si 5xx */
 export async function createEntradasBulk(
   items: CreateEntradaBody[]
 ): Promise<void> {
   let lastErr: any = null;
-  for (const it of items) {
-    try {
-      await createEntrada(it);
-    } catch (e: any) {
-      lastErr = e;
-      // seguimos con las demás
+
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+
+    // retry x3 con backoff si 5xx
+    let ok = false;
+    let attempt = 0;
+    while (!ok && attempt < 3) {
+      attempt++;
+      try {
+        await createEntrada(it);
+        ok = true;
+      } catch (e: any) {
+        lastErr = e;
+        const st = e?.status || e?.response?.status;
+        const is5xx = st >= 500 && st < 600;
+        console.log(
+          `[createEntradasBulk] item #${i + 1} intento ${attempt} falló (status=${st})`
+        );
+        if (is5xx && attempt < 3) {
+          const wait = 300 * attempt;
+          await new Promise((r) => setTimeout(r, wait));
+          continue;
+        }
+        break;
+      }
     }
-  }
-  if (lastErr) {
-    const msg =
-      lastErr?.response?.data?.message ||
-      lastErr?.message ||
-      "No se pudieron crear todas las entradas.";
-    throw new Error(msg);
+
+    if (!ok) {
+      const st = lastErr?.status || lastErr?.response?.status;
+      const msg =
+        lastErr?.response?.data?.message ||
+        lastErr?.response?.data?.Message ||
+        lastErr?.message ||
+        "No se pudo crear la entrada.";
+      throw new Error(
+        `Fallo al crear la entrada #${i + 1}.\nHTTP POST /v1/Entrada/CrearEntradas\nStatus: ${st}\nPayload: ${JSON.stringify(
+          it
+        )}\nMensaje: ${msg}`
+      );
+    }
   }
 }
 
 /** =========================================================================
  *                                  UPDATE
- *  PUT /v1/Entrada/UpdateEntrada
- *  body:
- *  {
- *    "idFecha": "string",
- *    "precio": 0,
- *    "tipo": 0
- *  }
  *  ======================================================================= */
 
 export async function updateEntrada(body: UpdateEntradaBody): Promise<void> {
@@ -318,15 +365,6 @@ export async function updateEntrada(body: UpdateEntradaBody): Promise<void> {
  *                               RESERVAS
  *  ======================================================================= */
 
-/**
- * PUT /v1/Entrada/ReservarEntradas
- * body:
- * {
- *   "entradas": [{ "tipoEntrada": 0, "cantidad": 0 }],
- *   "idUsuario": "string",
- *   "idFecha": "string"
- * }
- */
 export async function reservarEntradas(
   body: ReservarEntradasBody
 ): Promise<ReservarEntradasResponse> {
@@ -344,9 +382,6 @@ export async function reservarEntradas(
   return data ?? {};
 }
 
-/**
- * PUT /v1/Entrada/CancelarReserva?idCompra=...
- */
 export async function cancelarReserva(idCompra: string): Promise<void> {
   const token = await login();
   await apiClient.put("/v1/Entrada/CancelarReserva", null, {
@@ -355,10 +390,6 @@ export async function cancelarReserva(idCompra: string): Promise<void> {
   });
 }
 
-/**
- * GET /v1/Entrada/GetReservaActiva?idUsuario=...
- * Devuelve la reserva activa del usuario (si existe).
- */
 export async function fetchReservaActiva(
   idUsuario: string
 ): Promise<ReservaActiva> {
@@ -370,67 +401,46 @@ export async function fetchReservaActiva(
     });
     return data ?? null;
   } catch (e: any) {
-    // si devuelve 400 cuando no hay reserva, lo normalizamos a null
     if (e?.response?.status === 400 || e?.response?.status === 404) return null;
     throw e;
   }
 }
 
 /** =========================================================================
- *                 RESOLUCIÓN FLEXIBLE DE TIPOS POR NOMBRE
+ *                 RESOLUCIÓN DE CÓDIGOS DE TIPOS
  *  ======================================================================= */
 
 const norm = (s: string) =>
   (s || "")
     .normalize("NFD")
-    // @ts-ignore - unicode property
+    // @ts-ignore
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
     .trim();
 
 export type TipoCodes = {
-  general: number;
-  vip: number;
-  earlyGeneral: number;
-  earlyVip: number;
+  general: number; // 0
+  earlyGeneral: number; // 1
+  vip: number; // 2
+  earlyVip: number; // 3
 };
 
-/**
- * Dado el listado de tipos, retorna los codes más probables.
- * Si tu backend usa otros nombres/códigos, pasámelos y lo dejo fijo.
- */
 export async function resolveTipoCodes(): Promise<TipoCodes> {
   const tipos = await fetchTiposEntrada().catch(() => []);
-  // Fallback por si GetTiposEntrada no existe
-  if (!tipos.length) {
-    return { general: 1, vip: 2, earlyGeneral: 3, earlyVip: 4 };
+  let codes: TipoCodes = { general: 0, earlyGeneral: 1, vip: 2, earlyVip: 3 };
+
+  if (!Array.isArray(tipos) || !tipos.length) return codes;
+
+  const byName = new Map<number, string>();
+  for (const t of tipos) byName.set(t.cdTipo, norm(t.dsTipo));
+
+  for (const [cd, n] of byName) {
+    if (n === "general") codes.general = cd;
+    else if (n === "general early bird") codes.earlyGeneral = cd;
+    else if (n === "vip") codes.vip = cd;
+    else if (n === "vip early bird") codes.earlyVip = cd;
   }
 
-  let general = 0,
-    vip = 0,
-    earlyGeneral = 0,
-    earlyVip = 0;
-
-  for (const t of tipos) {
-    const n = norm(t.dsTipo);
-    const isGeneral = /(^|\s)(general|comun|común)(\s|$)/.test(n);
-    const isVip = /(^|\s)(vip|preferencial|premium)(\s|$)/.test(n);
-    const isEarly = /early|anticipad|preventa|promo|promocional|tempran/.test(
-      n
-    );
-
-    if (isEarly && isGeneral && !earlyGeneral) earlyGeneral = t.cdTipo;
-    else if (isEarly && isVip && !earlyVip) earlyVip = t.cdTipo;
-    else if (isGeneral && !general) general = t.cdTipo;
-    else if (isVip && !vip) vip = t.cdTipo;
-  }
-
-  const fallback = (v: number, def: number) => (v > 0 ? v : def);
-
-  return {
-    general: fallback(general, 1),
-    vip: fallback(vip, 2),
-    earlyGeneral: fallback(earlyGeneral, 3),
-    earlyVip: fallback(earlyVip, 4),
-  };
+  console.log("[resolveTipoCodes] mapeo final:", codes, " (desde: ", tipos, ")");
+  return codes;
 }

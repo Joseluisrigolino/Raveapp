@@ -1,4 +1,3 @@
-// utils/events/eventApi.ts
 import { EventItem } from "@/interfaces/EventItem";
 import { apiClient, login } from "@/utils/apiConfig";
 import { mediaApi } from "@/utils/mediaApi";
@@ -32,18 +31,30 @@ function formatTimeRange(startIso?: string, endIso?: string): string {
   return `${pad(s.getHours())}hs a ${pad(e.getHours())}hs`;
 }
 
-/** ---------- media (tolerante) ---------- */
+/** ---------- media (SIEMPRE imagen, nunca youtube) ---------- */
 const PLACEHOLDER_IMAGE = "";
+
+/**
+ * Usa mediaApi.getFirstImage (filtra mdVideo y youtube) y normaliza a absoluta.
+ */
 async function fetchEventMediaUrl(idEvento: string): Promise<string> {
   try {
     if (!idEvento) return PLACEHOLDER_IMAGE;
-    const data: any = await mediaApi.getByEntidad(idEvento);
-    const m = data?.media?.[0];
-    let img = m?.url ?? m?.imagen ?? "";
-    if (img && !/^https?:\/\//.test(img)) {
+
+    // pide SOLO imagen
+    let img = await mediaApi.getFirstImage(idEvento);
+
+    // extra defensa: por si backend metió youtube en url por error
+    if (/youtube\.com|youtu\.be/i.test(img)) {
+      img = "";
+    }
+
+    // normalizar absoluta si es relativa
+    if (img && !/^https?:\/\//i.test(img)) {
       const base = apiClient.defaults.baseURL ?? "";
       img = `${base}${img.startsWith("/") ? "" : "/"}${img}`;
     }
+
     return img || PLACEHOLDER_IMAGE;
   } catch {
     return PLACEHOLDER_IMAGE;
@@ -134,10 +145,8 @@ async function normalizeEvento(e: RawEvento): Promise<EventItemWithExtras> {
     e?.fechas?.[0]?.inicio ?? e?.inicioEvento ?? e?.inicio ?? null;
   const finIso = e?.fechas?.[0]?.fin ?? e?.finEvento ?? e?.fin ?? null;
 
-  const imageUrl =
-    (await fetchEventMediaUrl(String(e?.idEvento))) ||
-    e?.media?.[0]?.imagen ||
-    "";
+  // SOLO esta fuente de imagen (sin fallbacks a e.media legacy)
+  const imageUrl = (await fetchEventMediaUrl(String(e?.idEvento))) || "";
 
   const code = Number(
     Array.isArray(e?.genero) && e.genero.length ? e.genero[0] : NaN
@@ -275,7 +284,8 @@ export async function fetchEventById(
       return await normalizeEvento(data);
     } catch (e: any) {
       const status = e?.response?.status;
-      if (status && status !== 404) console.warn("[fetchEventById] intento fallido:", status);
+      if (status && status !== 404)
+        console.warn("[fetchEventById] intento fallido:", status);
       continue;
     }
   }
@@ -308,12 +318,14 @@ export async function fetchEventById(
 }
 
 /** ---------- CREATE (POST /v1/Evento/CrearEvento) ---------- */
-export type CreateEventResponse = {
-  idEvento?: string;
-  IdEvento?: string;
-  evento?: { idEvento?: string; IdEvento?: string };
-  [k: string]: any;
-};
+export type CreateEventResponse =
+  | {
+      idEvento?: string;
+      IdEvento?: string;
+      evento?: { idEvento?: string; IdEvento?: string };
+      [k: string]: any;
+    }
+  | string;
 
 export async function createEvent(body: any): Promise<string> {
   const token = await login();
@@ -328,12 +340,17 @@ export async function createEvent(body: any): Promise<string> {
     { headers }
   );
 
-  const data = resp?.data ?? {};
+  const data = resp?.data;
+
+  // La API puede devolver directamente el id como string
+  if (typeof data === "string" && data.trim()) return String(data);
+
+  // O un objeto con distintas claves posibles
   const id =
-    data.idEvento ??
-    data.IdEvento ??
-    data?.evento?.idEvento ??
-    data?.evento?.IdEvento ??
+    (data as any)?.idEvento ??
+    (data as any)?.IdEvento ??
+    (data as any)?.evento?.idEvento ??
+    (data as any)?.evento?.IdEvento ??
     "";
 
   if (!id) {
@@ -402,7 +419,6 @@ export async function setEventStatus(
   estado: number,
   extra?: Record<string, any>
 ): Promise<void> {
-  // Mandamos varias claves para ser compatibles con distintos backends
   const payload = {
     estado,
     cdEstado: estado,
@@ -412,48 +428,14 @@ export async function setEventStatus(
   await updateEvent(idEvento, payload);
 }
 
-/** ---------- Cancelar evento (intenta endpoint específico y si no, update) ---------- */
-export async function cancelEvent(
-  idEvento: string,
-  motivo?: string
-): Promise<void> {
+/** ---------- Cancelar/Eliminar evento (DELETE dedicado) ---------- */
+export async function cancelEvent(idEvento: string): Promise<void> {
   const id = String(idEvento || "").trim();
-  const token = await login();
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
+  if (!id) throw new Error("Falta el id del evento.");
+  const token = await login().catch(() => null);
 
-  // 1) Intentar endpoint dedicado si existe
-  const tryCancelEndpoints: Array<() => Promise<any>> = [
-    () =>
-      apiClient.post(
-        "/v1/Evento/CancelarEvento",
-        { idEvento: id, motivo: motivo ?? "" },
-        { headers }
-      ),
-    () =>
-      apiClient.put(
-        "/v1/Evento/CancelarEvento",
-        { idEvento: id, motivo: motivo ?? "" },
-        { headers }
-      ),
-  ];
-
-  for (const fn of tryCancelEndpoints) {
-    try {
-      await fn();
-      return; // listo
-    } catch (e: any) {
-      // si 404/405/501 seguimos con el fallback
-      continue;
-    }
-  }
-
-  // 2) Fallback: setear estado = CANCELADO con campos compatibles
-  await setEventStatus(id, ESTADO_CODES.CANCELADO, {
-    motivoCancelacion: motivo ?? "",
-    cancelado: true,
-    isCancelado: true,
+  await apiClient.delete("/v1/Evento/DeleteEvento", {
+    params: { id },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 }

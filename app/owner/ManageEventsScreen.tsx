@@ -1,7 +1,8 @@
 // screens/ManageEventsScreen.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -9,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
@@ -77,119 +79,120 @@ export default function ManageEventsScreen() {
 
   /** Datos */
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [allEvents, setAllEvents] = useState<ManageEventCardItem[]>([]);
 
-  /**
-   * Carga inicial y cada vez que cambian los estados disponibles.
-   * Pide a la API los eventos por cada estado, los mergea y normaliza.
-   */
-  useEffect(() => {
-    let mounted = true;
+  /** Cargador central de eventos (se usa en focus y pull-to-refresh) */
+  const loadAllEvents = useCallback(async () => {
+    setErrorMsg(null);
+    setLoading(true);
 
-    (async () => {
-      setLoading(true);
-      setErrorMsg(null);
+    try {
+      const codes =
+        eventStates.length > 0
+          ? eventStates.map((s) => s.code)
+          : [0, 1, 2, 3, 4, 5, 6];
 
-      try {
-        const codes =
-          eventStates.length > 0
-            ? eventStates.map((s) => s.code)
-            : [0, 1, 2, 3, 4, 5, 6];
+      const batches = await Promise.all(
+        codes.map(async (code) => {
+          try {
+            const arr = await fetchEvents(code); // normalizados por estado
+            const label =
+              eventStates.find((s) => s.code === code)?.label ??
+              FALLBACK_STATE_LABEL[code] ??
+              `Estado ${code}`;
 
-        const batches = await Promise.all(
-          codes.map(async (code) => {
-            try {
-              const arr = await fetchEvents(code); // normalizados por estado
-              const label =
-                eventStates.find((s) => s.code === code)?.label ??
-                FALLBACK_STATE_LABEL[code] ??
-                `Estado ${code}`;
+            // Map a la forma que consume la Card
+            return arr.map((e: any) => ({
+              id: String(e.id),
+              eventName: e.title ?? "",
+              date: e.date ?? "",
+              timeRange: e.timeRange ?? "",
+              imageUrl: e.imageUrl || "",
+              address: e.address ?? "",
+              type: e.type ?? "Otros",
+              statusCode: code,
+              statusLabel: label,
+              __raw: e, // por si en el futuro querés filtrar por propietario
+            })) as ManageEventCardItem[];
+          } catch (err: any) {
+            console.warn(
+              `[GetEventos Estado=${code}]`,
+              err?.response?.status || err?.message
+            );
+            return [] as ManageEventCardItem[];
+          }
+        })
+      );
 
-              // Map a la forma que consume la Card
-              return arr.map((e: any) => ({
-                id: String(e.id),
-                eventName: e.title ?? "",
-                date: e.date ?? "",
-                timeRange: e.timeRange ?? "",
-                imageUrl: e.imageUrl || "",
-                address: e.address ?? "",
-                type: e.type ?? "Otros",
-                statusCode: code,
-                statusLabel: label,
-              })) as ManageEventCardItem[];
-            } catch (err: any) {
-              console.warn(
-                `[GetEventos Estado=${code}]`,
-                err?.response?.status || err?.message
-              );
-              return [] as ManageEventCardItem[];
-            }
-          })
-        );
+      const merged = batches.flat();
 
-        const merged = batches.flat();
+      // Filtrar por propietario si se puede (por id o email)
+      const userId = (user as any)?.idUsuario ?? (user as any)?.id ?? null;
+      const email = (
+        (user as any)?.email ?? (user as any)?.correo ?? (user as any)?.mail ?? ""
+      )
+        .toString()
+        .toLowerCase();
 
-        // Filtrar por propietario si se puede (por id o email)
-        const userId = (user as any)?.idUsuario ?? (user as any)?.id ?? null;
-        const email = (
-          (user as any)?.email ??
-          (user as any)?.correo ??
-          (user as any)?.mail ??
-          ""
+      const mine = merged.filter((ev: any) => {
+        const ownerId =
+          ev?.__raw?.ownerId ??
+          ev?.__raw?.propietario?.idUsuario ??
+          ev?.__raw?.idUsuarioPropietario ??
+          null;
+
+        const ownerEmail = (
+          ev?.__raw?.ownerEmail ?? ev?.__raw?.propietario?.correo ?? ""
         )
           .toString()
           .toLowerCase();
 
-        const mine = merged.filter((ev: any) => {
-          const ownerId =
-            ev?.__raw?.ownerId ??
-            ev?.__raw?.propietario?.idUsuario ??
-            ev?.__raw?.idUsuarioPropietario ??
-            null;
+        if (userId && ownerId) return String(ownerId) === String(userId);
+        if (email && ownerEmail) return ownerEmail === email;
+        return true;
+      });
 
-          const ownerEmail = (
-            ev?.__raw?.ownerEmail ?? ev?.__raw?.propietario?.correo ?? ""
-          )
-            .toString()
-            .toLowerCase();
-
-          if (userId && ownerId) return String(ownerId) === String(userId);
-          if (email && ownerEmail) return ownerEmail === email;
-          return true;
-        });
-
-        if (mounted) setAllEvents(mine);
-      } catch (err: any) {
-        if (mounted)
-          setErrorMsg(err?.message || "No se pudieron cargar tus eventos.");
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
+      setAllEvents(mine);
+    } catch (err: any) {
+      setErrorMsg(err?.message || "No se pudieron cargar tus eventos.");
+    } finally {
+      setLoading(false);
+    }
   }, [user, eventStates]);
+
+  /** Recarga cada vez que la pantalla vuelve a estar enfocada */
+  useFocusEffect(
+    useCallback(() => {
+      loadAllEvents();
+      return () => {};
+    }, [loadAllEvents])
+  );
+
+  /** Pull-to-refresh */
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadAllEvents();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadAllEvents]);
 
   /** Aplicación de filtros, búsqueda y ORDEN personalizado */
   const filteredEvents = useMemo(() => {
     let events = [...allEvents];
 
-    // Filtro por estado seleccionado
     if (selectedFilter !== "all") {
       events = events.filter((ev) => ev.statusCode === selectedFilter);
     }
 
-    // Búsqueda por texto
     if (searchText.trim()) {
       const q = searchText.toLowerCase();
       events = events.filter((ev) => ev.eventName.toLowerCase().includes(q));
     }
 
-    // Orden principal por prioridad de estado (según STATUS_ORDER)
-    // y, a igualdad de prioridad, por fecha ascendente (dd/mm/yyyy).
     events.sort((a, b) => {
       const pa = statusPriority(a.statusCode);
       const pb = statusPriority(b.statusCode);
@@ -237,7 +240,12 @@ export default function ManageEventsScreen() {
       </View>
 
       {/* Lista */}
-      <ScrollView contentContainerStyle={styles.listContent}>
+      <ScrollView
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {loading ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator />
