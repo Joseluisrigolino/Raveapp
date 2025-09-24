@@ -3,7 +3,9 @@ export interface NewsItem {
   idNoticia: string;
   titulo: string;
   contenido: string;
-  imagen: string | null;
+  imagen?: string | null;
   dtPublicado: string;
-  eventId?: number; // o string, según corresponda
+  urlEvento?: string | null;
+  // legacy numeric id (mock helpers may use numeric ids)
+  id?: number;
 }

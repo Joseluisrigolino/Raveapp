@@ -29,7 +29,7 @@ import { useAuth } from "@/context/AuthContext";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 
 
-export default function ArtistScreen() {
+export default function ArtistaPantalla() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const [artist, setArtist] = useState<any>(null);

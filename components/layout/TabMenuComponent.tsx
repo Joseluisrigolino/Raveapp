@@ -2,6 +2,7 @@
 import React, { useMemo } from "react";
 import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
+import * as nav from "@/utils/navigation";
 import { TabMenuProps } from "@/interfaces/TabMenuProps";
 import { COLORS } from "@/styles/globalStyles";
 
@@ -22,7 +23,7 @@ export default function TabMenuComponent({ tabs }: TabMenuProps) {
             key={`${tab.label}-${i}`}
             style={styles.tabButton}
             activeOpacity={0.7}
-            onPress={() => !tab.isActive && router.push(tab.route)}
+            onPress={() => !tab.isActive && nav.push(router, tab.route as any)}
           >
             <Text style={[styles.tabText, tab.isActive && styles.tabTextActive]}>
               {tab.label.toUpperCase()}

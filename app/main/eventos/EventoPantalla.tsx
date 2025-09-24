@@ -15,6 +15,8 @@ import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityI
 import { IconButton } from "react-native-paper";
 import { WebView } from "react-native-webview";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { ROUTES } from "../../../routes";
+import * as nav from "@/utils/navigation";
 
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
@@ -36,7 +38,6 @@ import {
   fetchEntradasByFecha,
   fetchTiposEntrada,
   getTipoMap,
-  mergeEntradasConTipos,
   UiEntrada,
 } from "@/utils/events/entradaApi";
 
@@ -161,7 +162,12 @@ export default function EventScreen() {
         const results = await Promise.all(
           fechas.map(async (f) => {
             const raw = await fetchEntradasByFecha(f.idFecha);
-            const merged = mergeEntradasConTipos(raw, tipoMap, 10);
+            // local merge: map ApiEntradaFecha -> UiEntrada using tipoMap
+            const merged: UiEntrada[] = (raw || []).map((r: any) => ({
+              ...r,
+              nombreTipo: tipoMap.get(Number(r.cdTipo)) ?? String(r.cdTipo),
+              maxCompra: 10,
+            }));
             return [f.idFecha, merged] as const;
           })
         );
@@ -245,9 +251,7 @@ export default function EventScreen() {
   const handleBuyPress = () => {
     if (!eventData) return;
     const sel = encodeURIComponent(JSON.stringify(selectedTickets));
-    router.push(
-      `/main/TicketsScreens/BuyTicketScreen?id=${eventData.id}&selection=${sel}`
-    );
+    nav.push(router, { pathname: ROUTES.MAIN.TICKETS.BUY, params: { id: eventData.id, selection: sel } });
   };
 
   if (loading) {

@@ -2,19 +2,25 @@
 import * as React from "react";
 import { StyleSheet, View } from "react-native";
 import { Button } from "react-native-paper";
-import globalStyles from "@/styles/globalStyles";
+import { COLORS } from "@/styles/globalStyles";
 
 const ButtonInApp = ({
   icon = "google",
   text = "Default Text",
-  width = "70%",
-  height = 50,
+  width = "70%" as unknown as number | string,
+  height = 50 as number,
   onPress = () => {},
+}: {
+  icon?: string;
+  text?: string;
+  width?: number | string;
+  height?: number;
+  onPress?: () => void;
 }) => {
   return (
     <View style={styles.container}>
       <Button
-        style={[styles.button, { width, height }]}
+        style={[styles.button, { width, height } as any]}
         icon={icon}
         mode="contained"
         onPress={onPress}
@@ -34,8 +40,8 @@ const styles = StyleSheet.create({
   button: {
     justifyContent: "center",
     alignItems: "center",
-    // Usamos el color primario en lugar de "#000222"
-    backgroundColor: globalStyles.COLORS.primary,
+    // Usamos el color primario definido en tokens
+    backgroundColor: COLORS.primary,
   },
 });
 

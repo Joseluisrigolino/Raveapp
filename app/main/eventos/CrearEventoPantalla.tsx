@@ -17,9 +17,11 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { ROUTES } from "../../../routes";
 
 /** Layout y UI base */
 import Header from "@/components/layout/HeaderComponent";
+import * as nav from "@/utils/navigation";
 import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import TitlePers from "@/components/common/TitleComponent";
@@ -852,10 +854,10 @@ export default function CreateEventScreen() {
         return;
       }
 
-      Alert.alert("Éxito", "Evento y entradas creados correctamente.", [
+        Alert.alert("Éxito", "Evento y entradas creados correctamente.", [
         {
           text: "OK",
-          onPress: () => router.push("../owner/ManageEventScreen"),
+          onPress: () => nav.push(router, { pathname: ROUTES.OWNER.MANAGE_EVENTS }),
         },
       ]);
     } catch (e: any) {
@@ -883,12 +885,12 @@ export default function CreateEventScreen() {
         tabs={[
           {
             label: "Crear evento",
-            route: "/main/CreateEventScreen",
+            route: ROUTES.MAIN.EVENTS.CREATE,
             isActive: true,
           },
           {
             label: "Mis fiestas recurrentes",
-            route: "/owner/PartysScreen",
+            route: ROUTES.OWNER.PARTYS,
             isActive: false,
           },
         ]}

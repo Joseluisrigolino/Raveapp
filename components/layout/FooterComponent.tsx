@@ -17,6 +17,8 @@ import {
 import { IconButton } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { ROUTES } from "../../routes";
+import * as nav from "@/utils/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { mediaApi } from "@/utils/mediaApi";
 import { getProfile } from "@/utils/auth/userHelpers";
@@ -64,24 +66,25 @@ export default function Footer() {
   }, [user]);
 
   // ===== Rutas barra inferior
-  const handleHomePress = () => router.replace("/main/EventsScreens/MenuScreen");
+  const handleHomePress = () => nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
   const handleNewsPress = () =>
-    router.replace(
-      isAdmin
-        ? "/admin/NewsScreens/ManageNewScreen"
-        : "/main/NewsScreens/NewsScreen"
+    nav.replace(
+    router,
+    isAdmin
+      ? ROUTES.ADMIN.NEWS.MANAGE
+      : ROUTES.MAIN.NEWS.LIST
     );
   const handleTicketsPress = () =>
-    router.replace("/main/TicketsScreens/TicketPurchasedMenu");
+    nav.replace(router, ROUTES.MAIN.TICKETS.MENU);
   const handleEventManagementPress = () =>
-    router.replace(
-      isAdmin
-        ? "/admin/EventsValidateScreens/EventsToValidateScreen"
-        : "/main/EventsScreens/CreateEventScreen"
+    nav.replace(
+    router,
+    isAdmin
+      ? ROUTES.ADMIN.EVENTS_VALIDATE.LIST
+      : ROUTES.MAIN.EVENTS.CREATE
     );
-  const handleArtistsPress = () =>
-    router.replace("/admin/ArtistScreens/ManageArtistsScreen");
-  const handleTycPress = () => router.replace("/admin/Tyc");
+  const handleArtistsPress = () => nav.replace(router, ROUTES.ADMIN.ARTISTS.MANAGE);
+  const handleTycPress = () => nav.replace(router, ROUTES.ADMIN.TYC);
 
   // ===== Bottom Sheet (3/4 de pantalla)
   const [open, setOpen] = useState(false);
@@ -146,28 +149,29 @@ export default function Footer() {
     })
   ).current;
 
-  const go = (route: string) => {
+  type RouteArg = string | { pathname: string; params?: Record<string, any> };
+  const go = (route: any) => {
     closeSheet();
-    setTimeout(() => router.push(route), 140);
+    setTimeout(() => nav.push(router, route), 140);
   };
   const doLogout = async () => {
     closeSheet();
     try {
       if (typeof logout === "function") await logout();
     } finally {
-      router.replace("/main/EventsScreens/MenuScreen");
+      nav.replace(router, { pathname: ROUTES.MAIN.EVENTS.MENU });
     }
   };
 
   // ---- Ítems
   const userItems = [
-    { icon: "heart", label: "Mis eventos favoritos", route: "/main/EventsScreens/FavEventScreen" },
-    { icon: "account", label: "Mi perfil", route: "/main/UserScreens/UserProfileEditScreen" },
+  { icon: "heart", label: "Mis eventos favoritos", route: { pathname: ROUTES.MAIN.EVENTS.FAV } },
+  { icon: "account", label: "Mi perfil", route: { pathname: ROUTES.MAIN.USER.PROFILE_EDIT } },
   ];
   const ownerItems = [
-    { icon: "calendar-multiselect", label: "Mis eventos creados", route: "/owner/ManageEventsScreen" },
-    { icon: "repeat", label: "Mis fiestas recurrentes", route: "/owner/PartysScreen" },
-    { icon: "ticket-percent", label: "Entradas vendidas", route: "/owner/TicketSoldScreen" },
+  { icon: "calendar-multiselect", label: "Mis eventos creados", route: { pathname: ROUTES.OWNER.MANAGE_EVENTS } },
+  { icon: "repeat", label: "Mis fiestas recurrentes", route: { pathname: ROUTES.OWNER.PARTYS } },
+  { icon: "ticket-percent", label: "Entradas vendidas", route: { pathname: ROUTES.OWNER.TICKET_SOLD } },
   ];
 
   return (

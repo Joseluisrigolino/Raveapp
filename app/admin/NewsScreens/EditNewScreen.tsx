@@ -80,8 +80,8 @@ export default function EditNewScreen() {
 
     if (!result.canceled && result.assets?.length > 0) {
       const asset = result.assets[0];
-      const fileInfo = await FileSystem.getInfoAsync(asset.uri);
-      if (fileInfo.size && fileInfo.size > 2 * 1024 * 1024) {
+      const fileInfo: any = await FileSystem.getInfoAsync(asset.uri);
+      if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
         return Alert.alert("Error", "La imagen supera los 2MB permitidos.");
       }
       setNewImageUri(asset.uri);

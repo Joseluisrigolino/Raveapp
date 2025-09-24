@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { Text, TextInput, Button, useTheme } from "react-native-paper";
 import { useRouter } from "expo-router";
+import * as nav from "@/utils/navigation";
+import { ROUTES } from "../../routes";
 
 import globalStyles from "@/styles/globalStyles";
 import { apiClient, login as apiLogin } from "@/utils/apiConfig";
@@ -74,8 +76,8 @@ export default function RegisterUserScreen() {
         headers: { "Content-Type": "application/json" },
       });
 
-      Alert.alert("¡Éxito!", "Tu cuenta se ha registrado correctamente.");
-      router.replace("/login/Index");
+    Alert.alert("¡Éxito!", "Tu cuenta se ha registrado correctamente.");
+    nav.replace(router, ROUTES.LOGIN.LOGIN);
     } catch (err: any) {
       console.error("Error CreateUsuario:", err);
       if (err.response?.data?.errors) {

@@ -11,4 +11,6 @@ export interface Artist {
   likes: number;                // total de likes
   likedByIds: string[];         // array de IDs de usuarios que dieron like
   likedByImages: string[];      // URLs de las imágenes de esos usuarios
+  // Campos opcionales que vienen desde el API
+  idSocial?: string | null;
 }

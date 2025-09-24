@@ -1,6 +1,5 @@
-// app/main/MenuScreen.tsx
-
-import React, { useState, useEffect, useMemo } from "react";
+// app/main/EventsScreens/FavEventScreen.tsx
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -11,17 +10,23 @@ import {
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { ROUTES } from "../../../routes";
+import * as nav from "@/utils/navigation";
 
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-// Ajustá la ruta según dónde tengas el componente:
+import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import CardComponent from "@/components/events/CardComponent";
 import FiltersSection from "@/components/filters/FiltersSection";
 
-import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
-import { EventItem } from "@/interfaces/EventItem";
+import { useAuth } from "@/context/AuthContext";
 import { fetchEvents } from "@/utils/events/eventApi";
+import {
+  getEventosFavoritos,
+  putEventoFavorito,
+} from "@/utils/auth/userHelpers";
+
 import {
   fetchProvinces,
   fetchMunicipalities,
@@ -29,13 +34,10 @@ import {
   fetchLocalitiesByName,
 } from "@/utils/georef/georefHelpers";
 
-import { useAuth } from "@/context/AuthContext";
-import {
-  putEventoFavorito,
-  getEventosFavoritos,
-} from "@/utils/auth/userHelpers";
+import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
+import { EventItem } from "@/interfaces/EventItem";
 
-// Helper para rango de semana
+// Rango de semana (igual que en MenuScreen)
 function getWeekRange() {
   const today = new Date();
   const dayOfWeek = today.getDay(); // Domingo = 0
@@ -46,24 +48,26 @@ function getWeekRange() {
   return { startOfWeek, endOfWeek };
 }
 
-export default function MenuScreen() {
+export default function FavEventScreen() {
   const router = useRouter();
   const { user } = useAuth();
 
-  // Normalizo ID de usuario (puede venir como id o idUsuario)
+  // Normalizo ID de usuario
   const userId: string | null =
     (user as any)?.idUsuario ?? (user as any)?.id ?? null;
 
-  // Eventos y carga
-  const [allEvents, setAllEvents] = useState<EventItem[]>([]);
+  // Estado base
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Favoritos en memoria (ids) + busy por item
+  // Sólo eventos favoritos del usuario
+  const [favEvents, setFavEvents] = useState<EventItem[]>([]);
+
+  // Corazones
   const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [favBusy, setFavBusy] = useState<string | null>(null);
 
-  // Trae eventos + (si hay user) favoritos, en paralelo
+  // Carga: trae IDs de favoritos del user + todos los eventos, y filtra
   useEffect(() => {
     let mounted = true;
 
@@ -72,14 +76,19 @@ export default function MenuScreen() {
         setLoading(true);
         setError(null);
 
-        const eventsPromise = fetchEvents();
-        const favsPromise = userId
-          ? getEventosFavoritos(String(userId))
-          : Promise.resolve<string[]>([]);
+        if (!userId) {
+          setFavEvents([]);
+          setFavSet(new Set());
+          return;
+        }
 
-        const [evts, favIds] = await Promise.all([eventsPromise, favsPromise]);
+        const [all, favIds] = await Promise.all([
+          fetchEvents(),
+          getEventosFavoritos(String(userId)),
+        ]);
 
-        const sorted = evts
+        // Ordenar como en MenuScreen
+        const sortedAll = all
           .map((e) => ({
             ...e,
             _ts: (() => {
@@ -90,13 +99,16 @@ export default function MenuScreen() {
           .sort((a, b) => a._ts - b._ts)
           .map(({ _ts, ...rest }) => rest);
 
-        if (!mounted) return;
+        // Filtrar sólo favoritos
+        const favIdSet = new Set(favIds.map(String));
+        const onlyFavs = sortedAll.filter((e) => e.id && favIdSet.has(String(e.id)));
 
-        setAllEvents(sorted);
-        setFavSet(new Set(favIds.map(String))); // hidrata corazones
+        if (!mounted) return;
+        setFavEvents(onlyFavs);
+        setFavSet(favIdSet);
       } catch (err) {
-        console.error("[MenuScreen] Error cargando eventos/favoritos:", err);
-        if (mounted) setError("Error al cargar los eventos.");
+        console.error("[FavEventScreen] Error cargando favoritos:", err);
+        if (mounted) setError("Error al cargar tus eventos favoritos.");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -105,16 +117,16 @@ export default function MenuScreen() {
     return () => {
       mounted = false;
     };
-    // Reintenta si cambia el usuario logueado
   }, [userId]);
 
-  // --- estados y handlers de filtros (idénticos a antes) ---
+  // --- filtros (idénticos a MenuScreen) ---
   const [searchText, setSearchText] = useState("");
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+
   const [locationFilterOpen, setLocationFilterOpen] = useState(false);
   const [provinceText, setProvinceText] = useState("");
   const [provinceSuggestions, setProvinceSuggestions] = useState<
@@ -128,12 +140,14 @@ export default function MenuScreen() {
   const [localitySuggestions, setLocalitySuggestions] = useState<
     { id: string; nombre: string }[]
   >([]);
+
   const [weekActive, setWeekActive] = useState(false);
   const [afterActive, setAfterActive] = useState(false);
   const [lgbtActive, setLgbtActive] = useState(false);
   const [genreFilterOpen, setGenreFilterOpen] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
 
+  // Helpers ubicación (igual que en MenuScreen)
   async function onProvinceTextChange(v: string) {
     setProvinceText(v);
     if (v.trim().length < 3) return setProvinceSuggestions([]);
@@ -206,9 +220,10 @@ export default function MenuScreen() {
     setSelectedGenres([]);
   }
 
-  // Filtrado de eventos
+  // Filtrado final (igual que en MenuScreen pero sobre favEvents)
   const filteredEvents = useMemo(() => {
-    let results = [...allEvents];
+    let results = [...favEvents];
+
     if (searchText.trim()) {
       const lower = searchText.toLowerCase();
       results = results.filter((ev) => ev.title.toLowerCase().includes(lower));
@@ -222,17 +237,17 @@ export default function MenuScreen() {
     }
     if (provinceText) {
       results = results.filter((ev) =>
-        ev.address.toLowerCase().includes(provinceText.toLowerCase())
+        ev.address?.toLowerCase().includes(provinceText.toLowerCase())
       );
     }
     if (municipalityText) {
       results = results.filter((ev) =>
-        ev.address.toLowerCase().includes(municipalityText.toLowerCase())
+        ev.address?.toLowerCase().includes(municipalityText.toLowerCase())
       );
     }
     if (localityText) {
       results = results.filter((ev) =>
-        ev.address.toLowerCase().includes(localityText.toLowerCase())
+        ev.address?.toLowerCase().includes(localityText.toLowerCase())
       );
     }
     if (weekActive) {
@@ -252,7 +267,7 @@ export default function MenuScreen() {
     }
     return results;
   }, [
-    allEvents,
+    favEvents,
     searchText,
     startDate,
     endDate,
@@ -265,41 +280,34 @@ export default function MenuScreen() {
     selectedGenres,
   ]);
 
-  // UI handlers
-  const toggleDateFilter = () => {
-    setDateFilterOpen((v) => !v);
-    setLocationFilterOpen(false);
-    setGenreFilterOpen(false);
-  };
-  const toggleLocationFilter = () => {
-    setLocationFilterOpen((v) => !v);
-    setDateFilterOpen(false);
-    setGenreFilterOpen(false);
-  };
-  const toggleGenreFilter = () => {
-    setGenreFilterOpen((v) => !v);
-    setDateFilterOpen(false);
-    setLocationFilterOpen(false);
-  };
+  // Navegación card
+  function handleCardPress(_title: string, id?: string) {
+    if (id) nav.push(router, { pathname: ROUTES.MAIN.EVENTS.EVENT, params: { id } });
+  }
 
-  const handleCardPress = (_: string, id?: string) => {
-    if (id) router.push(`/main/EventsScreens/EventScreen?id=${id}`);
-  };
-
-  // Toggle favorito (optimista)
+  // Toggle favorito (optimista). En esta pantalla, si se desmarca, se remueve del listado.
   const handleToggleFavorite = async (eventId: string) => {
     if (!userId) {
-      Alert.alert(
-        "Iniciá sesión",
-        "Necesitás estar logueado para marcar favoritos."
-      );
+      Alert.alert("Iniciá sesión", "Necesitás estar logueado para gestionar favoritos.");
       return;
     }
     const wasFav = favSet.has(eventId);
-    const next = new Set(favSet);
-    if (wasFav) next.delete(eventId);
-    else next.add(eventId);
-    setFavSet(next);
+
+    // Estados previos para revertir en caso de error
+    const prevFavSet = new Set(favSet);
+    const prevFavEvents = [...favEvents];
+
+    // Optimista: si estaba marcado, lo saco del set y de la lista
+    const nextFavSet = new Set(favSet);
+    if (wasFav) {
+      nextFavSet.delete(eventId);
+      setFavEvents((current) => current.filter((e) => String(e.id) !== String(eventId)));
+    } else {
+      // En esta pantalla rara vez vas a "agregar", pero contemplado por consistencia
+      nextFavSet.add(eventId);
+      // (Si quisieras agregar de nuevo, deberíamos traer los datos del evento; omitido a propósito)
+    }
+    setFavSet(nextFavSet);
     setFavBusy(eventId);
 
     try {
@@ -308,15 +316,10 @@ export default function MenuScreen() {
         idEvento: String(eventId),
       });
     } catch (e) {
-      // revertimos si falla
-      const revert = new Set(next);
-      if (wasFav) revert.add(eventId);
-      else revert.delete(eventId);
-      setFavSet(revert);
-      Alert.alert(
-        "Error",
-        "No se pudo actualizar el favorito. Probá de nuevo."
-      );
+      // Revertimos
+      setFavSet(prevFavSet);
+      setFavEvents(prevFavEvents);
+      Alert.alert("Error", "No se pudo actualizar el favorito. Probá de nuevo.");
     } finally {
       setFavBusy(null);
     }
@@ -324,27 +327,41 @@ export default function MenuScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.mainContainer}>
-        <Header />
-        <View style={{ flex: 1, justifyContent: "center" }}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
-        <Footer />
-      </SafeAreaView>
+      <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
+        <SafeAreaView style={styles.mainContainer}>
+          <Header />
+          <TabMenuComponent
+            tabs={[
+              { label: "Mis tickets", route: ROUTES.MAIN.TICKETS.MENU, isActive: false },
+              { label: "Eventos favoritos", route: ROUTES.MAIN.EVENTS.FAV, isActive: true },
+            ]}
+          />
+          <View style={{ flex: 1, justifyContent: "center" }}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+          <Footer />
+        </SafeAreaView>
+      </ProtectedRoute>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={styles.mainContainer}>
-        <Header />
-        <View
-          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-        >
-          <Text style={{ color: COLORS.negative }}>{error}</Text>
-        </View>
-        <Footer />
-      </SafeAreaView>
+      <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
+        <SafeAreaView style={styles.mainContainer}>
+          <Header />
+          <TabMenuComponent
+            tabs={[
+              { label: "Mis tickets", route: ROUTES.MAIN.TICKETS.MENU, isActive: false },
+              { label: "Eventos favoritos", route: ROUTES.MAIN.EVENTS.FAV, isActive: true },
+            ]}
+          />
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <Text style={{ color: COLORS.negative }}>{error}</Text>
+          </View>
+          <Footer />
+        </SafeAreaView>
+      </ProtectedRoute>
     );
   }
 
@@ -352,6 +369,14 @@ export default function MenuScreen() {
     <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
       <SafeAreaView style={styles.mainContainer}>
         <Header />
+
+        <TabMenuComponent
+          tabs={[
+            { label: "Mis tickets", route: ROUTES.MAIN.TICKETS.MENU, isActive: false },
+            { label: "Eventos favoritos", route: ROUTES.MAIN.EVENTS.FAV, isActive: true },
+          ]}
+        />
+
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           nestedScrollEnabled
@@ -359,9 +384,7 @@ export default function MenuScreen() {
         >
           <FiltersSection
             isDateActive={Boolean(startDate && endDate)}
-            isLocationActive={Boolean(
-              provinceText || municipalityText || localityText
-            )}
+            isLocationActive={Boolean(provinceText || municipalityText || localityText)}
             isGenreActive={selectedGenres.length > 0}
             weekActive={weekActive}
             afterActive={afterActive}
@@ -372,7 +395,11 @@ export default function MenuScreen() {
             searchText={searchText}
             onSearchTextChange={setSearchText}
             dateFilterOpen={dateFilterOpen}
-            onToggleDateFilter={toggleDateFilter}
+            onToggleDateFilter={() => {
+              setDateFilterOpen((v) => !v);
+              setLocationFilterOpen(false);
+              setGenreFilterOpen(false);
+            }}
             startDate={startDate}
             endDate={endDate}
             showStartPicker={showStartPicker}
@@ -386,7 +413,11 @@ export default function MenuScreen() {
               setEndDate(null);
             }}
             locationFilterOpen={locationFilterOpen}
-            onToggleLocationFilter={toggleLocationFilter}
+            onToggleLocationFilter={() => {
+              setLocationFilterOpen((v) => !v);
+              setDateFilterOpen(false);
+              setGenreFilterOpen(false);
+            }}
             provinceText={provinceText}
             onProvinceTextChange={onProvinceTextChange}
             provinceSuggestions={provinceSuggestions}
@@ -401,7 +432,11 @@ export default function MenuScreen() {
             onPickLocality={onPickLocality}
             onClearLocation={onClearLocation}
             genreFilterOpen={genreFilterOpen}
-            onToggleGenreFilter={toggleGenreFilter}
+            onToggleGenreFilter={() => {
+              setGenreFilterOpen((v) => !v);
+              setDateFilterOpen(false);
+              setLocationFilterOpen(false);
+            }}
             selectedGenres={selectedGenres}
             onToggleGenre={onToggleGenre}
             onClearGenres={onClearGenres}
@@ -410,9 +445,7 @@ export default function MenuScreen() {
 
           <View style={styles.containerCards}>
             {filteredEvents.length === 0 ? (
-              <Text style={styles.noEventsText}>
-                No existen eventos con esos filtros.
-              </Text>
+              <Text style={styles.noEventsText}>No existen eventos con esos filtros.</Text>
             ) : (
               filteredEvents.map((ev) => (
                 <CardComponent
@@ -422,19 +455,15 @@ export default function MenuScreen() {
                   date={ev.date}
                   foto={ev.imageUrl}
                   onPress={() => handleCardPress(ev.title, ev.id)}
-                  // Favoritos: pintado inicial según GET y toggle optimista
                   isFavorite={ev.id ? favSet.has(String(ev.id)) : false}
-                  onToggleFavorite={
-                    ev.id
-                      ? () => handleToggleFavorite(String(ev.id))
-                      : undefined
-                  }
+                  onToggleFavorite={ev.id ? () => handleToggleFavorite(String(ev.id)) : undefined}
                   disableFavorite={favBusy === String(ev.id)}
                 />
               ))
             )}
           </View>
         </ScrollView>
+
         <Footer />
       </SafeAreaView>
     </ProtectedRoute>

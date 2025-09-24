@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
+import { ROUTES } from "../../../routes";
+import * as nav from "@/utils/navigation";
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 
 import Header from "@/components/layout/HeaderComponent";
@@ -27,7 +29,7 @@ export default function NewsScreen() {
   const path = usePathname();
   const { user } = useAuth();
 
-  const roles = Array.isArray(user?.roles) ? user.roles : [user?.roles];
+  const roles = Array.isArray(user?.roles) ? (user.roles as any[]) : user?.roles ? [user.roles] : [];
   const isAdmin = roles.includes("admin");
 
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
@@ -52,26 +54,26 @@ export default function NewsScreen() {
   const tabs = [
     {
       label: "Administrar Noticias",
-      route: "/admin/NewsScreens/ManageNewScreen",
+      route: ROUTES.ADMIN.NEWS.MANAGE,
       isActive: currentScreen === "ManageNewsScreen",
       visible: isAdmin,
     },
     {
       label: "Noticias",
-      route: "/main/NewsScreens/NewsScreen",
+      route: ROUTES.MAIN.NEWS.LIST,
       isActive: currentScreen === "NewsScreen",
       visible: true,
     },
     {
       label: "Artistas",
-      route: "/main/ArtistsScreens/ArtistsScreen",
-      isActive: currentScreen === "ArtistsScreen",
+    route: ROUTES.MAIN.ARTISTS.LIST,
+      isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split('/').pop(),
       visible: true,
     },
   ].filter((tab) => tab.visible);
 
   const goToDetail = (item: NewsItem) =>
-    router.push(`/main/NewsScreens/NewScreen?id=${item.idNoticia}`);
+    nav.push(router, { pathname: ROUTES.MAIN.NEWS.ITEM, params: { id: item.idNoticia } });
 
   return (
     <ProtectedRoute allowedRoles={["admin", "owner", "user"]}>

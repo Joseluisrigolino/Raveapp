@@ -2,10 +2,10 @@ import React from "react";
 import { View, StyleSheet, Text } from "react-native";
 import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 
-export default function HeaderComponent() {
+export default function HeaderComponent({ title }: { title?: string }) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>RaveApp</Text>
+      <Text style={styles.title}>{title ?? "RaveApp"}</Text>
     </View>
   );
 }

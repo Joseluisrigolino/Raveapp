@@ -47,6 +47,7 @@ export const FONT_SIZES = {
   body: 14,
   button: 16,
   smallText: 14,
+  caption: 12,
 } as const;
 
 export const RADIUS = {

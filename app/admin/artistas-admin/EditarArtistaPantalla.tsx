@@ -1,6 +1,6 @@
-// src/screens/admin/NewArtistScreen.tsx
+// src/screens/admin/EditArtistScreen.tsx
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -14,18 +14,20 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
+
 import {
-  createArtistOnApi,
-  fetchArtistsFromApi,
+  fetchOneArtistFromApi,
+  updateArtistOnApi,
 } from "@/utils/artists/artistApi";
 import { mediaApi } from "@/utils/mediaApi";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-export default function NewArtistScreen() {
+export default function EditArtistScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
   const [name, setName] = useState("");
@@ -34,6 +36,42 @@ export default function NewArtistScreen() {
   const [spotifyURL, setSpotifyURL] = useState("");
   const [soundcloudURL, setSoundcloudURL] = useState("");
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [idMedia, setIdMedia] = useState<string | null>(null);
+  const [idSocial, setIdSocial] = useState<string | null>(null);
+  const [isActivo, setIsActivo] = useState(true);
+  const [newImageLocalUri, setNewImageLocalUri] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id || id === "undefined") {
+      Alert.alert("Error", "ID inválido recibido.");
+      return;
+    }
+
+    const loadArtist = async () => {
+      try {
+        const a = await fetchOneArtistFromApi(id);
+        setName(a.name);
+        setDescription(a.description || "");
+        setInstagramURL(a.instagramURL || "");
+        setSpotifyURL(a.spotifyURL || "");
+        setSoundcloudURL(a.soundcloudURL || "");
+        setIdSocial(a.idSocial ?? null);
+        setIsActivo(a.isActivo ?? true);
+        setImageUri(a.image || null);
+
+        const media = await mediaApi.getByEntidad(id);
+        if (Array.isArray(media.media) && media.media.length > 0) {
+          setIdMedia(media.media[0].idMedia || null);
+        }
+    } catch (err) {
+      const anyErr = err as any;
+      console.error("❌ Error cargando artista:", anyErr?.response?.data || err);
+        Alert.alert("Error", "No se pudo cargar el artista.");
+      }
+    };
+
+    loadArtist();
+  }, [id]);
 
   const handleSelectImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -41,65 +79,73 @@ export default function NewArtistScreen() {
       quality: 0.8,
     });
 
-    if (!result.canceled && result.assets.length > 0) {
+    if (!result.canceled && result.assets?.length > 0) {
       const asset = result.assets[0];
-      const fileInfo = await FileSystem.getInfoAsync(asset.uri);
+      const fileInfo: any = await FileSystem.getInfoAsync(asset.uri);
 
-      if (fileInfo.size && fileInfo.size > 2 * 1024 * 1024) {
+      if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
         Alert.alert("Error", "La imagen supera los 2MB permitidos.");
         return;
       }
 
-      setImageUri(asset.uri);
+      setNewImageLocalUri(asset.uri);
+      setImageUri(asset.uri); // actualiza vista previa
     }
   };
 
-  const handleDeleteImage = () => {
-    setImageUri(null);
+  const handleDeleteImage = async () => {
+    if (!idMedia) {
+      return Alert.alert("Error", "No se encontró imagen para eliminar.");
+    }
+    try {
+      await mediaApi.delete(idMedia);
+      setImageUri(null);
+      setIdMedia(null);
+      Alert.alert("Imagen eliminada correctamente.");
+    } catch (error) {
+      console.error("Error al eliminar imagen:", error);
+      Alert.alert("Error", "No se pudo eliminar la imagen.");
+    }
   };
 
-  const handleCreateArtist = async () => {
-    if (!name.trim()) {
+  const handleUpdateArtist = async () => {
+    if (!id || id === "undefined" || !name.trim()) {
       return Alert.alert("Error", "El nombre del artista es obligatorio.");
     }
 
     try {
-      await createArtistOnApi({
+      if (newImageLocalUri) {
+        const fileName = newImageLocalUri.split("/").pop() ?? "foto.jpg";
+        const file: any = {
+          uri: newImageLocalUri,
+          name: fileName,
+          type: "image/jpeg",
+        };
+
+        await mediaApi.upload(id, file); // sube la imagen nueva
+        setNewImageLocalUri(null); // limpia estado
+      }
+
+      await updateArtistOnApi({
+        idArtista: id,
         name,
         description,
         instagramURL,
         spotifyURL,
         soundcloudURL,
+        idSocial,
+        isActivo,
       });
 
-      // Obtener el último artista creado (por nombre)
-      const artistas = await fetchArtistsFromApi();
-      const creado = artistas.find((a) => a.name === name);
-      if (!creado) throw new Error("No se pudo identificar el artista creado.");
-
-      // Subir imagen si existe
-      if (imageUri) {
-        const fileName = imageUri.split("/").pop() ?? "image.jpg";
-        const fileType = fileName.endsWith(".png") ? "image/png" : "image/jpeg";
-
-        const file: any = {
-          uri: imageUri,
-          name: fileName,
-          type: fileType,
-        };
-
-        await mediaApi.upload(creado.idArtista, file);
-      }
-
-      Alert.alert("Éxito", "Artista creado correctamente.");
+      Alert.alert("Éxito", "Artista actualizado correctamente.");
       router.back();
     } catch (err: any) {
-      console.error("Error al crear artista:", err);
+      console.error("Error al actualizar artista:", err?.response?.data || err);
       const msg =
         typeof err?.response?.data === "string"
           ? err.response.data
           : JSON.stringify(err?.response?.data || err, null, 2);
-      Alert.alert("Error al crear artista", msg);
+      Alert.alert("Error al actualizar", msg);
     }
   };
 
@@ -107,7 +153,7 @@ export default function NewArtistScreen() {
     <SafeAreaView style={styles.container}>
       <Header />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Ingresar nuevo artista</Text>
+        <Text style={styles.title}>Modificar artista</Text>
 
         <Text style={styles.label}>Nombre del artista:</Text>
         <TextInput
@@ -121,25 +167,22 @@ export default function NewArtistScreen() {
         <View style={styles.imageContainer}>
           {imageUri ? (
             <>
-              <Image source={{ uri: imageUri }} style={styles.artistImage} />
+              <Image
+                source={{ uri: imageUri }}
+                style={styles.artistImage}
+                onError={() => setImageUri(null)}
+              />
               <TouchableOpacity
                 style={styles.deleteButton}
                 onPress={handleDeleteImage}
               >
-                <Text style={styles.deleteButtonText}>Eliminar imagen</Text>
+                <Text style={styles.deleteButtonText}>
+                  Eliminar imagen actual
+                </Text>
               </TouchableOpacity>
             </>
           ) : (
-            <View
-              style={[
-                styles.artistImage,
-                {
-                  backgroundColor: COLORS.borderInput,
-                  justifyContent: "center",
-                  alignItems: "center",
-                },
-              ]}
-            >
+            <View style={[styles.artistImage, styles.imageFallback]}>
               <Text style={styles.imagePlaceholderText}>Sin imagen</Text>
             </View>
           )}
@@ -189,8 +232,8 @@ export default function NewArtistScreen() {
           onChangeText={setSpotifyURL}
         />
 
-        <TouchableOpacity style={styles.btn} onPress={handleCreateArtist}>
-          <Text style={styles.btnText}>Crear Artista</Text>
+        <TouchableOpacity style={styles.btn} onPress={handleUpdateArtist}>
+          <Text style={styles.btnText}>Confirmar</Text>
         </TouchableOpacity>
       </ScrollView>
       <Footer />
@@ -244,6 +287,16 @@ const styles = StyleSheet.create({
     borderRadius: 70,
     marginBottom: 12,
   },
+  imageFallback: {
+    backgroundColor: COLORS.borderInput,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imagePlaceholderText: {
+    fontFamily: FONTS.bodyRegular,
+    color: COLORS.textSecondary,
+    fontSize: 14,
+  },
   deleteButton: {
     backgroundColor: COLORS.negative,
     paddingVertical: 8,
@@ -264,11 +317,6 @@ const styles = StyleSheet.create({
   selectImageButtonText: {
     color: COLORS.cardBg,
     fontFamily: FONTS.subTitleMedium,
-  },
-  imagePlaceholderText: {
-    fontFamily: FONTS.bodyRegular,
-    color: COLORS.textSecondary,
-    fontSize: 14,
   },
   imageNotice: {
     marginTop: 8,

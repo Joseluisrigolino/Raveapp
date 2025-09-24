@@ -10,6 +10,8 @@ import {
   StyleSheet,
 } from "react-native";
 import { useRouter, usePathname } from "expo-router";
+import { ROUTES } from "../../../routes";
+import * as nav from "@/utils/navigation";
 
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
@@ -23,12 +25,12 @@ import { fetchArtistsFromApi } from "@/utils/artists/artistApi";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-export default function ArtistsScreen() {
+export default function ArtistasPantalla() {
   const router = useRouter();
   const path = usePathname();
   const { user } = useAuth();
 
-  const roles = Array.isArray(user?.roles) ? user.roles : [user?.roles];
+  const roles = Array.isArray(user?.roles) ? (user.roles as any[]) : user?.roles ? [user.roles] : [];
   const isAdmin = roles.includes("admin");
 
   const [searchText, setSearchText] = useState<string>("");
@@ -58,11 +60,7 @@ export default function ArtistsScreen() {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
   const handlePress = (artist: Artist) => {
-    router.push(
-      `/main/ArtistsScreens/ArtistScreen?id=${encodeURIComponent(
-        artist.idArtista
-      )}`
-    );
+    nav.push(router, { pathname: ROUTES.MAIN.ARTISTS.ITEM, params: { id: artist.idArtista } });
   };
 
   const currentScreen = path.split("/").pop() || "";
@@ -71,20 +69,20 @@ export default function ArtistsScreen() {
       ? [
           {
             label: "Adm Artistas",
-            route: "/admin/ArtistScreens/ManageArtistsScreen",
-            isActive: currentScreen === "ManageArtistsScreen",
+            route: ROUTES.ADMIN.ARTISTS.MANAGE,
+            isActive: currentScreen === ROUTES.ADMIN.ARTISTS.MANAGE.split("/").pop(),
           },
         ]
       : []),
     {
       label: "Artistas",
-      route: "/main/ArtistsScreens/ArtistsScreen",
-      isActive: currentScreen === "ArtistsScreen",
+      route: ROUTES.MAIN.ARTISTS.LIST,
+      isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split("/").pop(),
     },
     {
       label: "Noticias",
-      route: "/main/NewsScreens/NewsScreen",
-      isActive: currentScreen === "NewsScreen",
+      route: ROUTES.MAIN.NEWS.LIST,
+      isActive: currentScreen === ROUTES.MAIN.NEWS.LIST.split("/").pop(),
     },
   ];
 

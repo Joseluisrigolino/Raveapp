@@ -15,6 +15,8 @@ import {
 } from "react-native";
 import { IconButton } from "react-native-paper";
 import { useRouter, usePathname } from "expo-router";
+import * as nav from "@/utils/navigation";
+import { ROUTES } from "../../../routes";
 import { useFocusEffect } from "@react-navigation/native";
 
 import Header from "@/components/layout/HeaderComponent";
@@ -33,7 +35,11 @@ export default function ManageArtistsScreen() {
   const router = useRouter();
   const path = usePathname();
   const { user } = useAuth();
-  const roles = Array.isArray(user?.roles) ? user.roles : [user?.roles];
+  const roles = Array.isArray(user?.roles)
+    ? (user.roles as any[])
+    : user?.roles
+    ? [user.roles]
+    : [];
   const isAdmin = roles.includes("admin");
 
   const [artists, setArtists] = useState<Artist[]>([]);
@@ -73,10 +79,7 @@ export default function ManageArtistsScreen() {
   };
 
   const handleEdit = (idArtista: string) => {
-    router.push({
-      pathname: "/admin/ArtistScreens/EditArtistScreen",
-      params: { id: idArtista },
-    });
+    nav.push(router, { pathname: ROUTES.ADMIN.ARTISTS.EDIT, params: { id: idArtista } });
   };
 
   const handleDelete = (idArtista: string) => {
@@ -114,7 +117,7 @@ export default function ManageArtistsScreen() {
   };
 
   const handleCreateArtist = () => {
-    router.push("/admin/ArtistScreens/NewArtistScreen");
+    nav.push(router, { pathname: ROUTES.ADMIN.ARTISTS.NEW });
   };
 
   const filtered = artists.filter((a) =>
@@ -126,15 +129,15 @@ export default function ManageArtistsScreen() {
       ? [
           {
             label: "Adm Artistas",
-            route: "/admin/ArtistScreens/ManageArtistsScreen",
-            isActive: path === "/admin/ArtistScreens/ManageArtistsScreen",
+            route: ROUTES.ADMIN.ARTISTS.MANAGE,
+            isActive: path === ROUTES.ADMIN.ARTISTS.MANAGE,
           },
         ]
       : []),
     {
       label: "Artistas",
-      route: "/main/ArtistsScreens/ArtistsScreen",
-      isActive: path === "/main/ArtistsScreens/ArtistsScreen",
+      route: ROUTES.MAIN.ARTISTS.LIST,
+      isActive: path === ROUTES.MAIN.ARTISTS.LIST,
     },
   ];
 
@@ -298,7 +301,7 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     marginLeft: 8,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.card,
   },
   buttonsRow: {
     flexDirection: "row",

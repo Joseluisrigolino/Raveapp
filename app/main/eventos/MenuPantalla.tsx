@@ -1,5 +1,6 @@
-// app/main/EventsScreens/FavEventScreen.tsx
-import React, { useEffect, useMemo, useState } from "react";
+// app/main/MenuScreen.tsx
+
+import React, { useState, useEffect, useMemo } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -10,21 +11,19 @@ import {
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { ROUTES } from "../../../routes";
+import * as nav from "@/utils/navigation";
 
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import TabMenuComponent from "@/components/layout/TabMenuComponent";
+// Ajustá la ruta según dónde tengas el componente:
 import CardComponent from "@/components/events/CardComponent";
 import FiltersSection from "@/components/filters/FiltersSection";
 
-import { useAuth } from "@/context/AuthContext";
+import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
+import { EventItem } from "@/interfaces/EventItem";
 import { fetchEvents } from "@/utils/events/eventApi";
-import {
-  getEventosFavoritos,
-  putEventoFavorito,
-} from "@/utils/auth/userHelpers";
-
 import {
   fetchProvinces,
   fetchMunicipalities,
@@ -32,10 +31,13 @@ import {
   fetchLocalitiesByName,
 } from "@/utils/georef/georefHelpers";
 
-import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
-import { EventItem } from "@/interfaces/EventItem";
+import { useAuth } from "@/context/AuthContext";
+import {
+  putEventoFavorito,
+  getEventosFavoritos,
+} from "@/utils/auth/userHelpers";
 
-// Rango de semana (igual que en MenuScreen)
+// Helper para rango de semana
 function getWeekRange() {
   const today = new Date();
   const dayOfWeek = today.getDay(); // Domingo = 0
@@ -46,26 +48,24 @@ function getWeekRange() {
   return { startOfWeek, endOfWeek };
 }
 
-export default function FavEventScreen() {
+export default function MenuScreen() {
   const router = useRouter();
   const { user } = useAuth();
 
-  // Normalizo ID de usuario
+  // Normalizo ID de usuario (puede venir como id o idUsuario)
   const userId: string | null =
     (user as any)?.idUsuario ?? (user as any)?.id ?? null;
 
-  // Estado base
+  // Eventos y carga
+  const [allEvents, setAllEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Sólo eventos favoritos del usuario
-  const [favEvents, setFavEvents] = useState<EventItem[]>([]);
-
-  // Corazones
+  // Favoritos en memoria (ids) + busy por item
   const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [favBusy, setFavBusy] = useState<string | null>(null);
 
-  // Carga: trae IDs de favoritos del user + todos los eventos, y filtra
+  // Trae eventos + (si hay user) favoritos, en paralelo
   useEffect(() => {
     let mounted = true;
 
@@ -74,19 +74,14 @@ export default function FavEventScreen() {
         setLoading(true);
         setError(null);
 
-        if (!userId) {
-          setFavEvents([]);
-          setFavSet(new Set());
-          return;
-        }
+        const eventsPromise = fetchEvents();
+        const favsPromise = userId
+          ? getEventosFavoritos(String(userId))
+          : Promise.resolve<string[]>([]);
 
-        const [all, favIds] = await Promise.all([
-          fetchEvents(),
-          getEventosFavoritos(String(userId)),
-        ]);
+        const [evts, favIds] = await Promise.all([eventsPromise, favsPromise]);
 
-        // Ordenar como en MenuScreen
-        const sortedAll = all
+        const sorted = evts
           .map((e) => ({
             ...e,
             _ts: (() => {
@@ -97,16 +92,13 @@ export default function FavEventScreen() {
           .sort((a, b) => a._ts - b._ts)
           .map(({ _ts, ...rest }) => rest);
 
-        // Filtrar sólo favoritos
-        const favIdSet = new Set(favIds.map(String));
-        const onlyFavs = sortedAll.filter((e) => e.id && favIdSet.has(String(e.id)));
-
         if (!mounted) return;
-        setFavEvents(onlyFavs);
-        setFavSet(favIdSet);
+
+        setAllEvents(sorted);
+        setFavSet(new Set(favIds.map(String))); // hidrata corazones
       } catch (err) {
-        console.error("[FavEventScreen] Error cargando favoritos:", err);
-        if (mounted) setError("Error al cargar tus eventos favoritos.");
+        console.error("[MenuScreen] Error cargando eventos/favoritos:", err);
+        if (mounted) setError("Error al cargar los eventos.");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -115,16 +107,16 @@ export default function FavEventScreen() {
     return () => {
       mounted = false;
     };
+    // Reintenta si cambia el usuario logueado
   }, [userId]);
 
-  // --- filtros (idénticos a MenuScreen) ---
+  // --- estados y handlers de filtros (idénticos a antes) ---
   const [searchText, setSearchText] = useState("");
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-
   const [locationFilterOpen, setLocationFilterOpen] = useState(false);
   const [provinceText, setProvinceText] = useState("");
   const [provinceSuggestions, setProvinceSuggestions] = useState<
@@ -138,14 +130,12 @@ export default function FavEventScreen() {
   const [localitySuggestions, setLocalitySuggestions] = useState<
     { id: string; nombre: string }[]
   >([]);
-
   const [weekActive, setWeekActive] = useState(false);
   const [afterActive, setAfterActive] = useState(false);
   const [lgbtActive, setLgbtActive] = useState(false);
   const [genreFilterOpen, setGenreFilterOpen] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
 
-  // Helpers ubicación (igual que en MenuScreen)
   async function onProvinceTextChange(v: string) {
     setProvinceText(v);
     if (v.trim().length < 3) return setProvinceSuggestions([]);
@@ -218,10 +208,9 @@ export default function FavEventScreen() {
     setSelectedGenres([]);
   }
 
-  // Filtrado final (igual que en MenuScreen pero sobre favEvents)
+  // Filtrado de eventos
   const filteredEvents = useMemo(() => {
-    let results = [...favEvents];
-
+    let results = [...allEvents];
     if (searchText.trim()) {
       const lower = searchText.toLowerCase();
       results = results.filter((ev) => ev.title.toLowerCase().includes(lower));
@@ -235,17 +224,17 @@ export default function FavEventScreen() {
     }
     if (provinceText) {
       results = results.filter((ev) =>
-        ev.address?.toLowerCase().includes(provinceText.toLowerCase())
+        ev.address.toLowerCase().includes(provinceText.toLowerCase())
       );
     }
     if (municipalityText) {
       results = results.filter((ev) =>
-        ev.address?.toLowerCase().includes(municipalityText.toLowerCase())
+        ev.address.toLowerCase().includes(municipalityText.toLowerCase())
       );
     }
     if (localityText) {
       results = results.filter((ev) =>
-        ev.address?.toLowerCase().includes(localityText.toLowerCase())
+        ev.address.toLowerCase().includes(localityText.toLowerCase())
       );
     }
     if (weekActive) {
@@ -265,7 +254,7 @@ export default function FavEventScreen() {
     }
     return results;
   }, [
-    favEvents,
+    allEvents,
     searchText,
     startDate,
     endDate,
@@ -278,34 +267,41 @@ export default function FavEventScreen() {
     selectedGenres,
   ]);
 
-  // Navegación card
-  function handleCardPress(_title: string, id?: string) {
-    if (id) router.push(`/main/EventsScreens/EventScreen?id=${id}`);
-  }
+  // UI handlers
+  const toggleDateFilter = () => {
+    setDateFilterOpen((v) => !v);
+    setLocationFilterOpen(false);
+    setGenreFilterOpen(false);
+  };
+  const toggleLocationFilter = () => {
+    setLocationFilterOpen((v) => !v);
+    setDateFilterOpen(false);
+    setGenreFilterOpen(false);
+  };
+  const toggleGenreFilter = () => {
+    setGenreFilterOpen((v) => !v);
+    setDateFilterOpen(false);
+    setLocationFilterOpen(false);
+  };
 
-  // Toggle favorito (optimista). En esta pantalla, si se desmarca, se remueve del listado.
+  const handleCardPress = (_: string, id?: string) => {
+    if (id) nav.push(router, { pathname: ROUTES.MAIN.EVENTS.EVENT, params: { id } });
+  };
+
+  // Toggle favorito (optimista)
   const handleToggleFavorite = async (eventId: string) => {
     if (!userId) {
-      Alert.alert("Iniciá sesión", "Necesitás estar logueado para gestionar favoritos.");
+      Alert.alert(
+        "Iniciá sesión",
+        "Necesitás estar logueado para marcar favoritos."
+      );
       return;
     }
     const wasFav = favSet.has(eventId);
-
-    // Estados previos para revertir en caso de error
-    const prevFavSet = new Set(favSet);
-    const prevFavEvents = [...favEvents];
-
-    // Optimista: si estaba marcado, lo saco del set y de la lista
-    const nextFavSet = new Set(favSet);
-    if (wasFav) {
-      nextFavSet.delete(eventId);
-      setFavEvents((current) => current.filter((e) => String(e.id) !== String(eventId)));
-    } else {
-      // En esta pantalla rara vez vas a "agregar", pero contemplado por consistencia
-      nextFavSet.add(eventId);
-      // (Si quisieras agregar de nuevo, deberíamos traer los datos del evento; omitido a propósito)
-    }
-    setFavSet(nextFavSet);
+    const next = new Set(favSet);
+    if (wasFav) next.delete(eventId);
+    else next.add(eventId);
+    setFavSet(next);
     setFavBusy(eventId);
 
     try {
@@ -314,10 +310,15 @@ export default function FavEventScreen() {
         idEvento: String(eventId),
       });
     } catch (e) {
-      // Revertimos
-      setFavSet(prevFavSet);
-      setFavEvents(prevFavEvents);
-      Alert.alert("Error", "No se pudo actualizar el favorito. Probá de nuevo.");
+      // revertimos si falla
+      const revert = new Set(next);
+      if (wasFav) revert.add(eventId);
+      else revert.delete(eventId);
+      setFavSet(revert);
+      Alert.alert(
+        "Error",
+        "No se pudo actualizar el favorito. Probá de nuevo."
+      );
     } finally {
       setFavBusy(null);
     }
@@ -325,41 +326,27 @@ export default function FavEventScreen() {
 
   if (loading) {
     return (
-      <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
-        <SafeAreaView style={styles.mainContainer}>
-          <Header />
-          <TabMenuComponent
-            tabs={[
-              { label: "Mis tickets", route: "/main/TicketsScreens/TicketPurchasedMenu", isActive: false },
-              { label: "Eventos favoritos", route: "/main/EventsScreens/FavEventScreen", isActive: true },
-            ]}
-          />
-          <View style={{ flex: 1, justifyContent: "center" }}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-          </View>
-          <Footer />
-        </SafeAreaView>
-      </ProtectedRoute>
+      <SafeAreaView style={styles.mainContainer}>
+        <Header />
+        <View style={{ flex: 1, justifyContent: "center" }}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+        <Footer />
+      </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
-        <SafeAreaView style={styles.mainContainer}>
-          <Header />
-          <TabMenuComponent
-            tabs={[
-              { label: "Mis tickets", route: "/main/TicketsScreens/TicketPurchasedMenu", isActive: false },
-              { label: "Eventos favoritos", route: "/main/EventsScreens/FavEventScreen", isActive: true },
-            ]}
-          />
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-            <Text style={{ color: COLORS.negative }}>{error}</Text>
-          </View>
-          <Footer />
-        </SafeAreaView>
-      </ProtectedRoute>
+      <SafeAreaView style={styles.mainContainer}>
+        <Header />
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
+          <Text style={{ color: COLORS.negative }}>{error}</Text>
+        </View>
+        <Footer />
+      </SafeAreaView>
     );
   }
 
@@ -367,14 +354,6 @@ export default function FavEventScreen() {
     <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
       <SafeAreaView style={styles.mainContainer}>
         <Header />
-
-        <TabMenuComponent
-          tabs={[
-            { label: "Mis tickets", route: "/main/TicketsScreens/TicketPurchasedMenu", isActive: false },
-            { label: "Eventos favoritos", route: "/main/EventsScreens/FavEventScreen", isActive: true },
-          ]}
-        />
-
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           nestedScrollEnabled
@@ -382,7 +361,9 @@ export default function FavEventScreen() {
         >
           <FiltersSection
             isDateActive={Boolean(startDate && endDate)}
-            isLocationActive={Boolean(provinceText || municipalityText || localityText)}
+            isLocationActive={Boolean(
+              provinceText || municipalityText || localityText
+            )}
             isGenreActive={selectedGenres.length > 0}
             weekActive={weekActive}
             afterActive={afterActive}
@@ -393,11 +374,7 @@ export default function FavEventScreen() {
             searchText={searchText}
             onSearchTextChange={setSearchText}
             dateFilterOpen={dateFilterOpen}
-            onToggleDateFilter={() => {
-              setDateFilterOpen((v) => !v);
-              setLocationFilterOpen(false);
-              setGenreFilterOpen(false);
-            }}
+            onToggleDateFilter={toggleDateFilter}
             startDate={startDate}
             endDate={endDate}
             showStartPicker={showStartPicker}
@@ -411,11 +388,7 @@ export default function FavEventScreen() {
               setEndDate(null);
             }}
             locationFilterOpen={locationFilterOpen}
-            onToggleLocationFilter={() => {
-              setLocationFilterOpen((v) => !v);
-              setDateFilterOpen(false);
-              setGenreFilterOpen(false);
-            }}
+            onToggleLocationFilter={toggleLocationFilter}
             provinceText={provinceText}
             onProvinceTextChange={onProvinceTextChange}
             provinceSuggestions={provinceSuggestions}
@@ -430,11 +403,7 @@ export default function FavEventScreen() {
             onPickLocality={onPickLocality}
             onClearLocation={onClearLocation}
             genreFilterOpen={genreFilterOpen}
-            onToggleGenreFilter={() => {
-              setGenreFilterOpen((v) => !v);
-              setDateFilterOpen(false);
-              setLocationFilterOpen(false);
-            }}
+            onToggleGenreFilter={toggleGenreFilter}
             selectedGenres={selectedGenres}
             onToggleGenre={onToggleGenre}
             onClearGenres={onClearGenres}
@@ -443,7 +412,9 @@ export default function FavEventScreen() {
 
           <View style={styles.containerCards}>
             {filteredEvents.length === 0 ? (
-              <Text style={styles.noEventsText}>No existen eventos con esos filtros.</Text>
+              <Text style={styles.noEventsText}>
+                No existen eventos con esos filtros.
+              </Text>
             ) : (
               filteredEvents.map((ev) => (
                 <CardComponent
@@ -453,15 +424,19 @@ export default function FavEventScreen() {
                   date={ev.date}
                   foto={ev.imageUrl}
                   onPress={() => handleCardPress(ev.title, ev.id)}
+                  // Favoritos: pintado inicial según GET y toggle optimista
                   isFavorite={ev.id ? favSet.has(String(ev.id)) : false}
-                  onToggleFavorite={ev.id ? () => handleToggleFavorite(String(ev.id)) : undefined}
+                  onToggleFavorite={
+                    ev.id
+                      ? () => handleToggleFavorite(String(ev.id))
+                      : undefined
+                  }
                   disableFavorite={favBusy === String(ev.id)}
                 />
               ))
             )}
           </View>
         </ScrollView>
-
         <Footer />
       </SafeAreaView>
     </ProtectedRoute>

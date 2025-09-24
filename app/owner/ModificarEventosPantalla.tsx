@@ -405,6 +405,15 @@ export default function ModifyEventScreen() {
               idArtista: a?.idArtista,
               name: a?.nombre ?? a?.name ?? "",
               image: a?.imagen ?? a?.image ?? "",
+              description: a?.bio ?? a?.description ?? "",
+              creationDate: a?.dtAlta ?? a?.creationDate ?? "",
+              isActivo: a?.isActivo === undefined ? true : Boolean(a.isActivo),
+              instagramURL: a?.socials?.mdInstagram ?? a?.instagramURL ?? "",
+              spotifyURL: a?.socials?.mdSpotify ?? a?.spotifyURL ?? "",
+              soundcloudURL: a?.socials?.mdSoundcloud ?? a?.soundcloudURL ?? "",
+              likes: a?.likes ?? 0,
+              likedByIds: a?.likedByIds ?? [],
+              likedByImages: a?.likedByImages ?? [],
             }))
           : [];
         setSelectedArtists(artistasFromApi);
@@ -1668,4 +1677,26 @@ const styles = StyleSheet.create({
       default: "System",
     }),
   },
+  /* small utility styles reused from GenreSelector */
+  genreGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 2,
+  },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.cardBg,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  chipOn: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  chipText: { color: COLORS.primary, fontWeight: "600" },
+  chipTextOn: { color: COLORS.cardBg, fontWeight: "700" },
 });

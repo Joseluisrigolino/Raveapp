@@ -17,6 +17,8 @@ import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import { useRouter } from "expo-router";
+import * as nav from "@/utils/navigation";
+import { ROUTES } from "../../../routes";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
@@ -243,8 +245,8 @@ export default function UserProfileEditScreen() {
       if (result.canceled || !result.assets?.length) return;
 
       const asset = result.assets[0];
-      const fileInfo = await FileSystem.getInfoAsync(asset.uri);
-      if (fileInfo.size && fileInfo.size > 2 * 1024 * 1024) {
+      const fileInfo: any = await FileSystem.getInfoAsync(asset.uri);
+      if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
         return Alert.alert("Imagen muy pesada", "Máximo permitido: 2MB.");
       }
       setPreviousProfileImage(profileImage);
@@ -369,7 +371,7 @@ export default function UserProfileEditScreen() {
       },
     };
     try {
-      await updateUsuario(payload);
+  await updateUsuario(payload as any);
       Alert.alert("Éxito", "Perfil actualizado.");
       setEditMode(
         Object.fromEntries(Object.keys(editMode).map((k) => [k, false]))
@@ -403,8 +405,8 @@ export default function UserProfileEditScreen() {
 
       await apiClient.delete(`/v1/Usuario/DeleteUsuario/${apiUser.idUsuario}`);
       setShowDeleteModal(false);
-      logout();
-      router.replace("/auth/LoginScreen");
+  logout();
+  nav.replace(router, ROUTES.LOGIN.LOGIN);
     } catch (e: any) {
       Alert.alert(
         "Error",

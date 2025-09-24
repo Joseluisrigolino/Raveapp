@@ -10,6 +10,8 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { ROUTES } from "../../routes";
+import * as nav from "@/utils/navigation";
 import { useFocusEffect } from "@react-navigation/native";
 
 import Header from "@/components/layout/HeaderComponent";
@@ -206,17 +208,17 @@ export default function ManageEventsScreen() {
   /** Navegaciones */
   const handleTicketsSold = (eventId: string | number) => {
     const id = String(eventId);
-    router.push({ pathname: "/owner/TicketSoldScreen", params: { id } });
+    nav.push(router, { pathname: ROUTES.OWNER.TICKET_SOLD, params: { id } });
   };
 
   const handleModify = (eventId: string | number) => {
     const id = String(eventId);
-    router.push({ pathname: "/owner/ModifyEventScreen", params: { id } });
+    nav.push(router, { pathname: ROUTES.OWNER.MODIFY_EVENT, params: { id } });
   };
 
   const handleCancel = (eventId: string | number) => {
     const id = String(eventId);
-    router.push({ pathname: "/owner/CancelEventScreen", params: { id } });
+    nav.push(router, { pathname: ROUTES.OWNER.CANCEL_EVENT, params: { id } });
   };
 
   return (

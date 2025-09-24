@@ -7,40 +7,49 @@ import { getAllEvents, getEventById } from "@/utils/events/eventHelpers";
 
 const mockNews: NewsItem[] = [
   {
+    idNoticia: "1",
     id: 1,
-    title: "New Release 1",
-    imageUrl: "https://picsum.photos/700/400?random=1",
-    description: `Llegó el viernes y se viene finde largo...
+    titulo: "New Release 1",
+    imagen: "https://picsum.photos/700/400?random=1",
+    contenido: `Llegó el viernes y se viene finde largo...
 https://open.spotify.com/playlist/3PanXbcy6jmHBtJh2dvFIB
 Visita nuestro sitio: https://example.com`,
-    eventId: 2, // <--- noticia vinculada al evento con id=2 (Techno Day)
+    dtPublicado: new Date().toISOString(),
+    urlEvento: "https://raveapp.com.ar/evento/2",
   },
   {
+    idNoticia: "2",
     id: 2,
-    title: "New Release 2",
-    imageUrl: "https://picsum.photos/700/400?random=2",
-    description: `Otra noticia con un link: https://expo.dev`,
-    // sin eventId => no hay evento relacionado
+    titulo: "New Release 2",
+    imagen: "https://picsum.photos/700/400?random=2",
+    contenido: `Otra noticia con un link: https://expo.dev`,
+    dtPublicado: new Date().toISOString(),
   },
   {
+    idNoticia: "3",
     id: 3,
-    title: "New Release 3",
-    imageUrl: "https://picsum.photos/700/400?random=3",
-    description: `Descubre más en https://reactnative.dev`,
-    eventId: 7, // <--- noticia vinculada al evento con id=7 (Ultra Festival)
+    titulo: "New Release 3",
+    imagen: "https://picsum.photos/700/400?random=3",
+    contenido: `Descubre más en https://reactnative.dev`,
+    dtPublicado: new Date().toISOString(),
+    urlEvento: "https://raveapp.com.ar/evento/7",
   },
   {
+    idNoticia: "4",
     id: 4,
-    title: "New Release 4 (sin evento)",
-    imageUrl: "https://picsum.photos/700/400?random=4",
-    description: `Esta noticia no tiene evento linkeado.`,
+    titulo: "New Release 4 (sin evento)",
+    imagen: "https://picsum.photos/700/400?random=4",
+    contenido: `Esta noticia no tiene evento linkeado.`,
+    dtPublicado: new Date().toISOString(),
   },
   {
+    idNoticia: "5",
     id: 5,
-    title: "New Release 5",
-    imageUrl: "https://picsum.photos/700/400?random=5",
-    description: `Check this link: https://docs.expo.dev`,
-    eventId: 11, // <--- noticia vinculada al evento con id=11 (After LGBT Semanal)
+    titulo: "New Release 5",
+    imagen: "https://picsum.photos/700/400?random=5",
+    contenido: `Check this link: https://docs.expo.dev`,
+    dtPublicado: new Date().toISOString(),
+    urlEvento: "https://raveapp.com.ar/evento/11",
   },
 ];
 
@@ -51,6 +60,6 @@ export function getAllNews(): NewsItem[] {
 
 /** Devuelve la noticia con ese ID o null si no existe. */
 export function getNewsById(id: number): NewsItem | null {
-  const found = mockNews.find((news) => news.id === id);
+  const found = mockNews.find((news) => news.id === id || Number(news.idNoticia) === id);
   return found ?? null;
 }

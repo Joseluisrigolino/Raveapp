@@ -8,6 +8,8 @@ import {
   StyleSheet,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { ROUTES } from "../../../routes";
+import * as nav from "@/utils/navigation";
 
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
@@ -54,9 +56,9 @@ function TicketsPurchasedMenuContent() {
 
   const handlePress = (item: TicketPurchasedMenuItem) => {
     const route = item.isFinished
-      ? `/main/TicketsScreens/TicketFinalizedScreen?id=${item.id}`
-      : `/main/TicketsScreens/TicketPurchasedScreen?id=${item.id}`;
-    router.push(route);
+      ? { pathname: ROUTES.MAIN.TICKETS.FINALIZED, params: { id: item.id } }
+      : { pathname: ROUTES.MAIN.TICKETS.PURCHASED, params: { id: item.id } };
+    nav.push(router, route);
   };
 
   return (
@@ -67,12 +69,12 @@ function TicketsPurchasedMenuContent() {
         tabs={[
           {
             label: "Mis tickets",
-            route: "/main/TicketsScreens/TicketPurchasedMenu",
+            route: ROUTES.MAIN.TICKETS.MENU,
             isActive: true,
           },
           {
             label: "Eventos favoritos",
-            route: "/main/EventsScreens/FavEventScreen",
+            route: ROUTES.MAIN.EVENTS.FAV,
             isActive: false,
           },
         ]}

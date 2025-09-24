@@ -142,12 +142,15 @@ export async function fetchOneArtistFromApi(
 
     return artist;
   } catch (err: any) {
-    console.error(
-      "❌ fetchOneArtistFromApi ERROR:",
-      err?.response?.data || err
-    );
+    const anyErr = err as any;
+    console.error("❌ fetchOneArtistFromApi ERROR:", anyErr?.response?.data || err);
     throw err;
   }
+}
+
+// Helper compatible with older callsites: createArtist(name, isActivoNum)
+export async function createArtist(name: string, isActivo: 0 | 1 = 1): Promise<void> {
+  return createArtistOnApi({ name, isActivo: isActivo === 1 });
 }
 
 export async function fetchArtistsFromApi(): Promise<Artist[]> {

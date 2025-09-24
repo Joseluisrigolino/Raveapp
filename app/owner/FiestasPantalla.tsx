@@ -12,6 +12,9 @@ import {
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { ROUTES } from "../../routes";
+
+import * as nav from "@/utils/navigation";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
@@ -50,7 +53,6 @@ export default function PartysScreen() {
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
 
-  // ---- Editar
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
@@ -167,8 +169,8 @@ export default function PartysScreen() {
         <Header />
         <TabMenuComponent
           tabs={[
-            { label: "Crear evento", route: "/main/EventsScreens/CreateEventScreen", isActive: false },
-            { label: "Fiestas recurrentes", route: "/owner/PartysScreen", isActive: true },
+            { label: "Crear evento", route: ROUTES.MAIN.EVENTS.CREATE, isActive: false },
+            { label: "Fiestas recurrentes", route: ROUTES.OWNER.PARTYS, isActive: true },
           ]}
         />
         <View style={{ flex: 1, justifyContent: "center" }}>
@@ -186,8 +188,8 @@ export default function PartysScreen() {
       {/* SubHeader para volver a Crear evento */}
       <TabMenuComponent
         tabs={[
-          { label: "Crear evento", route: "/main/EventsScreens/CreateEventScreen", isActive: false },
-          { label: "Fiestas recurrentes", route: "/owner/PartysScreen", isActive: true },
+          { label: "Crear evento", route: ROUTES.MAIN.EVENTS.CREATE, isActive: false },
+          { label: "Fiestas recurrentes", route: ROUTES.OWNER.PARTYS, isActive: true },
         ]}
       />
 
@@ -299,11 +301,7 @@ export default function PartysScreen() {
                   <View style={{ flex: 1 }}>
                     <TouchableOpacity
                       onPress={() =>
-                        router.push(
-                          `/owner/PartyRatingsScreen?id=${encodeURIComponent(
-                            it.idFiesta
-                          )}`
-                        )
+                        nav.push(router, { pathname: ROUTES.OWNER.PARTY_RATINGS, params: { id: encodeURIComponent(it.idFiesta) } } as any)
                       }
                     >
                       <Text style={styles.link}>Ver calificaciones</Text>
@@ -343,7 +341,7 @@ export default function PartysScreen() {
                   {/* Eliminar */}
                   <View style={{ width: 100, alignItems: "flex-end" }}>
                     <TouchableOpacity
-                      style={[styles.smallBtn, { backgroundColor: "#ef4444" }]}
+                      style={[styles.smallBtn, styles.smallBtnGray]}
                       onPress={() => handleDelete(it.idFiesta, nombre)}
                     >
                       <Text style={styles.smallBtnText}>Eliminar</Text>

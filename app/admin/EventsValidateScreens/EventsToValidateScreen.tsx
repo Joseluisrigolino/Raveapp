@@ -13,6 +13,8 @@ import {
   StyleSheet,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { ROUTES } from "../../../routes";
+import * as nav from "@/utils/navigation";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
@@ -52,7 +54,7 @@ export default function EventsToValidateScreen() {
   });
 
   const handleVerify = (id: string) => {
-    router.push(`/admin/EventsValidateScreens/ValidateEventScreen?id=${id}`);
+    nav.push(router, { pathname: ROUTES.ADMIN.EVENTS_VALIDATE.VALIDATE, params: { id } });
   };
 
   const renderItem = ({ item }: { item: EventItem }) => (
@@ -74,9 +76,9 @@ export default function EventsToValidateScreen() {
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>Propietario: </Text>
-          {item.ownerName ?? "N/D"}
+          {(item as any).ownerName ?? "N/D"}
         </Text>
-        {item.ownerEmail && <Text style={styles.label}>{item.ownerEmail}</Text>}
+        {(item as any).ownerEmail && <Text style={styles.label}>{(item as any).ownerEmail}</Text>}
 
         <TouchableOpacity
           style={styles.button}
@@ -132,7 +134,7 @@ const styles = StyleSheet.create({
   },
   titleScreen: {
     fontFamily: FONTS.titleBold,
-    fontSize: FONT_SIZES.title,
+  fontSize: FONT_SIZES.titleMain,
     color: COLORS.textPrimary,
     marginBottom: 12,
   },

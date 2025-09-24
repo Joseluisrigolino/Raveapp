@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as nav from "@/utils/navigation";
+import { ROUTES } from "../../../routes";
 
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
@@ -86,12 +88,9 @@ export default function NewScreen() {
 
   const handleGoToEvent = () => {
     if (!linkedEventId) return;
-    // Pasamos SOLO el UUID (no la URL)
-    // Además, por compatibilidad, EventScreen puede leer 'id' o 'idEvento'
-    router.push({
-      pathname: "/main/EventsScreens/EventScreen",
-      params: { id: linkedEventId, idEvento: linkedEventId },
-    });
+  // Pasamos SOLO el UUID (no la URL)
+  // Además, por compatibilidad, EventScreen puede leer 'id' o 'idEvento'
+  nav.push(router, { pathname: ROUTES.MAIN.EVENTS.EVENT, params: { id: linkedEventId, idEvento: linkedEventId } });
   };
 
   if (loading) {

@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import { Text, TextInput, Button } from "react-native-paper";
 import { Link, useRouter } from "expo-router";
+import * as nav from "@/utils/navigation";
+import { ROUTES } from "../../routes";
 
 import TitlePers from "@/components/common/TitleComponent";
 import globalStyles from "@/styles/globalStyles";
@@ -42,16 +44,19 @@ export default function LoginScreen() {
         return;
       }
 
-      // Redirige según rol
-      switch (u.role) {
-        case "admin":
-          router.replace("/admin/EventsValidateScreens/EventsToValidateScreen");
-          break;
-        case "owner":
-          router.replace("/main/EventsScreens/CreateEventScreen");
-          break;
-        default:
-          router.replace("/main/EventsScreens/MenuScreen");
+      // Redirige según rol (normalizamos a array)
+      const roles = Array.isArray((u as any)?.roles)
+        ? (u as any).roles
+        : (u as any)?.roles
+        ? [(u as any).roles]
+        : [];
+
+      if (roles.includes("admin")) {
+        nav.replace(router, ROUTES.ADMIN.EVENTS_VALIDATE.LIST);
+      } else if (roles.includes("owner")) {
+        nav.replace(router, ROUTES.MAIN.EVENTS.CREATE);
+      } else {
+        nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
       }
     } catch (e) {
       Alert.alert("Error", "Ocurrió un problema al iniciar sesión.");
@@ -128,7 +133,7 @@ export default function LoginScreen() {
 
           <View style={styles.linksRow}>
             <Text variant="bodySmall" style={styles.linkText}>
-              <Link href="/login/RegisterUserScreen">
+              <Link href={ROUTES.LOGIN.REGISTER}>
                 ¿No tenés cuenta? Registrate
               </Link>
             </Text>
@@ -137,7 +142,7 @@ export default function LoginScreen() {
           <View style={styles.linksRow}>
             <Button
               mode="text"
-              onPress={() => router.replace("/main/EventsScreens/MenuScreen")}
+              onPress={() => nav.replace(router, ROUTES.MAIN.EVENTS.MENU)}
               compact
               labelStyle={{ color: globalStyles.COLORS.primary, fontWeight: "600" }}
             >

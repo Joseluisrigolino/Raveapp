@@ -1,0 +1,60 @@
+export const ROUTES = {
+  MAIN: {
+    EVENTS: {
+      MENU: "/main/eventos/MenuPantalla",
+      CREATE: "/main/eventos/CrearEventoPantalla",
+      EVENT: "/main/eventos/EventoPantalla",
+      FAV: "/main/eventos/EventoLikeadoPantalla",
+    },
+    ARTISTS: {
+      LIST: "/main/artistas/ArtistasPantalla",
+      ITEM: "/main/artistas/ArtistaPantalla",
+    },
+    NEWS: {
+      LIST: "/main/noticias/NewsScreen",
+      ITEM: "/main/noticias/NewScreen",
+    },
+    TICKETS: {
+      MENU: "/main/tickets/TicketPurchasedMenu",
+      FINALIZED: "/main/tickets/TicketFinalizedScreen",
+      PURCHASED: "/main/tickets/TicketPurchasedScreen",
+      BUY: "/main/tickets/BuyTicketScreen",
+    },
+    USER: {
+      PROFILE_EDIT: "/main/usuario/UserProfileEditScreen",
+      PROFILE: "/main/usuario/PerfilDeUsuarioPantalla",
+    },
+  },
+  ADMIN: {
+    ARTISTS: {
+      MANAGE: "/admin/artistas-admin/AdministrarArtistasPantalla",
+      EDIT: "/admin/artistas-admin/EditarArtistaPantalla",
+      NEW: "/admin/artistas-admin/NuevoArtistaPantalla",
+    },
+    NEWS: {
+      MANAGE: "/admin/NewsScreens/ManageNewScreen",
+      CREATE: "/admin/NewsScreens/CrearNoticiaPantalla",
+      EDIT: "/admin/NewsScreens/EditarNoticiaPantalla",
+    },
+    EVENTS_VALIDATE: {
+      LIST: "/admin/EventsValidateScreens/EventsToValidateScreen",
+      VALIDATE: "/admin/EventsValidateScreens/ValidateEventScreen",
+    },
+    TYC: "/admin/Tyc",
+  },
+  OWNER: {
+    PARTY_RATINGS: "/owner/PartyRatingsScreen",
+    PARTYS: "/owner/PartysScreen",
+    MANAGE_EVENTS: "/owner/AdministrarEventosPantalla",
+    TICKET_SOLD: "/owner/TicketSoldScreen",
+    MODIFY_EVENT: "/owner/ModifyEventScreen",
+    CANCEL_EVENT: "/owner/CancelEventScreen",
+  },
+  LOGIN: {
+    LOGIN: "/login/login",
+    REGISTER: "/login/RegistroUsuario",
+  },
+  NOT_FOUND: "/+not-found",
+} as const;
+
+export default ROUTES;

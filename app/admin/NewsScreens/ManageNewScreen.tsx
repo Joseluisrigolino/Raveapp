@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import { IconButton } from "react-native-paper";
 import { useRouter, usePathname } from "expo-router";
+import { ROUTES } from "../../../routes";
+import * as nav from "@/utils/navigation";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
@@ -31,7 +33,7 @@ export default function ManageNewsScreen() {
   const router = useRouter();
   const path = usePathname();
   const { user } = useAuth();
-  const roles = Array.isArray(user?.roles) ? user.roles : [user?.roles];
+  const roles = Array.isArray(user?.roles) ? (user.roles as any[]) : user?.roles ? [user.roles] : [];
   const isAdmin = roles.includes("admin");
 
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -52,7 +54,7 @@ export default function ManageNewsScreen() {
   }, []);
 
   const handleEdit = (idNoticia: string) => {
-    router.push(`/admin/NewsScreens/EditNewScreen?id=${idNoticia}`);
+    nav.push(router, { pathname: ROUTES.ADMIN.NEWS.EDIT, params: { id: idNoticia } });
   };
 
   const handleDelete = (idNoticia: string) => {
@@ -84,14 +86,14 @@ export default function ManageNewsScreen() {
   const tabs = [
     {
       label: "Administrar Noticias",
-      route: "/admin/NewsScreens/ManageNewScreen",
-      isActive: path === "/admin/NewsScreens/ManageNewScreen",
+      route: ROUTES.ADMIN.NEWS.MANAGE,
+      isActive: path === ROUTES.ADMIN.NEWS.MANAGE,
       visible: isAdmin,
     },
     {
       label: "Noticias",
-      route: "/main/NewsScreens/NewsScreen",
-      isActive: path === "/main/NewsScreens/NewsScreen",
+      route: ROUTES.MAIN.NEWS.LIST,
+      isActive: path === ROUTES.MAIN.NEWS.LIST,
       visible: true,
     },
   ].filter((t) => t.visible);
@@ -139,7 +141,7 @@ export default function ManageNewsScreen() {
         <View style={styles.content}>
           <TouchableOpacity
             style={styles.createButton}
-            onPress={() => router.push("/admin/NewsScreens/CreateNewScreen")}
+            onPress={() => nav.push(router, { pathname: ROUTES.ADMIN.NEWS.CREATE })}
           >
             <Text style={styles.createButtonText}>+ Crear noticia</Text>
           </TouchableOpacity>
@@ -187,7 +189,7 @@ const styles = StyleSheet.create({
   },
   screenTitle: {
     fontFamily: FONTS.titleBold,
-    fontSize: FONT_SIZES.title,
+    fontSize: FONT_SIZES.titleMain,
     color: COLORS.textPrimary,
     marginBottom: 12,
   },
@@ -240,7 +242,7 @@ const styles = StyleSheet.create({
   },
   actionIcon: {
     marginLeft: 8,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.card,
   },
   buttonsRow: {
     flexDirection: "row",
