@@ -44,20 +44,8 @@ export default function LoginScreen() {
         return;
       }
 
-      // Redirige según rol (normalizamos a array)
-      const roles = Array.isArray((u as any)?.roles)
-        ? (u as any).roles
-        : (u as any)?.roles
-        ? [(u as any).roles]
-        : [];
-
-      if (roles.includes("admin")) {
-        nav.replace(router, ROUTES.ADMIN.EVENTS_VALIDATE.LIST);
-      } else if (roles.includes("owner")) {
-        nav.replace(router, ROUTES.MAIN.EVENTS.CREATE);
-      } else {
-        nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
-      }
+      // Siempre redirigimos a MenuPantalla tras login exitoso
+      nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
     } catch (e) {
       Alert.alert("Error", "Ocurrió un problema al iniciar sesión.");
     } finally {
