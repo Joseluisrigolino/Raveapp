@@ -21,7 +21,9 @@ export const ROUTES = {
       BUY: "/main/tickets/BuyTicketScreen",
     },
     USER: {
-      PROFILE_EDIT: "/main/usuario/UserProfileEditScreen",
+      // The physical file is named `PerfilDeUsuarioPantalla.tsx` (exports UserProfileEditScreen),
+      // so point PROFILE_EDIT to that path so expo-router can resolve it.
+      PROFILE_EDIT: "/main/usuario/PerfilDeUsuarioPantalla",
       PROFILE: "/main/usuario/PerfilDeUsuarioPantalla",
     },
   },
@@ -44,7 +46,7 @@ export const ROUTES = {
   },
   OWNER: {
     PARTY_RATINGS: "/owner/PartyRatingsScreen",
-    PARTYS: "/owner/PartysScreen",
+  PARTYS: "/owner/FiestasPantalla",
     MANAGE_EVENTS: "/owner/AdministrarEventosPantalla",
     TICKET_SOLD: "/owner/TicketSoldScreen",
     MODIFY_EVENT: "/owner/ModifyEventScreen",

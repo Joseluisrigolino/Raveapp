@@ -17,6 +17,58 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { ROUTES } from "../../../routes";
+import { Animated, Easing } from "react-native";
+import { BlurView } from "expo-blur";
+
+// Animated popup component for smoother appearance
+const AnimatedPopup: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const scaleAnim = React.useRef(new Animated.Value(0.7)).current;
+  const opacityAnim = React.useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 320,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.exp),
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 320,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.exp),
+      }),
+    ]).start();
+  }, [scaleAnim, opacityAnim]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.modalCard,
+        {
+          transform: [{ scale: scaleAnim }],
+          opacity: opacityAnim,
+        },
+      ]}
+    >
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>¡Importante!</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Text style={{ color: COLORS.negative, fontWeight: "bold" }}>Cerrar</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{ padding: 18 }}>
+          <Text style={{ fontSize: 16, color: COLORS.textPrimary, marginBottom: 12 }}>
+            Al crear un evento, tu usuario pasará a ser <Text style={{ fontWeight: "bold", color: COLORS.primary }}>Organizador</Text> y tendrás acceso a nuevas funcionalidades para administrar tus eventos.
+          </Text>
+          <Text style={{ fontSize: 15, color: COLORS.textSecondary }}>
+            Si continúas y el evento se crea correctamente, tu cuenta será actualizada automáticamente.
+          </Text>
+        </View>
+      </Animated.View>
+  );
+};
 
 /** Layout y UI base */
 import Header from "@/components/layout/HeaderComponent";
@@ -245,13 +297,38 @@ async function ensureFechaListo(
 
 /* ================= Pantalla ================= */
 export default function CreateEventScreen() {
+  // ...existing code...
+  const { user, updateUsuario } = useAuth();
+  const userId: string | null =
+    (user as any)?.idUsuario ?? (user as any)?.id ?? null;
+  // Detectar si el usuario tiene rol "Usuario" (frontend: 'user')
+  const isUsuario = Array.isArray((user as any)?.roles)
+    ? (user as any).roles.includes('user')
+    : false;
+  const mustShowLogin = !user;
+
+  // Debug: log user and isUsuario to diagnose popup issue
+  React.useEffect(() => {
+    console.log('[DEBUG] user:', user);
+    console.log('[DEBUG] roles:', (user as any)?.roles);
+    console.log('[DEBUG] isUsuario:', isUsuario);
+  }, [user, isUsuario]);
   const router = useRouter();
 
   /* --- Auth --- */
-  const { user } = useAuth();
-  const userId: string | null =
-    (user as any)?.idUsuario ?? (user as any)?.id ?? null;
-  const mustShowLogin = !user || (user as any)?.role === "guest";
+  // ...existing code...
+
+  // Estado para mostrar el popup de upgrade de rol
+  const [showUpgradePopup, setShowUpgradePopup] = useState(false);
+
+  useEffect(() => {
+    // Mostrar popup solo si el usuario tiene rol "Usuario" (cdRol: 0)
+    if (isUsuario) {
+      setShowUpgradePopup(true);
+    } else {
+      setShowUpgradePopup(false);
+    }
+  }, [isUsuario]);
 
   /* --- Datos base --- */
   const [eventName, setEventName] = useState("");
@@ -739,12 +816,25 @@ export default function CreateEventScreen() {
       console.warn("[getFileSize] fetch->blob falló, intentando fallback expo-file-system:", e);
       try {
         if (Platform.OS !== "web") {
-          const FileSystem = await import("expo-file-system");
+          const FileSystem = await import("expo-file-system/legacy");
           const info = await FileSystem.getInfoAsync(uri);
           if (info && typeof (info as any).size === "number") return (info as any).size;
         }
       } catch (err) {
         console.warn("[getFileSize] fallback FileSystem falló:", err);
+      }
+    }
+    // Si no se pudo determinar el tamaño, intentamos obtenerlo desde asset (si existe)
+    if (uri && typeof uri === 'string') {
+      const assetIdMatch = uri.match(/asset:(\d+)/);
+      if (assetIdMatch) {
+        try {
+          const MediaLibrary = await import('expo-media-library');
+          const asset = await MediaLibrary.getAssetInfoAsync(assetIdMatch[1]);
+          if (asset && typeof asset.size === 'number') return asset.size;
+        } catch (e) {
+          console.warn('[getFileSize] MediaLibrary fallback falló:', e);
+        }
       }
     }
     return 0; // no pudimos determinar tamaño
@@ -765,7 +855,6 @@ export default function CreateEventScreen() {
 
     try {
       if (!userId) throw new Error('Usuario no autenticado.');
-      // Validaciones mínimas
       if (!eventName || !acceptedTC) throw new Error('Complete nombre de evento y acepte T&C.');
 
       // 1) Crear entidades pendientes (fiesta recurrente, etc.)
@@ -808,29 +897,33 @@ export default function CreateEventScreen() {
 
       console.log('[CreateEvent] payload que se enviará a createEvent:', JSON.parse(JSON.stringify(body)));
 
-      const createResult = await createEvent(body);
-      console.log('[CreateEvent] respuesta cruda del backend:', createResult);
+      // 3) Crear evento en backend
+      let createResult;
+      try {
+        createResult = await createEvent(body);
+        console.log('[CreateEvent] respuesta cruda del backend:', createResult);
+      } catch (err: any) {
+        const msg = extractBackendMessage(err);
+        Alert.alert('Error al crear evento', msg);
+        return;
+      }
 
-      // 3) Extraer fechas devueltas por el backend
+      // 4) Extraer fechas devueltas por el backend
       let remoteFechas = extractFechasFromCreateResp(createResult as any);
       console.log('[CreateEvent] remoteFechas extraídas:', remoteFechas);
 
-      // 4) Si no hay fechas, intentamos determinar si el createResult es idFecha o idEvento
+      // 5) Si no hay fechas, intentamos determinar si el createResult es idFecha o idEvento
       let fechaIds: string[] = [];
-
       const entradaApi = await import('@/utils/events/entradaApi');
       const eventApi = await import('@/utils/events/eventApi');
 
-      // Si el backend devolvió un string (posible idEvento o idFecha)
       if (!remoteFechas.length && typeof createResult === 'string' && createResult.trim()) {
         const candidate = String(createResult).trim();
-        // 4.a) Probar si es un idFecha válido (GET entradas fecha responde OK)
         const esFecha = await probeGetEntradasFecha(candidate).catch(() => false);
         if (esFecha) {
           console.log('[CreateEvent] backend devolvió un idFecha simple:', [candidate]);
           fechaIds = [candidate];
         } else {
-          // 4.b) Probar si es idEvento y obtener sus fechas
           try {
             const ev = await eventApi.fetchEventById(candidate);
             const fromEvent = ev?.fechas?.map((f: any) => String(f?.idFecha).trim()).filter(Boolean) || [];
@@ -844,105 +937,140 @@ export default function CreateEventScreen() {
         }
       }
 
-      // 5) Si ahora tenemos remoteFechas, mapear a ids por cercanía
       if (remoteFechas.length) {
         const mapped = mapLocalToRemoteFechaIds(daySchedules, remoteFechas as any);
         fechaIds = mapped.filter(Boolean);
       }
 
-      // 6) Si aún no hay fechaIds, intentar resolución por búsqueda general (nombre/fecha)
       if (!fechaIds.length) {
-        try {
-          const maybeEventId = await tryResolveEventIdAfterCreate(eventName, daySchedules[0]?.start);
-          if (maybeEventId) {
-            const ev = await eventApi.fetchEventById(maybeEventId);
-            const fromEvent = ev?.fechas?.map((f: any) => String(f?.idFecha).trim()).filter(Boolean) || [];
-            if (fromEvent.length) {
-              console.log('[CreateEvent] fechas obtenidas tras tryResolveEventIdAfterCreate:', fromEvent);
-              remoteFechas = fromEvent.map((id: string) => ({ idFecha: id }));
-              fechaIds = fromEvent;
-            }
-          }
-        } catch (e) {
-          console.warn('[CreateEvent] intento adicional para resolver idEvento/fechas falló', e);
-        }
+        Alert.alert('Error', 'No se pudieron obtener los IDs de las fechas del evento. El evento no se creó.');
+        return;
       }
 
-      console.log('[CreateEvent] fechaIds resueltas finales:', fechaIds);
-
-      if (!fechaIds.length) {
-        console.error('[CreateEvent] No se pudieron resolver ids de fecha. No se crearán entradas.');
-        Alert.alert('Error', 'No se pudieron obtener los IDs de las fechas del evento. Revise la consola para más detalles.');
-        return; // no navegamos
-      }
-
-      // 7) Esperar a que las fechas estén visibles en backend (poll)
+      // 6) Esperar a que las fechas estén visibles en backend (poll)
       for (const idF of fechaIds) {
         await entradaApi.ensureFechaListo(idF).catch(() => {
           console.warn('[CreateEvent] ensureFechaListo no confirmó fecha:', idF);
         });
       }
 
-      // 8) Crear entradas
+      // 7) Crear entradas
       const entradasPayload = await buildEntradasForFechas(fechaIds);
-      console.log('[Entradas] payload a crear:', JSON.parse(JSON.stringify(entradasPayload)));
       try {
         await entradaApi.createEntradasBulk(entradasPayload);
         console.log('[Entradas] creación OK');
       } catch (e: any) {
-        console.error('[Entradas] creación FALLÓ:', e?.message || e);
-        Alert.alert('Error al crear entradas', e?.message || 'Fallo al crear las entradas. Revise la consola.');
-        return; // no navegamos
+        Alert.alert('Error al crear entradas', e?.message || 'Fallo al crear las entradas. El evento no se creó.');
+        return;
       }
 
-      // 9) Subir media (si corresponde) — no bloqueante para la navegación final
-      try {
-        if (photoFile) {
+      // 8) Subir media (si corresponde) — si falla, abortar
+      if (photoFile) {
+        try {
+          // Validar tamaño antes de subir (igual que en perfil)
+          const FileSystem = await import('expo-file-system/legacy');
+          const fileInfo: any = await FileSystem.getInfoAsync(photoFile);
+          if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
+            Alert.alert(
+              'Imagen demasiado grande',
+              'La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana.'
+            );
+            return;
+          }
           const fn = photoFile.split('/').pop() || 'image.jpg';
-          const fileObj = { name: fn, type: 'image/jpeg', uri: photoFile } as any;
-          console.log('[Media] subiendo imagen con payload:', JSON.parse(JSON.stringify({ file: { name: fn, type: 'image/jpeg' } }))); 
+          const fileObj = {
+            uri: photoFile,
+            name: fn,
+            type: 'image/jpeg',
+          };
           const mediaApi = (await import('@/utils/mediaApi')).mediaApi;
-
-          // Preferimos subir la media asignada a la entidad EVENTO (IdEntidadMedia).
-          // Intentamos resolver createdEventId (si el backend devolvió idEvento) y usamos eso; si no, hacemos fallback a la primera fecha (idFecha).
           let uploadTarget = (fechaIds && fechaIds[0]) || null;
           try {
-            // intentar obtener idEvento si fue devuelto al crear
             let possibleEventId: string | null = null;
             if (typeof createResult === 'string') {
-              // si createResult fue string, puede ser idEvento; probeamos si NO es idFecha
               const cand = String(createResult).trim();
               const esFecha = await probeGetEntradasFecha(cand).catch(() => false);
               if (!esFecha) possibleEventId = cand;
-            } else if (createResult && (createResult.idEvento || createResult.IdEvento || createResult.id || createResult.Id)) {
-              possibleEventId = String(createResult.idEvento ?? createResult.IdEvento ?? createResult.id ?? createResult.Id);
+            } else if (createResult && ((createResult as any).idEvento || (createResult as any).IdEvento || (createResult as any).id || (createResult as any).Id)) {
+              possibleEventId = String((createResult as any).idEvento ?? (createResult as any).IdEvento ?? (createResult as any).id ?? (createResult as any).Id);
             }
             if (possibleEventId) uploadTarget = possibleEventId;
           } catch (e) {
             console.warn('[Media] no se pudo resolver idEvento, se usará idFecha como fallback:', e);
           }
-
           if (!uploadTarget) {
-            console.warn('[Media] no se encontró idEvento ni idFecha; se omitirá subida.');
-          } else {
-            console.log('[Media] usando IdEntidadMedia para subida:', uploadTarget);
-            const resp = await mediaApi.upload(String(uploadTarget), fileObj);
-            console.log('[Media] respuesta de mediaApi.upload:', resp);
+            Alert.alert('Error', 'No se encontró idEvento ni idFecha para subir la imagen. El evento no se creó.');
+            return;
           }
+          await mediaApi.upload(String(uploadTarget), fileObj);
+        } catch (e: any) {
+          const msg = typeof e === 'object' && e !== null && 'message' in e ? String((e as any).message) : '';
+          if (msg.toLowerCase().includes('size') || msg.toLowerCase().includes('too large') || msg.includes('2MB')) {
+            Alert.alert(
+              'Imagen demasiado grande',
+              'La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana.'
+            );
+          } else {
+            Alert.alert('Error', 'No se pudo subir la imagen. El evento no se creó.');
+          }
+          return;
         }
-      } catch (e) {
-        console.warn('[Media] subida FALLÓ (no bloqueante):', (e as any)?.message ?? String(e));
       }
 
-      // 10) Si llegamos hasta acá, todo crítico fue OK → navegar a Administrar Eventos
-      console.log('[CreateEvent] flujo completado con éxito. Redirigiendo a AdministrarEventosPantalla');
+      // 9) Actualizar rol usuario (si corresponde) — si falla, abortar
+      if (isUsuario) {
+        try {
+          const userData = user as any;
+          const roles = Array.isArray(userData?.roles) ? userData.roles.map(Number) : [];
+          const cdRoles = roles.includes(2) ? roles : [...roles, 2];
+          const payload = {
+            idUsuario: userData?.idUsuario ?? userData?.id ?? userId,
+            nombre: userData?.nombre ?? userData?.name ?? "",
+            apellido: userData?.apellido ?? userData?.lastName ?? "",
+            correo: userData?.correo ?? userData?.email ?? "",
+            cbu: userData?.cbu ?? "",
+            dni: userData?.dni ?? "",
+            telefono: userData?.telefono ?? "",
+            bio: userData?.bio ?? "",
+            cdRoles,
+            domicilio: {
+              provincia: {
+                nombre: provinceName,
+                codigo: provinceId,
+              },
+              municipio: {
+                nombre: municipalityName,
+                codigo: municipalityId,
+              },
+              localidad: {
+                nombre: localityName,
+                codigo: localityId,
+              },
+              direccion: street,
+              latitud: 0,
+              longitud: 0,
+            },
+            socials: {
+              idSocial: userData?.socials?.idSocial ?? "",
+              mdInstagram: userData?.socials?.mdInstagram ?? "",
+              mdSpotify: userData?.socials?.mdSpotify ?? "",
+              mdSoundcloud: userData?.socials?.mdSoundcloud ?? "",
+            },
+            dtNacimiento: userData?.dtNacimiento ?? userData?.fechaNacimiento ?? "",
+          };
+          await updateUsuario(payload);
+        } catch (e: any) {
+          const backendMsg = extractBackendMessage(e);
+          Alert.alert('Error actualizando rol', backendMsg + '. El evento no se creó.');
+          return;
+        }
+      }
+
       Alert.alert('Éxito', 'Evento creado correctamente.');
       router.push('/owner/AdministrarEventosPantalla');
     } catch (err: any) {
-      console.error('[CreateEvent] error no manejado en handleSubmit:', err);
       const msg = err?.message || extractBackendMessage(err);
       Alert.alert('Error', String(msg));
-      // no navegamos para que el usuario pueda corregir
     }
   }, [
     userId,
@@ -1051,23 +1179,83 @@ export default function CreateEventScreen() {
   }, []);
 
   /* ================= Render ================= */
+  // --- Botón de autocompletar para pruebas rápidas ---
+  const [autoCounter, setAutoCounter] = useState(1);
+  const handleAutoFill = useCallback(() => {
+    // Nombre evento
+    setEventName(`evento pepe argento +${autoCounter}`);
+    setAutoCounter((c) => c + 1);
+    // Tipo evento
+    setEventType("1d");
+    // Géneros musicales: selecciona 2-3 random
+    if (genres.length > 0) {
+      const shuffled = [...genres].sort(() => Math.random() - 0.5);
+      setSelectedGenres(shuffled.slice(0, Math.min(3, genres.length)).map((g) => g.cdGenero));
+    }
+    // Artistas: selecciona los primeros 3
+    if (allArtists && allArtists.length > 0) {
+      setSelectedArtists(allArtists.slice(0, 3));
+    }
+    // Provincia: CABA
+    setProvinceId("02");
+    setProvinceName("Ciudad Autónoma de Buenos Aires");
+    // Municipio: CABA
+    setMunicipalityId("02");
+    setMunicipalityName("Ciudad Autónoma de Buenos Aires");
+    // Localidad: Saavedra (si existe en la lista)
+    const saavedra = localities.find((l) => l.nombre?.toLowerCase() === "saavedra");
+    if (saavedra) {
+      setLocalityId(saavedra.id);
+      setLocalityName(saavedra.nombre);
+    } else if (localities.length > 0) {
+      setLocalityId(localities[0].id);
+      setLocalityName(localities[0].nombre);
+    }
+    // Dirección
+    setStreet("tandil 4341");
+    // Descripción
+    setEventDescription("descripcion");
+    // Fecha y hora: inicio mañana, fin pasado mañana
+    const now = new Date();
+    const start = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    setDaySchedules([{ start, end }]);
+    // Entradas generales y early birds
+    setDaysTickets([{ genQty: "100", genPrice: "100", ebGenQty: "10", ebGenPrice: "80", vipQty: "0", vipPrice: "", ebVipQty: "0", ebVipPrice: "" }]);
+    // Configuración de entradas
+    setDaySaleConfigs([{ saleStart: start, sellUntil: end }]);
+    // Aceptar términos y condiciones
+    setAcceptedTC(true);
+  }, [autoCounter, genres, allArtists, localities]);
+
   return (
     <SafeAreaView style={styles.container}>
       <Header />
 
+      {/* Popup para usuarios con rol 0 (Usuario) con animación */}
+      {showUpgradePopup && (
+        <Modal
+          visible={showUpgradePopup}
+          transparent
+          animationType="none"
+          onRequestClose={() => setShowUpgradePopup(false)}
+        >
+          <BlurView intensity={20} style={styles.modalBlurBackdrop}>
+            <AnimatedPopup onClose={() => setShowUpgradePopup(false)} />
+          </BlurView>
+        </Modal>
+      )}
+
       <TabMenuComponent
-        tabs={[
-          {
-            label: "Crear evento",
-            route: ROUTES.MAIN.EVENTS.CREATE,
-            isActive: true,
-          },
-          {
-            label: "Mis fiestas recurrentes",
-            route: ROUTES.OWNER.PARTYS,
-            isActive: false,
-          },
-        ]}
+        tabs={[{
+          label: "Crear evento",
+          route: ROUTES.MAIN.EVENTS.CREATE,
+          isActive: true,
+        }, {
+          label: "Mis fiestas recurrentes",
+          route: ROUTES.OWNER.PARTYS,
+          isActive: false,
+        }]}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -1108,8 +1296,7 @@ export default function CreateEventScreen() {
         ) : (
           <View style={{ width: "100%" }}>
             <TitlePers text="Crear Evento" />
-            <View className="divider" style={styles.divider} />
-
+            <View style={styles.divider} />
             <Text style={styles.h2}>Datos del evento</Text>
             <EventBasicData
               eventName={eventName}
@@ -1131,14 +1318,12 @@ export default function CreateEventScreen() {
               eventType={eventType}
               setEventType={setEventType}
             />
-
             <Text style={styles.h2}>Género/s musical/es</Text>
             <GenreSelector
               genres={genres}
               selectedGenres={selectedGenres}
               onToggle={toggleGenre}
             />
-
             <Text style={styles.h2}>Artista/s</Text>
             <ArtistSelector
               artistInput={artistInput}
@@ -1150,7 +1335,6 @@ export default function CreateEventScreen() {
               selectedArtists={selectedArtists}
               onRemoveArtist={handleRemoveArtist}
             />
-
             <Text style={styles.h2}>Ubicación del evento</Text>
             <LocationSelector
               provinces={provinces}
@@ -1175,12 +1359,10 @@ export default function CreateEventScreen() {
               showLocalities={showLocalities}
               setShowLocalities={setShowLocalities}
               handleSelectProvince={async (id: string, name: string) => {
-                // si es CABA (02): cargamos todas las localidades de capital y saltamos municipio
                 handleSelectProvinceCallback(id, name);
                 if (id === '02') {
                   setShowMunicipalities(false);
                   setMunicipalities([]);
-                  // autoseleccionamos el municipio con nombre igual a "Ciudad Autónoma de Buenos Aires"
                   setMunicipalityId('02');
                   setMunicipalityName('Ciudad Autónoma de Buenos Aires');
                   setLocalityLoading(true);
@@ -1189,7 +1371,6 @@ export default function CreateEventScreen() {
                     const locs = await fetchLocalitiesByProvince(id);
                     setLocalities(locs || []);
                   } catch (e) {
-                    console.warn('Error fetchLocalities (CABA):', e);
                     setLocalities([]);
                   } finally {
                     setLocalityLoading(false);
@@ -1200,19 +1381,16 @@ export default function CreateEventScreen() {
               handleSelectLocality={handleSelectLocalityCallback}
               allowLocalitiesWithoutMunicipality={provinceId === '02'}
             />
-
             <Text style={styles.h2}>Descripción</Text>
             <DescriptionField
               value={eventDescription}
               onChange={setEventDescription}
             />
-
             <Text style={styles.h2}>Fecha y hora del evento</Text>
             <ScheduleSection
               daySchedules={daySchedules}
               setSchedule={setSchedule}
             />
-
             <Text style={styles.h2}>Entradas</Text>
             <TicketSection
               daysTickets={daysTickets}
@@ -1222,13 +1400,11 @@ export default function CreateEventScreen() {
                 (parseInt(d.vipQty || "0", 10) || 0)
               }
             />
-
             <Text style={styles.h2}>Configuración de entradas</Text>
             <TicketConfigSection
               daySaleConfigs={daySaleConfigs}
               setSaleCfg={setSaleCfg}
             />
-
             <Text style={styles.h2}>Multimedia</Text>
             <MediaSection
               photoFile={photoFile}
@@ -1238,7 +1414,6 @@ export default function CreateEventScreen() {
               onChangeVideo={setVideoLink}
               onChangeMusic={setMusicLink}
             />
-
             <View style={styles.card}>
               <TouchableOpacity
                 style={styles.checkRow}
@@ -1250,7 +1425,6 @@ export default function CreateEventScreen() {
                 <Text style={styles.checkText}>
                   Acepto{" "}
                   <Text style={styles.link} onPress={() => {
-                    // en Android hay problemas con Linking directo, abrimos modal WebView
                     openTycModal();
                   }}>
                     términos y condiciones
@@ -1261,10 +1435,8 @@ export default function CreateEventScreen() {
               <TouchableOpacity
                 style={styles.submitButton}
                 onPress={async () => {
-                  // Validaciones extra
                   const ok = validateBeforeSubmit();
                   if (!ok) return;
-                  // continuar
                   setCreating(true);
                   try {
                     await handleSubmit();
@@ -1274,6 +1446,14 @@ export default function CreateEventScreen() {
                 }}
               >
                 <Text style={styles.submitButtonText}>CREAR EVENTO</Text>
+              </TouchableOpacity>
+
+              {/* Botón de autocompletar para pruebas rápidas */}
+              <TouchableOpacity
+                style={[styles.submitButton, { backgroundColor: COLORS.info, marginTop: 8 }]}
+                onPress={handleAutoFill}
+              >
+                <Text style={[styles.submitButtonText, { color: '#fff' }]}>AUTOCOMPLETAR PRUEBA</Text>
               </TouchableOpacity>
 
               <CirculoCarga visible={creating} text="Creando evento..." />
@@ -1359,6 +1539,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
     justifyContent: "center",
+    padding: 16,
+  },
+  modalBlurBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
     padding: 16,
   },
   modalCard: {

@@ -27,16 +27,14 @@ import { COLORS } from "@/styles/globalStyles";
 
 export default function Footer() {
   const router = useRouter();
-  const { user, logout } = useAuth() as any;
+  // Consumir el contexto de autenticación. Tipamos con `any` para mantener
+  // compatibilidad con el shape existente, pero preferimos usar los helpers
+  // `hasRole`/`hasAnyRole` expuestos desde `AuthContext`.
+  const { user, logout, hasRole, hasAnyRole } = useAuth() as any;
 
-  // ---- Roles (robusto: soporta role y roles[])
-  const isAdmin =
-    (Array.isArray(user?.roles) && user.roles.includes("admin")) ||
-    user?.role === "admin";
-  const isOwner =
-    isAdmin ||
-    (Array.isArray(user?.roles) && user.roles.includes("owner")) ||
-    user?.role === "owner";
+  // Ahora simplificamos los checks de roles reutilizando helpers del contexto.
+  const isAdmin = hasRole("admin");
+  const isOwner = hasAnyRole(["owner", "admin"]);
 
   // ===== Avatar
   const randomProfileImage = useMemo(
@@ -91,21 +89,29 @@ export default function Footer() {
   const windowH = Dimensions.get("window").height;
   const SHEET_H = Math.round(windowH * 0.75);
 
+  // Animaciones mejoradas
   const translateY = useRef(new Animated.Value(SHEET_H)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const avatarScale = useRef(new Animated.Value(0.85)).current;
 
   const animateOpen = () => {
     Animated.parallel([
-      Animated.timing(translateY, {
+      Animated.spring(translateY, {
         toValue: 0,
-        duration: 360,
-        easing: Easing.out(Easing.cubic),
+        speed: 12,
+        bounciness: 8,
         useNativeDriver: true,
       }),
       Animated.timing(backdropOpacity, {
         toValue: 1,
-        duration: 360,
+        duration: 320,
         easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(avatarScale, {
+        toValue: 1,
+        speed: 10,
+        bounciness: 7,
         useNativeDriver: true,
       }),
     ]).start();
@@ -114,14 +120,20 @@ export default function Footer() {
     Animated.parallel([
       Animated.timing(translateY, {
         toValue: SHEET_H,
-        duration: 260,
+        duration: 220,
         easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.timing(backdropOpacity, {
         toValue: 0,
-        duration: 260,
+        duration: 180,
         easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(avatarScale, {
+        toValue: 0.85,
+        speed: 8,
+        bounciness: 5,
         useNativeDriver: true,
       }),
     ]).start(() => cb && cb());
@@ -159,14 +171,16 @@ export default function Footer() {
     try {
       if (typeof logout === "function") await logout();
     } finally {
-      nav.replace(router, { pathname: ROUTES.MAIN.EVENTS.MENU });
+      nav.replace(router, ROUTES.LOGIN.LOGIN);
     }
   };
 
   // ---- Ítems
+  // Mostrar siempre "Mis eventos favoritos" y "Mi perfil"
   const userItems = [
-  { icon: "heart", label: "Mis eventos favoritos", route: { pathname: ROUTES.MAIN.EVENTS.FAV } },
-  { icon: "account", label: "Mi perfil", route: { pathname: ROUTES.MAIN.USER.PROFILE_EDIT } },
+    { icon: "heart", label: "Mis eventos favoritos", route: { pathname: ROUTES.MAIN.EVENTS.FAV } },
+    { icon: "ticket-confirmation", label: "Mis entradas", route: { pathname: ROUTES.MAIN.TICKETS.MENU } },
+    { icon: "account", label: "Mi perfil", route: { pathname: ROUTES.MAIN.USER.PROFILE_EDIT } },
   ];
   const ownerItems = [
   { icon: "calendar-multiselect", label: "Mis eventos creados", route: { pathname: ROUTES.OWNER.MANAGE_EVENTS } },
@@ -230,7 +244,8 @@ export default function Footer() {
       {/* ===== Modal + Bottom Sheet ===== */}
       <Modal visible={open} transparent animationType="none" onRequestClose={closeSheet}>
         <View style={styles.modalRoot}>
-          <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+          {/* Fondo difuminado con blur */}
+          <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}> 
             <Pressable style={{ flex: 1 }} onPress={closeSheet} />
           </Animated.View>
 
@@ -246,12 +261,18 @@ export default function Footer() {
                 </TouchableOpacity>
               </View>
 
-              {/* Header: avatar + nombre */}
+              {/* Header: avatar + nombre, avatar animado */}
               <View style={styles.profileHeader}>
-                <Image source={{ uri: profileImageUrl }} style={styles.bigAvatar} />
-                <View style={{ marginLeft: 12, flex: 1 }}>
+                <Animated.Image
+                  source={{ uri: profileImageUrl }}
+                  style={[styles.bigAvatar, { transform: [{ scale: avatarScale }] }]}
+                />
+                <View style={{ marginLeft: 14, flex: 1 }}>
                   <Text style={styles.nameText}>
                     {user?.displayName || user?.name || user?.username || "Usuario"}
+                  </Text>
+                  <Text style={styles.usernameText}>
+                    {user?.email ? user.email : ""}
                   </Text>
                 </View>
               </View>
@@ -261,7 +282,7 @@ export default function Footer() {
               <View style={styles.menuSection}>
                 {userItems.map((it) => (
                   <TouchableOpacity key={it.label} style={styles.menuItem} onPress={() => go(it.route)}>
-                    <MaterialCommunityIcons name={it.icon as any} size={20} color={COLORS.textPrimary} />
+                    <MaterialCommunityIcons name={it.icon as any} size={22} color={COLORS.textPrimary} />
                     <Text style={styles.menuText}>{it.label}</Text>
                   </TouchableOpacity>
                 ))}
@@ -270,11 +291,11 @@ export default function Footer() {
               {/* Opciones de organizador */}
               {isOwner && (
                 <>
-                  <Text style={styles.sectionTitle}>Opciones de organizador</Text>
+                  <Text style={styles.sectionTitle}>Organizador</Text>
                   <View style={styles.menuSection}>
                     {ownerItems.map((it) => (
                       <TouchableOpacity key={it.label} style={styles.menuItem} onPress={() => go(it.route)}>
-                        <MaterialCommunityIcons name={it.icon as any} size={20} color={COLORS.textPrimary} />
+                        <MaterialCommunityIcons name={it.icon as any} size={22} color={COLORS.textPrimary} />
                         <Text style={styles.menuText}>{it.label}</Text>
                       </TouchableOpacity>
                     ))}
@@ -283,8 +304,8 @@ export default function Footer() {
               )}
 
               <View style={{ flex: 1 }} />
-              <TouchableOpacity style={[styles.menuItem, { marginBottom: 16 }]} onPress={doLogout}>
-                <MaterialCommunityIcons name="logout" size={20} color={COLORS.negative} />
+              <TouchableOpacity style={[styles.menuItem, styles.logoutBtn]} onPress={doLogout}>
+                <MaterialCommunityIcons name="logout" size={22} color={COLORS.negative} />
                 <Text style={[styles.menuText, { color: COLORS.negative }]}>Cerrar sesión</Text>
               </TouchableOpacity>
             </SafeAreaView>
@@ -315,44 +336,79 @@ const styles = StyleSheet.create({
   avatar: { width: "100%", height: "100%" },
 
   modalRoot: { flex: 1, justifyContent: "flex-end" },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.45)" },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    // Si usas expo-blur, podrías agregar un BlurView aquí
+  },
   sheet: {
     width: "100%",
     backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: -2 },
-    elevation: 18,
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 22,
+    borderWidth: 1,
+    borderColor: "#f3f3f3",
   },
-  handleBar: { paddingTop: 8, paddingBottom: 6, alignItems: "center", justifyContent: "center" },
-  handle: { width: 48, height: 5, borderRadius: 3, backgroundColor: "#E2E8F0" },
-  closeBtn: { position: "absolute", right: 12, top: 8, padding: 6 },
+  handleBar: { paddingTop: 10, paddingBottom: 8, alignItems: "center", justifyContent: "center" },
+  handle: { width: 54, height: 6, borderRadius: 3, backgroundColor: "#E2E8F0" },
+  closeBtn: { position: "absolute", right: 16, top: 10, padding: 8 },
 
   profileHeader: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 22,
+    paddingVertical: 18,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "#f3f3f3",
+    backgroundColor: "#fafcff",
+    shadowColor: "#e0e0e0",
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
   },
-  bigAvatar: { width: 48, height: 48, borderRadius: 24 },
-  nameText: { color: COLORS.textPrimary, fontWeight: "700", fontSize: 16 },
+  bigAvatar: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    backgroundColor: "#f3f3f3",
+  },
+  nameText: { color: COLORS.textPrimary, fontWeight: "700", fontSize: 18 },
+  usernameText: { color: COLORS.textSecondary, fontSize: 13, marginTop: 2 },
 
   sectionTitle: {
     color: COLORS.textSecondary,
     fontWeight: "700",
-    fontSize: 12,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 6,
+    fontSize: 13,
+    paddingHorizontal: 22,
+    paddingTop: 16,
+    paddingBottom: 7,
     textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   menuSection: { paddingVertical: 2 },
-  menuItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14 },
-  menuText: { marginLeft: 12, color: COLORS.textPrimary, fontSize: 15 },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 22,
+    paddingVertical: 15,
+    borderRadius: 12,
+    marginVertical: 2,
+    backgroundColor: "#f8f9fa",
+  },
+  menuText: { marginLeft: 14, color: COLORS.textPrimary, fontSize: 16, fontWeight: "500" },
+  logoutBtn: {
+    marginBottom: 18,
+    backgroundColor: "#fff0f0",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.negative,
+  },
 });

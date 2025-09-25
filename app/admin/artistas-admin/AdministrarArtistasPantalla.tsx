@@ -34,13 +34,9 @@ import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 export default function ManageArtistsScreen() {
   const router = useRouter();
   const path = usePathname();
-  const { user } = useAuth();
-  const roles = Array.isArray(user?.roles)
-    ? (user.roles as any[])
-    : user?.roles
-    ? [user.roles]
-    : [];
-  const isAdmin = roles.includes("admin");
+  // Usar helpers del contexto para roles y autenticación
+  const { user, isAuthenticated, hasRole } = useAuth();
+  const isAdmin = hasRole("admin");
 
   const [artists, setArtists] = useState<Artist[]>([]);
   const [searchText, setSearchText] = useState("");

@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import * as nav from "@/utils/navigation";
 import { ROUTES } from "../../../routes";
@@ -36,8 +36,9 @@ import {
 } from "@/utils/georef/georefHelpers";
 
 export default function UserProfileEditScreen() {
-  const router = useRouter();
+  // ...existing code...
   const { user, logout } = useAuth();
+  const router = useRouter();
 
   // Perfil
   const [apiUser, setApiUser] = useState<any>(null);
@@ -239,7 +240,7 @@ export default function UserProfileEditScreen() {
   const handleSelectPhoto = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: "images",
         quality: 0.9,
       });
       if (result.canceled || !result.assets?.length) return;
@@ -247,13 +248,26 @@ export default function UserProfileEditScreen() {
       const asset = result.assets[0];
       const fileInfo: any = await FileSystem.getInfoAsync(asset.uri);
       if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
-        return Alert.alert("Imagen muy pesada", "Máximo permitido: 2MB.");
+        Alert.alert(
+          "Imagen demasiado grande",
+          "La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana."
+        );
+        return;
       }
       setPreviousProfileImage(profileImage);
       setPendingPhotoUri(asset.uri);
       setProfileImage(asset.uri);
-    } catch {
-      Alert.alert("Error", "No se pudo seleccionar la imagen.");
+    } catch (err: any) {
+      // Si el error tiene información sobre el tamaño, mostrar alerta específica
+      const msg = typeof err === "object" && err !== null && "message" in err ? String((err as any).message) : "";
+      if (msg.toLowerCase().includes("size") || msg.toLowerCase().includes("too large") || msg.includes("2MB")) {
+        Alert.alert(
+          "Imagen demasiado grande",
+          "La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana."
+        );
+      } else {
+        Alert.alert("Error", "No se pudo seleccionar la imagen.");
+      }
     }
   };
   const handleCancelPhoto = () => {
@@ -761,7 +775,10 @@ export default function UserProfileEditScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.logout]}
-            onPress={logout}
+            onPress={async () => {
+              await logout();
+              nav.replace(router, ROUTES.LOGIN.LOGIN);
+            }}
           >
             <Text style={styles.buttonText}>Cerrar sesión</Text>
           </TouchableOpacity>

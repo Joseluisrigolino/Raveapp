@@ -14,7 +14,6 @@ import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 
 import { OwnerEventTicketsSoldData } from "@/interfaces/OwnerEventTicketsSold";
-import { getTicketsSoldDataById } from "@/utils/owners/ownerEventTicketsSoldHelper";
 
 // Importa tus estilos globales
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
@@ -28,10 +27,19 @@ export default function TicketsSoldScreen() {
 
   useEffect(() => {
     if (id) {
-      const found = getTicketsSoldDataById(Number(id));
-      if (found) {
-        setTicketsSoldData(found);
-      }
+      // Simulación de datos si no hay helper
+      // En producción deberías traer esto de la API
+      setTicketsSoldData({
+        eventId: Number(id),
+        eventName: `Evento #${id}`,
+        lastUpdate: new Date().toLocaleString(),
+        rows: [
+          { type: "General", price: 5000, quantity: 120, total: 600000, inStock: 30 },
+          { type: "VIP", price: 12000, quantity: 40, total: 480000, inStock: 10 },
+        ],
+        totalTickets: 160,
+        totalRevenue: 1080000,
+      });
     }
   }, [id]);
 

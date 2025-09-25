@@ -83,6 +83,8 @@ export default function LoginScreen() {
               value={username}
               onChangeText={setUsername}
               style={styles.input}
+              underlineColor="transparent"
+              activeUnderlineColor="transparent"
               right={<TextInput.Icon icon="email-outline" color="#6b7280" />}
               theme={{
                 colors: {
@@ -102,6 +104,8 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
               style={styles.input}
+              underlineColor="transparent"
+              activeUnderlineColor="transparent"
               right={
                 <TextInput.Icon
                   icon={secure ? "eye" : "eye-off"}

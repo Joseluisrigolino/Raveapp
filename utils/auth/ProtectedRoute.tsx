@@ -8,10 +8,20 @@ interface Props {
   children: React.ReactNode;
 }
 
+/**
+ * Componente que envuelve pantallas que requieren ciertos roles.
+ * Usa `hasAnyRole` del contexto para centralizar la lógica de permisos.
+ *
+ * Uso:
+ * <ProtectedRoute allowedRoles={["admin","owner"]}>
+ *   <MyScreen />
+ * </ProtectedRoute>
+ */
 export default function ProtectedRoute({ allowedRoles, children }: Props) {
-  const { user } = useAuth();
-  const hasAccess = user?.roles?.some((r) => allowedRoles.includes(r));
-  if (!hasAccess) {
+  const { isAuthenticated, hasAnyRole } = useAuth();
+
+  // Si no está autenticado o no tiene ninguno de los roles permitidos
+  if (!isAuthenticated || !hasAnyRole(allowedRoles)) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.center}>
@@ -20,6 +30,7 @@ export default function ProtectedRoute({ allowedRoles, children }: Props) {
       </SafeAreaView>
     );
   }
+
   return <>{children}</>;
 }
 

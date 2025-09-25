@@ -28,10 +28,9 @@ import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 export default function ArtistasPantalla() {
   const router = useRouter();
   const path = usePathname();
-  const { user } = useAuth();
-
-  const roles = Array.isArray(user?.roles) ? (user.roles as any[]) : user?.roles ? [user.roles] : [];
-  const isAdmin = roles.includes("admin");
+  // Usar helpers del contexto para roles y autenticación
+  const { user, isAuthenticated, hasRole } = useAuth();
+  const isAdmin = hasRole("admin");
 
   const [searchText, setSearchText] = useState<string>("");
   const [artists, setArtists] = useState<Artist[]>([]);

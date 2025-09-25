@@ -38,11 +38,10 @@ type PartyItem = {
 
 export default function PartysScreen() {
   const router = useRouter();
-  const { user } = useAuth();
-
-  // Normalizo el id del usuario
-  const userId: string | null =
-    (user as any)?.idUsuario ?? (user as any)?.id ?? null;
+  // Usar helpers del contexto para roles y autenticación
+  const { user, isAuthenticated, hasRole } = useAuth();
+  // Normalizar el id del usuario: preferimos user.id, si no existe usamos idUsuario
+  const userId: string | null = (user as any)?.id ?? (user as any)?.idUsuario ?? null;
 
   // ---- Estado base
   const [loading, setLoading] = useState(true);

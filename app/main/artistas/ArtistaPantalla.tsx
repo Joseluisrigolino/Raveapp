@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Linking,
+  Alert,
 } from "react-native";
 import { IconButton, Avatar } from "react-native-paper";
 import { useLocalSearchParams } from "expo-router";
@@ -31,7 +32,8 @@ import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 
 export default function ArtistaPantalla() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user } = useAuth();
+  // Usar helpers del contexto para roles y autenticación
+  const { user, isAuthenticated, hasRole } = useAuth();
   const [artist, setArtist] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
@@ -75,7 +77,8 @@ export default function ArtistaPantalla() {
         setIsLiked(!!refreshed.isLiked);
       }
     } catch (e) {
-      // Podrías mostrar un error si falla
+      console.error("Error al marcar favorito:", e);
+      Alert.alert("Error", "No se pudo actualizar el favorito. Probá de nuevo.");
     }
   };
 

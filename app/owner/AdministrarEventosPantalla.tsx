@@ -66,7 +66,11 @@ const compareDatesAsc = (a: string, b: string) => {
 
 export default function ManageEventsScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  // Usamos el contexto de autenticación. Además de `user` el contexto
+  // expone helpers como `isAuthenticated`, `hasRole`, `hasAnyRole` que
+  // permiten centralizar la lógica de permisos y evitar repetir checks
+  // en cada componente.
+  const { user, isAuthenticated, hasRole, hasAnyRole } = useAuth();
 
   /** Filtro seleccionado ("all" o código de estado) */
   const [selectedFilter, setSelectedFilter] = useState<FilterValue>("all");
@@ -130,7 +134,10 @@ export default function ManageEventsScreen() {
 
       const merged = batches.flat();
 
-      // Filtrar por propietario si se puede (por id o email)
+      // Filtrar por propietario si se puede (por id o email).
+      // El backend puede devolver distintos campos según el helper usado,
+      // por eso intentamos varios nombres comunes. Idealmente el `AuthUser`
+      // debería normalizar `id` y `username`.
       const userId = (user as any)?.idUsuario ?? (user as any)?.id ?? null;
       const email = (
         (user as any)?.email ?? (user as any)?.correo ?? (user as any)?.mail ?? ""
@@ -151,9 +158,10 @@ export default function ManageEventsScreen() {
           .toString()
           .toLowerCase();
 
+        // Solo mostrar eventos creados por el usuario logueado
         if (userId && ownerId) return String(ownerId) === String(userId);
         if (email && ownerEmail) return ownerEmail === email;
-        return true;
+        return false; // No mostrar eventos de otros usuarios
       });
 
       setAllEvents(mine);

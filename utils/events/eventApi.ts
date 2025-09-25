@@ -1,3 +1,12 @@
+/**
+ * Devuelve los flags isAfter y isLGBT de un evento dado (EventItemWithExtras)
+ */
+export function getEventFlags(event: EventItemWithExtras): { isAfter: boolean; isLGBT: boolean } {
+  return {
+    isAfter: Boolean(event.isAfter),
+    isLGBT: Boolean(event.isLGBT)
+  };
+}
 import { EventItem } from "@/interfaces/EventItem";
 import { apiClient, login } from "@/utils/apiConfig";
 import { mediaApi } from "@/utils/mediaApi";

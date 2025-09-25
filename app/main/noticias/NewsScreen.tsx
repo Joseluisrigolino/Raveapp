@@ -28,10 +28,9 @@ const PLACEHOLDER_IMAGE = "https://via.placeholder.com/400x200?text=Sin+imagen";
 export default function NewsScreen() {
   const router = useRouter();
   const path = usePathname();
-  const { user } = useAuth();
-
-  const roles = Array.isArray(user?.roles) ? (user.roles as any[]) : user?.roles ? [user.roles] : [];
-  const isAdmin = roles.includes("admin");
+  // Usar helpers del contexto para roles y autenticación
+  const { user, isAuthenticated, hasRole } = useAuth();
+  const isAdmin = hasRole("admin");
 
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);

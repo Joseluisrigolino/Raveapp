@@ -4,7 +4,7 @@ export async function toggleArtistFavoriteOnApi(
   idArtista: string
 ): Promise<Artist & { isLiked?: boolean } | void> {
   const token = await login();
-  await apiClient.post(
+  await apiClient.put(
     "/v1/Usuario/ArtistaFavorito",
     { idUsuario, idArtista },
     { headers: { Authorization: `Bearer ${token}` } }
