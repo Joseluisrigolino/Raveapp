@@ -57,7 +57,7 @@ export const mediaApi = {
   },
 
   /** Sube media (igual que ya tenías) */
-  async upload(idEntidadMedia: string, file: any, video?: string) {
+  async upload(idEntidadMedia: string, file: any, video?: string, options?: { compress?: boolean }) {
     if (!idEntidadMedia || !file) {
       throw new Error("mediaApi.upload: faltan idEntidadMedia o file");
     }
@@ -81,10 +81,64 @@ export const mediaApi = {
     } catch {}
     if (video) form.append("Video", video);
 
-    const { data } = await apiClient.post("/v1/Media", form, {
-      headers: token ? { Authorization: `Bearer ${token}` } : ({} as any),
-    });
-    return data;
+    const url = (apiClient.defaults.baseURL ?? "") + "/v1/Media";
+
+    // Si estamos en entorno RN/Expo: preferimos fetch (evita problemas con Content-Type/boundary)
+    const isReactNativeLike = typeof navigator === 'object' && navigator.product === 'ReactNative';
+
+    if (isReactNativeLike) {
+      try {
+        console.log('[mediaApi.upload] usando fetch principal (RN) ->', { idEntidadMedia, url });
+        const headers: any = {};
+        if (token) headers.Authorization = `Bearer ${token}`;
+        const resp = await fetch(url, { method: 'POST', headers, body: form as any });
+        const text = await resp.text();
+        let parsed: any = text;
+        try {
+          parsed = JSON.parse(text);
+        } catch {}
+        if (!resp.ok) {
+          const errMsg = parsed?.message || parsed || `HTTP ${resp.status}`;
+          throw Object.assign(new Error('mediaApi.upload(fetch) fallo: ' + errMsg), { status: resp.status, raw: parsed });
+        }
+        return parsed;
+      } catch (err: any) {
+        console.warn('[mediaApi.upload] fetch principal fallo, se intentará axios como fallback:', err?.message ?? err);
+        // permitir caer al bloque axios fallback a continuación
+      }
+    }
+
+    // Si no estamos en RN o si fetch falló, intentamos axios
+    try {
+      console.log('[mediaApi.upload] intentando axios (fallback) ->', { idEntidadMedia, url });
+      const { data } = await apiClient.post('/v1/Media', form, {
+        headers: token ? { Authorization: `Bearer ${token}` } : ({} as any),
+      });
+      return data;
+    } catch (err: any) {
+      console.warn('[mediaApi.upload] axios fallo:', err?.message ?? err);
+      console.warn('[mediaApi.upload] detalle response:', err?.response ?? err?.request ?? 'sin detalle');
+      // último recurso: reintentar fetch (por si axios manipuló headers)
+      try {
+        console.log('[mediaApi.upload] intentando fallback fetch final ->', url);
+        const headers: any = {};
+        if (token) headers.Authorization = `Bearer ${token}`;
+        const resp = await fetch(url, { method: 'POST', headers, body: form as any });
+        const text = await resp.text();
+        let parsed: any = text;
+        try {
+          parsed = JSON.parse(text);
+        } catch {}
+        if (!resp.ok) {
+          const errMsg = parsed?.message || parsed || `HTTP ${resp.status}`;
+          throw Object.assign(new Error('mediaApi.upload(fetch) fallo: ' + errMsg), { status: resp.status, raw: parsed });
+        }
+        return parsed;
+      } catch (err2: any) {
+        console.error('[mediaApi.upload] fallback fetch fallo:', err2?.message ?? err2);
+        throw err; // re-throw original axios error (más informativo)
+      }
+    }
   },
 
   /** Eliminar media */

@@ -40,6 +40,8 @@ interface Props {
   setShowMunicipalities: (v: boolean) => void;
   showLocalities: boolean;
   setShowLocalities: (v: boolean) => void;
+  // Si true, permitimos mostrar localidades sin que exista municipio seleccionado
+  allowLocalitiesWithoutMunicipality?: boolean;
 
   handleSelectProvince: (id: string, name: string) => Promise<void> | void;
   handleSelectMunicipality: (id: string, name: string) => Promise<void> | void;
@@ -72,6 +74,7 @@ export default function LocationSelector(props: Props) {
     handleSelectProvince,
     handleSelectMunicipality,
     handleSelectLocality,
+    allowLocalitiesWithoutMunicipality,
   } = props;
 
   return (
@@ -108,14 +111,14 @@ export default function LocationSelector(props: Props) {
       <Text style={styles.label}>Municipio</Text>
       <TouchableOpacity
         style={styles.dropdownButton}
-        disabled={!provinceId}
+        disabled={!provinceId || provinceId === '02'}
         onPress={() => {
           setShowMunicipalities(!showMunicipalities);
           setShowProvinces(false);
           setShowLocalities(false);
         }}
       >
-        <Text style={[styles.dropdownText, !provinceId && { opacity: 0.5 }]}>
+        <Text style={[styles.dropdownText, (!provinceId || provinceId === '02') && { opacity: 0.5 }]}>
           {municipalityName || "Seleccione un municipio"}
         </Text>
       </TouchableOpacity>
@@ -137,14 +140,17 @@ export default function LocationSelector(props: Props) {
       <Text style={styles.label}>Localidad</Text>
       <TouchableOpacity
         style={styles.dropdownButton}
-        disabled={!municipalityId}
+        disabled={!municipalityId && !allowLocalitiesWithoutMunicipality}
         onPress={() => {
           setShowLocalities(!showLocalities);
           setShowProvinces(false);
           setShowMunicipalities(false);
         }}
       >
-        <Text style={[styles.dropdownText, !municipalityId && { opacity: 0.5 }]}>
+        <Text style={[
+          styles.dropdownText,
+          !municipalityId && !allowLocalitiesWithoutMunicipality && { opacity: 0.5 }
+        ]}>
           {localityName || "Seleccione una localidad"}
         </Text>
       </TouchableOpacity>

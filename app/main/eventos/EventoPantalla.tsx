@@ -34,12 +34,16 @@ import {
   putEventoFavorito,
 } from "@/utils/auth/userHelpers";
 
+// Traemos directamente el raw de la API por fecha (fetchEntradasFechaRaw)
+// y resolvemos tipos/estados con los helpers del módulo de entradas.
 import {
-  fetchEntradasByFecha,
+  fetchEntradasFechaRaw,
   fetchTiposEntrada,
   getTipoMap,
+  getEstadoMap,
   UiEntrada,
 } from "@/utils/events/entradaApi";
+import { ESTADO_CODES } from "@/utils/events/eventApi";
 
 type FechaLite = { idFecha: string; inicio: string; fin: string };
 
@@ -156,19 +160,64 @@ export default function EventScreen() {
       if (!fechas.length) return;
       setLoadingEntradas(true);
       try {
+        // Aseguramos caches de tipos y estados
         await fetchTiposEntrada();
         const tipoMap = await getTipoMap();
 
+        // Intentamos también traer mapa de estados (por si queremos mostrar estado de la entrada)
+        // Nota: getEstadoMap es opcional si no necesitamos labels ahora
+        // const estadoMap = await getEstadoMap().catch(() => new Map());
+
         const results = await Promise.all(
-          fechas.map(async (f) => {
-            const raw = await fetchEntradasByFecha(f.idFecha);
-            // local merge: map ApiEntradaFecha -> UiEntrada using tipoMap
-            const merged: UiEntrada[] = (raw || []).map((r: any) => ({
-              ...r,
-              nombreTipo: tipoMap.get(Number(r.cdTipo)) ?? String(r.cdTipo),
-              maxCompra: 10,
-            }));
-            return [f.idFecha, merged] as const;
+          fechas.map(async (f): Promise<[string, UiEntrada[]]> => {
+            // Traemos raw para conservar idEntrada, cantidad, tipo.dsTipo, etc.
+            const raw = await fetchEntradasFechaRaw(f.idFecha).catch(() => []);
+
+            // Si la fecha no está en EN_VENTA, no devolvemos entradas para esa fecha
+            const fechaEstado = raw?.[0]?.fecha?.estado ?? null;
+            if (fechaEstado !== ESTADO_CODES.EN_VENTA) {
+              return [f.idFecha, [] as UiEntrada[]];
+            }
+
+            const merged: UiEntrada[] = (raw || []).map((r: any, idx: number) => {
+              const tipoObj = r.tipo ?? null;
+              const fechaObj = r.fecha ?? null;
+
+              const cdTipo = Number(tipoObj?.cdTipo ?? 0);
+              const nombreTipo =
+                tipoMap.get(cdTipo) ?? tipoObj?.dsTipo ?? String(cdTipo);
+
+              const cantidad =
+                typeof r.cantidad === "number" ? Number(r.cantidad) : undefined;
+
+              const maxPorUsuario =
+                typeof r.maxPorUsuario === "number" ? r.maxPorUsuario : undefined;
+
+              // asegurar idEntrada único: si backend no provee id, generamos uno con índice
+              const idEntradaRaw = r.idEntrada ?? null;
+              const idEntrada = String(
+                idEntradaRaw ?? `gen-${f.idFecha}-${cdTipo}-${idx}`
+              );
+
+              return {
+                idEntrada,
+                idFecha: String(fechaObj?.idFecha ?? f.idFecha),
+                cdTipo,
+                precio: Number(r.precio ?? 0),
+                stock: cantidad,
+                maxPorUsuario,
+                nombreTipo,
+                // maxCompra: preferir maxPorUsuario, sino stock, sino 10
+                maxCompra:
+                  typeof maxPorUsuario === "number"
+                    ? maxPorUsuario
+                    : typeof cantidad === "number"
+                    ? cantidad
+                    : 10,
+              } as UiEntrada;
+            });
+
+            return [f.idFecha, merged];
           })
         );
 
@@ -240,13 +289,22 @@ export default function EventScreen() {
     let sum = 0;
     Object.entries(entradasPorFecha).forEach(([idFecha, arr]) => {
       arr.forEach((ent) => {
-        const key = `fecha-${idFecha}-tipo-${ent.cdTipo}`;
-        const qty = selectedTickets[key] || 0;
+        const entryKey = `entrada-${ent.idEntrada}`;
+        const qty = selectedTickets[entryKey] || 0;
         sum += qty * (ent.precio || 0);
       });
     });
     return sum;
   }, [entradasPorFecha, selectedTickets]);
+
+  const noEntradasAvailable = useMemo(() => {
+    if (loadingEntradas) return false;
+    if (!fechas || fechas.length === 0) return true;
+    const hasAny = Object.values(entradasPorFecha).some(
+      (arr) => Array.isArray(arr) && arr.length > 0
+    );
+    return !hasAny;
+  }, [loadingEntradas, fechas, entradasPorFecha]);
 
   const handleBuyPress = () => {
     if (!eventData) return;
@@ -345,7 +403,12 @@ export default function EventScreen() {
               </View>
             )}
 
-            {!loadingEntradas &&
+            {!loadingEntradas && noEntradasAvailable ? (
+              <View style={{ paddingVertical: 20, alignItems: "center" }}>
+                <Text style={{ color: COLORS.textSecondary }}>Entradas no disponibles.</Text>
+              </View>
+            ) : (
+              !loadingEntradas &&
               fechas.map((f, idx) => {
                 const entradas = entradasPorFecha[f.idFecha] || [];
                 return (
@@ -362,27 +425,32 @@ export default function EventScreen() {
                       </Text>
                     ) : (
                       entradas.map((ent) => {
-                        const key = `fecha-${f.idFecha}-tipo-${ent.cdTipo}`;
+                        const entryKey = `entrada-${ent.idEntrada}`;
                         return (
                           <TicketSelector
-                            key={key}
+                            key={entryKey}
                             label={`${ent.nombreTipo} ($${ent.precio})`}
                             maxQty={ent.maxCompra}
-                            currentQty={selectedTickets[key] || 0}
-                            onChange={(d) => updateTicketCount(key, d)}
+                            currentQty={selectedTickets[entryKey] || 0}
+                            onChange={(d) => updateTicketCount(entryKey, d)}
                           />
                         );
                       })
                     )}
                   </View>
                 );
-              })}
+              })
+            )}
 
             <View style={styles.subtotalRow}>
               <Text style={styles.subtotalText}>Subtotal: ${subtotal}</Text>
               <TouchableOpacity
-                style={styles.buyButton}
+                style={[
+                  styles.buyButton,
+                  (noEntradasAvailable || subtotal <= 0) && styles.buyButtonDisabled,
+                ]}
                 onPress={handleBuyPress}
+                disabled={noEntradasAvailable || subtotal <= 0}
               >
                 <Text style={styles.buyButtonText}>Comprar</Text>
               </TouchableOpacity>
@@ -507,6 +575,9 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.card,
     paddingVertical: 10,
     paddingHorizontal: 20,
+  },
+  buyButtonDisabled: {
+    opacity: 0.5,
   },
   buyButtonText: {
     fontFamily: FONTS.bodyRegular,

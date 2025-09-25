@@ -5,7 +5,8 @@ const API_BASE_URL = "https://api.raveapp.com.ar";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 5000,
+  // Aumentamos timeout para operaciones de upload en mobile
+  timeout: 30000,
 });
 
 // Función para obtener el “root” token que autoriza las demás llamadas

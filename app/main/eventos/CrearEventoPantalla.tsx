@@ -1,6 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -72,6 +71,7 @@ import ScheduleSection from "@/components/events/create/ScheduleSection";
 import TicketSection from "@/components/events/create/TicketSection";
 import TicketConfigSection from "@/components/events/create/TicketConfigSection";
 import MediaSection from "@/components/events/create/MediaSection";
+import CirculoCarga from '@/components/general/CirculoCarga';
 
 /* ================= Tipos locales ================= */
 type EventType = "1d" | "2d" | "3d";
@@ -418,13 +418,13 @@ export default function CreateEventScreen() {
   }, [isRecurring]);
 
   /* ================= Handlers ================= */
-  const toggleGenre = (id: number) => {
+  const toggleGenre = useCallback((id: number) => {
     setSelectedGenres((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
-  };
+  }, []);
 
-  const addArtistByName = (nameRaw: string) => {
+  const addArtistByName = useCallback((nameRaw: string) => {
     const name = nameRaw.trim();
     if (!name) return;
     if (selectedArtists.some((a) => norm(a.name) === norm(name))) {
@@ -433,17 +433,17 @@ export default function CreateEventScreen() {
     }
     setSelectedArtists((prev) => [...prev, { name, image: "" } as ArtistSel]);
     setArtistInput("");
-  };
+  }, [selectedArtists]);
 
-  const handleSelectArtistFromSuggestions = (a: Artist) => {
+  const handleSelectArtistFromSuggestions = useCallback((a: Artist) => {
     if (selectedArtists.some((s) => norm(s.name) === norm(a.name))) return;
     setSelectedArtists((prev) => [...prev, a]);
     setArtistInput("");
-  };
+  }, [selectedArtists]);
 
-  const handleRemoveArtist = (name: string) => {
+  const handleRemoveArtist = useCallback((name: string) => {
     setSelectedArtists((prev) => prev.filter((x) => x.name !== name));
-  };
+  }, []);
 
   const onPickParty = (p: Party) => {
     setSelectedPartyId(p.idFiesta);
@@ -457,120 +457,174 @@ export default function CreateEventScreen() {
     setNewPartyLocked(true);
   };
 
-  const setSchedule = (i: number, key: keyof DaySchedule, val: Date) => {
+  const setSchedule = useCallback((i: number, key: keyof DaySchedule, val: Date) => {
     setDaySchedules((prev) => {
       const arr = [...prev];
       arr[i] = { ...arr[i], [key]: val };
       return arr;
     });
-  };
-  const setSaleCfg = (i: number, key: keyof DaySaleConfig, val: Date) => {
+  }, []);
+  const setSaleCfg = useCallback((i: number, key: keyof DaySaleConfig, val: Date) => {
     setDaySaleConfigs((prev) => {
       const arr = [...prev];
       arr[i] = { ...arr[i], [key]: val };
       return arr;
     });
-  };
-  const setTicket = (i: number, key: keyof DayTickets, val: string) => {
+  }, []);
+  const setTicket = useCallback((i: number, key: keyof DayTickets, val: string) => {
     setDaysTickets((prev) => {
       const arr = [...prev];
       arr[i] = { ...arr[i], [key]: val.replace(/[^0-9]/g, "") };
       return arr;
     });
-  };
+  }, []);
 
-  const totalPerDay = (d: DayTickets) =>
-    (parseInt(d.genQty || "0", 10) || 0) + (parseInt(d.vipQty || "0", 10) || 0);
+  // Estados de carga para evitar bloquear la UI en Android
+  const [municipalityLoading, setMunicipalityLoading] = useState(false);
+  const [localityLoading, setLocalityLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
 
-  const grandTotal = useMemo(
-    () => daysTickets.reduce((acc, d) => acc + totalPerDay(d), 0),
-    [daysTickets]
-  );
+  // Handlers no bloqueantes para selección de provincia/municipio/localidad
+  const handleSelectProvinceCallback = useCallback((id: string, name: string) => {
+    // Actualizamos UI inmediatamente
+    setProvinceId(id);
+    setProvinceName(name);
+    setMunicipalityId("");
+    setMunicipalityName("");
+    setLocalityId("");
+    setLocalityName("");
+    setMunicipalities([]);
+    setLocalities([]);
+    setShowProvinces(false);
 
-  // ====== VALIDACIÓN DE ARCHIVO IMAGEN (tamaño y extensión) ======
-  const isAllowedExt = (nameOrUri?: string) => {
-    if (!nameOrUri) return false;
-    const last = nameOrUri.split("?")[0].split("#")[0].split("/").pop() || "";
-    const ext = (last.split(".").pop() || "").toLowerCase();
-    return ALLOWED_EXTS.has(ext);
-  };
-
-  const handleSelectPhoto = async () => {
-    try {
-      const current = await ImagePicker.getMediaLibraryPermissionsAsync();
-      if (current.status !== "granted") {
-        const req = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (req.status !== "granted") {
-          Alert.alert(
-            "Permiso denegado",
-            "Necesitamos permiso para acceder a tus fotos."
-          );
-          return;
-        }
+    // Cargamos municipios en background para no bloquear la UI (Android)
+    setTimeout(async () => {
+      setMunicipalityLoading(true);
+      try {
+        const mun = await fetchMunicipalities(id);
+        setMunicipalities(mun);
+      } catch (e) {
+        console.warn("Error fetchMunicipalities:", e);
+        setMunicipalities([]);
+      } finally {
+        setMunicipalityLoading(false);
       }
+    }, 0);
+  }, []);
 
-      if (Platform.OS === "web") {
-        Alert.alert(
-          "No soportado en Web",
-          "En Web usá el botón 'Subir archivo' (input type=file)."
-        );
-        return;
+  const handleSelectMunicipalityCallback = useCallback((id: string, name: string) => {
+    setMunicipalityId(id);
+    setMunicipalityName(name);
+    setLocalityId("");
+    setLocalityName("");
+    setLocalities([]);
+    setShowMunicipalities(false);
+
+    setTimeout(async () => {
+      setLocalityLoading(true);
+      try {
+        const loc = await fetchLocalities(provinceId, id);
+        setLocalities(loc);
+      } catch (e) {
+        console.warn("Error fetchLocalities:", e);
+        setLocalities([]);
+      } finally {
+        setLocalityLoading(false);
       }
+    }, 0);
+  }, [provinceId]);
 
-      const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 1,
-        selectionLimit: 1,
-      });
+  const handleSelectLocalityCallback = useCallback((id: string, name: string) => {
+    setLocalityId(id);
+    setLocalityName(name);
+    setShowLocalities(false);
+  }, []);
 
-      if (res.canceled || !res.assets?.length) return;
-
-      const asset = res.assets[0];
-      const uri = asset.uri;
-
-      // 1) Tamaño real del archivo
-      const info = await FileSystem.getInfoAsync(uri);
-      const size = (info as any)?.size ?? asset.fileSize ?? 0;
-      if (size > MAX_IMAGE_BYTES) {
-        Alert.alert(
-          "Imagen demasiado pesada",
-          "La imagen debe pesar menos de 2 MB."
-        );
-        return; // NO seteamos photoFile
-      }
-
-      // 2) Extensión permitida (JPG, JPEG, PNG)
-      const filename = asset.fileName || uri.split("/").pop() || "";
-      const allowed = isAllowedExt(filename) || isAllowedExt(uri);
-      if (!allowed) {
-        Alert.alert(
-          "Formato no soportado",
-          "La imagen debe ser JPG, JPEG o PNG."
-        );
-        return; // NO seteamos photoFile
-      }
-
-      // Si pasó validaciones, recién ahí lo seteamos
-      setPhotoFile(uri);
-    } catch (e) {
-      console.error("ImagePicker error", e);
-      Alert.alert("Error", "No se pudo abrir la galería.");
+  // VALIDACIONES extra antes de submit
+  const validateBeforeSubmit = useCallback(() => {
+    // 1) Género obligatorio
+    if (!selectedGenres || selectedGenres.length === 0) {
+      Alert.alert('Validación', 'Debe seleccionar al menos un género musical.');
+      return false;
     }
-  };
+    // 2) Descripción obligatoria
+    if (!eventDescription || !eventDescription.trim()) {
+      Alert.alert('Validación', 'La descripción es obligatoria.');
+      return false;
+    }
+    // 3) Fechas: inicio/fin deben ser > ahora y fin > inicio y no misma hora exacta
+    const now = Date.now();
+    for (let i = 0; i < daySchedules.length; i++) {
+      const s = daySchedules[i].start ? new Date(daySchedules[i].start).getTime() : NaN;
+      const e = daySchedules[i].end ? new Date(daySchedules[i].end).getTime() : NaN;
+      if (!isFinite(s) || !isFinite(e)) {
+        Alert.alert('Validación', `La fecha de inicio y fin del día ${i + 1} son obligatorias.`);
+        return false;
+      }
+      if (s <= now) {
+        Alert.alert('Validación', `La fecha de inicio del día ${i + 1} debe ser posterior al momento actual.`);
+        return false;
+      }
+      if (e <= now) {
+        Alert.alert('Validación', `La fecha de fin del día ${i + 1} debe ser posterior al momento actual.`);
+        return false;
+      }
+      if (e <= s) {
+        Alert.alert('Validación', `La fecha de fin del día ${i + 1} debe ser posterior a la fecha de inicio.`);
+        return false;
+      }
+      // No permitir misma hora exacta
+      const sameHour = Math.abs(e - s) < 60 * 60 * 1000 && new Date(e).getHours() === new Date(s).getHours() && new Date(e).getDate() === new Date(s).getDate();
+      if (sameHour) {
+        Alert.alert('Validación', `La fecha de fin del día ${i + 1} no puede estar en la misma hora que el inicio.`);
+        return false;
+      }
+    }
+
+    // 4) Si provincia es CABA (02), forzamos skip municipio y requerimos localidad
+    if (provinceId === '02') {
+      if (!localityId) {
+        Alert.alert('Validación', 'Debe seleccionar una localidad en Ciudad Autónoma de Buenos Aires.');
+        return false;
+      }
+    } else {
+      // fuera de CABA: municipio y localidad obligatorios
+      if (!municipalityId) {
+        Alert.alert('Validación', 'Debe seleccionar un municipio.');
+        return false;
+      }
+      if (!localityId) {
+        Alert.alert('Validación', 'Debe seleccionar una localidad.');
+        return false;
+      }
+    }
+
+    return true;
+  }, [selectedGenres, eventDescription, daySchedules, provinceId, municipalityId, localityId]);
 
   // Helpers
   const toIso = (d?: Date) => (d ? new Date(d).toISOString() : undefined);
 
   async function createPendingEntities(userId: string) {
+    const result: { partyCreated?: any } = {};
     if (isRecurring && newPartyLocked && newPartyName.trim()) {
-      await createParty({
+      const payload = {
         idUsuario: String(userId),
         nombre: newPartyName.trim(),
         isActivo: true,
-      });
+      };
+      console.log("[PendingEntities] creando fiesta recurrente con payload:", payload);
+      try {
+        const created = await createParty(payload);
+        result.partyCreated = created;
+        console.log("[PendingEntities] fiesta recurrente creada:", created);
+      } catch (e: any) {
+        console.error("[PendingEntities] error creando fiesta:", extractBackendMessage(e));
+        throw e;
+      }
     }
     // Si hay artistas nuevos, aquí podrías agregar lógica para crearlos si existe la función correspondiente.
+    return result;
   }
 
   async function buildEntradasForFechas(
@@ -661,211 +715,260 @@ export default function CreateEventScreen() {
     }
   }
 
+  // Helper: validar extensión permitida a partir de un nombre o URI
+  const isAllowedExt = (nameOrUri?: string | null): boolean => {
+    if (!nameOrUri) return false;
+    const cleaned = String(nameOrUri).split("?")[0].split("#")[0];
+    const parts = cleaned.split(".");
+    if (parts.length < 2) return false;
+    const ext = parts.pop()!.toLowerCase();
+    return ALLOWED_EXTS.has(ext);
+  };
+
+  // Helper: obtener tamaño de archivo de forma robusta.
+  // Intenta fetch->blob (funciona en web y RN), y si falla usa expo-file-system como fallback.
+  async function getFileSize(uri: string): Promise<number> {
+    try {
+      // Intentamos fetch primero
+      const res = await fetch(uri);
+      if (!res.ok) throw new Error("fetch no OK");
+      // @ts-ignore - blob puede no estar tipado en entornos RN
+      const blob = await res.blob();
+      if (blob && typeof blob.size === "number") return blob.size;
+    } catch (e) {
+      console.warn("[getFileSize] fetch->blob falló, intentando fallback expo-file-system:", e);
+      try {
+        if (Platform.OS !== "web") {
+          const FileSystem = await import("expo-file-system");
+          const info = await FileSystem.getInfoAsync(uri);
+          if (info && typeof (info as any).size === "number") return (info as any).size;
+        }
+      } catch (err) {
+        console.warn("[getFileSize] fallback FileSystem falló:", err);
+      }
+    }
+    return 0; // no pudimos determinar tamaño
+  }
+
   // Submit final
-  const handleSubmit = async () => {
-    if (!userId) {
-      Alert.alert("Sesión", "Debés iniciar sesión para crear un evento.");
-      return;
-    }
-    if (!eventName.trim()) {
-      Alert.alert("Nombre", "Completá el nombre del evento.");
-      return;
-    }
-    if (!photoFile) {
-      Alert.alert("Foto obligatoria", "Seleccioná una imagen del evento.");
-      return;
-    }
-    if (!acceptedTC) {
-      Alert.alert("Términos", "Debés aceptar los términos y condiciones.");
-      return;
-    }
+  const handleSubmit = useCallback(async () => {
+    console.log('[CreateEvent] Inicio del flujo de creación. Resumen inicial:', {
+      dayCount,
+      eventName,
+      eventType,
+      isRecurring,
+      selectedArtists: selectedArtists.map((a) => ({ id: (a as any).idArtista ?? (a as any).id, name: (a as any).name })),
+      selectedGenres,
+      selectedPartyId,
+      userId,
+    });
 
     try {
-      await createPendingEntities(String(userId)).catch((e) => {
-        throw new Error(extractBackendMessage(e));
+      if (!userId) throw new Error('Usuario no autenticado.');
+      // Validaciones mínimas
+      if (!eventName || !acceptedTC) throw new Error('Complete nombre de evento y acepte T&C.');
+
+      // 1) Crear entidades pendientes (fiesta recurrente, etc.)
+      const pending = await createPendingEntities(userId).catch((e) => {
+        console.warn('[CreateEvent] createPendingEntities fallo, se continúa:', e);
+        return {} as any;
       });
+      console.log('[CreateEvent] pending entities result:', pending);
 
-      const artistIds = selectedArtists
-        .map((a) => a.idArtista || (a as any).id || (a as any).IdArtista)
-        .filter(Boolean)
-        .map(String);
-
-      const fechasPayload = daySchedules.map((sch, i) => ({
-        inicio: toIso(sch.start),
-        fin: toIso(sch.end),
-        inicioVenta: toIso(daySaleConfigs[i]?.saleStart),
-        finVenta: toIso(daySaleConfigs[i]?.sellUntil),
+      // 2) Construir body y llamar createEvent
+      const body = {
+        descripcion: eventDescription || "",
+        domicilio: {
+          direccion: street || "",
+          latitud: 0,
+          longitud: 0,
+          provincia: { codigo: provinceId, nombre: provinceName },
+          municipio: { codigo: municipalityId, nombre: municipalityName },
+          localidad: { codigo: localityId, nombre: localityName },
+        },
         estado: 0,
-      }));
-
-      const domicilio = {
-        localidad: { nombre: localityName, codigo: localityId },
-        municipio: { nombre: municipalityName, codigo: municipalityId },
-        provincia: { nombre: provinceName, codigo: provinceId },
-        direccion: street,
-        latitud: 0,
-        longitud: 0,
-      };
-
-      // 🔑 clave: mandar null si no hay fiesta
-      const idFiestaValue = selectedPartyId ? String(selectedPartyId) : null;
-
-      const body: any = {
-        idUsuario: String(userId),
-        idArtistas: artistIds as string[],
-        domicilio,
-        nombre: eventName.trim(),
-        descripcion: eventDescription?.trim() ?? "",
+        fechas: daySchedules.map((d, i) => ({
+          inicio: toIso(d.start),
+          fin: toIso(d.end),
+          inicioVenta: toIso(daySaleConfigs[i]?.saleStart),
+          finVenta: toIso(daySaleConfigs[i]?.sellUntil),
+          estado: 0,
+        })),
         genero: selectedGenres,
+        idArtistas: selectedArtists.map((a) => (a as any).idArtista ?? (a as any).id).filter(Boolean),
+        idFiesta: selectedPartyId || null,
+        idUsuario: userId,
+        inicioVenta: toIso(daySaleConfigs[0]?.saleStart),
+        finVenta: toIso(daySaleConfigs[0]?.sellUntil),
         isAfter,
         isLgbt: isLGBT,
-        inicioVenta: toIso(daySaleConfigs[0]?.saleStart),
-        finVenta: toIso(daySaleConfigs[daySaleConfigs.length - 1]?.sellUntil),
-        estado: 0,
-        fechas: fechasPayload,
-        soundCloud: musicLink?.trim() || "",
-        idFiesta: idFiestaValue,
+        nombre: eventName,
+        soundCloud: musicLink || "",
       };
-      // Si preferís OMITE la propiedad cuando no hay fiesta:
-      // if (idFiestaValue === null) delete body.idFiesta;
 
-      console.log("[CreateEvent] payload:", JSON.stringify(body, null, 2));
+      console.log('[CreateEvent] payload que se enviará a createEvent:', JSON.parse(JSON.stringify(body)));
 
-      // 1) Crear evento
-      let resp: any;
-      try {
-        resp = await createEvent(body);
-      } catch (e: any) {
-        Alert.alert("Error al crear el evento", extractBackendMessage(e));
-        return;
-      }
+      const createResult = await createEvent(body);
+      console.log('[CreateEvent] respuesta cruda del backend:', createResult);
 
-      try {
-        const preview = JSON.stringify(resp, null, 2);
-        console.log(
-          "[CreateEvent] raw response (first 2KB):",
-          preview.length > 2000
-            ? preview.slice(0, 2000) + " …(truncado)"
-            : preview
-        );
-      } catch {
-        console.log("[CreateEvent] raw response: <no JSON serializable>");
-      }
+      // 3) Extraer fechas devueltas por el backend
+      let remoteFechas = extractFechasFromCreateResp(createResult as any);
+      console.log('[CreateEvent] remoteFechas extraídas:', remoteFechas);
 
-      // 2) Resolver fechas devueltas
-      const remoteFechas = extractFechasFromCreateResp(resp);
-
-      // 2.a) Resolver idEvento (si existiera)
-      let idEvento: string | null =
-        typeof resp !== "string"
-          ? resp?.idEvento ??
-            resp?.id ??
-            resp?.Id ??
-            resp?.Id_Evento ??
-            resp?.data?.idEvento ??
-            resp?.data?.id ??
-            null
-          : null;
-
-      // 2.b) Resolver fechaIds para cada día local
+      // 4) Si no hay fechas, intentamos determinar si el createResult es idFecha o idEvento
       let fechaIds: string[] = [];
-      if (remoteFechas.length) {
-        fechaIds = mapLocalToRemoteFechaIds(daySchedules, remoteFechas);
-        if (
-          fechaIds.filter(Boolean).length !== daySchedules.length &&
-          remoteFechas.length === daySchedules.length
-        ) {
-          fechaIds = remoteFechas.map((f) => f.idFecha);
-        }
-      } else if (typeof resp === "string") {
-        // Backend devuelve un único idFecha
-        fechaIds = new Array(dayCount).fill(resp);
-      }
 
-      console.log("[CreateEvent] fechaIds resueltas:", fechaIds);
+      const entradaApi = await import('@/utils/events/entradaApi');
+      const eventApi = await import('@/utils/events/eventApi');
 
-      if (fechaIds.filter(Boolean).length !== dayCount) {
-        Alert.alert(
-          "Error",
-          "No se pudieron confirmar las fechas del evento a partir de la respuesta del backend."
-        );
-        return;
-      }
-
-      // 2.c) Si no hay idEvento, intentar resolver por nombre/fecha
-      if (!idEvento) {
-        idEvento = await tryResolveEventIdAfterCreate(
-          eventName.trim(),
-          daySchedules[0]?.start
-        );
-        console.log("[CreateEvent] idEvento resuelto por búsqueda:", idEvento);
-      }
-
-      // 3) Mitigar 500: esperar a que la fecha exista
-      await ensureFechaListo(fechaIds[0], probeGetEntradasFecha, {
-        retries: 6,
-        baseDelayMs: 350,
-      });
-
-      // 4) Subir imagen si tenemos idEvento
-      if (photoFile && idEvento) {
-        const filename = photoFile.split("/").pop() || "evento.jpg";
-        const ext = filename.includes(".") ? filename.split(".").pop() : "jpg";
-        const type = `image/${ext?.toLowerCase() === "png" ? "png" : "jpeg"}`;
-        // @ts-ignore - RN FormData file shape
-        const file: any = { uri: photoFile, name: filename, type };
-        console.log("[Media] subiendo imagen:", { idEvento, filename, type });
-        try {
-          await mediaApi.upload(idEvento, file);
-          console.log("[Media] subida OK");
-        } catch (e: any) {
-          console.log("[Media] subida FALLÓ:", extractBackendMessage(e));
-          Alert.alert(
-            "Aviso",
-            "El evento se creó, pero la imagen no se pudo subir: " +
-              extractBackendMessage(e)
-          );
-        }
-      } else if (photoFile && !idEvento) {
-        console.log(
-          "[Media] se omitió la subida: no se pudo resolver idEvento."
-        );
-        Alert.alert(
-          "Aviso",
-          "No pude identificar el ID del evento recién creado. La imagen no fue subida."
-        );
-      }
-
-      // 5) Crear entradas
-      try {
-        const entradas = await buildEntradasForFechas(fechaIds);
-        console.log("[Entradas] payload a crear:", entradas);
-        if (entradas.length) {
-          await createEntradasBulk(entradas);
-          console.log("[Entradas] creación OK");
+      // Si el backend devolvió un string (posible idEvento o idFecha)
+      if (!remoteFechas.length && typeof createResult === 'string' && createResult.trim()) {
+        const candidate = String(createResult).trim();
+        // 4.a) Probar si es un idFecha válido (GET entradas fecha responde OK)
+        const esFecha = await probeGetEntradasFecha(candidate).catch(() => false);
+        if (esFecha) {
+          console.log('[CreateEvent] backend devolvió un idFecha simple:', [candidate]);
+          fechaIds = [candidate];
         } else {
-          console.log(
-            "[Entradas] no hay items para crear (cantidades o precios en 0)"
-          );
+          // 4.b) Probar si es idEvento y obtener sus fechas
+          try {
+            const ev = await eventApi.fetchEventById(candidate);
+            const fromEvent = ev?.fechas?.map((f: any) => String(f?.idFecha).trim()).filter(Boolean) || [];
+            if (fromEvent.length) {
+              console.log('[CreateEvent] fechas obtenidas consultando evento por id:', fromEvent);
+              remoteFechas = fromEvent.map((id: string) => ({ idFecha: id }));
+            }
+          } catch (e) {
+            console.warn('[CreateEvent] fetchEventById no resolvió fechas para:', candidate, e);
+          }
         }
-      } catch (e: any) {
-        console.log("[Entradas] creación FALLÓ:", extractBackendMessage(e));
-        Alert.alert("Error al crear las entradas", extractBackendMessage(e));
-        return;
       }
 
-        Alert.alert("Éxito", "Evento y entradas creados correctamente.", [
-        {
-          text: "OK",
-          onPress: () => nav.push(router, { pathname: ROUTES.OWNER.MANAGE_EVENTS }),
-        },
-      ]);
-    } catch (e: any) {
-      const msg = extractBackendMessage(e);
-      console.error("[CreateEvent] error:", e);
-      Alert.alert("Error", msg);
+      // 5) Si ahora tenemos remoteFechas, mapear a ids por cercanía
+      if (remoteFechas.length) {
+        const mapped = mapLocalToRemoteFechaIds(daySchedules, remoteFechas as any);
+        fechaIds = mapped.filter(Boolean);
+      }
+
+      // 6) Si aún no hay fechaIds, intentar resolución por búsqueda general (nombre/fecha)
+      if (!fechaIds.length) {
+        try {
+          const maybeEventId = await tryResolveEventIdAfterCreate(eventName, daySchedules[0]?.start);
+          if (maybeEventId) {
+            const ev = await eventApi.fetchEventById(maybeEventId);
+            const fromEvent = ev?.fechas?.map((f: any) => String(f?.idFecha).trim()).filter(Boolean) || [];
+            if (fromEvent.length) {
+              console.log('[CreateEvent] fechas obtenidas tras tryResolveEventIdAfterCreate:', fromEvent);
+              remoteFechas = fromEvent.map((id: string) => ({ idFecha: id }));
+              fechaIds = fromEvent;
+            }
+          }
+        } catch (e) {
+          console.warn('[CreateEvent] intento adicional para resolver idEvento/fechas falló', e);
+        }
+      }
+
+      console.log('[CreateEvent] fechaIds resueltas finales:', fechaIds);
+
+      if (!fechaIds.length) {
+        console.error('[CreateEvent] No se pudieron resolver ids de fecha. No se crearán entradas.');
+        Alert.alert('Error', 'No se pudieron obtener los IDs de las fechas del evento. Revise la consola para más detalles.');
+        return; // no navegamos
+      }
+
+      // 7) Esperar a que las fechas estén visibles en backend (poll)
+      for (const idF of fechaIds) {
+        await entradaApi.ensureFechaListo(idF).catch(() => {
+          console.warn('[CreateEvent] ensureFechaListo no confirmó fecha:', idF);
+        });
+      }
+
+      // 8) Crear entradas
+      const entradasPayload = await buildEntradasForFechas(fechaIds);
+      console.log('[Entradas] payload a crear:', JSON.parse(JSON.stringify(entradasPayload)));
+      try {
+        await entradaApi.createEntradasBulk(entradasPayload);
+        console.log('[Entradas] creación OK');
+      } catch (e: any) {
+        console.error('[Entradas] creación FALLÓ:', e?.message || e);
+        Alert.alert('Error al crear entradas', e?.message || 'Fallo al crear las entradas. Revise la consola.');
+        return; // no navegamos
+      }
+
+      // 9) Subir media (si corresponde) — no bloqueante para la navegación final
+      try {
+        if (photoFile) {
+          const fn = photoFile.split('/').pop() || 'image.jpg';
+          const fileObj = { name: fn, type: 'image/jpeg', uri: photoFile } as any;
+          console.log('[Media] subiendo imagen con payload:', JSON.parse(JSON.stringify({ file: { name: fn, type: 'image/jpeg' } }))); 
+          const mediaApi = (await import('@/utils/mediaApi')).mediaApi;
+
+          // Preferimos subir la media asignada a la entidad EVENTO (IdEntidadMedia).
+          // Intentamos resolver createdEventId (si el backend devolvió idEvento) y usamos eso; si no, hacemos fallback a la primera fecha (idFecha).
+          let uploadTarget = (fechaIds && fechaIds[0]) || null;
+          try {
+            // intentar obtener idEvento si fue devuelto al crear
+            let possibleEventId: string | null = null;
+            if (typeof createResult === 'string') {
+              // si createResult fue string, puede ser idEvento; probeamos si NO es idFecha
+              const cand = String(createResult).trim();
+              const esFecha = await probeGetEntradasFecha(cand).catch(() => false);
+              if (!esFecha) possibleEventId = cand;
+            } else if (createResult && (createResult.idEvento || createResult.IdEvento || createResult.id || createResult.Id)) {
+              possibleEventId = String(createResult.idEvento ?? createResult.IdEvento ?? createResult.id ?? createResult.Id);
+            }
+            if (possibleEventId) uploadTarget = possibleEventId;
+          } catch (e) {
+            console.warn('[Media] no se pudo resolver idEvento, se usará idFecha como fallback:', e);
+          }
+
+          if (!uploadTarget) {
+            console.warn('[Media] no se encontró idEvento ni idFecha; se omitirá subida.');
+          } else {
+            console.log('[Media] usando IdEntidadMedia para subida:', uploadTarget);
+            const resp = await mediaApi.upload(String(uploadTarget), fileObj);
+            console.log('[Media] respuesta de mediaApi.upload:', resp);
+          }
+        }
+      } catch (e) {
+        console.warn('[Media] subida FALLÓ (no bloqueante):', (e as any)?.message ?? String(e));
+      }
+
+      // 10) Si llegamos hasta acá, todo crítico fue OK → navegar a Administrar Eventos
+      console.log('[CreateEvent] flujo completado con éxito. Redirigiendo a AdministrarEventosPantalla');
+      Alert.alert('Éxito', 'Evento creado correctamente.');
+      router.push('/owner/AdministrarEventosPantalla');
+    } catch (err: any) {
+      console.error('[CreateEvent] error no manejado en handleSubmit:', err);
+      const msg = err?.message || extractBackendMessage(err);
+      Alert.alert('Error', String(msg));
+      // no navegamos para que el usuario pueda corregir
     }
-  };
+  }, [
+    userId,
+    eventName,
+    photoFile,
+    acceptedTC,
+    eventType,
+    dayCount,
+    selectedGenres,
+    selectedArtists,
+    isRecurring,
+    selectedPartyId,
+    daySchedules,
+    daySaleConfigs,
+    musicLink,
+    isAfter,
+    isLGBT,
+    provinceId,
+    provinceName,
+    municipalityId,
+    municipalityName,
+    localityId,
+    localityName,
+    street,
+    router,
+  ]);
 
   const artistSuggestions: Artist[] = useMemo(() => {
     const q = norm(artistInput);
@@ -875,6 +978,77 @@ export default function CreateEventScreen() {
       .filter((a) => !selectedSet.has(norm(a.name)) && norm(a.name).includes(q))
       .slice(0, 8);
   }, [artistInput, allArtists, selectedArtists]);
+
+  const totalPerDay = useCallback((d: DayTickets) =>
+    (parseInt(d.genQty || "0", 10) || 0) + (parseInt(d.vipQty || "0", 10) || 0)
+  , []);
+
+  const grandTotal = useMemo(() => daysTickets.reduce((acc, d) => acc + totalPerDay(d), 0), [daysTickets, totalPerDay]);
+
+  /* Multimedia */
+  const handleSelectPhoto = useCallback(async () => {
+    try {
+      const current = await ImagePicker.getMediaLibraryPermissionsAsync();
+      if (current.status !== "granted") {
+        const req = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (req.status !== "granted") {
+          Alert.alert(
+            "Permiso denegado",
+            "Necesitamos permiso para acceder a tus fotos."
+          );
+          return;
+        }
+      }
+
+      if (Platform.OS === "web") {
+        Alert.alert(
+          "No soportado en Web",
+          "En Web usá el botón 'Subir archivo' (input type=file)."
+        );
+        return;
+      }
+
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 1,
+        selectionLimit: 1,
+      });
+
+      if (res.canceled || !res.assets?.length) return;
+
+      const asset = res.assets[0];
+      const uri = asset.uri;
+
+      // 1) Tamaño real del archivo (robusto)
+      const size = await getFileSize(uri);
+      if (size > MAX_IMAGE_BYTES) {
+        Alert.alert(
+          "Imagen demasiado pesada",
+          "La imagen debe pesar menos de 2 MB."
+        );
+        return; // NO seteamos photoFile
+      }
+
+      // 2) Extensión permitida (JPG, JPEG, PNG)
+      const filename = asset.fileName || uri.split("/").pop() || "";
+      const allowed = isAllowedExt(filename) || isAllowedExt(uri);
+      if (!allowed) {
+        Alert.alert(
+          "Formato no soportado",
+          "La imagen debe ser JPG, JPEG o PNG."
+        );
+        return; // NO seteamos photoFile
+      }
+
+      // Si pasó validaciones, recién ahí lo seteamos
+      console.log("[Media] foto seleccionada:", { uri, filename, size });
+      setPhotoFile(uri);
+    } catch (e) {
+      console.error("ImagePicker error", e);
+      Alert.alert("Error", "No se pudo abrir la galería.");
+    }
+  }, []);
 
   /* ================= Render ================= */
   return (
@@ -1001,37 +1175,30 @@ export default function CreateEventScreen() {
               showLocalities={showLocalities}
               setShowLocalities={setShowLocalities}
               handleSelectProvince={async (id: string, name: string) => {
-                setProvinceId(id);
-                setProvinceName(name);
-                setMunicipalityId("");
-                setMunicipalityName("");
-                setLocalityId("");
-                setLocalityName("");
-                setMunicipalities([]);
-                setLocalities([]);
-                setShowProvinces(false);
-                try {
-                  const mun = await fetchMunicipalities(id);
-                  setMunicipalities(mun);
-                } catch {}
+                // si es CABA (02): cargamos todas las localidades de capital y saltamos municipio
+                handleSelectProvinceCallback(id, name);
+                if (id === '02') {
+                  setShowMunicipalities(false);
+                  setMunicipalities([]);
+                  // autoseleccionamos el municipio con nombre igual a "Ciudad Autónoma de Buenos Aires"
+                  setMunicipalityId('02');
+                  setMunicipalityName('Ciudad Autónoma de Buenos Aires');
+                  setLocalityLoading(true);
+                  try {
+                    const { fetchLocalitiesByProvince } = await import('@/utils/georef/georefHelpers');
+                    const locs = await fetchLocalitiesByProvince(id);
+                    setLocalities(locs || []);
+                  } catch (e) {
+                    console.warn('Error fetchLocalities (CABA):', e);
+                    setLocalities([]);
+                  } finally {
+                    setLocalityLoading(false);
+                  }
+                }
               }}
-              handleSelectMunicipality={async (id: string, name: string) => {
-                setMunicipalityId(id);
-                setMunicipalityName(name);
-                setLocalityId("");
-                setLocalityName("");
-                setLocalities([]);
-                setShowMunicipalities(false);
-                try {
-                  const loc = await fetchLocalities(provinceId, id);
-                  setLocalities(loc);
-                } catch {}
-              }}
-              handleSelectLocality={(id: string, name: string) => {
-                setLocalityId(id);
-                setLocalityName(name);
-                setShowLocalities(false);
-              }}
+              handleSelectMunicipality={handleSelectMunicipalityCallback}
+              handleSelectLocality={handleSelectLocalityCallback}
+              allowLocalitiesWithoutMunicipality={provinceId === '02'}
             />
 
             <Text style={styles.h2}>Descripción</Text>
@@ -1082,7 +1249,10 @@ export default function CreateEventScreen() {
                 />
                 <Text style={styles.checkText}>
                   Acepto{" "}
-                  <Text style={styles.link} onPress={openTycModal}>
+                  <Text style={styles.link} onPress={() => {
+                    // en Android hay problemas con Linking directo, abrimos modal WebView
+                    openTycModal();
+                  }}>
                     términos y condiciones
                   </Text>
                 </Text>
@@ -1090,137 +1260,39 @@ export default function CreateEventScreen() {
 
               <TouchableOpacity
                 style={styles.submitButton}
-                onPress={handleSubmit}
+                onPress={async () => {
+                  // Validaciones extra
+                  const ok = validateBeforeSubmit();
+                  if (!ok) return;
+                  // continuar
+                  setCreating(true);
+                  try {
+                    await handleSubmit();
+                  } finally {
+                    setCreating(false);
+                  }
+                }}
               >
                 <Text style={styles.submitButtonText}>CREAR EVENTO</Text>
               </TouchableOpacity>
 
+              <CirculoCarga visible={creating} text="Creando evento..." />
+
               <Text style={[styles.totalLine, { textAlign: "center" }]}>
-                Total general de entradas:{" "}
-                <Text style={{ color: GREEN, fontWeight: "700" }}>
-                  {grandTotal}
-                </Text>
+                {grandTotal > 0
+                  ? `Total aproximado: $${grandTotal}`
+                  : "Sin entradas configuradas"}
               </Text>
             </View>
           </View>
         )}
       </ScrollView>
 
-      {/* ===== Modal Términos y Condiciones ===== */}
-      <Modal
-        visible={tycVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setTycVisible(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Términos y Condiciones</Text>
-              <TouchableOpacity onPress={() => setTycVisible(false)}>
-                <MaterialCommunityIcons
-                  name="close"
-                  size={22}
-                  color={COLORS.textPrimary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalBody}>
-              {tycLoading && (
-                <View style={styles.center}>
-                  <ActivityIndicator />
-                  <Text style={{ marginTop: 8, color: COLORS.textSecondary }}>
-                    Cargando…
-                  </Text>
-                </View>
-              )}
-
-              {!tycLoading && !tycError && !tycUrl && (
-                <View style={styles.center}>
-                  <Text style={{ color: COLORS.textSecondary }}>
-                    No hay archivo disponible.
-                  </Text>
-                </View>
-              )}
-
-              {!tycLoading && tycError && (
-                <View style={styles.center}>
-                  <Text style={{ color: COLORS.negative, marginBottom: 8 }}>
-                    {tycError}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.button}
-                    onPress={openTycModal}
-                  >
-                    <Text style={styles.buttonText}>Reintentar</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {!tycLoading && tycUrl && (
-                <>
-                  {(() => {
-                    let WebViewComp: any = null;
-                    try {
-                      WebViewComp = require("react-native-webview").WebView;
-                    } catch {}
-                    if (WebViewComp) {
-                      return (
-                        <WebViewComp
-                          source={{ uri: buildViewerUrl(tycUrl!) }}
-                          style={{ flex: 1, borderRadius: RADIUS.card }}
-                        />
-                      );
-                    }
-                    if (Platform.OS === "web") {
-                      // @ts-ignore
-                      return (
-                        <iframe
-                          src={buildViewerUrl(tycUrl!)}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            border: "none",
-                          }}
-                          title="Términos y Condiciones"
-                        />
-                      );
-                    }
-                    return (
-                      <View style={styles.center}>
-                        <Text
-                          style={{
-                            color: COLORS.textSecondary,
-                            marginBottom: 10,
-                          }}
-                        >
-                          No se pudo incrustar el PDF en este dispositivo.
-                        </Text>
-                        <TouchableOpacity
-                          style={styles.button}
-                          onPress={() => Linking.openURL(tycUrl!)}
-                        >
-                          <Text style={styles.buttonText}>
-                            Abrir en el navegador
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  })()}
-                </>
-              )}
-            </View>
-          </View>
-        </View>
-      </Modal>
-
       <Footer />
     </SafeAreaView>
   );
 }
 
-/* ================= Estilos ================= */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.backgroundLight },
   scrollContent: { padding: 16 },

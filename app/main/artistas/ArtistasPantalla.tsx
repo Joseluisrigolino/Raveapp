@@ -65,6 +65,16 @@ export default function ArtistasPantalla() {
 
   const currentScreen = path.split("/").pop() || "";
   const tabs = [
+    {
+      label: "Noticias",
+      route: ROUTES.MAIN.NEWS.LIST,
+      isActive: currentScreen === ROUTES.MAIN.NEWS.LIST.split("/").pop(),
+    },
+    {
+      label: "Artistas",
+      route: ROUTES.MAIN.ARTISTS.LIST,
+      isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split("/").pop(),
+    },
     ...(isAdmin
       ? [
           {
@@ -74,16 +84,6 @@ export default function ArtistasPantalla() {
           },
         ]
       : []),
-    {
-      label: "Artistas",
-      route: ROUTES.MAIN.ARTISTS.LIST,
-      isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split("/").pop(),
-    },
-    {
-      label: "Noticias",
-      route: ROUTES.MAIN.NEWS.LIST,
-      isActive: currentScreen === ROUTES.MAIN.NEWS.LIST.split("/").pop(),
-    },
   ];
 
   return (

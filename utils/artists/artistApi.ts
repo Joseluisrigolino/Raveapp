@@ -1,11 +1,22 @@
 // Marca o desmarca un artista como favorito para un usuario
-export async function toggleArtistFavoriteOnApi(idUsuario: string, idArtista: string): Promise<void> {
+export async function toggleArtistFavoriteOnApi(
+  idUsuario: string,
+  idArtista: string
+): Promise<Artist & { isLiked?: boolean } | void> {
   const token = await login();
   await apiClient.post(
     "/v1/Usuario/ArtistaFavorito",
     { idUsuario, idArtista },
     { headers: { Authorization: `Bearer ${token}` } }
   );
+
+  // Después del toggle, pedir al servidor el estado actualizado para este usuario
+  try {
+    const updated = await fetchOneArtistFromApi(idArtista, idUsuario);
+    return updated;
+  } catch {
+    return undefined;
+  }
 }
 import { apiClient, login } from "@/utils/apiConfig";
 import { mediaApi } from "@/utils/mediaApi";

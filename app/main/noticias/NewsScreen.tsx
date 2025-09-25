@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -8,6 +8,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
@@ -34,46 +35,62 @@ export default function NewsScreen() {
 
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await getNews();
-        setNewsList(data);
-      } catch (err) {
-        console.error("[debug] Error fetching news:", err);
-        setError("Error al cargar las noticias");
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const loadNews = useCallback(async (opts: { refresh?: boolean } = {}) => {
+    if (opts.refresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+    try {
+      const data = await getNews();
+      setNewsList(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("[NewsScreen] Error fetching news:", err);
+      setError("Error al cargar las noticias");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  const currentScreen = path.split("/").pop() || "";
-  const tabs = [
-    {
-      label: "Administrar Noticias",
-      route: ROUTES.ADMIN.NEWS.MANAGE,
-      isActive: currentScreen === "ManageNewsScreen",
-      visible: isAdmin,
-    },
-    {
-      label: "Noticias",
-      route: ROUTES.MAIN.NEWS.LIST,
-      isActive: currentScreen === "NewsScreen",
-      visible: true,
-    },
-    {
-      label: "Artistas",
-    route: ROUTES.MAIN.ARTISTS.LIST,
-      isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split('/').pop(),
-      visible: true,
-    },
-  ].filter((tab) => tab.visible);
+  useEffect(() => {
+    loadNews();
+  }, [loadNews]);
 
-  const goToDetail = (item: NewsItem) =>
-    nav.push(router, { pathname: ROUTES.MAIN.NEWS.ITEM, params: { id: item.idNoticia } });
+  const currentScreen = path?.split("/").pop() || "";
+
+  // Tabs: aseguramos que NOTICIAS / ARTISTAS estén primero en ese orden
+  const tabs = useMemo(() => {
+    const baseTabs: any[] = [
+      {
+        label: "Noticias",
+        route: ROUTES.MAIN.NEWS.LIST,
+        isActive: currentScreen === ROUTES.MAIN.NEWS.LIST.split("/").pop(),
+      },
+      {
+        label: "Artistas",
+        route: ROUTES.MAIN.ARTISTS.LIST,
+        isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split("/").pop(),
+      },
+    ];
+
+    if (isAdmin) {
+      // Mostrar administración al final para no romper el orden principal
+      baseTabs.push({
+        label: "Administrar Noticias",
+        route: ROUTES.ADMIN.NEWS.MANAGE,
+        isActive: currentScreen === ROUTES.ADMIN.NEWS.MANAGE.split("/").pop(),
+      });
+    }
+
+    return baseTabs;
+  }, [currentScreen, isAdmin]);
+
+  const goToDetail = useCallback(
+    (item: NewsItem) => nav.push(router, { pathname: ROUTES.MAIN.NEWS.ITEM, params: { id: item.idNoticia } }),
+    [router]
+  );
 
   return (
     <ProtectedRoute allowedRoles={["admin", "owner", "user"]}>
@@ -88,20 +105,26 @@ export default function NewsScreen() {
         ) : error ? (
           <View style={styles.centered}>
             <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity onPress={() => loadNews({ refresh: true })} style={styles.retryButton}>
+              <Text style={styles.retryText}>Reintentar</Text>
+            </TouchableOpacity>
           </View>
         ) : newsList.length === 0 ? (
           <View style={styles.centered}>
             <Text style={styles.errorText}>No hay noticias disponibles.</Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadNews({ refresh: true })} />}
+          >
             <View style={styles.containerCards}>
               {newsList.map((item) => (
                 <TouchableOpacity
                   key={item.idNoticia}
                   style={styles.newsCard}
                   onPress={() => goToDetail(item)}
-                  activeOpacity={0.8}
+                  activeOpacity={0.85}
                 >
                   <Image
                     source={{ uri: item.imagen || PLACEHOLDER_IMAGE }}
@@ -114,9 +137,7 @@ export default function NewsScreen() {
                     </Text>
                     <Text style={styles.readMore}>→</Text>
                   </View>
-                  <Text style={styles.newsDate}>
-                    {new Date(item.dtPublicado).toLocaleDateString()}
-                  </Text>
+                  <Text style={styles.newsDate}>{new Date(item.dtPublicado).toLocaleDateString()}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -138,6 +159,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    padding: 20,
   },
   scrollContent: {
     paddingBottom: 16,
@@ -186,5 +208,16 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.body,
     color: COLORS.negative,
     textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+  },
+  retryText: {
+    color: "#fff",
+    fontWeight: "700",
   },
 });

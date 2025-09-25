@@ -64,11 +64,16 @@ export default function ArtistaPantalla() {
   const toggleLike = async () => {
     if (!user || !artist) return;
     try {
-      await toggleArtistFavoriteOnApi(user.id, artist.idArtista);
-      // Refrescar artista para actualizar likes y avatares en tiempo real
-      const updated = await fetchOneArtistFromApi(id, user.id);
-      setArtist(updated);
-      setIsLiked(!!updated.isLiked);
+      const updated = await toggleArtistFavoriteOnApi(user.id, artist.idArtista);
+      if (updated) {
+        setArtist(updated);
+        setIsLiked(!!updated.isLiked);
+      } else {
+        // Fallback: re-fetch
+        const refreshed = await fetchOneArtistFromApi(id, user.id);
+        setArtist(refreshed);
+        setIsLiked(!!refreshed.isLiked);
+      }
     } catch (e) {
       // Podrías mostrar un error si falla
     }
@@ -104,6 +109,8 @@ export default function ArtistaPantalla() {
           </View>
 
           <LikesArtistComponent
+            idArtista={artist.idArtista}
+            currentUserId={user?.id}
             likedByImages={artist.likedByImages}
             likedByIds={artist.likedByIds}
             isLiked={isLiked}

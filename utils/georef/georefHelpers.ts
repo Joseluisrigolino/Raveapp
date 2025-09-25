@@ -80,6 +80,35 @@ export async function fetchLocalities(
 }
 
 /**
+ * Obtiene localidades únicamente por provincia (sin filtrar por municipio).
+ * Útil para Ciudad Autónoma de Buenos Aires donde se quiere listar todas las
+ * localidades de la capital independientemente del municipio.
+ */
+export async function fetchLocalitiesByProvince(
+  provinceId: string
+): Promise<Localidad[]> {
+  // No normalizamos el id: la API espera el formato tal como lo provee la fuente (ej. '02' para CABA).
+  const prov = provinceId;
+
+  const url = `https://apis.datos.gob.ar/georef/api/localidades?provincia=${encodeURIComponent(
+    prov
+  )}&campos=id,nombre&max=1000`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      // loguear para ayudar al debugging (status y url)
+      console.warn(`[fetchLocalitiesByProvince] respuesta no OK: ${res.status} ${res.statusText} - ${url}`);
+      throw new Error(`Error al obtener localidades por provincia: ${res.status}`);
+    }
+    const data = await res.json();
+    return data.localidades || [];
+  } catch (err) {
+    console.warn('[fetchLocalitiesByProvince] fallo fetch:', err, 'url:', url);
+    throw err;
+  }
+}
+
+/**
  * Busca localidades por nombre parcial (ej. "Corrien") en la API georef.
  * Ejemplo: GET https://apis.datos.gob.ar/georef/api/localidades?nombre=Corrien&max=10
  */
