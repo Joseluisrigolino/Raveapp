@@ -102,27 +102,36 @@ export async function createParty(args: {
   idUsuario: string;
   nombre: string;
   isActivo?: boolean;
-}): Promise<void> {
+}): Promise<string | null> {
   const token = await login();
-  const body = {
+  const body: any = {
     idUsuario: args.idUsuario,
     nombre: args.nombre,
-    isActivo: args.isActivo ?? true,
   };
-  await apiClient.post("/v1/Fiesta/CrearFiesta", body, {
+  if (typeof args.isActivo !== 'undefined') body.isActivo = !!args.isActivo;
+  const resp = await apiClient.post("/v1/Fiesta/CrearFiesta", body, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
   });
+  const data = resp?.data;
+  const id = (data && (data.idFiesta ?? data.id ?? data.IdFiesta ?? data.Id)) || null;
+  if (!id) {
+    try { console.warn('[createParty] no id returned by API for payload:', JSON.stringify(body)); } catch {}
+  }
+  return id ? String(id) : null;
 }
 
 export async function updateParty(args: {
   idFiesta: string;
-  nombre: string;
+  nombre?: string;
+  isActivo?: boolean;
 }): Promise<void> {
   const token = await login();
-  const body = { idFiesta: args.idFiesta, nombre: args.nombre };
+  const body: any = { idFiesta: args.idFiesta };
+  if (typeof args.nombre !== 'undefined') body.nombre = args.nombre;
+  if (typeof args.isActivo !== 'undefined') body.isActivo = !!args.isActivo;
   await apiClient.put("/v1/Fiesta/UpdateFiesta", body, {
     headers: {
       Authorization: `Bearer ${token}`,

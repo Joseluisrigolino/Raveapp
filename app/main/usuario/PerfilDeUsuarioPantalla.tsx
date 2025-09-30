@@ -1,5 +1,5 @@
 // src/screens/UserProfileEditScreen.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -13,6 +13,7 @@ import {
   Image,
   Modal,
 } from "react-native";
+import { Menu } from "react-native-paper";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -33,6 +34,7 @@ import {
   fetchProvinces,
   fetchMunicipalities,
   fetchLocalities,
+  fetchLocalitiesByProvince,
 } from "@/utils/georef/georefHelpers";
 
 export default function UserProfileEditScreen() {
@@ -101,16 +103,57 @@ export default function UserProfileEditScreen() {
   const [showMunicipalities, setShowMunicipalities] = useState(false);
   const [showLocalities, setShowLocalities] = useState(false);
 
+  // Errores visuales para la sección de domicilio
+  const [addressErrors, setAddressErrors] = useState<{
+    province: boolean;
+    municipality: boolean;
+    locality: boolean;
+    street: boolean;
+  }>({ province: false, municipality: false, locality: false, street: false });
+
   // Selecciones actuales (IDs)
   const [provinceId, setProvinceId] = useState("");
   const [municipalityId, setMunicipalityId] = useState("");
   const [localityId, setLocalityId] = useState("");
+
+  // Estados para los selectores de fecha de nacimiento
+  const [dateSelectors, setDateSelectors] = useState({
+    day: "",
+    month: "",
+    year: "",
+  });
+  
+  // Estados para controlar la visibilidad de los menús de fecha
+  const [menuVisible, setMenuVisible] = useState({
+    day: false,
+    month: false,
+    year: false,
+  });
 
   // Foto fallback
   const randomProfileImage = useMemo(
     () => `https://picsum.photos/seed/${Math.floor(Math.random() * 10000)}/100`,
     []
   );
+
+  // Generar opciones para los selectores de fecha
+  const days = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+  const months = [
+    { value: '01', label: 'Enero' },
+    { value: '02', label: 'Febrero' },
+    { value: '03', label: 'Marzo' },
+    { value: '04', label: 'Abril' },
+    { value: '05', label: 'Mayo' },
+    { value: '06', label: 'Junio' },
+    { value: '07', label: 'Julio' },
+    { value: '08', label: 'Agosto' },
+    { value: '09', label: 'Septiembre' },
+    { value: '10', label: 'Octubre' },
+    { value: '11', label: 'Noviembre' },
+    { value: '12', label: 'Diciembre' },
+  ];
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 100 }, (_, i) => (currentYear - i).toString());
 
   // ====== MODAL CAMBIO DE CONTRASEÑA ======
   const [showPwdModal, setShowPwdModal] = useState(false);
@@ -150,6 +193,17 @@ export default function UserProfileEditScreen() {
             floorDept: "",
           },
         });
+
+        // Inicializar selectores de fecha si hay fecha de nacimiento
+        const birthDateStr = u.dtNacimiento?.split?.("T")?.[0] ?? "";
+        if (birthDateStr && /^\d{4}-\d{2}-\d{2}$/.test(birthDateStr)) {
+          const [year, month, day] = birthDateStr.split('-');
+          setDateSelectors({
+            day: day,
+            month: month,
+            year: year,
+          });
+        }
 
         // 2) Foto + idMedia
         const mediaData: any = await mediaApi.getByEntidad(u.idUsuario);
@@ -199,10 +253,59 @@ export default function UserProfileEditScreen() {
   // Helpers
   const onChange = (field: string, value: string) =>
     setUserData((d) => ({ ...d, [field]: value }));
-  const onAddressChange = (field: string, value: string) =>
+  const onAddressChange = (field: string, value: string) => {
+    // limpiar el error visual correspondiente cuando el usuario edita
+    setAddressErrors((e) => ({ ...e, [field]: false } as any));
     setUserData((d) => ({ ...d, address: { ...d.address, [field]: value } }));
-  const toggle = (key: string) =>
+  };
+
+  const toggle = (key: string) => {
+    // Especial: al editar la provincia, desplegar todos los campos de domicilio
+    if (key === "address.province") {
+      setEditMode((m) => ({
+        ...m,
+        ["address.province"]: true,
+        // mostrar municipio sólo si la provincia actual NO es CABA (02)
+        ["address.municipality"]: provinceId !== '02',
+        ["address.locality"]: true,
+        ["address.street"]: true,
+      }));
+      // limpiar errores visuales cuando el usuario decide editar
+      setAddressErrors({ province: false, municipality: false, locality: false, street: false });
+      return;
+    }
+
     setEditMode((m) => ({ ...m, [key]: !m[key] }));
+
+    // Si se está activando el modo de edición de birthdate, inicializar selectores
+    if (key === "birthdate" && !editMode[key] && userData.birthdate) {
+      const birthDateStr = userData.birthdate;
+      if (birthDateStr && /^\d{4}-\d{2}-\d{2}$/.test(birthDateStr)) {
+        const [year, month, day] = birthDateStr.split('-');
+        setDateSelectors({
+          day: day,
+          month: month,
+          year: year,
+        });
+      }
+    }
+  };
+
+  // Función para actualizar la fecha completa cuando cambian los selectores
+  const updateBirthDate = (day: string, month: string, year: string) => {
+    if (day && month && year) {
+      const formattedDate = `${year}-${month}-${day}`;
+      onChange("birthdate", formattedDate);
+    }
+  };
+
+  // Funciones para manejar los cambios en los selectores de fecha
+  const handleDateSelectorChange = (type: 'day' | 'month' | 'year', value: string) => {
+    const newSelectors = { ...dateSelectors, [type]: value };
+    setDateSelectors(newSelectors);
+    setMenuVisible(prev => ({ ...prev, [type]: false }));
+    updateBirthDate(newSelectors.day, newSelectors.month, newSelectors.year);
+  };
 
   // Georef handlers
   const handleSelectProvince = async (id: string, nombre: string) => {
@@ -215,9 +318,22 @@ export default function UserProfileEditScreen() {
     setLocalities([]);
     onAddressChange("municipality", "");
     onAddressChange("locality", "");
-    try {
-      setMunicipalities(await fetchMunicipalities(id));
-    } catch {}
+    
+    // Lógica especial para Ciudad Autónoma de Buenos Aires (CABA)
+    if (id === '02') {
+      // Para CABA, el municipio es la misma CABA
+      setMunicipalityId('02');
+      onAddressChange("municipality", "Ciudad Autónoma de Buenos Aires");
+      try {
+        // Cargar localidades de CABA directamente (sin municipio específico)
+        setLocalities(await fetchLocalitiesByProvince(id));
+      } catch {}
+    } else {
+      // Para otras provincias, cargar municipios normalmente
+      try {
+        setMunicipalities(await fetchMunicipalities(id));
+      } catch {}
+    }
   };
   const handleSelectMunicipality = async (id: string, nombre: string) => {
     setMunicipalityId(id);
@@ -367,34 +483,132 @@ export default function UserProfileEditScreen() {
   // ===== GUARDAR PERFIL =====
   const handleConfirm = async () => {
     if (!apiUser) return;
+    
+    // Validar datos antes de enviar
+    if (!userData.firstName?.trim() || !userData.lastName?.trim()) {
+      Alert.alert("Error", "El nombre y apellido son obligatorios.");
+      return;
+    }
+    
+    if (!userData.email?.trim() || !userData.dni?.trim()) {
+      Alert.alert("Error", "El correo y DNI son obligatorios.");
+      return;
+    }
+
+    // Si el usuario abrió la sección de domicilio (o seleccionó provincia), validar que esté completa
+    const addressEdited = editMode["address.province"] || editMode["address.locality"] || editMode["address.municipality"] || editMode["address.street"];
+    if (addressEdited) {
+      const missingProvince = !userData.address.province?.trim();
+      const missingStreet = !userData.address.street?.trim();
+      // Si no es CABA, es necesario municipio y localidad; si es CABA (02) no pedir municipio
+      const missingLocality = !userData.address.locality?.trim();
+      const missingMunicipality = provinceId !== '02' && !userData.address.municipality?.trim();
+
+      if (missingProvince || missingStreet || missingLocality || missingMunicipality) {
+        setAddressErrors({ province: missingProvince, municipality: missingMunicipality, locality: missingLocality, street: missingStreet });
+        Alert.alert("Error", "Si editás el domicilio, por favor completá todos los campos requeridos de la sección.");
+        return;
+      }
+    }
+    
+    // Construir el domicilio actualizado
+    const updatedDomicilio = {
+      provincia: {
+        nombre: userData.address.province || apiUser.domicilio?.provincia?.nombre || "",
+        codigo: provinceId || apiUser.domicilio?.provincia?.codigo || ""
+      },
+      municipio: {
+        nombre: userData.address.municipality || apiUser.domicilio?.municipio?.nombre || "",
+        codigo: municipalityId || apiUser.domicilio?.municipio?.codigo || ""
+      },
+      localidad: {
+        nombre: userData.address.locality || apiUser.domicilio?.localidad?.nombre || "",
+        codigo: localityId || apiUser.domicilio?.localidad?.codigo || ""
+      },
+      direccion: userData.address.street?.trim() || "",
+      latitud: apiUser.domicilio?.latitud || 0,
+      longitud: apiUser.domicilio?.longitud || 0,
+    };
+    
+    // Formatear fecha de nacimiento correctamente
+    let formattedBirthdate = apiUser.dtNacimiento;
+    if (userData.birthdate) {
+      try {
+        const date = new Date(userData.birthdate + 'T00:00:00.000Z');
+        if (!isNaN(date.getTime())) {
+          formattedBirthdate = date.toISOString();
+        }
+      } catch (dateErr) {
+        console.warn("Error formateando fecha:", dateErr);
+      }
+    }
+    
     const payload = {
       idUsuario: apiUser.idUsuario,
-      nombre: userData.firstName,
-      apellido: userData.lastName,
-      correo: userData.email,
-      dni: userData.dni,
-      telefono: userData.phone,
-      dtNacimiento: userData.birthdate,
-      domicilio: {
-        provincia: apiUser.domicilio?.provincia,
-        municipio: apiUser.domicilio?.municipio,
-        localidad: apiUser.domicilio?.localidad,
-        direccion: userData.address.street?.trim() || "",
-        latitud: apiUser.domicilio?.latitud,
-        longitud: apiUser.domicilio?.longitud,
-      },
+      nombre: userData.firstName.trim(),
+      apellido: userData.lastName.trim(),
+      correo: userData.email.trim(),
+      dni: userData.dni.trim(),
+      telefono: userData.phone?.trim() || "",
+      cbu: apiUser.cbu || "",
+      nombreFantasia: apiUser.nombreFantasia || "",
+      bio: apiUser.bio || "",
+      dtNacimiento: formattedBirthdate,
+      domicilio: updatedDomicilio,
+      cdRoles: apiUser.cdRoles || [], // Incluir roles existentes
+      socials: {
+        idSocial: (apiUser.socials?.idSocial && apiUser.socials.idSocial !== null) ? apiUser.socials.idSocial : "",
+        mdInstagram: (apiUser.socials?.mdInstagram && apiUser.socials.mdInstagram !== null) ? apiUser.socials.mdInstagram : "",
+        mdSpotify: (apiUser.socials?.mdSpotify && apiUser.socials.mdSpotify !== null) ? apiUser.socials.mdSpotify : "",
+        mdSoundcloud: (apiUser.socials?.mdSoundcloud && apiUser.socials.mdSoundcloud !== null) ? apiUser.socials.mdSoundcloud : ""
+      }
     };
+    
+    console.log("Payload a enviar:", JSON.stringify(payload, null, 2));
+    
     try {
-  await updateUsuario(payload as any);
-      Alert.alert("Éxito", "Perfil actualizado.");
+      await updateUsuario(payload);
+      Alert.alert("Éxito", "Perfil actualizado correctamente.");
       setEditMode(
         Object.fromEntries(Object.keys(editMode).map((k) => [k, false]))
       );
+      
+      // Recargar el perfil para mostrar los datos actualizados
+      if (user) {
+        try {
+          const updatedProfile = await getProfile(user.username);
+          setApiUser(updatedProfile);
+        } catch (refreshErr) {
+          console.warn("No se pudo refrescar el perfil:", refreshErr);
+        }
+      }
     } catch (err: any) {
-      Alert.alert(
-        "Error",
-        err?.response?.data?.title || "Hubo un problema actualizando tus datos."
-      );
+      console.error("Error actualizando usuario:", err);
+      console.error("Response data:", err?.response?.data);
+      console.error("Response status:", err?.response?.status);
+      console.error("Response headers:", err?.response?.headers);
+      
+      let errorMessage = "Hubo un problema actualizando tus datos.";
+      if (err?.response?.data) {
+        const data = err.response.data;
+        if (data.message) {
+          errorMessage = data.message;
+        } else if (data.title) {
+          errorMessage = data.title;
+        } else if (data.errors) {
+          const errors = Object.entries(data.errors)
+            .map(([field, messages]: [string, any]) => {
+              const messageList = Array.isArray(messages) ? messages : [messages];
+              return `${field}: ${messageList.join(', ')}`;
+            })
+            .join('\n');
+          errorMessage = `Errores de validación:\n${errors}`;
+        } else if (typeof data === 'string') {
+          errorMessage = data;
+        }
+      }
+      
+      Alert.alert("Error", errorMessage);
     }
   };
 
@@ -459,22 +673,41 @@ export default function UserProfileEditScreen() {
     onChangeText: (t: string) => void;
   }) => {
     const isEditing = !!editMode[modeKey as string];
+    const inputRef = useRef<TextInput | null>(null);
+
+    // cuando isEditing pasa a true, enfocamos el input automáticamente
+    useEffect(() => {
+      if (isEditing && inputRef.current) {
+        setTimeout(() => inputRef.current && inputRef.current.focus(), 50);
+      }
+    }, [isEditing]);
+    
+    // Saltear el renderizado para birthdate ya que se maneja por separado
+    if (modeKey === "birthdate") {
+      return null;
+    }
+    
     return (
       <>
         <Text style={styles.addressSubtitle}>{label}</Text>
         {isEditing ? (
           <TextInput
+            ref={inputRef}
             style={styles.inputFull}
             value={value}
             onChangeText={onChangeText}
             keyboardType={keyboardType}
             placeholder={label}
+            blurOnSubmit={false}
+            autoCorrect={false}
+            selectionColor={COLORS.primary}
+            returnKeyType="done"
           />
         ) : (
           <View style={styles.rowNoLabel}>
             <Text style={[styles.valueText, { flex: 1 }]}>{value || "–"}</Text>
             <TouchableOpacity
-              onPress={() => toggle(modeKey as string)}
+              onPress={() => setEditMode((m) => ({ ...m, [modeKey as string]: true }))}
               style={styles.icon}
             >
               <MaterialIcons
@@ -492,7 +725,7 @@ export default function UserProfileEditScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Header />
-      <ScrollView contentContainerStyle={styles.scroll}>
+  <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <Text style={styles.mainTitle}>Mi Perfil</Text>
 
         {/* Foto (tap en imagen o lápiz abre selector) */}
@@ -568,12 +801,129 @@ export default function UserProfileEditScreen() {
           keyboardType="email-address"
           onChangeText={(t) => onChange("email", t)}
         />
-        <RenderEditableField
-          label="Fecha de nacimiento"
-          value={userData.birthdate}
-          modeKey="birthdate"
-          onChangeText={(t) => onChange("birthdate", t)}
-        />
+        
+        {/* Fecha de nacimiento con selectores */}
+        <Text style={styles.addressSubtitle}>Fecha de nacimiento</Text>
+        {editMode["birthdate"] ? (
+          <>
+            <View style={styles.dateContainer}>
+              {/* Selector de Día */}
+              <View style={styles.selectorContainer}>
+                <Menu
+                  visible={menuVisible.day}
+                  onDismiss={() => setMenuVisible(prev => ({ ...prev, day: false }))}
+                  anchor={
+                    <TouchableOpacity
+                      style={styles.dateSelector}
+                      onPress={() => setMenuVisible(prev => ({ ...prev, day: true }))}
+                    >
+                      <Text style={styles.dateSelectorText}>
+                        {dateSelectors.day || "Día"}
+                      </Text>
+                    </TouchableOpacity>
+                  }
+                  contentStyle={styles.menuContent}
+                >
+                  <ScrollView style={styles.menuScrollView}>
+                    {days.map((day) => (
+                      <Menu.Item
+                        key={day}
+                        onPress={() => handleDateSelectorChange('day', day)}
+                        title={day}
+                        titleStyle={styles.menuItemTitle}
+                      />
+                    ))}
+                  </ScrollView>
+                </Menu>
+              </View>
+
+              {/* Selector de Mes */}
+              <View style={styles.selectorContainer}>
+                <Menu
+                  visible={menuVisible.month}
+                  onDismiss={() => setMenuVisible(prev => ({ ...prev, month: false }))}
+                  anchor={
+                    <TouchableOpacity
+                      style={styles.dateSelector}
+                      onPress={() => setMenuVisible(prev => ({ ...prev, month: true }))}
+                    >
+                      <Text style={styles.dateSelectorText}>
+                        {months.find(m => m.value === dateSelectors.month)?.label || "Mes"}
+                      </Text>
+                    </TouchableOpacity>
+                  }
+                  contentStyle={styles.menuContent}
+                >
+                  <ScrollView style={styles.menuScrollView}>
+                    {months.map((month) => (
+                      <Menu.Item
+                        key={month.value}
+                        onPress={() => handleDateSelectorChange('month', month.value)}
+                        title={month.label}
+                        titleStyle={styles.menuItemTitle}
+                      />
+                    ))}
+                  </ScrollView>
+                </Menu>
+              </View>
+
+              {/* Selector de Año */}
+              <View style={styles.selectorContainer}>
+                <Menu
+                  visible={menuVisible.year}
+                  onDismiss={() => setMenuVisible(prev => ({ ...prev, year: false }))}
+                  anchor={
+                    <TouchableOpacity
+                      style={styles.dateSelector}
+                      onPress={() => setMenuVisible(prev => ({ ...prev, year: true }))}
+                    >
+                      <Text style={styles.dateSelectorText}>
+                        {dateSelectors.year || "Año"}
+                      </Text>
+                    </TouchableOpacity>
+                  }
+                  contentStyle={styles.menuContent}
+                >
+                  <ScrollView style={styles.menuScrollView}>
+                    {years.map((year) => (
+                      <Menu.Item
+                        key={year}
+                        onPress={() => handleDateSelectorChange('year', year)}
+                        title={year}
+                        titleStyle={styles.menuItemTitle}
+                      />
+                    ))}
+                  </ScrollView>
+                </Menu>
+              </View>
+            </View>
+          </>
+        ) : (
+          <View style={styles.rowNoLabel}>
+            <Text style={[styles.valueText, { flex: 1 }]}>{
+              userData.birthdate ? 
+                (() => {
+                  const date = new Date(userData.birthdate + 'T00:00:00');
+                  return date.toLocaleDateString('es-ES', {
+                    day: '2-digit',
+                    month: '2-digit', 
+                    year: 'numeric'
+                  });
+                })() 
+                : "–"
+            }</Text>
+            <TouchableOpacity
+              onPress={() => toggle("birthdate")}
+              style={styles.icon}
+            >
+              <MaterialIcons
+                name="edit"
+                size={20}
+                color={COLORS.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Cambiar contraseña */}
         <TouchableOpacity style={styles.resetContainer} onPress={openPwdModal}>
@@ -601,18 +951,18 @@ export default function UserProfileEditScreen() {
                 {userData.address.province || "Seleccione provincia"}
               </Text>
             </TouchableOpacity>
-            {showProvinces && (
-              <View style={styles.dropdownContainer}>
+                {showProvinces && (
+              <ScrollView nestedScrollEnabled={true} keyboardShouldPersistTaps="handled" style={[styles.dropdownContainer, { maxHeight: 180 }]}>
                 {provinces.map((p) => (
                   <TouchableOpacity
                     key={p.id}
                     style={styles.dropdownItem}
                     onPress={() => handleSelectProvince(p.id, p.nombre)}
                   >
-                    <Text>{p.nombre}</Text>
+                    <Text style={styles.dropdownItemText}>{p.nombre}</Text>
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
             )}
           </>
         ) : (
@@ -633,55 +983,59 @@ export default function UserProfileEditScreen() {
           </View>
         )}
 
-        {/* Municipio */}
-        <Text style={styles.addressSubtitle}>Municipio</Text>
-        {editMode["address.municipality"] ? (
+        {/* Municipio: ocultar por completo si la provincia seleccionada es CABA (02) */}
+        {provinceId !== '02' && (
           <>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              disabled={!provinceId}
-              onPress={() => {
-                setShowMunicipalities(!showMunicipalities);
-                setShowProvinces(false);
-                setShowLocalities(false);
-              }}
-            >
-              <Text
-                style={[styles.dropdownText, !provinceId && { opacity: 0.5 }]}
-              >
-                {userData.address.municipality || "Seleccione municipio"}
-              </Text>
-            </TouchableOpacity>
-            {showMunicipalities && (
-              <View style={styles.dropdownContainer}>
-                {municipalities.map((m) => (
-                  <TouchableOpacity
-                    key={m.id}
-                    style={styles.dropdownItem}
-                    onPress={() => handleSelectMunicipality(m.id, m.nombre)}
+            <Text style={styles.addressSubtitle}>Municipio</Text>
+            {editMode["address.municipality"] ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.dropdownButton, (!provinceId) && { opacity: 0.5 }, addressErrors.municipality && styles.errorBorder]}
+                  disabled={!provinceId}
+                  onPress={() => {
+                    setShowMunicipalities(!showMunicipalities);
+                    setShowProvinces(false);
+                    setShowLocalities(false);
+                  }}
+                >
+                  <Text
+                    style={[styles.dropdownText, (!provinceId) && { opacity: 0.5 }]}
                   >
-                    <Text>{m.nombre}</Text>
-                  </TouchableOpacity>
-                ))}
+                    {userData.address.municipality || "Seleccione municipio"}
+                  </Text>
+                </TouchableOpacity>
+                {showMunicipalities && (
+                  <ScrollView nestedScrollEnabled={true} keyboardShouldPersistTaps="handled" style={[styles.dropdownContainer, { maxHeight: 180 }]}>
+                    {municipalities.map((m) => (
+                      <TouchableOpacity
+                        key={m.id}
+                        style={styles.dropdownItem}
+                        onPress={() => handleSelectMunicipality(m.id, m.nombre)}
+                      >
+                        <Text style={styles.dropdownItemText}>{m.nombre}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </>
+            ) : (
+              <View style={styles.rowNoLabel}>
+                <Text style={[styles.valueText, { flex: 1 }]}>
+                  {userData.address.municipality || "–"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => toggle("address.municipality")}
+                  style={styles.icon}
+                >
+                  <MaterialIcons
+                    name="edit"
+                    size={20}
+                    color={COLORS.textSecondary}
+                  />
+                </TouchableOpacity>
               </View>
             )}
           </>
-        ) : (
-          <View style={styles.rowNoLabel}>
-            <Text style={[styles.valueText, { flex: 1 }]}>
-              {userData.address.municipality || "–"}
-            </Text>
-            <TouchableOpacity
-              onPress={() => toggle("address.municipality")}
-              style={styles.icon}
-            >
-              <MaterialIcons
-                name="edit"
-                size={20}
-                color={COLORS.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
         )}
 
         {/* Localidad */}
@@ -689,8 +1043,8 @@ export default function UserProfileEditScreen() {
         {editMode["address.locality"] ? (
           <>
             <TouchableOpacity
-              style={styles.dropdownButton}
-              disabled={!municipalityId}
+              style={[styles.dropdownButton, (!municipalityId && provinceId !== '02') && { opacity: 0.5 }]}
+              disabled={!municipalityId && provinceId !== '02'}
               onPress={() => {
                 setShowLocalities(!showLocalities);
                 setShowProvinces(false);
@@ -700,24 +1054,24 @@ export default function UserProfileEditScreen() {
               <Text
                 style={[
                   styles.dropdownText,
-                  !municipalityId && { opacity: 0.5 },
+                  (!municipalityId && provinceId !== '02') && { opacity: 0.5 },
                 ]}
               >
                 {userData.address.locality || "Seleccione localidad"}
               </Text>
             </TouchableOpacity>
             {showLocalities && (
-              <View style={styles.dropdownContainer}>
+              <ScrollView nestedScrollEnabled={true} keyboardShouldPersistTaps="handled" style={[styles.dropdownContainer, { maxHeight: 180 }]}>
                 {localities.map((l) => (
                   <TouchableOpacity
                     key={l.id}
                     style={styles.dropdownItem}
                     onPress={() => handleSelectLocality(l.id, l.nombre)}
                   >
-                    <Text>{l.nombre}</Text>
+                    <Text style={styles.dropdownItemText}>{l.nombre}</Text>
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
             )}
           </>
         ) : (
@@ -742,7 +1096,7 @@ export default function UserProfileEditScreen() {
         <Text style={styles.addressSubtitle}>Dirección</Text>
         {editMode["address.street"] ? (
           <TextInput
-            style={styles.inputFull}
+            style={[styles.inputFull, addressErrors.street && styles.errorBorder]}
             placeholder="Ej: Av. Rivadavia 1234 5°B"
             value={userData.address.street}
             onChangeText={(v) => onAddressChange("street", v)}
@@ -788,6 +1142,55 @@ export default function UserProfileEditScreen() {
         <TouchableOpacity onPress={openDeleteModal}>
           <Text style={styles.deleteLink}>Eliminar cuenta</Text>
         </TouchableOpacity>
+        {/* Hacer administrador (assign role 1) */}
+        <TouchableOpacity onPress={async () => {
+          if (!apiUser) return;
+          Alert.alert(
+            "Confirmar",
+            "¿Querés otorgar permiso de administrador a este usuario?",
+            [
+              { text: "Cancelar", style: "cancel" },
+              { text: "Confirmar", onPress: async () => {
+                try {
+                  const newRoles = Array.isArray(apiUser.cdRoles) ? [...apiUser.cdRoles] : [];
+                  if (!newRoles.includes(1)) newRoles.push(1);
+                  const adminPayload = {
+                    idUsuario: apiUser.idUsuario,
+                    nombre: apiUser.nombre || userData.firstName || "",
+                    apellido: apiUser.apellido || userData.lastName || "",
+                    correo: apiUser.correo || userData.email || "",
+                    dni: apiUser.dni || userData.dni || "",
+                    telefono: apiUser.telefono || userData.phone || "",
+                    cbu: apiUser.cbu || "",
+                    nombreFantasia: apiUser.nombreFantasia || "",
+                    bio: apiUser.bio || "",
+                    dtNacimiento: apiUser.dtNacimiento || null,
+                    domicilio: apiUser.domicilio || {},
+                    cdRoles: newRoles,
+                    socials: {
+                      idSocial: apiUser.socials?.idSocial ?? "",
+                      mdInstagram: apiUser.socials?.mdInstagram ?? "",
+                      mdSpotify: apiUser.socials?.mdSpotify ?? "",
+                      mdSoundcloud: apiUser.socials?.mdSoundcloud ?? "",
+                    }
+                  };
+                  await updateUsuario(adminPayload);
+                  Alert.alert("Listo", "El usuario ahora tiene rol de administrador.");
+                  // refrescar perfil
+                  if (user) {
+                    const updatedProfile = await getProfile(user.username);
+                    setApiUser(updatedProfile);
+                  }
+                } catch (e: any) {
+                  console.error("Error asignando admin:", e);
+                  Alert.alert("Error", e?.response?.data?.title || "No se pudo asignar rol de administrador.");
+                }
+              } }
+            ]
+          );
+        }}>
+          <Text style={[styles.deleteLink, { textDecorationLine: 'none' }]}>Hacer administrador</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* ===== MODAL CAMBIO DE CONTRASEÑA ===== */}
@@ -803,29 +1206,41 @@ export default function UserProfileEditScreen() {
 
             <Text style={styles.modalLabel}>Contraseña actual</Text>
             <TextInput
-              style={styles.modalInput}
+              style={styles.inputFull}
               value={pwdCurrent}
               onChangeText={setPwdCurrent}
               secureTextEntry
               placeholder="••••••"
+              blurOnSubmit={false}
+              autoCorrect={false}
+              selectionColor={COLORS.primary}
+              returnKeyType="done"
             />
 
             <Text style={styles.modalLabel}>Nueva contraseña</Text>
             <TextInput
-              style={styles.modalInput}
+              style={styles.inputFull}
               value={pwdNew}
               onChangeText={setPwdNew}
               secureTextEntry
               placeholder="Mín. 6 caracteres"
+              blurOnSubmit={false}
+              autoCorrect={false}
+              selectionColor={COLORS.primary}
+              returnKeyType="done"
             />
 
             <Text style={styles.modalLabel}>Confirmar nueva contraseña</Text>
             <TextInput
-              style={styles.modalInput}
+              style={styles.inputFull}
               value={pwdConfirm}
               onChangeText={setPwdConfirm}
               secureTextEntry
               placeholder="Repetir contraseña"
+              blurOnSubmit={false}
+              autoCorrect={false}
+              selectionColor={COLORS.primary}
+              returnKeyType="done"
             />
 
             {pwdError ? (
@@ -966,14 +1381,30 @@ const styles = StyleSheet.create({
 
   inputFull: {
     width: "90%",
-    backgroundColor: COLORS.cardBg,
+    marginBottom: 14,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
+    height: 56,
+    paddingHorizontal: 16,
+    paddingRight: 12,
     borderWidth: 1,
-    borderColor: COLORS.borderInput,
-    borderRadius: RADIUS.card,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 8,
-    color: COLORS.textPrimary,
+    borderColor: "#e6e9ef",
+    color: "#111827",
+    // Shadow para iOS
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    // Elevation para Android
+    elevation: 2,
+  },
+
+  errorBorder: {
+    borderColor: COLORS.negative,
+    borderWidth: 1.5,
   },
 
   resetContainer: {
@@ -1017,26 +1448,102 @@ const styles = StyleSheet.create({
 
   dropdownButton: {
     width: "90%",
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderColor: "#d1d5db",
     borderWidth: 1,
-    borderColor: COLORS.borderInput,
-    borderRadius: RADIUS.card,
-    padding: 10,
+    minHeight: 48,
+    padding: 12,
     marginBottom: 4,
+    justifyContent: 'center',
+    // Shadow para iOS
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    // Elevation para Android
+    elevation: 1,
   },
-  dropdownText: { color: COLORS.textPrimary },
+  dropdownText: { 
+    color: "#374151",
+    fontSize: 14,
+    fontWeight: "500",
+  },
   dropdownContainer: {
     width: "90%",
-    borderWidth: 1,
-    borderColor: COLORS.textPrimary,
-    borderRadius: RADIUS.card,
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    maxHeight: 200,
     marginBottom: 8,
+    // Shadow para iOS
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    // Elevation para Android
+    elevation: 4,
   },
   dropdownItem: {
-    padding: 10,
+    padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "#f3f4f6",
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: "#374151",
+  },
+
+  // Estilos para selectores de fecha
+  dateContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    gap: 8,
+    width: "90%",
+  },
+  selectorContainer: {
+    flex: 1,
+  },
+  dateSelector: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderColor: "#d1d5db",
+    borderWidth: 1,
+    minHeight: 48,
+    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    // Shadow para iOS
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    // Elevation para Android
+    elevation: 1,
+  },
+  dateSelectorText: {
+    color: "#374151",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  menuContent: {
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    maxHeight: 200,
+    // Shadow para iOS
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    // Elevation para Android
+    elevation: 4,
+  },
+  menuScrollView: {
+    maxHeight: 180,
+  },
+  menuItemTitle: {
+    fontSize: 14,
+    color: "#374151",
   },
 
   buttonContainer: {

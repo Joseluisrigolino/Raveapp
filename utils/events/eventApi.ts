@@ -127,8 +127,10 @@ type RawEvento = any;
 
 export type EventItemWithExtras = EventItem & {
   estado?: number;
+  cdEstado?: number;
   fechas?: { idFecha: string; inicio: string; fin: string }[];
   ownerName?: string;
+  ownerId?: string;
   ownerEmail?: string;
   genero?: number[];
   artistas?: any[];
@@ -145,6 +147,7 @@ export type EventItemWithExtras = EventItem & {
   musica?: string;
   isAfter?: boolean;
   isLGBT?: boolean;
+  __raw?: any;
 };
 
 async function normalizeEvento(e: RawEvento): Promise<EventItemWithExtras> {
@@ -178,6 +181,47 @@ async function normalizeEvento(e: RawEvento): Promise<EventItemWithExtras> {
     direccion: e?.domicilio?.direccion ?? e?.direccion ?? "",
   };
 
+  // detectar URLs multimedia en varios posibles campos/formatos
+  const mediaCandidates: string[] = [];
+  const pushIf = (val: any) => {
+    if (typeof val === "string" && val.trim()) mediaCandidates.push(val.trim());
+  };
+
+  // campos directos
+  pushIf(e?.video);
+  pushIf(e?.Video);
+  pushIf(e?.videoUrl);
+  pushIf(e?.urlVideo);
+  pushIf(e?.url_video);
+  pushIf(e?.musica);
+  pushIf(e?.soundCloud);
+  pushIf(e?.soundcloud);
+  pushIf(e?.sound_cloud);
+  pushIf(e?.musicaUrl);
+  pushIf(e?.musicaURL);
+  pushIf(e?.music);
+  pushIf(e?.musicUrl);
+
+  // campos legacy mdVideo / mdAudio o url dentro de media[]
+  if (Array.isArray(e?.media)) {
+    for (const m of e.media) {
+      if (!m) continue;
+      pushIf(m.mdVideo ?? m.MDVideo ?? m.mdvideo);
+      pushIf(m.mdAudio ?? m.MDAudio ?? m.mdaudio);
+      pushIf(m.url ?? m.Url ?? m.path ?? m.uri);
+      pushIf(m.video ?? m.Video);
+      pushIf(m.audio ?? m.Audio);
+    }
+  }
+
+  // normalizar: preferir YouTube para `video` y SoundCloud para `musica`
+  const findFirst = (re: RegExp) => mediaCandidates.find((u) => re.test(u));
+  const youTubeCandidate = findFirst(/youtube\.com|youtu\.be/i) ?? null;
+  const soundCloudCandidate = findFirst(/soundcloud\.com/i) ?? null;
+
+  const normalizedVideo = youTubeCandidate ?? (typeof e?.video === "string" ? e.video : undefined);
+  const normalizedMusica = soundCloudCandidate ?? (typeof e?.musica === "string" ? e.musica : undefined);
+
   return {
     id: String(e?.idEvento ?? e?.id ?? ""),
     title: String(e?.nombre ?? e?.titulo ?? e?.dsNombre ?? ""),
@@ -188,22 +232,34 @@ async function normalizeEvento(e: RawEvento): Promise<EventItemWithExtras> {
     imageUrl,
     type,
     estado: Number.isFinite(estadoCod) ? estadoCod : undefined,
-    ownerName: e?.propietario?.nombre,
-    ownerEmail: e?.propietario?.correo,
+    // Exponer el cdEstado original (raw) que usa la API para identificar el estado
+    cdEstado: Number.isFinite(Number(e?.cdEstado ?? e?.cd_estado ?? e?.cdestado))
+      ? Number(e?.cdEstado ?? e?.cd_estado ?? e?.cdestado)
+      : undefined,
+    // el backend puede devolver datos del propietario en distintos campos
+    ownerName: e?.propietario?.nombre ?? e?.usuario?.nombre ?? e?.ownerName,
+    ownerId:
+      e?.propietario?.idUsuario ?? e?.usuario?.idUsuario ?? e?.ownerId ?? e?.idUsuarioPropietario ?? undefined,
+    ownerEmail: e?.propietario?.correo ?? e?.usuario?.correo ?? e?.ownerEmail,
+    __raw: e,
     fechas: Array.isArray(e?.fechas)
       ? e.fechas.map((f: any) => ({
           idFecha: String(f?.idFecha ?? ""),
           inicio: String(f?.inicio ?? ""),
           fin: String(f?.fin ?? ""),
+          estado: Number.isFinite(Number(f?.estado)) ? Number(f?.estado) : undefined,
         }))
       : [],
     genero: Array.isArray(e?.genero) ? e.genero : [],
     artistas: Array.isArray(e?.artistas) ? e.artistas : [],
     domicilio: dom,
-    video: e?.video,
-    musica: e?.musica,
+  video: normalizedVideo ?? e?.video,
+  musica: normalizedMusica ?? e?.musica,
     isAfter: Boolean(e?.isAfter),
-    isLGBT: Boolean(e?.isLGBT),
+    // La API puede devolver distintas variantes de la propiedad (isLgbt, isLGBT, isLgtb, etc.)
+    isLGBT: Boolean(
+      e?.isLgbt ?? e?.isLGBT ?? e?.isLgtb ?? e?.isLGTB ?? e?.isLGBt ?? e?.is_lgbt ?? false
+    ),
   };
 }
 
@@ -349,6 +405,18 @@ export async function createEvent(body: any): Promise<string> {
     { headers }
   );
 
+  // Only log the created idEvento to avoid noisy output in production-like logs
+  try {
+    const anyData: any = resp?.data;
+    const id =
+      (anyData && (anyData.idEvento ?? anyData.IdEvento ?? anyData.evento?.idEvento ?? anyData.evento?.IdEvento)) ||
+      (typeof anyData === "string" && anyData)
+      || null;
+    if (id) {
+      try { console.info('[createEvent] idEvento:', String(id)); } catch {}
+    }
+  } catch {}
+
   const data = resp?.data;
 
   // La API puede devolver directamente el id como string
@@ -380,6 +448,72 @@ export async function updateEvent(
   const token = await login();
   const headers = { Authorization: `Bearer ${token}` };
 
+  // If the payload only contains status fields, many backends expect a full event object
+  // for UpdateEvento. Try constructing the full body and calling UpdateEvento directly
+  // before attempting other endpoints. This reduces 404s when backend requires full body.
+  try {
+    const keys = Object.keys(payload || {});
+    const statusOnly = keys.length > 0 && keys.every((k) => ["estado", "cdEstado", "estadoEvento"].includes(k));
+    if (statusOnly) {
+      try {
+        let raw: any = null;
+        try {
+          const evt = await fetchEventById(id);
+          raw = (evt as any).__raw ?? null;
+        } catch {
+          raw = null;
+        }
+
+        const buildBodyFromRaw = (r: any) => {
+          if (!r) return { idEvento: id };
+          return {
+            idEvento: r?.idEvento ?? r?.id ?? id,
+            idArtistas: Array.isArray(r?.artistas) ? r.artistas.map((a: any) => a?.idArtista ?? a?.id) : [],
+            domicilio: r?.domicilio ?? r?.direccion ? {
+              localidad: r?.domicilio?.localidad ?? r?.localidad ?? null,
+              municipio: r?.domicilio?.municipio ?? r?.municipio ?? null,
+              provincia: r?.domicilio?.provincia ?? r?.provincia ?? null,
+              direccion: r?.domicilio?.direccion ?? r?.direccion ?? "",
+              latitud: r?.domicilio?.latitud ?? r?.latitud ?? 0,
+              longitud: r?.domicilio?.longitud ?? r?.longitud ?? 0,
+            } : undefined,
+            nombre: r?.nombre ?? r?.titulo ?? r?.dsNombre,
+            descripcion: r?.descripcion,
+            genero: Array.isArray(r?.genero) ? r.genero : (r?.genero ? [r.genero] : []),
+            isAfter: Boolean(r?.isAfter),
+            isLgbt: Boolean(r?.isLgbt ?? r?.isLGBT),
+            inicioEvento: r?.fechas?.[0]?.inicio ?? r?.inicioEvento ?? r?.inicio,
+            finEvento: r?.fechas?.[0]?.fin ?? r?.finEvento ?? r?.fin,
+            estado: payload?.estado ?? r?.estado ?? undefined,
+            fechas: Array.isArray(r?.fechas)
+              ? r.fechas.map((f: any) => ({
+                  idFecha: f?.idFecha ?? f?.id,
+                  inicio: f?.inicio,
+                  fin: f?.fin,
+                  inicioVenta: f?.inicioVenta,
+                  finVenta: f?.finVenta,
+                  estado: f?.estado,
+                }))
+              : [],
+            idFiesta: r?.idFiesta ?? null,
+            soundCloud: r?.soundCloud ?? r?.musica ?? r?.soundcloud ?? null,
+          };
+        };
+
+        const fullBody = buildBodyFromRaw(raw);
+        // merge any provided fields
+        Object.assign(fullBody, payload || {});
+        await apiClient.put("/v1/Evento/UpdateEvento", fullBody, { headers });
+        return;
+      } catch (err) {
+        console.warn('[updateEvent] intento directo UpdateEvento con body completo falló, continuando intentos:', String((err as any)?.message || err));
+        // continue to generic attempts
+      }
+    }
+  } catch {
+    // no-op: fall back to generic attempts below
+  }
+
   const attempts: Array<() => Promise<any>> = [
     () =>
       apiClient.put(
@@ -403,9 +537,33 @@ export async function updateEvent(
       apiClient.put(`/v1/Evento/${encodeURIComponent(id)}`, payload, {
         headers,
       }),
+    // posibles endpoints alternativos para cambiar estado
+    () =>
+      apiClient.post(
+        "/v1/Evento/CambiarEstado",
+        { idEvento: id, ...payload },
+        { headers }
+      ),
+    () =>
+      apiClient.post(
+        "/v1/Evento/SetEstado",
+        { idEvento: id, ...payload },
+        { headers }
+      ),
   ];
 
   let lastErr: any = null;
+  // for debugging: list the human-friendly attempted endpoints (in same order)
+  const base = apiClient.defaults.baseURL ?? "";
+  // for debugging: list the human-friendly attempted endpoints (in same order)
+  const attemptedEndpoints = [
+    { method: "PUT", url: "/v1/Evento/UpdateEvento", fullUrl: `${base}/v1/Evento/UpdateEvento`, body: { idEvento: id, ...payload } },
+    { method: "PUT", url: "/v1/Evento/Update", fullUrl: `${base}/v1/Evento/Update`, body: { idEvento: id, ...payload } },
+    { method: "PUT", url: "/v1/Evento/PutEvento", fullUrl: `${base}/v1/Evento/PutEvento`, body: { idEvento: id, ...payload } },
+    { method: "PUT", url: `/v1/Evento/${encodeURIComponent(id)}`, fullUrl: `${base}/v1/Evento/${encodeURIComponent(id)}`, body: payload },
+    { method: "POST", url: "/v1/Evento/CambiarEstado", fullUrl: `${base}/v1/Evento/CambiarEstado`, body: { idEvento: id, ...payload } },
+    { method: "POST", url: "/v1/Evento/SetEstado", fullUrl: `${base}/v1/Evento/SetEstado`, body: { idEvento: id, ...payload } },
+  ];
   for (const fn of attempts) {
     try {
       await fn();
@@ -415,10 +573,22 @@ export async function updateEvent(
       continue;
     }
   }
-  const msg =
-    lastErr?.response?.data?.message ||
-    lastErr?.message ||
-    "No se pudo actualizar el evento (endpoint desconocido).";
+  // build a diagnostic message including HTTP status / body if available
+  const status = lastErr?.response?.status ?? lastErr?.status;
+  const respData = lastErr?.response?.data ?? lastErr?.response?.data?.toString?.() ?? lastErr?.toString?.();
+  const baseMsg = (lastErr?.response?.data && (lastErr?.response?.data?.message || lastErr?.response?.data)) || lastErr?.message || "No se pudo actualizar el evento (endpoint desconocido).";
+  const diag = {
+    attemptedEndpoints,
+    lastStatus: status,
+    lastResponseData: respData,
+    lastErrorMessage: String(lastErr?.message || lastErr),
+  };
+  try {
+    console.warn("[updateEvent] todos los endpoints intentados fallaron:", JSON.stringify(diag, null, 2));
+  } catch {
+    console.warn("[updateEvent] todos los endpoints intentados fallaron: (no se pudo stringify diag)", diag);
+  }
+  const msg = `${String(baseMsg)} | diagnostics: ${JSON.stringify(diag)}`;
   throw new Error(msg);
 }
 
@@ -434,7 +604,76 @@ export async function setEventStatus(
     estadoEvento: estado,
     ...extra,
   };
-  await updateEvent(idEvento, payload);
+  try {
+    await updateEvent(idEvento, payload);
+    return;
+  } catch (e: any) {
+    console.warn("[setEventStatus] updateEvent falló, intentando UpdateEvento con body completo:", e?.message || e);
+    // intentar fallback: armar body completo usando el evento tal cual viene (fetchEventById -> __raw)
+    try {
+      const token = await login().catch(() => null);
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+      // intentar obtener el raw del evento para construir el body completo
+      let raw: any = null;
+      try {
+        const evt = await fetchEventById(idEvento);
+        raw = (evt as any).__raw ?? null;
+      } catch (err) {
+        // no crítico: si no se puede recuperar, seguiremos intentando con campos mínimos
+        raw = null;
+      }
+
+      const buildBodyFromRaw = (r: any) => {
+        if (!r) {
+          return { idEvento };
+        }
+        return {
+          idEvento: r?.idEvento ?? r?.id ?? idEvento,
+          idArtistas: Array.isArray(r?.artistas) ? r.artistas.map((a: any) => a?.idArtista ?? a?.id) : [],
+          domicilio: r?.domicilio ?? r?.direccion ? {
+            localidad: r?.domicilio?.localidad ?? r?.localidad ?? null,
+            municipio: r?.domicilio?.municipio ?? r?.municipio ?? null,
+            provincia: r?.domicilio?.provincia ?? r?.provincia ?? null,
+            direccion: r?.domicilio?.direccion ?? r?.direccion ?? "",
+            latitud: r?.domicilio?.latitud ?? r?.latitud ?? 0,
+            longitud: r?.domicilio?.longitud ?? r?.longitud ?? 0,
+          } : undefined,
+          nombre: r?.nombre ?? r?.titulo ?? r?.dsNombre,
+          descripcion: r?.descripcion,
+          genero: Array.isArray(r?.genero) ? r.genero : (r?.genero ? [r.genero] : []),
+          isAfter: Boolean(r?.isAfter),
+          isLgbt: Boolean(r?.isLgbt ?? r?.isLGBT),
+          inicioEvento: r?.fechas?.[0]?.inicio ?? r?.inicioEvento ?? r?.inicio,
+          finEvento: r?.fechas?.[0]?.fin ?? r?.finEvento ?? r?.fin,
+          estado: estado,
+          fechas: Array.isArray(r?.fechas)
+            ? r.fechas.map((f: any) => ({
+                idFecha: f?.idFecha ?? f?.id,
+                inicio: f?.inicio,
+                fin: f?.fin,
+                inicioVenta: f?.inicioVenta,
+                finVenta: f?.finVenta,
+                estado: f?.estado,
+              }))
+            : [],
+          idFiesta: r?.idFiesta ?? null,
+          soundCloud: r?.soundCloud ?? r?.musica ?? r?.soundcloud ?? null,
+        };
+      };
+
+      const fullBody = buildBodyFromRaw(raw);
+      // merge any extra fields provided explicitly
+      Object.assign(fullBody, extra || {});
+
+      // Enviar al endpoint UpdateEvento (que según tu doc espera un objeto completo)
+      await apiClient.put("/v1/Evento/UpdateEvento", fullBody, { headers });
+      return;
+    } catch (err2: any) {
+      console.error("[setEventStatus] fallback UpdateEvento falló:", err2);
+      throw err2;
+    }
+  }
 }
 
 /** ---------- Cancelar/Eliminar evento (DELETE dedicado) ---------- */

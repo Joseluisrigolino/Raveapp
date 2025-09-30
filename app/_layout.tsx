@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 import { AuthProvider } from "@/context/AuthContext";
+import { Provider as PaperProvider } from 'react-native-paper';
 import { View, Text, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import globalStyles, { COLORS } from "@/styles/globalStyles";
@@ -14,8 +15,9 @@ const formatRouteName = (name?: string) => {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <Stack
+    <PaperProvider>
+      <AuthProvider>
+        <Stack
         initialRouteName="login/login"
         screenOptions={({ route }) => ({
           headerTintColor: "#fff",
@@ -41,8 +43,9 @@ export default function RootLayout() {
         {/* Segmentos padres (no hace falta listar todo lo demás) */}
         <Stack.Screen name="admin" options={{ headerShown: false }} />
         <Stack.Screen name="main" options={{ headerShown: false }} />
-      </Stack>
-    </AuthProvider>
+        </Stack>
+      </AuthProvider>
+    </PaperProvider>
   );
 }
 

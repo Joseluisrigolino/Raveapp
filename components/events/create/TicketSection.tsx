@@ -1,6 +1,6 @@
 // components/events/create/TicketSection.tsx
 import React from "react";
-import { View, Text, TextInput, StyleSheet } from "react-native";
+import { View, Text, TextInput, StyleSheet, Platform } from "react-native";
 import { COLORS, RADIUS } from "@/styles/globalStyles";
 
 export type DayTickets = {
@@ -55,17 +55,17 @@ export default function TicketsSection({
             <View style={styles.row}>
               <TextInput
                 style={[styles.input, styles.inputSm]}
-                keyboardType="numeric"
+                keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
                 value={d.genQty}
-                onChangeText={(v) => setTicket(i, "genQty", v)}
+                onChangeText={(v) => setTicket(i, "genQty", v.replace(/[^0-9]/g, ''))}
                 placeholder="0"
                 placeholderTextColor={COLORS.textSecondary}
               />
               <TextInput
                 style={[styles.input, styles.inputSm]}
-                keyboardType="numeric"
+                keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
                 value={d.genPrice}
-                onChangeText={(v) => setTicket(i, "genPrice", v)}
+                onChangeText={(v) => setTicket(i, "genPrice", v.replace(/[^0-9]/g, ''))}
                 placeholder="Precio"
                 placeholderTextColor={COLORS.textSecondary}
               />
@@ -85,9 +85,9 @@ export default function TicketsSection({
                   styles.inputSm,
                   !enableEBGen && styles.inputDisabled,
                 ]}
-                keyboardType="numeric"
+                keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
                 value={d.ebGenQty}
-                onChangeText={(v) => setTicket(i, "ebGenQty", v)}
+                onChangeText={(v) => setTicket(i, "ebGenQty", v.replace(/[^0-9]/g, ''))}
                 placeholder="0"
                 placeholderTextColor={COLORS.textSecondary}
                 editable={enableEBGen}
@@ -98,9 +98,9 @@ export default function TicketsSection({
                   styles.inputSm,
                   !enableEBGen && styles.inputDisabled,
                 ]}
-                keyboardType="numeric"
+                keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
                 value={d.ebGenPrice}
-                onChangeText={(v) => setTicket(i, "ebGenPrice", v)}
+                onChangeText={(v) => setTicket(i, "ebGenPrice", v.replace(/[^0-9]/g, ''))}
                 placeholder="Precio EarlyBird"
                 placeholderTextColor={COLORS.textSecondary}
                 editable={enableEBGen}
@@ -112,17 +112,17 @@ export default function TicketsSection({
             <View style={styles.row}>
               <TextInput
                 style={[styles.input, styles.inputSm]}
-                keyboardType="numeric"
+                keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
                 value={d.vipQty}
-                onChangeText={(v) => setTicket(i, "vipQty", v)}
+                onChangeText={(v) => setTicket(i, "vipQty", v.replace(/[^0-9]/g, ''))}
                 placeholder="0"
                 placeholderTextColor={COLORS.textSecondary}
               />
               <TextInput
                 style={[styles.input, styles.inputSm]}
-                keyboardType="numeric"
+                keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
                 value={d.vipPrice}
-                onChangeText={(v) => setTicket(i, "vipPrice", v)}
+                onChangeText={(v) => setTicket(i, "vipPrice", v.replace(/[^0-9]/g, ''))}
                 placeholder="Precio"
                 placeholderTextColor={COLORS.textSecondary}
               />
@@ -142,9 +142,9 @@ export default function TicketsSection({
                   styles.inputSm,
                   !enableEBVip && styles.inputDisabled,
                 ]}
-                keyboardType="numeric"
+                keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
                 value={d.ebVipQty}
-                onChangeText={(v) => setTicket(i, "ebVipQty", v)}
+                onChangeText={(v) => setTicket(i, "ebVipQty", v.replace(/[^0-9]/g, ''))}
                 placeholder="0"
                 placeholderTextColor={COLORS.textSecondary}
                 editable={enableEBVip}
@@ -155,9 +155,9 @@ export default function TicketsSection({
                   styles.inputSm,
                   !enableEBVip && styles.inputDisabled,
                 ]}
-                keyboardType="numeric"
+                keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
                 value={d.ebVipPrice}
-                onChangeText={(v) => setTicket(i, "ebVipPrice", v)}
+                onChangeText={(v) => setTicket(i, "ebVipPrice", v.replace(/[^0-9]/g, ''))}
                 placeholder="Precio EarlyBird"
                 placeholderTextColor={COLORS.textSecondary}
                 editable={enableEBVip}

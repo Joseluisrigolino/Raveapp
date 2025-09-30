@@ -12,7 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { Text, TextInput, Button, useTheme, HelperText } from "react-native-paper";
+import { Text, TextInput, Button, useTheme, HelperText, Menu } from "react-native-paper";
 import { useRouter } from "expo-router";
 import * as nav from "@/utils/navigation";
 import { ROUTES } from "../../routes";
@@ -34,20 +34,71 @@ export default function RegisterUserScreen() {
     password: "",
     confirmPassword: "",
   });
+  
+  // Estados para los selectores de fecha
+  const [dateSelectors, setDateSelectors] = useState({
+    day: "",
+    month: "",
+    year: "",
+  });
+  
+  // Estados para controlar la visibilidad de los menús
+  const [menuVisible, setMenuVisible] = useState({
+    day: false,
+    month: false,
+    year: false,
+  });
+  
   const [loading, setLoading] = useState(false);
   const [securePass, setSecurePass] = useState(true);
   const [secureConfirm, setSecureConfirm] = useState(true);
 
+  // Generar opciones para los selectores
+  const days = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+  const months = [
+    { value: '01', label: 'Enero' },
+    { value: '02', label: 'Febrero' },
+    { value: '03', label: 'Marzo' },
+    { value: '04', label: 'Abril' },
+    { value: '05', label: 'Mayo' },
+    { value: '06', label: 'Junio' },
+    { value: '07', label: 'Julio' },
+    { value: '08', label: 'Agosto' },
+    { value: '09', label: 'Septiembre' },
+    { value: '10', label: 'Octubre' },
+    { value: '11', label: 'Noviembre' },
+    { value: '12', label: 'Diciembre' },
+  ];
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 100 }, (_, i) => (currentYear - i).toString());
+
   const setField = (key: keyof typeof form, value: string) =>
     setForm((s) => ({ ...s, [key]: value }));
+
+  // Función para actualizar la fecha completa cuando cambian los selectores
+  const updateBirthDate = (day: string, month: string, year: string) => {
+    if (day && month && year) {
+      const formattedDate = `${year}-${month}-${day}`;
+      setForm(prev => ({ ...prev, birthDate: formattedDate }));
+    }
+  };
+
+  // Funciones para manejar los cambios en los selectores
+  const handleDateSelectorChange = (type: 'day' | 'month' | 'year', value: string) => {
+    const newSelectors = { ...dateSelectors, [type]: value };
+    setDateSelectors(newSelectors);
+    setMenuVisible(prev => ({ ...prev, [type]: false }));
+    updateBirthDate(newSelectors.day, newSelectors.month, newSelectors.year);
+  };
 
   const isEmailValid = (email: string) => /\S+@\S+\.\S+/.test(email);
   const isPasswordValid = (p: string) => p.length >= 8 && /[A-Za-z]/.test(p) && /\d/.test(p);
 
   const parseBirthDateToISO = (input: string) => {
-    // Accept formats: YYYY-MM-DD or dd/mm/yyyy or dd-mm-yyyy
+    // El input ya viene en formato YYYY-MM-DD desde los selectores
     if (!input) return new Date().toISOString();
     if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return new Date(input).toISOString();
+    // Fallback para otros formatos por compatibilidad
     const parts = input.includes("/") ? input.split("/") : input.split("-");
     if (parts.length === 3) {
       const [d, m, y] = parts;
@@ -185,18 +236,101 @@ export default function RegisterUserScreen() {
                 activeUnderlineColor="transparent"
               />
 
-              <TextInput
-                mode="flat"
-                label="Fecha de nacimiento*"
-                placeholder="dd/mm/aaaa o YYYY-MM-DD"
-                value={form.birthDate}
-                onChangeText={(t) => setField("birthDate", t)}
-                style={styles.input}
-                textColor="#111827"
-                placeholderTextColor="#6b7280"
-                underlineColor="transparent"
-                activeUnderlineColor="transparent"
-              />
+              <Text style={styles.dateLabel}>Fecha de nacimiento*</Text>
+              <View style={styles.dateContainer}>
+                {/* Selector de Día */}
+                <View style={styles.selectorContainer}>
+                  <Menu
+                    visible={menuVisible.day}
+                    onDismiss={() => setMenuVisible(prev => ({ ...prev, day: false }))}
+                    anchor={
+                      <Button
+                        mode="outlined"
+                        onPress={() => setMenuVisible(prev => ({ ...prev, day: true }))}
+                        style={styles.dateSelector}
+                        contentStyle={styles.dateSelectorContent}
+                        labelStyle={styles.dateSelectorLabel}
+                      >
+                        {dateSelectors.day || "Día"}
+                      </Button>
+                    }
+                    contentStyle={styles.menuContent}
+                  >
+                    <ScrollView style={styles.menuScrollView}>
+                      {days.map((day) => (
+                        <Menu.Item
+                          key={day}
+                          onPress={() => handleDateSelectorChange('day', day)}
+                          title={day}
+                          titleStyle={styles.menuItemTitle}
+                        />
+                      ))}
+                    </ScrollView>
+                  </Menu>
+                </View>
+
+                {/* Selector de Mes */}
+                <View style={styles.selectorContainer}>
+                  <Menu
+                    visible={menuVisible.month}
+                    onDismiss={() => setMenuVisible(prev => ({ ...prev, month: false }))}
+                    anchor={
+                      <Button
+                        mode="outlined"
+                        onPress={() => setMenuVisible(prev => ({ ...prev, month: true }))}
+                        style={styles.dateSelector}
+                        contentStyle={styles.dateSelectorContent}
+                        labelStyle={styles.dateSelectorLabel}
+                      >
+                        {months.find(m => m.value === dateSelectors.month)?.label || "Mes"}
+                      </Button>
+                    }
+                    contentStyle={styles.menuContent}
+                  >
+                    <ScrollView style={styles.menuScrollView}>
+                      {months.map((month) => (
+                        <Menu.Item
+                          key={month.value}
+                          onPress={() => handleDateSelectorChange('month', month.value)}
+                          title={month.label}
+                          titleStyle={styles.menuItemTitle}
+                        />
+                      ))}
+                    </ScrollView>
+                  </Menu>
+                </View>
+
+                {/* Selector de Año */}
+                <View style={styles.selectorContainer}>
+                  <Menu
+                    visible={menuVisible.year}
+                    onDismiss={() => setMenuVisible(prev => ({ ...prev, year: false }))}
+                    anchor={
+                      <Button
+                        mode="outlined"
+                        onPress={() => setMenuVisible(prev => ({ ...prev, year: true }))}
+                        style={styles.dateSelector}
+                        contentStyle={styles.dateSelectorContent}
+                        labelStyle={styles.dateSelectorLabel}
+                      >
+                        {dateSelectors.year || "Año"}
+                      </Button>
+                    }
+                    contentStyle={styles.menuContent}
+                  >
+                    <ScrollView style={styles.menuScrollView}>
+                      {years.map((year) => (
+                        <Menu.Item
+                          key={year}
+                          onPress={() => handleDateSelectorChange('year', year)}
+                          title={year}
+                          titleStyle={styles.menuItemTitle}
+                        />
+                      ))}
+                    </ScrollView>
+                  </Menu>
+                </View>
+              </View>
 
               <TextInput
                 mode="flat"
@@ -401,6 +535,66 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     // Elevation para Android
     elevation: 2,
+  },
+
+  /* Estilos para selectores de fecha */
+  dateLabel: {
+    fontSize: 16,
+    color: "#374151",
+    marginBottom: 8,
+    marginLeft: 4,
+    fontWeight: "500",
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    gap: 8,
+  },
+  selectorContainer: {
+    flex: 1,
+  },
+  dateSelector: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderColor: "#d1d5db",
+    borderWidth: 1,
+    minHeight: 48,
+    // Shadow para iOS
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    // Elevation para Android
+    elevation: 1,
+  },
+  dateSelectorContent: {
+    height: 48,
+    justifyContent: 'center',
+  },
+  dateSelectorLabel: {
+    color: "#374151",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  menuContent: {
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    maxHeight: 200,
+    // Shadow para iOS
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    // Elevation para Android
+    elevation: 4,
+  },
+  menuScrollView: {
+    maxHeight: 180,
+  },
+  menuItemTitle: {
+    fontSize: 14,
+    color: "#374151",
   },
 
 });

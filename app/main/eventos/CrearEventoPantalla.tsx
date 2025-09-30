@@ -8,71 +8,22 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  Modal,
   ActivityIndicator,
   Linking,
   Platform,
-  Image,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { ROUTES } from "../../../routes";
-import { Animated, Easing } from "react-native";
+// Animated/Easing not required here
 import { BlurView } from "expo-blur";
-
-// Animated popup component for smoother appearance
-const AnimatedPopup: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const scaleAnim = React.useRef(new Animated.Value(0.7)).current;
-  const opacityAnim = React.useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 320,
-        useNativeDriver: true,
-        easing: Easing.out(Easing.exp),
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 1,
-        duration: 320,
-        useNativeDriver: true,
-        easing: Easing.out(Easing.exp),
-      }),
-    ]).start();
-  }, [scaleAnim, opacityAnim]);
-
-  return (
-    <Animated.View
-      style={[
-        styles.modalCard,
-        {
-          transform: [{ scale: scaleAnim }],
-          opacity: opacityAnim,
-        },
-      ]}
-    >
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>¡Importante!</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={{ color: COLORS.negative, fontWeight: "bold" }}>Cerrar</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={{ padding: 18 }}>
-          <Text style={{ fontSize: 16, color: COLORS.textPrimary, marginBottom: 12 }}>
-            Al crear un evento, tu usuario pasará a ser <Text style={{ fontWeight: "bold", color: COLORS.primary }}>Organizador</Text> y tendrás acceso a nuevas funcionalidades para administrar tus eventos.
-          </Text>
-          <Text style={{ fontSize: 15, color: COLORS.textSecondary }}>
-            Si continúas y el evento se crea correctamente, tu cuenta será actualizada automáticamente.
-          </Text>
-        </View>
-      </Animated.View>
-  );
-};
+import { Portal } from 'react-native-paper';
+import PopUpOrganizadorIOS from '@/components/events/create/popup-organizador/PopUpOrganizadorIOS';
+import PopUpOrganizadorAndroid from '@/components/events/create/popup-organizador/PopUpOrganizadorAndroid';
 
 /** Layout y UI base */
 import Header from "@/components/layout/HeaderComponent";
-import * as nav from "@/utils/navigation";
+// navigation helper not required in this screen
 import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import TitlePers from "@/components/common/TitleComponent";
@@ -104,14 +55,10 @@ import {
 import { getPartiesByUser, createParty, Party } from "@/utils/partysApi";
 
 /** Entradas */
-import {
-  createEntradasBulk,
-  resolveTipoCodes,
-  CreateEntradaBody,
-} from "@/utils/events/entradaApi";
+import { resolveTipoCodes, CreateEntradaBody } from "@/utils/events/entradaApi";
 
 /** Media */
-import { mediaApi } from "@/utils/mediaApi";
+// mediaApi is imported dynamically when needed
 
 /** Componentes (crear) */
 import EventBasicData from "@/components/events/create/EventBasicData";
@@ -149,18 +96,42 @@ interface DaySaleConfig {
 }
 
 /* ================= Utils ================= */
-const GREEN = "#17a34a";
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2MB
 const ALLOWED_EXTS = new Set(["jpg", "jpeg", "png"]);
 
+// Lightweight logger wrapper: logs only in development (__DEV__), no-ops in production
+const log = {
+  debug: (...args: any[]) => {
+    try {
+      if (typeof __DEV__ !== 'undefined' && (__DEV__ as any)) console.debug(...args);
+    } catch {}
+  },
+  info: (...args: any[]) => {
+    try {
+      if (typeof __DEV__ !== 'undefined' && (__DEV__ as any)) console.info(...args);
+    } catch {}
+  },
+  warn: (...args: any[]) => {
+    try {
+      if (typeof __DEV__ !== 'undefined' && (__DEV__ as any)) console.warn(...args);
+    } catch {}
+  },
+  error: (...args: any[]) => {
+    try {
+      if (typeof __DEV__ !== 'undefined' && (__DEV__ as any)) console.error(...args);
+    } catch {}
+  },
+};
+
 const createEmptyDayTickets = (): DayTickets => ({
-  genQty: "0",
+  // inicializar como cadenas vacías para que se muestre el placeholder en los inputs
+  genQty: "",
   genPrice: "",
-  ebGenQty: "0",
+  ebGenQty: "",
   ebGenPrice: "",
-  vipQty: "0",
+  vipQty: "",
   vipPrice: "",
-  ebVipQty: "0",
+  ebVipQty: "",
   ebVipPrice: "",
 });
 const createEmptySchedule = (): DaySchedule => ({
@@ -274,26 +245,7 @@ function mapLocalToRemoteFechaIds(
   return out;
 }
 
-/** Espera a que la FECHA exista en backend antes de crear entradas */
-async function ensureFechaListo(
-  idFecha: string,
-  tryGetEntradasFecha: (id: string) => Promise<boolean>,
-  {
-    retries = 6,
-    baseDelayMs = 350,
-  }: { retries?: number; baseDelayMs?: number } = {}
-): Promise<void> {
-  for (let i = 0; i < retries; i++) {
-    const ok = await tryGetEntradasFecha(idFecha).catch(() => false);
-    if (ok) return;
-    const delay = baseDelayMs * Math.pow(1.6, i);
-    await new Promise((r) => setTimeout(r, delay));
-  }
-  console.log(
-    "[ensureFechaListo] no se confirmó la fecha tras reintentos:",
-    idFecha
-  );
-}
+// use entradaApi.ensureFechaListo instead of a local duplicate helper
 
 /* ================= Pantalla ================= */
 export default function CreateEventScreen() {
@@ -309,9 +261,7 @@ export default function CreateEventScreen() {
 
   // Debug: log user and isUsuario to diagnose popup issue
   React.useEffect(() => {
-    console.log('[DEBUG] user:', user);
-    console.log('[DEBUG] roles:', (user as any)?.roles);
-    console.log('[DEBUG] isUsuario:', isUsuario);
+    // Debug info suppressed to avoid noisy Metro logs. Keep effect for future hooks.
   }, [user, isUsuario]);
   const router = useRouter();
 
@@ -359,6 +309,8 @@ export default function CreateEventScreen() {
 
   const [newPartyName, setNewPartyName] = useState("");
   const [newPartyLocked, setNewPartyLocked] = useState(false);
+  const [tempCreatedPartyId, setTempCreatedPartyId] = useState<string | null>(null);
+  const [tempCreatedPartyName, setTempCreatedPartyName] = useState<string | null>(null);
 
   /* --- Ubicación --- */
   const [provinces, setProvinces] = useState<{ id: string; nombre: string }[]>(
@@ -398,6 +350,8 @@ export default function CreateEventScreen() {
   const [photoFile, setPhotoFile] = useState<string | null>(null);
   const [videoLink, setVideoLink] = useState("");
   const [musicLink, setMusicLink] = useState("");
+  // Mensaje de error final para mostrar al usuario en pantalla si algo falla durante creación
+  const [creationError, setCreationError] = useState<string | null>(null);
 
   /* --- T&C --- */
   const [acceptedTC, setAcceptedTC] = useState(false);
@@ -447,7 +401,13 @@ export default function CreateEventScreen() {
   useEffect(() => {
     fetchProvinces()
       .then(setProvinces)
-      .catch((err) => console.error("Error fetchProvinces:", err));
+      .catch((err) => {
+        try {
+          log.warn("Error fetchProvinces:", String(err?.message || err));
+        } catch {
+          log.warn("Error fetchProvinces: unknown error");
+        }
+      });
   }, []);
 
   useEffect(() => {
@@ -469,7 +429,11 @@ export default function CreateEventScreen() {
       fetchArtistsFromApi()
         .then((arr) => setAllArtists(arr))
         .catch((e) => {
-          console.error("fetchArtistsFromApi", e);
+          try {
+            log.warn("fetchArtistsFromApi", String(e?.message || e));
+          } catch {
+            log.warn("fetchArtistsFromApi: unknown error");
+          }
           setAllArtists([]);
         })
         .finally(() => setArtistLoading(false));
@@ -508,9 +472,37 @@ export default function CreateEventScreen() {
       setArtistInput("");
       return;
     }
-    setSelectedArtists((prev) => [...prev, { name, image: "" } as ArtistSel]);
+
+    // Añadir visualmente como nuevo (una sola vez)
+    const pendingArtist = ({ name, image: "", __isNew: true } as unknown) as ArtistSel;
+    setSelectedArtists((prev) => [...prev, pendingArtist]);
     setArtistInput("");
-  }, [selectedArtists]);
+
+    // Intento best-effort: crear el artista inmediatamente en la API como inactivo (isActivo = 0)
+    (async () => {
+      try {
+        const artistApi = await import('@/utils/artists/artistApi');
+        if (artistApi && typeof artistApi.createArtistOnApi === 'function') {
+          const id = await artistApi.createArtistOnApi({ name, description: "", instagramURL: "", spotifyURL: "", soundcloudURL: "", isActivo: false });
+          if (id) {
+            // Reemplazar el entry __isNew por objeto con idArtista
+            setSelectedArtists((prev) =>
+              prev.map((a) => {
+                if (norm((a as any).name || '') === norm(name) && (a as any).__isNew) {
+                  // Preserve the __isNew flag so the UI keeps showing the pending (yellow) icon
+                  const updated = ({ ...(a as any), idArtista: String(id) } as unknown) as ArtistSel;
+                  return updated;
+                }
+                return a;
+              })
+            );
+          }
+        }
+      } catch (e) {
+        // ignore: si falla, lo mantenemos como pendiente (__isNew) y se intentará crear en submit
+      }
+    })();
+  }, [selectedArtists, setSelectedArtists, setArtistInput]);
 
   const handleSelectArtistFromSuggestions = useCallback((a: Artist) => {
     if (selectedArtists.some((s) => norm(s.name) === norm(a.name))) return;
@@ -519,19 +511,85 @@ export default function CreateEventScreen() {
   }, [selectedArtists]);
 
   const handleRemoveArtist = useCallback((name: string) => {
-    setSelectedArtists((prev) => prev.filter((x) => x.name !== name));
-  }, []);
+    // Find the artist entry in current selected list
+    const target = selectedArtists.find((x) => norm(x.name) === norm(name));
+
+    // Remove from UI immediately
+    setSelectedArtists((prev) => prev.filter((x) => norm(x.name) !== norm(name)));
+
+    // If it's a manual-added artist (marked __isNew) OR explicitly inactive in DB
+    // and it has an idArtista, attempt to delete it from the backend as well.
+    try {
+      const idArtista = (target as any)?.idArtista;
+      const wasNew = Boolean((target as any)?.__isNew);
+      const isActivoFlag = (target as any)?.isActivo;
+      const isActivo = typeof isActivoFlag === 'boolean' ? isActivoFlag : isActivoFlag === 1 || isActivoFlag === '1';
+
+      if (idArtista && (wasNew || isActivo === false)) {
+        (async () => {
+          try {
+            const artistApi = await import('@/utils/artists/artistApi');
+            if (artistApi && typeof artistApi.deleteArtistFromApi === 'function') {
+              await artistApi.deleteArtistFromApi(String(idArtista));
+            try { log.info('[handleRemoveArtist] artista eliminado de la BBDD:', String(idArtista)); } catch {}
+            }
+          } catch (e) {
+            try { log.warn('[handleRemoveArtist] fallo al eliminar artista de la BBDD:', String((e as any)?.message || e)); } catch {}
+          }
+        })();
+      }
+    } catch (e) {
+      // no hacemos nada si la validación falla; ya removimos de la UI
+    }
+  }, [selectedArtists, setSelectedArtists]);
 
   const onPickParty = (p: Party) => {
-    setSelectedPartyId(p.idFiesta);
-    setShowPartyDropdown(false);
-    setNewPartyName("");
-    setNewPartyLocked(false);
+    // If there was a temp-created party (from pressing +), and it's different from
+    // the one the user selected, delete that temp party from the backend.
+    (async () => {
+      try {
+        if (tempCreatedPartyId && tempCreatedPartyId !== p.idFiesta) {
+          const partys = await import('@/utils/partysApi');
+          if (partys && typeof partys.deleteParty === 'function') {
+            await partys.deleteParty(tempCreatedPartyId);
+            try { log.info('[onPickParty] temp party deleted:', tempCreatedPartyId); } catch {}
+          }
+        }
+      } catch (e) {
+  try { log.warn('[onPickParty] failed deleting temp party:', String((e as any)?.message || e)); } catch {}
+      } finally {
+        setTempCreatedPartyId(null);
+        setSelectedPartyId(p.idFiesta);
+        setShowPartyDropdown(false);
+        setNewPartyName("");
+        setNewPartyLocked(false);
+      }
+    })();
   };
   const onPressAddNewParty = () => {
     const name = newPartyName.trim();
     if (!name) return;
+    // lock UI immediately and create the party in backend as inactivo (best-effort)
     setNewPartyLocked(true);
+    (async () => {
+      try {
+        const partys = await import('@/utils/partysApi');
+        if (partys && typeof partys.createParty === 'function' && userId) {
+          // create as inactivo by default so admin can approve if needed
+          const id = await partys.createParty({ idUsuario: String(userId), nombre: name, isActivo: false });
+          if (id) {
+            // store temp id/name but DO NOT select it or add it to the visible list
+            // because it's created as inactive and should not appear in selector
+            setTempCreatedPartyId(id);
+            setTempCreatedPartyName(name);
+          }
+        }
+      } catch (e) {
+  try { log.warn('[onPressAddNewParty] failed creating party:', String((e as any)?.message || e)); } catch {}
+        // unlock to allow retry
+        setNewPartyLocked(false);
+      }
+    })();
   };
 
   const setSchedule = useCallback((i: number, key: keyof DaySchedule, val: Date) => {
@@ -581,7 +639,7 @@ export default function CreateEventScreen() {
         const mun = await fetchMunicipalities(id);
         setMunicipalities(mun);
       } catch (e) {
-        console.warn("Error fetchMunicipalities:", e);
+  log.warn("Error fetchMunicipalities:", e);
         setMunicipalities([]);
       } finally {
         setMunicipalityLoading(false);
@@ -603,7 +661,7 @@ export default function CreateEventScreen() {
         const loc = await fetchLocalities(provinceId, id);
         setLocalities(loc);
       } catch (e) {
-        console.warn("Error fetchLocalities:", e);
+  log.warn("Error fetchLocalities:", e);
         setLocalities([]);
       } finally {
         setLocalityLoading(false);
@@ -622,6 +680,20 @@ export default function CreateEventScreen() {
     // 1) Género obligatorio
     if (!selectedGenres || selectedGenres.length === 0) {
       Alert.alert('Validación', 'Debe seleccionar al menos un género musical.');
+      return false;
+    }
+    // 1.b) Nombre del evento obligatorio
+    if (!eventName || !eventName.trim()) {
+      Alert.alert('Validación', 'El nombre del evento es obligatorio.');
+      return false;
+    }
+    // 1.c) Al menos un artista (aceptamos artistas existentes o agregados manualmente)
+    const hasArtist = Array.isArray(selectedArtists) && selectedArtists.some((a) => {
+      const maybeId = (a as any).idArtista ?? (a as any).id;
+      return Boolean(maybeId) || Boolean((a as any).__isNew);
+    });
+    if (!hasArtist) {
+      Alert.alert('Validación', 'Debe seleccionar al menos un artista (puede ser uno ya existente o uno añadido manualmente).');
       return false;
     }
     // 2) Descripción obligatoria
@@ -676,31 +748,168 @@ export default function CreateEventScreen() {
       }
     }
 
-    return true;
-  }, [selectedGenres, eventDescription, daySchedules, provinceId, municipalityId, localityId]);
+    // 5) Imagen obligatoria: no se debe crear evento sin foto
+    if (!photoFile) {
+      Alert.alert('Validación', 'Debe seleccionar una imagen para el evento.');
+      return false;
+    }
 
-  // Helpers
-  const toIso = (d?: Date) => (d ? new Date(d).toISOString() : undefined);
+    return true;
+  }, [selectedGenres, eventDescription, daySchedules, provinceId, municipalityId, localityId, selectedArtists, photoFile]);
+
+  // Formato aceptado por el backend: sin zona (yyyy-MM-ddTHH:mm:ss)
+  // Muchos backends .NET fallan al parsear ciertos ISO con Z/offsets; enviamos fecha limpia.
+  const formatBackendIso = (d?: Date | string | undefined | null): string | undefined => {
+    if (!d) return undefined;
+    try {
+      const dt = new Date(d as any);
+      if (!isFinite(dt.getTime())) return undefined;
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const YYYY = dt.getFullYear();
+      const MM = pad(dt.getMonth() + 1);
+      const DD = pad(dt.getDate());
+      const hh = pad(dt.getHours());
+      const mm = pad(dt.getMinutes());
+      const ss = pad(dt.getSeconds());
+      return `${YYYY}-${MM}-${DD}T${hh}:${mm}:${ss}`;
+    } catch {
+      return undefined;
+    }
+  };
 
   async function createPendingEntities(userId: string) {
-    const result: { partyCreated?: any } = {};
+    const result: { partyCreated?: any; artistaIds?: string[]; artistaIdsMap?: Record<string,string> } = {};
     if (isRecurring && newPartyLocked && newPartyName.trim()) {
       const payload = {
         idUsuario: String(userId),
         nombre: newPartyName.trim(),
         isActivo: true,
       };
-      console.log("[PendingEntities] creando fiesta recurrente con payload:", payload);
       try {
-        const created = await createParty(payload);
-        result.partyCreated = created;
-        console.log("[PendingEntities] fiesta recurrente creada:", created);
+        await createParty(payload);
+        // createParty no devuelve el objeto creado; intentar recuperar la fiesta recién creada
+        try {
+          const parties = await getPartiesByUser(String(userId));
+          const found = parties.find((p) => (p.nombre || "").trim() === payload.nombre.trim());
+          if (found) {
+            result.partyCreated = found;
+          }
+        } catch {
+          // best-effort: ignore
+        }
       } catch (e: any) {
-        console.error("[PendingEntities] error creando fiesta:", extractBackendMessage(e));
+        // createParty error is fatal for recurring party creation: rethrow
         throw e;
       }
     }
-    // Si hay artistas nuevos, aquí podrías agregar lógica para crearlos si existe la función correspondiente.
+
+    // Crear artistas nuevos (best-effort). No lanzar errores si falla; devolver ids si podemos resolverlos.
+    // Empezamos por incluir cualquier id ya conocido desde el selector
+    const alreadyKnownIds = selectedArtists.map((a) => (a as any).idArtista).filter(Boolean) as string[];
+    const newOnes = selectedArtists.filter((a) => (a as any).__isNew || !a.idArtista);
+    if (newOnes.length) {
+      try {
+        const artistApi = await import("@/utils/artists/artistApi");
+        const createdIds: string[] = [];
+        const createdMap: Record<string,string> = {};
+        // Merge known ids first
+        if (alreadyKnownIds.length) {
+          createdIds.push(...alreadyKnownIds);
+        }
+        // Prefer the 'createArtist' helper (CreateArtista endpoint) which exists in many environments.
+        // Fallback to createArtistInactive (CrearArtista) only if the first is not available or fails.
+        if (artistApi.createArtist) {
+          // try createArtist (usually posts to /v1/Artista/CreateArtista)
+          await Promise.all(
+            newOnes.map(async (a) => {
+              const name = (a.name || "").trim();
+              let lastId: string | null = null;
+              for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                  const id = await artistApi.createArtist(name, 0);
+                  if (id) {
+                    lastId = String(id);
+                    try { log.info('[createPendingEntities] created artist (preferred)', name, '->', String(id), 'attempt', attempt + 1); } catch {}
+                    break;
+                  } else {
+                    try { log.info('[createPendingEntities] createArtist returned no id for', name, 'attempt', attempt + 1); } catch {}
+                  }
+                } catch (e) {
+                  try { log.warn('[createPendingEntities] createArtist failed for', name, 'attempt', attempt + 1, String((e as any)?.message || e)); } catch {}
+                  // If 404 specifically, we'll let fallback try below
+                  if ((e as any)?.response?.status === 404) {
+                    break;
+                  }
+                }
+                await new Promise((r) => setTimeout(r, 220 * (attempt + 1)));
+              }
+              if (lastId) {
+                createdIds.push(lastId);
+                createdMap[norm(name)] = lastId;
+              }
+            })
+          );
+        }
+        // If we didn't manage to create via createArtist, try the other endpoint as fallback
+        if ((!createdIds.length) && artistApi.createArtistInactive) {
+          await Promise.all(
+            newOnes.map(async (a) => {
+              const name = (a.name || "").trim();
+              // intentar varios reintentos por si hay fallos transitorios
+              let lastId: string | null = null;
+              for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                  const id = await artistApi.createArtistInactive({ nombre: name, isActivo: 0 });
+                  if (id) {
+                    lastId = String(id);
+                    try { log.info('[createPendingEntities] created artist (fallback)', name, '->', String(id), 'attempt', attempt + 1); } catch {}
+                    break;
+                  } else {
+                    try { log.info('[createPendingEntities] createArtistInactive returned no id for', name, 'attempt', attempt + 1); } catch {}
+                  }
+                } catch (e) {
+                  try { log.warn('[createPendingEntities] createArtistInactive failed for', name, 'attempt', attempt + 1, String((e as any)?.message || e)); } catch {}
+                }
+                // backoff
+                await new Promise((r) => setTimeout(r, 220 * (attempt + 1)));
+              }
+              if (lastId) {
+                createdIds.push(lastId);
+                createdMap[norm(name)] = lastId;
+              }
+            })
+          );
+        }
+        if (createdIds.length) {
+          result.artistaIds = Array.from(new Set([...(result.artistaIds || []), ...createdIds]));
+          result.artistaIdsMap = createdMap;
+        }
+      } catch (err: any) {
+        // swallow creation errors; we'll attempt to fetch existing artists below
+      }
+
+      // Intentar recuperar ids de artistas que ahora existan
+      try {
+        const existing = await fetchArtistsFromApi().catch(() => []);
+        const createdIds: string[] = [];
+        for (const a of newOnes) {
+          const found = (existing || []).find((ea) => norm(ea.name || '') === norm(a.name || ''));
+          if (found && (found as any).idArtista) createdIds.push((found as any).idArtista);
+        }
+        if (createdIds.length) {
+          result.artistaIds = createdIds;
+          // merge into map if present
+          result.artistaIdsMap = result.artistaIdsMap || {};
+          for (const cid of createdIds) {
+            const found = (existing || []).find((ea) => (ea as any).idArtista === cid || norm((ea as any).name || '') === norm((existing || []).find(x=> (x as any).idArtista===cid)?.name || ''));
+            if (found && found.name) result.artistaIdsMap[norm(found.name)] = cid;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     return result;
   }
 
@@ -773,7 +982,11 @@ export default function CreateEventScreen() {
 
       return null;
     } catch (e) {
-      console.log("[tryResolveEventIdAfterCreate] error:", e);
+        try {
+          log.warn("[tryResolveEventIdAfterCreate] error:", String((e as any)?.message || e));
+        } catch {
+          log.warn("[tryResolveEventIdAfterCreate] error");
+        }
       return null;
     }
   }
@@ -813,7 +1026,7 @@ export default function CreateEventScreen() {
       const blob = await res.blob();
       if (blob && typeof blob.size === "number") return blob.size;
     } catch (e) {
-      console.warn("[getFileSize] fetch->blob falló, intentando fallback expo-file-system:", e);
+  log.warn("[getFileSize] fetch->blob falló, intentando fallback expo-file-system:", e);
       try {
         if (Platform.OS !== "web") {
           const FileSystem = await import("expo-file-system/legacy");
@@ -821,7 +1034,7 @@ export default function CreateEventScreen() {
           if (info && typeof (info as any).size === "number") return (info as any).size;
         }
       } catch (err) {
-        console.warn("[getFileSize] fallback FileSystem falló:", err);
+  log.warn("[getFileSize] fallback FileSystem falló:", err);
       }
     }
     // Si no se pudo determinar el tamaño, intentamos obtenerlo desde asset (si existe)
@@ -831,9 +1044,9 @@ export default function CreateEventScreen() {
         try {
           const MediaLibrary = await import('expo-media-library');
           const asset = await MediaLibrary.getAssetInfoAsync(assetIdMatch[1]);
-          if (asset && typeof asset.size === 'number') return asset.size;
+        if (asset && typeof (asset as any).size === 'number') return (asset as any).size;
         } catch (e) {
-          console.warn('[getFileSize] MediaLibrary fallback falló:', e);
+          log.warn('[getFileSize] MediaLibrary fallback falló:', e);
         }
       }
     }
@@ -842,29 +1055,117 @@ export default function CreateEventScreen() {
 
   // Submit final
   const handleSubmit = useCallback(async () => {
-    console.log('[CreateEvent] Inicio del flujo de creación. Resumen inicial:', {
-      dayCount,
-      eventName,
-      eventType,
-      isRecurring,
-      selectedArtists: selectedArtists.map((a) => ({ id: (a as any).idArtista ?? (a as any).id, name: (a as any).name })),
-      selectedGenres,
-      selectedPartyId,
-      userId,
-    });
+    // reset any previous creation error
+    setCreationError(null);
 
     try {
+      // Validaciones generales previas
+      if (!validateBeforeSubmit()) return;
+
       if (!userId) throw new Error('Usuario no autenticado.');
       if (!eventName || !acceptedTC) throw new Error('Complete nombre de evento y acepte T&C.');
 
+      // Pre-check: si hay una imagen seleccionada, validar tamaño y extensión antes de POST
+      if (photoFile) {
+        try {
+          const size = await getFileSize(photoFile);
+          if (size > MAX_IMAGE_BYTES) {
+            const userMsg = 'La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana.';
+            setCreationError(userMsg);
+            Alert.alert('Imagen demasiado grande', userMsg);
+            return;
+          }
+          const filename = photoFile.split('/').pop() || '';
+          if (!isAllowedExt(filename) && !isAllowedExt(photoFile)) {
+            const userMsg = 'Formato de imagen no soportado. Use JPG/JPEG/PNG.';
+            setCreationError(userMsg);
+            Alert.alert('Formato no soportado', userMsg);
+            return;
+          }
+        } catch (e: any) {
+          // Si fallo la comprobación local, abortar y mostrar mensaje sin hacer POST
+          const msg = String(e?.message || e || 'Fallo al validar la imagen');
+          setCreationError('Fallo al validar la imagen: ' + msg);
+          Alert.alert('Error', 'Fallo al validar la imagen: ' + msg);
+          return;
+        }
+      }
+
       // 1) Crear entidades pendientes (fiesta recurrente, etc.)
       const pending = await createPendingEntities(userId).catch((e) => {
-        console.warn('[CreateEvent] createPendingEntities fallo, se continúa:', e);
+        try {
+          log.warn('[CreateEvent] createPendingEntities fallo, se continúa:', String(e?.message || e));
+        } catch {
+          log.warn('[CreateEvent] createPendingEntities fallo, se continúa.');
+        }
         return {} as any;
       });
-      console.log('[CreateEvent] pending entities result:', pending);
 
-      // 2) Construir body y llamar createEvent
+      // If the user created a temp party earlier (isActivo=false), activate it now
+      if (tempCreatedPartyId) {
+        try {
+          const partys = await import('@/utils/partysApi');
+          if (partys && typeof partys.updateParty === 'function') {
+            await partys.updateParty({ idFiesta: tempCreatedPartyId, isActivo: true });
+            try { log.info('[CreateEvent] temp party activated before event create:', tempCreatedPartyId); } catch {}
+            // refresh parties and select the newly activated one so backend receives idFiesta
+            try {
+              const refreshed = await partys.getPartiesByUser(String(userId));
+              setMyParties(refreshed);
+            } catch {}
+            setSelectedPartyId(tempCreatedPartyId);
+            setTempCreatedPartyId(null);
+            setTempCreatedPartyName(null);
+          }
+        } catch (e) {
+          try { log.warn('[CreateEvent] failed activating temp party:', String((e as any)?.message || e)); } catch {}
+        }
+      }
+
+      // Resolver IDs de artistas: tomar ids explícitos seleccionados, intentar resolver por nombre contra allArtists,
+      // y añadir los ids devueltos por createPendingEntities (si existieran). Dedupe final.
+      const resolvedArtistIds: string[] = (() => {
+        const existing = selectedArtists
+          .map((a) => (a as any).idArtista ?? (a as any).id)
+          .filter(Boolean) as string[];
+
+        const missingNames = selectedArtists
+          .filter((a) => !((a as any).idArtista || (a as any).id))
+          .map((a) => (a.name || "").trim())
+          .filter(Boolean);
+
+        const byNameResolved: string[] = [];
+        if (missingNames.length && allArtists && allArtists.length) {
+          for (const name of missingNames) {
+            const found = allArtists.find((aa) => norm(aa.name || "") === norm(name));
+            if (found && (found as any).idArtista) byNameResolved.push((found as any).idArtista);
+          }
+        }
+
+  const created = (pending as any)?.artistaIds ?? [];
+  const createdMap = (pending as any)?.artistaIdsMap ?? {};
+
+        return Array.from(new Set([...(existing || []), ...(byNameResolved || []), ...(created || [])]));
+      })();
+
+      // resolvedArtistIds computed (silenciado en logs)
+
+        // Si creamos artistas, actualizar el estado visual para reemplazar los __isNew por objetos con idArtista
+        try {
+          if (resolvedArtistIds && resolvedArtistIds.length && (pending as any)?.artistaIdsMap) {
+            const map = (pending as any).artistaIdsMap as Record<string,string>;
+            setSelectedArtists((prev) => prev.map((a) => {
+              const key = norm(a.name || '');
+              if ((a as any).__isNew && map && map[key]) {
+                // Keep __isNew true so manual-added artists remain visually pending
+                return { ...(a as any), idArtista: map[key] } as ArtistSel;
+              }
+              return a;
+            }));
+          }
+        } catch {}
+
+  // 2) Construir body y llamar createEvent
       const body = {
         descripcion: eventDescription || "",
         domicilio: {
@@ -877,62 +1178,124 @@ export default function CreateEventScreen() {
         },
         estado: 0,
         fechas: daySchedules.map((d, i) => ({
-          inicio: toIso(d.start),
-          fin: toIso(d.end),
-          inicioVenta: toIso(daySaleConfigs[i]?.saleStart),
-          finVenta: toIso(daySaleConfigs[i]?.sellUntil),
+          inicio: formatBackendIso(d.start),
+          fin: formatBackendIso(d.end),
+          inicioVenta: formatBackendIso(daySaleConfigs[i]?.saleStart),
+          finVenta: formatBackendIso(daySaleConfigs[i]?.sellUntil),
           estado: 0,
         })),
-        genero: selectedGenres,
-        idArtistas: selectedArtists.map((a) => (a as any).idArtista ?? (a as any).id).filter(Boolean),
-        idFiesta: selectedPartyId || null,
+        // permiso explícito para backends que esperan campos raíz
+        inicioEvento: formatBackendIso(daySchedules[0]?.start),
+        finEvento: formatBackendIso(daySchedules[0]?.end),
+  genero: selectedGenres,
+  idArtistas: resolvedArtistIds,
+  // si creamos una fiesta recurrente en este flujo, preferir su id
+  idFiesta: (pending && pending.partyCreated && pending.partyCreated.idFiesta) || selectedPartyId || null,
         idUsuario: userId,
-        inicioVenta: toIso(daySaleConfigs[0]?.saleStart),
-        finVenta: toIso(daySaleConfigs[0]?.sellUntil),
+  inicioVenta: formatBackendIso(daySaleConfigs[0]?.saleStart),
+  finVenta: formatBackendIso(daySaleConfigs[0]?.sellUntil),
         isAfter,
         isLgbt: isLGBT,
         nombre: eventName,
         soundCloud: musicLink || "",
       };
 
-      console.log('[CreateEvent] payload que se enviará a createEvent:', JSON.parse(JSON.stringify(body)));
+      // Log conciso: fechas que serán enviadas al backend (ISO)
+      // fechas payload prepared (silenciado en logs)
 
       // 3) Crear evento en backend
       let createResult;
       try {
         createResult = await createEvent(body);
-        console.log('[CreateEvent] respuesta cruda del backend:', createResult);
       } catch (err: any) {
         const msg = extractBackendMessage(err);
         Alert.alert('Error al crear evento', msg);
         return;
       }
 
-      // 4) Extraer fechas devueltas por el backend
-      let remoteFechas = extractFechasFromCreateResp(createResult as any);
-      console.log('[CreateEvent] remoteFechas extraídas:', remoteFechas);
+      // Si createEvent devolvió idEvento pero fallamos en pasos posteriores, intentaremos limpiar (rollback)
+      let createdEventId: string | null = null;
+      try {
+        if (typeof createResult === 'string') {
+          // puede ser idEvento o idFecha, intentamos distinguir
+          const s = String(createResult).trim();
+          const esFecha = await probeGetEntradasFecha(s).catch(() => false);
+          if (!esFecha) createdEventId = s;
+        } else if (createResult && ((createResult as any).idEvento || (createResult as any).IdEvento || (createResult as any).id || (createResult as any).Id)) {
+          createdEventId = String((createResult as any).idEvento ?? (createResult as any).IdEvento ?? (createResult as any).id ?? (createResult as any).Id);
+        }
+      } catch (e) {
+  log.warn('[CreateEvent] no se pudo resolver idEvento inicial:', e);
+      }
+
+      // Si creamos una fiesta en este flujo, y tenemos idEvento, asegurarnos de asociarla al evento
+      try {
+        const partyIdToSet = (pending as any)?.partyCreated?.idFiesta || selectedPartyId || null;
+        if (createdEventId && partyIdToSet) {
+          try {
+            const eventApi = await import('@/utils/events/eventApi');
+            await eventApi.updateEvent(createdEventId, { idFiesta: String(partyIdToSet) });
+            try { log.info('[CreateEvent] asociada fiesta al evento:', String(partyIdToSet)); } catch {}
+          } catch (e) {
+            try { log.warn('[CreateEvent] no se pudo asociar idFiesta al evento:', String((e as any)?.message || e)); } catch {}
+          }
+        }
+      } catch {}
+
+      // Si creamos artistas nuevos en este flujo, asociarlos al evento recién creado
+      try {
+        const createdArtistIds = (pending as any)?.artistaIds ?? [];
+        if (createdArtistIds && createdArtistIds.length && createdEventId) {
+          try {
+            const eventApi = await import('@/utils/events/eventApi');
+            // Intentar obtener los artistas actuales del evento para no sobrescribir
+            let existingArtistIds: string[] = [];
+            try {
+              const evt = await eventApi.fetchEventById(createdEventId);
+              const raw = (evt as any).__raw ?? null;
+              if (raw && Array.isArray(raw.artistas)) {
+                existingArtistIds = raw.artistas.map((a: any) => a?.idArtista ?? a?.id ?? a?.IdArtista ?? a?.Id).filter(Boolean).map(String);
+              } else if (Array.isArray((evt as any).artistas)) {
+                existingArtistIds = (evt as any).artistas.map((a: any) => a?.idArtista ?? a?.id ?? a?.IdArtista ?? a?.Id).filter(Boolean).map(String);
+              }
+            } catch {
+              existingArtistIds = [];
+            }
+
+            const merged = Array.from(new Set([...(existingArtistIds || []), ...(createdArtistIds || [])]));
+            if (merged.length) {
+              await eventApi.updateEvent(createdEventId, { idArtistas: merged });
+              try { log.info('[CreateEvent] artistas asociados al evento:', JSON.stringify(merged)); } catch {}
+            }
+          } catch (e) {
+            try { log.warn('[CreateEvent] no se pudo asociar artistas creados al evento:', String((e as any)?.message || e)); } catch {}
+          }
+        }
+      } catch {}
+
+  // 4) Extraer fechas devueltas por el backend
+  let remoteFechas = extractFechasFromCreateResp(createResult as any);
+      // remoteFechas checked (silenciado)
 
       // 5) Si no hay fechas, intentamos determinar si el createResult es idFecha o idEvento
       let fechaIds: string[] = [];
       const entradaApi = await import('@/utils/events/entradaApi');
       const eventApi = await import('@/utils/events/eventApi');
 
-      if (!remoteFechas.length && typeof createResult === 'string' && createResult.trim()) {
+  if (!remoteFechas.length && typeof createResult === 'string' && createResult.trim()) {
         const candidate = String(createResult).trim();
         const esFecha = await probeGetEntradasFecha(candidate).catch(() => false);
         if (esFecha) {
-          console.log('[CreateEvent] backend devolvió un idFecha simple:', [candidate]);
           fechaIds = [candidate];
         } else {
           try {
             const ev = await eventApi.fetchEventById(candidate);
             const fromEvent = ev?.fechas?.map((f: any) => String(f?.idFecha).trim()).filter(Boolean) || [];
             if (fromEvent.length) {
-              console.log('[CreateEvent] fechas obtenidas consultando evento por id:', fromEvent);
               remoteFechas = fromEvent.map((id: string) => ({ idFecha: id }));
             }
           } catch (e) {
-            console.warn('[CreateEvent] fetchEventById no resolvió fechas para:', candidate, e);
+            // ignore fetchEventById errors for resolution
           }
         }
       }
@@ -942,7 +1305,95 @@ export default function CreateEventScreen() {
         fechaIds = mapped.filter(Boolean);
       }
 
+      // Crear artistas manuales (los que siguen como __isNew o sin id) AHORA que existe el evento
+      try {
+        const manualToCreate = selectedArtists.filter((a) => ((a as any).__isNew || !(a as any).idArtista));
+        if (manualToCreate.length && createdEventId) {
+          const artistApi = await import('@/utils/artists/artistApi');
+          const createdNow: string[] = [];
+          for (const a of manualToCreate) {
+            const name = (a.name || '').trim();
+            if (!name) continue;
+            // Skip if pending map already contains it
+            const alreadyFromPending = (pending as any)?.artistaIdsMap && (pending as any).artistaIdsMap[norm(name)];
+            if (alreadyFromPending) continue;
+            try {
+              const id = await artistApi.createArtistOnApi({ name, description: '', instagramURL: '', spotifyURL: '', soundcloudURL: '', isActivo: false } as any);
+              if (id) {
+                createdNow.push(String(id));
+                // update UI state
+                setSelectedArtists((prev) => prev.map((x) => (norm(x.name || '') === norm(name) ? ({ ...(x as any), idArtista: String(id) } as ArtistSel) : x)));
+              }
+            } catch (e) {
+              // ignore individual create failures
+            }
+          }
+
+          if (createdNow.length) {
+            try {
+              const eventApi2 = await import('@/utils/events/eventApi');
+              // fetch existing artist ids to merge
+              let existingArtistIds: string[] = [];
+              try {
+                const evt = await eventApi2.fetchEventById(createdEventId);
+                existingArtistIds = Array.isArray((evt as any).artistas)
+                  ? (evt as any).artistas.map((x: any) => x?.idArtista ?? x?.id ?? x?.IdArtista ?? x?.Id).filter(Boolean).map(String)
+                  : [];
+              } catch {}
+
+              const pendingIds = (pending as any)?.artistaIds || [];
+              const merged = Array.from(new Set([...(existingArtistIds || []), ...(pendingIds || []), ...createdNow]));
+              if (merged.length) {
+                await eventApi2.updateEvent(createdEventId, { idArtistas: merged });
+                try { log.info('[CreateEvent] artistas creados y asociados al evento:', JSON.stringify(createdNow)); } catch {}
+              }
+            } catch (e) {
+              try { log.warn('[CreateEvent] fallo asociando artistas creados al evento:', String((e as any)?.message || e)); } catch {}
+            }
+          }
+        }
+      } catch {}
+
+      // Si tenemos idEvento y hemos resuelto fechaIds, intentar asociarlas explícitamente al evento
+      try {
+        if (createdEventId && fechaIds.length) {
+          try {
+            await eventApi.updateEvent(createdEventId, { fechas: fechaIds.map((id) => ({ idFecha: id })) });
+            try { log.info('[CreateEvent] fechas asociadas al evento:', JSON.stringify(fechaIds)); } catch {}
+          } catch (e) {
+            try { log.warn('[CreateEvent] no se pudo asociar fechas al evento:', String((e as any)?.message || e)); } catch {}
+          }
+        }
+      } catch {}
+
+      // structured log: creation summary (event id resolution + artist ids if available)
+      try {
+        const createdEventIdResolved = ((): string | null => {
+          if (typeof createResult === 'string') {
+            const s = String(createResult).trim();
+            return s;
+          }
+          if (createResult && ((createResult as any).idEvento || (createResult as any).IdEvento || (createResult as any).id || (createResult as any).Id)) {
+            return String((createResult as any).idEvento ?? (createResult as any).IdEvento ?? (createResult as any).id ?? (createResult as any).Id);
+          }
+          return null;
+        })();
+
+  log.info('[CreateEvent] creationSummary:\n', JSON.stringify({ createdEventId: createdEventIdResolved, artistaIds: (pending as any)?.artistaIds || null, fechaIds }, null, 2));
+      } catch {
+        // ignore logging errors
+      }
+
       if (!fechaIds.length) {
+        // Si no hay fechaIds, intentar cleanup del evento creado
+        if (createdEventId) {
+          try {
+            const eventApi = await import('@/utils/events/eventApi');
+            await eventApi.cancelEvent(createdEventId).catch(() => eventApi.setEventStatus(createdEventId!, eventApi.ESTADO_CODES.RECHAZADO as any));
+          } catch {
+            // ignore rollback failure
+          }
+        }
         Alert.alert('Error', 'No se pudieron obtener los IDs de las fechas del evento. El evento no se creó.');
         return;
       }
@@ -950,7 +1401,7 @@ export default function CreateEventScreen() {
       // 6) Esperar a que las fechas estén visibles en backend (poll)
       for (const idF of fechaIds) {
         await entradaApi.ensureFechaListo(idF).catch(() => {
-          console.warn('[CreateEvent] ensureFechaListo no confirmó fecha:', idF);
+          log.warn('[CreateEvent] ensureFechaListo no confirmó fecha:', idF);
         });
       }
 
@@ -958,63 +1409,79 @@ export default function CreateEventScreen() {
       const entradasPayload = await buildEntradasForFechas(fechaIds);
       try {
         await entradaApi.createEntradasBulk(entradasPayload);
-        console.log('[Entradas] creación OK');
       } catch (e: any) {
+        // Rollback: intentar eliminar/cancelar evento si lo conocemos
+          if (createdEventId) {
+            try {
+              const eventApi = await import('@/utils/events/eventApi');
+              await eventApi.cancelEvent(createdEventId).catch(() => eventApi.setEventStatus(createdEventId!, eventApi.ESTADO_CODES.RECHAZADO as any));
+            } catch {
+              // ignore rollback failure
+            }
+        }
         Alert.alert('Error al crear entradas', e?.message || 'Fallo al crear las entradas. El evento no se creó.');
         return;
       }
 
       // 8) Subir media (si corresponde) — si falla, abortar
       if (photoFile) {
-        try {
-          // Validar tamaño antes de subir (igual que en perfil)
-          const FileSystem = await import('expo-file-system/legacy');
-          const fileInfo: any = await FileSystem.getInfoAsync(photoFile);
-          if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
-            Alert.alert(
-              'Imagen demasiado grande',
-              'La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana.'
-            );
-            return;
-          }
-          const fn = photoFile.split('/').pop() || 'image.jpg';
-          const fileObj = {
-            uri: photoFile,
-            name: fn,
-            type: 'image/jpeg',
-          };
-          const mediaApi = (await import('@/utils/mediaApi')).mediaApi;
-          let uploadTarget = (fechaIds && fechaIds[0]) || null;
           try {
-            let possibleEventId: string | null = null;
-            if (typeof createResult === 'string') {
-              const cand = String(createResult).trim();
-              const esFecha = await probeGetEntradasFecha(cand).catch(() => false);
-              if (!esFecha) possibleEventId = cand;
-            } else if (createResult && ((createResult as any).idEvento || (createResult as any).IdEvento || (createResult as any).id || (createResult as any).Id)) {
-              possibleEventId = String((createResult as any).idEvento ?? (createResult as any).IdEvento ?? (createResult as any).id ?? (createResult as any).Id);
+            // Validar tamaño antes de subir (igual que en perfil)
+            const FileSystem = await import('expo-file-system/legacy');
+            const fileInfo: any = await FileSystem.getInfoAsync(photoFile);
+            if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
+              Alert.alert(
+                'Imagen demasiado grande',
+                'La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana.'
+              );
+              return;
             }
-            if (possibleEventId) uploadTarget = possibleEventId;
-          } catch (e) {
-            console.warn('[Media] no se pudo resolver idEvento, se usará idFecha como fallback:', e);
-          }
-          if (!uploadTarget) {
-            Alert.alert('Error', 'No se encontró idEvento ni idFecha para subir la imagen. El evento no se creó.');
+            const fn = photoFile.split('/').pop() || 'image.jpg';
+            const fileObj = {
+              uri: photoFile,
+              name: fn,
+              type: 'image/jpeg',
+            };
+            const mediaApi = (await import('@/utils/mediaApi')).mediaApi;
+            let uploadTarget = (fechaIds && fechaIds[0]) || null;
+            try {
+              let possibleEventId: string | null = null;
+              if (typeof createResult === 'string') {
+                const cand = String(createResult).trim();
+                const esFecha = await probeGetEntradasFecha(cand).catch(() => false);
+                if (!esFecha) possibleEventId = cand;
+              } else if (createResult && ((createResult as any).idEvento || (createResult as any).IdEvento || (createResult as any).id || (createResult as any).Id)) {
+                possibleEventId = String((createResult as any).idEvento ?? (createResult as any).IdEvento ?? (createResult as any).id ?? (createResult as any).Id);
+              }
+              if (possibleEventId) uploadTarget = possibleEventId;
+            } catch {
+              // ignore resolution errors and fallback to fechaIds
+            }
+            if (!uploadTarget) {
+              Alert.alert('Error', 'No se encontró idEvento ni idFecha para subir la imagen. El evento no se creó.');
+              return;
+            }
+            await mediaApi.upload(String(uploadTarget), fileObj);
+          } catch (e: any) {
+            const msg = typeof e === 'object' && e !== null && 'message' in e ? String((e as any).message) : String(e || 'Error desconocido');
+            // Intentar rollback del evento creado
+            if (createdEventId) {
+              try {
+                const eventApi = await import('@/utils/events/eventApi');
+                await eventApi.cancelEvent(createdEventId).catch(() => eventApi.setEventStatus(createdEventId!, eventApi.ESTADO_CODES.RECHAZADO as any));
+              } catch {
+                // ignore rollback failure
+              }
+            }
+
+            // Mostrar mensaje en pantalla y en alerta
+            const userMsg = msg.toLowerCase().includes('size') || msg.toLowerCase().includes('too large') || msg.includes('2mb')
+              ? 'La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana.'
+              : 'No se pudo subir la imagen. El evento no se creó. Detalle: ' + msg;
+            setCreationError(userMsg);
+            Alert.alert('Error al subir imagen', userMsg);
             return;
           }
-          await mediaApi.upload(String(uploadTarget), fileObj);
-        } catch (e: any) {
-          const msg = typeof e === 'object' && e !== null && 'message' in e ? String((e as any).message) : '';
-          if (msg.toLowerCase().includes('size') || msg.toLowerCase().includes('too large') || msg.includes('2MB')) {
-            Alert.alert(
-              'Imagen demasiado grande',
-              'La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana.'
-            );
-          } else {
-            Alert.alert('Error', 'No se pudo subir la imagen. El evento no se creó.');
-          }
-          return;
-        }
       }
 
       // 9) Actualizar rol usuario (si corresponde) — si falla, abortar
@@ -1169,126 +1636,77 @@ export default function CreateEventScreen() {
         return; // NO seteamos photoFile
       }
 
-      // Si pasó validaciones, recién ahí lo seteamos
-      console.log("[Media] foto seleccionada:", { uri, filename, size });
+  // Si pasó validaciones, recién ahí lo seteamos
       setPhotoFile(uri);
     } catch (e) {
-      console.error("ImagePicker error", e);
+  log.error("ImagePicker error", e);
       Alert.alert("Error", "No se pudo abrir la galería.");
     }
   }, []);
 
   /* ================= Render ================= */
-  // --- Botón de autocompletar para pruebas rápidas ---
-  const [autoCounter, setAutoCounter] = useState(1);
-  const handleAutoFill = useCallback(() => {
-    // Nombre evento
-    setEventName(`evento pepe argento +${autoCounter}`);
-    setAutoCounter((c) => c + 1);
-    // Tipo evento
-    setEventType("1d");
-    // Géneros musicales: selecciona 2-3 random
-    if (genres.length > 0) {
-      const shuffled = [...genres].sort(() => Math.random() - 0.5);
-      setSelectedGenres(shuffled.slice(0, Math.min(3, genres.length)).map((g) => g.cdGenero));
-    }
-    // Artistas: selecciona los primeros 3
-    if (allArtists && allArtists.length > 0) {
-      setSelectedArtists(allArtists.slice(0, 3));
-    }
-    // Provincia: CABA
-    setProvinceId("02");
-    setProvinceName("Ciudad Autónoma de Buenos Aires");
-    // Municipio: CABA
-    setMunicipalityId("02");
-    setMunicipalityName("Ciudad Autónoma de Buenos Aires");
-    // Localidad: Saavedra (si existe en la lista)
-    const saavedra = localities.find((l) => l.nombre?.toLowerCase() === "saavedra");
-    if (saavedra) {
-      setLocalityId(saavedra.id);
-      setLocalityName(saavedra.nombre);
-    } else if (localities.length > 0) {
-      setLocalityId(localities[0].id);
-      setLocalityName(localities[0].nombre);
-    }
-    // Dirección
-    setStreet("tandil 4341");
-    // Descripción
-    setEventDescription("descripcion");
-    // Fecha y hora: inicio mañana, fin pasado mañana
-    const now = new Date();
-    const start = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-    setDaySchedules([{ start, end }]);
-    // Entradas generales y early birds
-    setDaysTickets([{ genQty: "100", genPrice: "100", ebGenQty: "10", ebGenPrice: "80", vipQty: "0", vipPrice: "", ebVipQty: "0", ebVipPrice: "" }]);
-    // Configuración de entradas
-    setDaySaleConfigs([{ saleStart: start, sellUntil: end }]);
-    // Aceptar términos y condiciones
-    setAcceptedTC(true);
-  }, [autoCounter, genres, allArtists, localities]);
 
   return (
     <SafeAreaView style={styles.container}>
       <Header />
 
       {/* Popup para usuarios con rol 0 (Usuario) con animación */}
-      {showUpgradePopup && (
-        <Modal
-          visible={showUpgradePopup}
-          transparent
-          animationType="none"
-          onRequestClose={() => setShowUpgradePopup(false)}
-        >
-          <BlurView intensity={20} style={styles.modalBlurBackdrop}>
-            <AnimatedPopup onClose={() => setShowUpgradePopup(false)} />
-          </BlurView>
-        </Modal>
-      )}
+      <Portal>
+        {showUpgradePopup && (
+          <View style={styles.portalWrapper} pointerEvents="box-none">
+            {Platform.OS === 'ios' ? (
+              <BlurView intensity={20} style={styles.modalBlurBackdrop}>
+                <PopUpOrganizadorIOS onClose={() => setShowUpgradePopup(false)} />
+              </BlurView>
+            ) : (
+              <View style={styles.modalBackdrop} pointerEvents="box-none">
+                {/* Try native BlurView first (may require rebuild on some Android devices). */}
+                <BlurView
+                  intensity={100}
+                  tint="dark"
+                  style={[styles.absoluteFill, { zIndex: 10000 } as any]}
+                  collapsable={false}
+                />
+                {/* Semi-transparent dark overlay to increase contrast but low enough to let blur show */}
+                <View style={styles.darkOverlay} />
+                <View style={styles.modalContentWrapper} pointerEvents="box-none">
+                  <PopUpOrganizadorAndroid onClose={() => setShowUpgradePopup(false)} />
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+      </Portal>
 
       <TabMenuComponent
-        tabs={[{
-          label: "Crear evento",
-          route: ROUTES.MAIN.EVENTS.CREATE,
-          isActive: true,
-        }, {
-          label: "Mis fiestas recurrentes",
-          route: ROUTES.OWNER.PARTYS,
-          isActive: false,
-        }]}
+        tabs={[
+          {
+            label: "Crear evento",
+            route: ROUTES.MAIN.EVENTS.CREATE,
+            isActive: true,
+          },
+          {
+            label: "Mis fiestas recurrentes",
+            route: ROUTES.OWNER.PARTYS,
+            isActive: false,
+          },
+        ]}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {mustShowLogin ? (
-          <View style={styles.notLoggedContainer}>
-            <TitlePers text="Crear Evento" />
+          <View style={{ width: "100%" }}>
             <View style={styles.divider} />
-            <Text style={styles.subtitle}>
-              Para crear un evento debes iniciar sesión.
-            </Text>
-            <TouchableOpacity
-              style={[styles.button, styles.loginButton]}
-              onPress={() => console.log("Iniciar sesión")}
-            >
+            <Text style={styles.subtitle}>Para crear un evento debes iniciar sesión.</Text>
+            <TouchableOpacity style={[styles.button, styles.loginButton]} onPress={() => {}}>
               <Text style={styles.buttonText}>Iniciar sesión</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.registerButton]}
-              onPress={() => console.log("Registrarme")}
-            >
+            <TouchableOpacity style={[styles.button, styles.registerButton]} onPress={() => {}}>
               <Text style={styles.buttonText}>Registrarme</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.googleButton]}
-              onPress={() => console.log("Login con Google")}
-            >
+            <TouchableOpacity style={[styles.button, styles.googleButton]} onPress={() => {}}>
               <View style={styles.googleButtonContent}>
-                <MaterialCommunityIcons
-                  name="google"
-                  size={20}
-                  color={COLORS.info}
-                  style={{ marginRight: 8 }}
-                />
+                <MaterialCommunityIcons name="google" size={20} color={COLORS.info} style={{ marginRight: 8 }} />
                 <Text style={styles.googleButtonText}>Login con Google</Text>
               </View>
             </TouchableOpacity>
@@ -1297,13 +1715,19 @@ export default function CreateEventScreen() {
           <View style={{ width: "100%" }}>
             <TitlePers text="Crear Evento" />
             <View style={styles.divider} />
+            {creationError ? (
+              <View style={{ padding: 12, backgroundColor: '#fdecea', borderRadius: 8, marginBottom: 10 }}>
+                <Text style={{ color: '#611a15', fontWeight: '600' }}>Error creando evento</Text>
+                <Text style={{ color: '#611a15' }}>{creationError}</Text>
+              </View>
+            ) : null}
             <Text style={styles.h2}>Datos del evento</Text>
             <EventBasicData
               eventName={eventName}
               onChangeEventName={setEventName}
               isRecurring={isRecurring}
               setIsRecurring={setIsRecurring}
-              myParties={myParties}
+              myParties={myParties.filter((p) => Boolean(p.isActivo))}
               partyLoading={partyLoading}
               selectedPartyId={selectedPartyId}
               setSelectedPartyId={setSelectedPartyId}
@@ -1448,14 +1872,6 @@ export default function CreateEventScreen() {
                 <Text style={styles.submitButtonText}>CREAR EVENTO</Text>
               </TouchableOpacity>
 
-              {/* Botón de autocompletar para pruebas rápidas */}
-              <TouchableOpacity
-                style={[styles.submitButton, { backgroundColor: COLORS.info, marginTop: 8 }]}
-                onPress={handleAutoFill}
-              >
-                <Text style={[styles.submitButtonText, { color: '#fff' }]}>AUTOCOMPLETAR PRUEBA</Text>
-              </TouchableOpacity>
-
               <CirculoCarga visible={creating} text="Creando evento..." />
 
               <Text style={[styles.totalLine, { textAlign: "center" }]}>
@@ -1469,6 +1885,220 @@ export default function CreateEventScreen() {
       </ScrollView>
 
       <Footer />
+      <Portal>
+        {tycVisible && (
+          <View style={styles.portalWrapper} pointerEvents="box-none">
+            {Platform.OS === 'ios' ? (
+              <BlurView intensity={20} style={styles.modalBlurBackdrop}>
+                <View style={styles.modalCard}>
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>Términos y Condiciones</Text>
+                    <TouchableOpacity onPress={() => setTycVisible(false)}>
+                      <MaterialCommunityIcons
+                        name="close"
+                        size={22}
+                        color={COLORS.textPrimary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.modalBody}>
+                    {tycLoading && (
+                      <View style={styles.center}>
+                        <ActivityIndicator />
+                        <Text style={{ marginTop: 8, color: COLORS.textSecondary }}>
+                          Cargando…
+                        </Text>
+                      </View>
+                    )}
+                    {!tycLoading && !tycError && !tycUrl && (
+                      <View style={styles.center}>
+                        <Text style={{ color: COLORS.textSecondary }}>
+                          No hay archivo disponible.
+                        </Text>
+                      </View>
+                    )}
+                    {!tycLoading && tycError && (
+                      <View style={styles.center}>
+                        <Text style={{ color: COLORS.negative, marginBottom: 8 }}>
+                          {tycError}
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.fileBtn}
+                          onPress={openTycModal}
+                        >
+                          <Text style={styles.fileBtnText}>Reintentar</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    {!tycLoading && tycUrl && (
+                      <>
+                        {(() => {
+                          let WebViewComp: any = null;
+                          try {
+                            WebViewComp = require("react-native-webview").WebView;
+                          } catch {}
+                          if (WebViewComp) {
+                            return (
+                              <WebViewComp
+                                source={{ uri: buildViewerUrl(tycUrl!) }}
+                                style={{ flex: 1, borderRadius: RADIUS.card }}
+                              />
+                            );
+                          }
+                          // @ts-ignore - runtime check for web iframe
+                          if (Platform.OS === "web") {
+                            // @ts-ignore – iframe sólo web
+                            return (
+                              <iframe
+                                src={buildViewerUrl(tycUrl!)}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  border: "none",
+                                }}
+                                title="Términos y Condiciones"
+                              />
+                            );
+                          }
+                          return (
+                            <View style={styles.center}>
+                              <Text
+                                style={{
+                                  color: COLORS.textSecondary,
+                                  marginBottom: 10,
+                                }}
+                              >
+                                No se pudo incrustar el PDF en este dispositivo.
+                              </Text>
+                              <TouchableOpacity
+                                style={styles.fileBtn}
+                                onPress={() => Linking.openURL(tycUrl!)}
+                              >
+                                <Text style={styles.fileBtnText}>
+                                  Abrir en el navegador
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          );
+                        })()}
+                      </>
+                    )}
+                  </View>
+                </View>
+              </BlurView>
+            ) : (
+              <View style={styles.modalBackdrop} pointerEvents="box-none">
+                <BlurView
+                  intensity={100}
+                  tint="dark"
+                  style={[styles.absoluteFill, { zIndex: 10000 } as any]}
+                  collapsable={false}
+                />
+                <View style={styles.darkOverlay} />
+                <View style={styles.modalContentWrapper} pointerEvents="box-none">
+                  <View style={styles.modalCard}>
+                    <View style={styles.modalHeader}>
+                      <Text style={styles.modalTitle}>Términos y Condiciones</Text>
+                      <TouchableOpacity onPress={() => setTycVisible(false)}>
+                        <MaterialCommunityIcons
+                          name="close"
+                          size={22}
+                          color={COLORS.textPrimary}
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.modalBody}>
+                      {tycLoading && (
+                        <View style={styles.center}>
+                          <ActivityIndicator />
+                          <Text style={{ marginTop: 8, color: COLORS.textSecondary }}>
+                            Cargando…
+                          </Text>
+                        </View>
+                      )}
+                      {!tycLoading && !tycError && !tycUrl && (
+                        <View style={styles.center}>
+                          <Text style={{ color: COLORS.textSecondary }}>
+                            No hay archivo disponible.
+                          </Text>
+                        </View>
+                      )}
+                      {!tycLoading && tycError && (
+                        <View style={styles.center}>
+                          <Text style={{ color: COLORS.negative, marginBottom: 8 }}>
+                            {tycError}
+                          </Text>
+                          <TouchableOpacity
+                            style={styles.fileBtn}
+                            onPress={openTycModal}
+                          >
+                            <Text style={styles.fileBtnText}>Reintentar</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                      {!tycLoading && tycUrl && (
+                        <>
+                          {(() => {
+                            let WebViewComp: any = null;
+                            try {
+                              WebViewComp = require("react-native-webview").WebView;
+                            } catch {}
+                            if (WebViewComp) {
+                              return (
+                                <WebViewComp
+                                  source={{ uri: buildViewerUrl(tycUrl!) }}
+                                  style={{ flex: 1, borderRadius: RADIUS.card }}
+                                />
+                              );
+                            }
+                            // @ts-ignore - runtime check for web iframe
+                            if (Platform.OS === "web") {
+                              // @ts-ignore – iframe sólo web
+                              return (
+                                <iframe
+                                  src={buildViewerUrl(tycUrl!)}
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    border: "none",
+                                  }}
+                                  title="Términos y Condiciones"
+                                />
+                              );
+                            }
+                            return (
+                              <View style={styles.center}>
+                                <Text
+                                  style={{
+                                    color: COLORS.textSecondary,
+                                    marginBottom: 10,
+                                  }}
+                                >
+                                  No se pudo incrustar el PDF en este dispositivo.
+                                </Text>
+                                <TouchableOpacity
+                                  style={styles.fileBtn}
+                                  onPress={() => Linking.openURL(tycUrl!)}
+                                >
+                                  <Text style={styles.fileBtnText}>
+                                    Abrir en el navegador
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                            );
+                          })()}
+                        </>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+      </Portal>
     </SafeAreaView>
   );
 }
@@ -1536,8 +2166,11 @@ const styles = StyleSheet.create({
   totalLine: { marginTop: 10, fontWeight: "600", color: COLORS.textPrimary },
 
   modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: "center",
     padding: 16,
   },
@@ -1546,6 +2179,39 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 16,
+  },
+  portalWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  absoluteFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  modalContentWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    padding: 16,
+    zIndex: 10001,
+  },
+  darkOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   modalCard: {
     backgroundColor: COLORS.cardBg,
@@ -1580,6 +2246,16 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: "center",
     marginVertical: 12,
+  },
+  fileBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+  },
+  fileBtnText: {
+    color: COLORS.cardBg,
+    fontWeight: "700",
   },
   button: {
     width: "80%",

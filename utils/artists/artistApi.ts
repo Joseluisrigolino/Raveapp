@@ -160,7 +160,7 @@ export async function fetchOneArtistFromApi(
 }
 
 // Helper compatible with older callsites: createArtist(name, isActivoNum)
-export async function createArtist(name: string, isActivo: 0 | 1 = 1): Promise<void> {
+export async function createArtist(name: string, isActivo: 0 | 1 = 1): Promise<string | null> {
   return createArtistOnApi({ name, isActivo: isActivo === 1 });
 }
 
@@ -181,7 +181,7 @@ export async function fetchArtistsFromApi(): Promise<Artist[]> {
 
 export async function createArtistOnApi(
   newArtist: Partial<Artist>
-): Promise<void> {
+): Promise<string | null> {
   const token = await login();
   const body = {
     nombre: newArtist.name,
@@ -192,14 +192,27 @@ export async function createArtistOnApi(
       mdSpotify: newArtist.spotifyURL ?? "",
       mdSoundcloud: newArtist.soundcloudURL ?? "",
     },
-    isActivo: true,
+    // Respetar el flag isActivo si se pasa en newArtist (boolean), por defecto true
+    isActivo: newArtist.isActivo === undefined ? true : Boolean(newArtist.isActivo),
   };
-  await apiClient.post("/v1/Artista/CreateArtista", body, {
+  const resp = await apiClient.post("/v1/Artista/CreateArtista", body, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
   });
+  // Intentar extraer id devuelto por la API
+  const data = resp?.data;
+  try {
+    try { console.info('[createArtistOnApi] status:', resp?.status, 'headers:', JSON.stringify(resp?.headers || {}, null, 2)); } catch {}
+    try { console.info('[createArtistOnApi] response data:', JSON.stringify(data, null, 2)); } catch {}
+  } catch {}
+  const id =
+    (data && (data.idArtista ?? data.id ?? data.IdArtista ?? data.Id)) || null;
+  if (!id) {
+    try { console.warn('[createArtistOnApi] no id returned by API for payload:', JSON.stringify(body)); } catch {}
+  }
+  return id ? String(id) : null;
 }
 
 export async function updateArtistOnApi(
@@ -235,12 +248,20 @@ export async function deleteArtistFromApi(idArtista: string): Promise<void> {
 export async function createArtistInactive(payload: {
   nombre: string;
   isActivo: 0 | 1;
-}) {
+}): Promise<string | null> {
   const token = await login();
-  await apiClient.post("/v1/Artista/CrearArtista", payload, {
+  const resp = await apiClient.post("/v1/Artista/CrearArtista", payload, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
   });
+  const data = resp?.data;
+  try { console.info('[createArtistInactive] status:', resp?.status, 'headers:', JSON.stringify(resp?.headers || {}, null, 2)); } catch {}
+  try { console.info('[createArtistInactive] response data:', JSON.stringify(data, null, 2)); } catch {}
+  const id = (data && (data.idArtista ?? data.id ?? data.IdArtista ?? data.Id)) || null;
+  if (!id) {
+    try { console.warn('[createArtistInactive] no id returned by API for payload:', JSON.stringify(payload)); } catch {}
+  }
+  return id ? String(id) : null;
 }

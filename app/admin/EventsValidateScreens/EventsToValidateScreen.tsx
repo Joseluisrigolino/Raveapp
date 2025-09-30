@@ -12,12 +12,13 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
 import { ROUTES } from "../../../routes";
 import * as nav from "@/utils/navigation";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
+import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 
 import { fetchEvents } from "@/utils/events/eventApi";
@@ -33,18 +34,48 @@ export default function EventsToValidateScreen() {
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
 
+  const { refresh } = useLocalSearchParams<{ refresh?: string }>();
+  const path = usePathname();
+  const currentScreen = path?.split("/").pop() || "";
+
+  const tabs = [
+    {
+      label: "EVENTOS A VALIDAR",
+      route: ROUTES.ADMIN.EVENTS_VALIDATE.LIST,
+      isActive: currentScreen === ROUTES.ADMIN.EVENTS_VALIDATE.LIST.split("/").pop(),
+    },
+    {
+      label: "EVENTOS APROBADOS",
+      route: ROUTES.MAIN.EVENTS.MENU,
+      isActive: currentScreen === ROUTES.MAIN.EVENTS.MENU.split("/").pop(),
+    },
+  ];
+
   useEffect(() => {
     (async () => {
       try {
+        setLoading(true);
         const data = await fetchEvents(0); // ahora pedimos Estado = 0
-        setEvents(data);
+        // Asegurar que sólo guardamos eventos con estado 0 (por aprobar).
+        // No filtramos por imagen aquí para no ocultar resultados; la UI puede mostrar
+        // un placeholder o marcar que falta imagen.
+        const filteredByState = Array.isArray(data)
+          ? data.filter((ev: any) => {
+              // Preferir cdEstado cuando esté disponible (raw API), si no usar estado normalizado
+              const isCdEstadoZero = ev?.cdEstado === 0 || String(ev?.cdEstado) === "0";
+              const isEstadoZero = ev?.estado === 0 || String(ev?.estado) === "0";
+              // Aceptamos cualquier evento con estado 0; no filtramos por imagen aquí.
+              return isCdEstadoZero || isEstadoZero;
+            })
+          : [];
+        setEvents(filteredByState);
       } catch (e) {
         console.error("Error al cargar eventos:", e);
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [refresh]);
 
   const filtered = events.filter((ev) => {
     const q = searchText.toLowerCase();
@@ -74,11 +105,20 @@ export default function EventsToValidateScreen() {
           <Text style={styles.bold}>Género(s): </Text>
           {item.type}
         </Text>
-        <Text style={styles.label}>
-          <Text style={styles.bold}>Propietario: </Text>
-          {(item as any).ownerName ?? "N/D"}
-        </Text>
-        {(item as any).ownerEmail && <Text style={styles.label}>{(item as any).ownerEmail}</Text>}
+        {}
+        {(() => {
+          // Resolver nombre y email desde distintos shapes posibles del backend
+          const raw: any = item as any;
+          const ownerName = raw.ownerName ?? raw.owner?.name ?? raw.propietario?.nombre ?? raw.ownerDisplayName ?? "N/D";
+          const ownerEmail = raw.ownerEmail ?? raw.owner?.email ?? raw.propietario?.correo ?? raw.email ?? null;
+          return (
+            <Text style={styles.label}>
+              <Text style={styles.bold}>Propietario: </Text>
+              {ownerName}
+              {ownerEmail ? ` — ${ownerEmail}` : ""}
+            </Text>
+          );
+        })()}
 
         <TouchableOpacity
           style={styles.button}
@@ -95,7 +135,16 @@ export default function EventsToValidateScreen() {
       <SafeAreaView style={styles.container}>
         <Header />
 
-        <View style={styles.content}>
+  <TabMenuComponent tabs={tabs} />
+
+  <View style={styles.content}>
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={() => nav.push(router, { pathname: ROUTES.MAIN.EVENTS.CREATE })}
+          >
+            <Text style={styles.createButtonText}>+ Crear evento</Text>
+          </TouchableOpacity>
+
           <Text style={styles.titleScreen}>Eventos a validar:</Text>
 
           <TextInput
@@ -107,6 +156,12 @@ export default function EventsToValidateScreen() {
 
           {loading ? (
             <ActivityIndicator size="large" color={COLORS.primary} />
+          ) : filtered.length === 0 ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: COLORS.textSecondary }}>
+                No hay eventos para aprobar en este momento.
+              </Text>
+            </View>
           ) : (
             <FlatList
               data={filtered}
@@ -137,6 +192,18 @@ const styles = StyleSheet.create({
   fontSize: FONT_SIZES.titleMain,
     color: COLORS.textPrimary,
     marginBottom: 12,
+  },
+  createButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.card,
+    paddingVertical: 10,
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  createButtonText: {
+    color: COLORS.cardBg,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
   },
   search: {
     backgroundColor: COLORS.cardBg,
@@ -182,7 +249,7 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 10,
-    backgroundColor: COLORS.alternative,
+    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.card,
     paddingVertical: 10,
     alignItems: "center",

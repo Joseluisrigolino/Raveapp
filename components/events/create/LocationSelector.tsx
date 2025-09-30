@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
+  ScrollView,
 } from "react-native";
 import { COLORS, RADIUS } from "@/styles/globalStyles";
 
@@ -95,45 +96,63 @@ export default function LocationSelector(props: Props) {
       </TouchableOpacity>
       {showProvinces && (
         <View style={styles.dropdownContainer}>
-          {provinces.map((p) => (
-            <TouchableOpacity
-              key={p.id}
-              style={styles.dropdownItem}
-              onPress={() => handleSelectProvince(p.id, p.nombre)}
-            >
-              <Text>{p.nombre}</Text>
-            </TouchableOpacity>
-          ))}
+          <ScrollView
+            style={styles.menuScrollView}
+            contentContainerStyle={{ paddingVertical: 4 }}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+          >
+            {provinces.map((p) => (
+              <TouchableOpacity
+                key={p.id}
+                style={styles.dropdownItem}
+                onPress={() => handleSelectProvince(p.id, p.nombre)}
+              >
+                <Text>{p.nombre}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       )}
 
-      {/* Municipio */}
-      <Text style={styles.label}>Municipio</Text>
-      <TouchableOpacity
-        style={styles.dropdownButton}
-        disabled={!provinceId || provinceId === '02'}
-        onPress={() => {
-          setShowMunicipalities(!showMunicipalities);
-          setShowProvinces(false);
-          setShowLocalities(false);
-        }}
-      >
-        <Text style={[styles.dropdownText, (!provinceId || provinceId === '02') && { opacity: 0.5 }]}>
-          {municipalityName || "Seleccione un municipio"}
-        </Text>
-      </TouchableOpacity>
-      {showMunicipalities && (
-        <View style={styles.dropdownContainer}>
-          {municipalities.map((m) => (
-            <TouchableOpacity
-              key={m.id}
-              style={styles.dropdownItem}
-              onPress={() => handleSelectMunicipality(m.id, m.nombre)}
-            >
-              <Text>{m.nombre}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+      {/* Municipio: ocultar completamente si la provincia es CABA (02) */}
+      {provinceId !== '02' && (
+        <>
+          <Text style={styles.label}>Municipio</Text>
+          <TouchableOpacity
+            style={styles.dropdownButton}
+            disabled={!provinceId}
+            onPress={() => {
+              setShowMunicipalities(!showMunicipalities);
+              setShowProvinces(false);
+              setShowLocalities(false);
+            }}
+          >
+            <Text style={[styles.dropdownText, !provinceId && { opacity: 0.5 }]}>
+              {municipalityName || "Seleccione un municipio"}
+            </Text>
+          </TouchableOpacity>
+          {showMunicipalities && (
+            <View style={styles.dropdownContainer}>
+              <ScrollView
+                style={styles.menuScrollView}
+                contentContainerStyle={{ paddingVertical: 4 }}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+              >
+                {municipalities.map((m) => (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={styles.dropdownItem}
+                    onPress={() => handleSelectMunicipality(m.id, m.nombre)}
+                  >
+                    <Text>{m.nombre}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </>
       )}
 
       {/* Localidad */}
@@ -156,15 +175,22 @@ export default function LocationSelector(props: Props) {
       </TouchableOpacity>
       {showLocalities && (
         <View style={styles.dropdownContainer}>
-          {localities.map((l) => (
-            <TouchableOpacity
-              key={l.id}
-              style={styles.dropdownItem}
-              onPress={() => handleSelectLocality(l.id, l.nombre)}
-            >
-              <Text>{l.nombre}</Text>
-            </TouchableOpacity>
-          ))}
+          <ScrollView
+            style={styles.menuScrollView}
+            contentContainerStyle={{ paddingVertical: 4 }}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+          >
+            {localities.map((l) => (
+              <TouchableOpacity
+                key={l.id}
+                style={styles.dropdownItem}
+                onPress={() => handleSelectLocality(l.id, l.nombre)}
+              >
+                <Text>{l.nombre}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       )}
 
@@ -215,43 +241,71 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   input: {
-    width: "100%",
-    backgroundColor: COLORS.backgroundLight,
+    width: "90%",
+    backgroundColor: "#fff",
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.borderInput,
-    borderRadius: RADIUS.card,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: COLORS.textPrimary,
+    borderColor: "#d1d5db",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    height: 56,
+    color: "#374151",
+    marginBottom: 4,
+    alignSelf: 'center',
+    // Shadow ligero
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 1,
   },
 
   // dropdowns
   dropdownButton: {
-    width: "100%",
-    backgroundColor: COLORS.backgroundLight,
+    width: "90%",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderColor: "#d1d5db",
     borderWidth: 1,
-    borderColor: COLORS.textPrimary,
-    borderRadius: RADIUS.card,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 8,
-    justifyContent: "center",
+    minHeight: 48,
+    padding: 12,
+    marginBottom: 4,
+    justifyContent: 'center',
+    alignSelf: 'center',
+    // Shadow ligero
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 1,
   },
-  dropdownText: { color: COLORS.textPrimary },
+  dropdownText: { 
+    color: "#374151",
+    fontSize: 14,
+    fontWeight: '500',
+  },
   dropdownContainer: {
-    width: "100%",
-    borderWidth: 1,
-    borderColor: COLORS.textPrimary,
-    borderRadius: RADIUS.card,
-    backgroundColor: COLORS.cardBg,
+    width: "90%",
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    maxHeight: 200,
     marginBottom: 8,
-    alignSelf: "center",
-    overflow: "hidden",
+    // Shadow
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 4,
+    alignSelf: 'center',
+    overflow: 'hidden',
+  },
+  menuScrollView: {
+    maxHeight: 180,
   },
   dropdownItem: {
-    padding: 10,
+    padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "#f3f4f6",
   },
 
   // flags

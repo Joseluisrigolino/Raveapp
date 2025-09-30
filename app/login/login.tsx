@@ -74,7 +74,7 @@ export default function LoginScreen() {
             <Text style={styles.subtitle}>Iniciá sesión para continuar</Text>
 
             <TextInput
-              mode="flat"
+              mode="outlined"
               label="Correo"
               placeholder="email@ejemplo.com"
               autoCapitalize="none"
@@ -83,29 +83,40 @@ export default function LoginScreen() {
               value={username}
               onChangeText={setUsername}
               style={styles.input}
-              underlineColor="transparent"
-              activeUnderlineColor="transparent"
+              textColor={'#0f172a'}
+              placeholderTextColor={'#4b5563'}
+              selectionColor={'#0f172a'}
+              caretHidden={false}
+              outlineColor={"#e6e9ef"}
+              activeOutlineColor={globalStyles.COLORS.primary}
+              outlineStyle={{ borderRadius: 16 }}
               right={<TextInput.Icon icon="email-outline" color="#6b7280" />}
               theme={{
                 colors: {
                   primary: globalStyles.COLORS.primary,
                   background: styles.input.backgroundColor,
-                  text: "#111827",
-                  placeholder: "#6b7280",
+                  text: "#0f172a",
+                  placeholder: "#4b5563",
                 },
+                roundness: 16,
               }}
             />
 
             <TextInput
-              mode="flat"
+              mode="outlined"
               label="Contraseña"
               placeholder="••••••••"
               secureTextEntry={secure}
               value={password}
               onChangeText={setPassword}
               style={styles.input}
-              underlineColor="transparent"
-              activeUnderlineColor="transparent"
+              textColor={'#0f172a'}
+              placeholderTextColor={'#4b5563'}
+              selectionColor={'#0f172a'}
+              caretHidden={false}
+              outlineColor={"#e6e9ef"}
+              activeOutlineColor={globalStyles.COLORS.primary}
+              outlineStyle={{ borderRadius: 16 }}
               right={
                 <TextInput.Icon
                   icon={secure ? "eye" : "eye-off"}
@@ -118,9 +129,10 @@ export default function LoginScreen() {
                 colors: {
                   primary: globalStyles.COLORS.primary,
                   background: styles.input.backgroundColor,
-                  text: "#111827",
-                  placeholder: "#6b7280",
+                  text: "#0f172a",
+                  placeholder: "#4b5563",
                 },
+                roundness: 16,
               }}
             />
 
@@ -186,7 +198,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,
-    overflow: 'hidden',
+  overflow: 'visible',
     padding: 20,
     shadowColor: "#000",
     shadowOpacity: 0.06,
@@ -211,8 +223,7 @@ const styles = StyleSheet.create({
     height: 56,
     paddingHorizontal: 16,
     paddingRight: 12,
-    borderWidth: 1,
-    borderColor: "#e6e9ef",
+    // border handled by TextInput outlined mode
     // Shadow para iOS
     shadowColor: "#000",
     shadowOpacity: 0.04,

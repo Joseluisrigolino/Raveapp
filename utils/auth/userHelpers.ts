@@ -32,6 +32,28 @@ export interface ApiUserFull {
   };
 }
 
+// Interfaz para actualización (incluyendo cdRoles que es obligatorio)
+export interface UpdateUsuarioPayload {
+  idUsuario: string;
+  nombre: string;
+  apellido: string;
+  correo: string;
+  dni: string;
+  telefono: string;
+  cbu: string;
+  nombreFantasia: string;
+  bio: string;
+  dtNacimiento: string; // ISO string
+  domicilio: DomicilioApi;
+  cdRoles: number[]; // Requerido por la API
+  socials: {
+    idSocial: string;
+    mdInstagram: string;
+    mdSpotify: string;
+    mdSoundcloud: string;
+  };
+}
+
 // 1) Traer perfil
 export async function getProfile(correo: string): Promise<ApiUserFull> {
   const { data } = await apiClient.get<{ usuarios: ApiUserFull[] }>(
@@ -43,8 +65,22 @@ export async function getProfile(correo: string): Promise<ApiUserFull> {
 }
 
 // 2) Actualizar perfil
-export async function updateUsuario(payload: ApiUserFull): Promise<void> {
-  await apiClient.put("/v1/Usuario/UpdateUsuario", payload);
+export async function updateUsuario(payload: UpdateUsuarioPayload): Promise<void> {
+  console.log("updateUsuario - Payload recibido:", JSON.stringify(payload, null, 2));
+  
+  try {
+    const response = await apiClient.put("/v1/Usuario/UpdateUsuario", payload, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    console.log("updateUsuario - Respuesta exitosa:", response.status);
+  } catch (error: any) {
+    console.error("updateUsuario - Error:", error);
+    console.error("updateUsuario - Response data:", error?.response?.data);
+    console.error("updateUsuario - Response status:", error?.response?.status);
+    throw error;
+  }
 }
 
 // 3) Crear usuario

@@ -83,87 +83,120 @@ function DirectDateTimeField({
         <Text style={styles.dtButtonText}>{fmt(value)}</Text>
       </TouchableOpacity>
 
-      {/* FECHA */}
-      <Modal visible={showDate} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View
-            style={[styles.modalCard, styles.modalInner, { backgroundColor: COLORS.cardBg }]}
-          >
-            <Text style={styles.modalTitle}>Seleccionar fecha</Text>
+      {Platform.OS === "ios" ? (
+        <>
+          <Modal visible={showDate} transparent animationType="fade">
+            <View style={styles.modalBackdrop}>
+              <View style={[styles.modalCard, styles.modalInner, { backgroundColor: COLORS.cardBg }]}> 
+                <Text style={styles.modalTitle}>Seleccionar fecha</Text>
+                <DateTimePicker
+                  value={tmpDate}
+                  mode="date"
+                  display={"spinner"}
+                  {...pickerCommonPropsDate}
+                  onChange={(_, d) => {
+                    if (d) setTmpDate(d);
+                  }}
+                />
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: "#E5E7EB" }]}
+                    onPress={() => setShowDate(false)}
+                  >
+                    <Text style={[styles.actionText, { color: COLORS.textPrimary }]}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: GREEN }]}
+                    onPress={() => {
+                      setShowDate(false);
+                      setShowTime(true);
+                    }}
+                  >
+                    <Text style={styles.actionText}>Continuar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal visible={showTime} transparent animationType="fade">
+            <View style={styles.modalBackdrop}>
+              <View style={[styles.modalCard, styles.modalInner, { backgroundColor: COLORS.cardBg }]}> 
+                <Text style={styles.modalTitle}>Seleccionar hora</Text>
+                <DateTimePicker
+                  value={tmpDate}
+                  mode="time"
+                  display={"spinner"}
+                  {...pickerCommonPropsTime}
+                  onChange={(_, d) => {
+                    if (d) {
+                      const merged = new Date(tmpDate);
+                      merged.setHours(d.getHours(), d.getMinutes(), 0, 0);
+                      setTmpDate(merged);
+                    }
+                  }}
+                />
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: "#E5E7EB" }]}
+                    onPress={() => setShowTime(false)}
+                  >
+                    <Text style={[styles.actionText, { color: COLORS.textPrimary }]}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: GREEN }]}
+                    onPress={() => {
+                      setShowTime(false);
+                      onChange(tmpDate);
+                    }}
+                  >
+                    <Text style={styles.actionText}>Aceptar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        </>
+      ) : (
+        <>
+          {showDate && (
             <DateTimePicker
               value={tmpDate}
               mode="date"
-              display={Platform.OS === "ios" ? "spinner" : "calendar"}
+              display={"calendar"}
               {...pickerCommonPropsDate}
-              onChange={(_, d) => {
-                if (d) setTmpDate(d);
+              onChange={(event: any, d?: Date) => {
+                if (!d || (event && event.type === "dismissed")) {
+                  setShowDate(false);
+                  return;
+                }
+                setTmpDate(d);
+                setShowDate(false);
+                setTimeout(() => setShowTime(true), 50);
               }}
             />
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: "#E5E7EB" }]}
-                onPress={() => setShowDate(false)}
-              >
-                <Text style={[styles.actionText, { color: COLORS.textPrimary }]}>
-                  Cancelar
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: GREEN }]}
-                onPress={() => {
-                  setShowDate(false);
-                  setShowTime(true);
-                }}
-              >
-                <Text style={styles.actionText}>Continuar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+          )}
 
-      {/* HORA */}
-      <Modal visible={showTime} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View
-            style={[styles.modalCard, styles.modalInner, { backgroundColor: COLORS.cardBg }]}
-          >
-            <Text style={styles.modalTitle}>Seleccionar hora</Text>
+          {showTime && (
             <DateTimePicker
               value={tmpDate}
               mode="time"
-              display={Platform.OS === "ios" ? "spinner" : "clock"}
+              display={"clock"}
               {...pickerCommonPropsTime}
-              onChange={(_, d) => {
-                if (d) {
-                  const merged = new Date(tmpDate);
-                  merged.setHours(d.getHours(), d.getMinutes(), 0, 0);
-                  setTmpDate(merged);
+              onChange={(event: any, d?: Date) => {
+                if (!d || (event && event.type === "dismissed")) {
+                  setShowTime(false);
+                  return;
                 }
+                const merged = new Date(tmpDate);
+                merged.setHours(d.getHours(), d.getMinutes(), 0, 0);
+                setShowTime(false);
+                onChange(merged);
               }}
             />
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: "#E5E7EB" }]}
-                onPress={() => setShowTime(false)}
-              >
-                <Text style={[styles.actionText, { color: COLORS.textPrimary }]}>
-                  Cancelar
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: GREEN }]}
-                onPress={() => {
-                  setShowTime(false);
-                  onChange(tmpDate);
-                }}
-              >
-                <Text style={styles.actionText}>Aceptar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+          )}
+        </>
+      )}
     </>
   );
 }

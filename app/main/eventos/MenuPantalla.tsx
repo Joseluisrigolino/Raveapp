@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, usePathname } from "expo-router";
 import { ROUTES } from "../../../routes";
 import * as nav from "@/utils/navigation";
 
@@ -22,7 +22,7 @@ import FiltersSection from "@/components/filters/FiltersSection";
 
 import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
 import { EventItem } from "@/interfaces/EventItem";
-import { fetchEvents } from "@/utils/events/eventApi";
+import { fetchEvents, fetchEventsByEstados, ESTADO_CODES } from "@/utils/events/eventApi";
 import {
   fetchProvinces,
   fetchMunicipalities,
@@ -31,6 +31,7 @@ import {
 } from "@/utils/georef/georefHelpers";
 
 import { useAuth } from "@/context/AuthContext";
+import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import {
   putEventoFavorito,
   getEventosFavoritos,
@@ -55,7 +56,23 @@ function parseDateToTs(dateStr?: string) {
 
 export default function MenuPantalla() {
   const router = useRouter();
-  const { user } = useAuth();
+  const path = usePathname();
+  const { user, hasRole } = useAuth();
+  const isAdmin = hasRole("admin");
+  const currentScreen = path?.split("/").pop() || "";
+
+  const tabs = [
+    {
+      label: "EVENTOS A VALIDAR",
+      route: ROUTES.ADMIN.EVENTS_VALIDATE.LIST,
+      isActive: currentScreen === ROUTES.ADMIN.EVENTS_VALIDATE.LIST.split("/").pop(),
+    },
+    {
+      label: "EVENTOS APROBADOS",
+      route: ROUTES.MAIN.EVENTS.MENU,
+      isActive: currentScreen === ROUTES.MAIN.EVENTS.MENU.split("/").pop(),
+    },
+  ];
 
   const userId: string | null =
     (user as any)?.idUsuario ?? (user as any)?.id ?? null;
@@ -76,7 +93,7 @@ export default function MenuPantalla() {
         setLoading(true);
         setError(null);
 
-        const eventsPromise = fetchEvents();
+  const eventsPromise = fetchEventsByEstados([ESTADO_CODES.APROBADO, ESTADO_CODES.EN_VENTA]);
         const favsPromise = userId
           ? getEventosFavoritos(String(userId))
           : Promise.resolve<string[]>([]);
@@ -347,6 +364,7 @@ export default function MenuPantalla() {
     <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
       <SafeAreaView style={styles.mainContainer}>
         <Header />
+        {isAdmin && <TabMenuComponent tabs={tabs} />}
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           nestedScrollEnabled

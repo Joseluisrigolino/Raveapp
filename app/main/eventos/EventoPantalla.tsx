@@ -25,6 +25,17 @@ import Footer from "@/components/layout/FooterComponent";
 import ReviewComponent from "@/components/events/ReviewComponent";
 import TicketSelector from "@/components/tickets/TicketSelector";
 
+import TituloEvento from "@/components/events/evento/TituloEvento";
+import HeroImagen from "@/components/events/evento/HeroImagen";
+import BloqueInfoEvento from "@/components/events/evento/BloqueInfoEvento";
+import BadgesEvento from "@/components/events/evento/BadgesEvento";
+import ReproductorSoundCloud from "@/components/events/evento/ReproductorSoundCloud";
+import ReproductorYouTube from "@/components/events/evento/ReproductorYouTube";
+import { styles as eventoStyles } from "@/components/events/evento/styles";
+import SeccionEntradas from "@/components/events/evento/SeccionEntradas";
+import ModalArtistas from "@/components/events/evento/ModalArtistas";
+import ResenasDelEvento from "@/components/events/evento/ResenasDelEvento";
+
 import { fetchEvents, getEventFlags } from "@/utils/events/eventApi";
 import { ReviewItem } from "@/interfaces/ReviewProps";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
@@ -108,14 +119,43 @@ export default function EventScreen() {
   };
   const findYouTubeUrl = (ev: any): string | null => {
     if (!ev) return null;
+    // 1) Preferir campos normalizados (video)
+    const candidates: string[] = [];
+    if (typeof ev.video === "string" && ev.video.trim()) candidates.push(ev.video.trim());
+    if (typeof ev.musica === "string" && ev.musica.trim()) candidates.push(ev.musica.trim());
+    // 2) legacy media array
     if (Array.isArray(ev.media)) {
-      const item = ev.media.find(
-        (m: any) =>
-          (typeof m?.mdVideo === "string" && /youtu\.?be/.test(m.mdVideo)) ||
-          (typeof m?.url === "string" && /youtu\.?be/.test(m.url))
-      );
-      if (item?.mdVideo && /youtu\.?be/.test(item.mdVideo)) return item.mdVideo;
-      if (item?.url && /youtu\.?be/.test(item.url)) return item.url;
+      for (const m of ev.media) {
+        if (typeof m?.mdVideo === "string" && m.mdVideo.trim()) candidates.push(m.mdVideo.trim());
+        if (typeof m?.url === "string" && m.url.trim()) candidates.push(m.url.trim());
+      }
+    }
+
+    for (const url of candidates) {
+      if (/youtu\.?be/i.test(url)) return url;
+      // aceptar enlaces a watch?v= y devolverlos tal cual (extractYouTubeId hará el resto)
+    }
+    return null;
+  };
+
+  const findSoundCloudUrl = (ev: any): string | null => {
+    if (!ev) return null;
+    const candidates: string[] = [];
+    // Priorizar campos que pueden venir del backend
+    if (typeof ev.soundCloud === "string" && ev.soundCloud.trim()) candidates.push(ev.soundCloud.trim());
+    if (typeof ev.soundcloud === "string" && ev.soundcloud.trim()) candidates.push(ev.soundcloud.trim());
+    if (typeof ev.sound_cloud === "string" && ev.sound_cloud.trim()) candidates.push(ev.sound_cloud.trim());
+    if (typeof ev.musica === "string" && ev.musica.trim()) candidates.push(ev.musica.trim());
+    if (typeof ev.video === "string" && ev.video.trim()) candidates.push(ev.video.trim());
+    if (Array.isArray(ev.media)) {
+      for (const m of ev.media) {
+        if (typeof m?.mdAudio === "string" && m.mdAudio.trim()) candidates.push(m.mdAudio.trim());
+        if (typeof m?.url === "string" && m.url.trim()) candidates.push(m.url.trim());
+      }
+    }
+
+    for (const url of candidates) {
+      if (/soundcloud/i.test(url)) return url;
     }
     return null;
   };
@@ -175,11 +215,8 @@ export default function EventScreen() {
             // Traemos raw para conservar idEntrada, cantidad, tipo.dsTipo, etc.
             const raw = await fetchEntradasFechaRaw(f.idFecha).catch(() => []);
 
-            // Si la fecha no está en EN_VENTA, no devolvemos entradas para esa fecha
-            const fechaEstado = raw?.[0]?.fecha?.estado ?? null;
-            if (fechaEstado !== ESTADO_CODES.EN_VENTA) {
-              return [f.idFecha, [] as UiEntrada[]];
-            }
+            // Antes filtrábamos entradas por estado (EN_VENTA). Quitamos esa restricción
+            // para mostrar todas las entradas independientemente del estado.
 
             const merged: UiEntrada[] = (raw || []).map((r: any, idx: number) => {
               const tipoObj = r.tipo ?? null;
@@ -248,6 +285,25 @@ export default function EventScreen() {
     const vid = url ? extractYouTubeId(url) : null;
     return vid ? `https://www.youtube.com/embed/${vid}` : null;
   }, [eventData]);
+
+  const soundCloudUrl = useMemo(() => {
+    if (!eventData) return null;
+    const url = findSoundCloudUrl(eventData);
+    return url || null;
+  }, [eventData]);
+
+  // Loggear el id del evento cuando lo tenemos (para validar en Swagger)
+  useEffect(() => {
+    if (eventData?.id) {
+      const flags = getEventFlags(eventData);
+      console.log("Evento cargado -> id:", String(eventData.id), {
+        isLGBT_api: flags.isLGBT,
+        isAfter_api: flags.isAfter,
+      });
+    }
+  }, [eventData]);
+
+  // ...existing code...
 
   // Favorito
   const toggleFavorite = async () => {
@@ -334,201 +390,58 @@ export default function EventScreen() {
       <SafeAreaView style={styles.container}>
         <Header />
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Título + corazón */}
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>{eventData.title}</Text>
-            <TouchableOpacity
-              onPress={toggleFavorite}
-              disabled={favBusy}
-              style={styles.heartBtn}
-              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-              activeOpacity={0.7}
-            >
-              <MaterialCommunityIcons
-                name={isFavorite ? "heart" : "heart-outline"}
-                size={28}
-                color={COLORS.negative}
-              />
-            </TouchableOpacity>
-          </View>
+          <TituloEvento title={eventData.title} isFavorite={isFavorite} favBusy={favBusy} onToggleFavorite={toggleFavorite} />
 
-          {/* Imagen banner con recuadro superpuesto */}
-          <View style={styles.heroImageWrapper}>
-            {eventData.imageUrl && eventData.imageUrl.trim() !== "" ? (
-              <Image
-                source={{ uri: eventData.imageUrl }}
-                style={styles.heroImage}
-              />
-            ) : null}
-          </View>
-          <View style={styles.eventInfoBlockImproved}>
-            {/* Artistas principales y modal */}
-            {eventData.artistas && eventData.artistas.length > 0 && (
-              <View style={styles.artistRowImproved}>
-                <MaterialCommunityIcons name="volume-high" size={24} color={COLORS.textPrimary} style={{ marginRight: 10 }} />
-                <Text style={styles.artistLabelImproved}>Artistas:</Text>
-                <Text style={styles.artistNameImproved} numberOfLines={1} ellipsizeMode="tail">
-                  {eventData.artistas.slice(0,2).map((a: any) => a.nombre).join(", ")}
-                  {eventData.artistas.length > 2 ? <Text>...</Text> : null}
-                </Text>
-                {eventData.artistas.length > 2 && (
-                  <TouchableOpacity style={styles.seeAllArtistsBtn} onPress={() => setShowArtistsModal(true)}>
-                    <MaterialCommunityIcons name="plus-circle" size={28} color="#2196F3" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-            {/* Modal de artistas */}
-            {showArtistsModal && (
-              <View style={styles.artistsModalOverlay}>
-                <View style={styles.artistsModalContent}>
-                  <Text style={styles.artistsModalTitle}>Artistas</Text>
-                  <ScrollView style={{ maxHeight: 260 }}>
-                    {(eventData.artistas ?? []).map((a: any, idx: number) => (
-                      <View key={idx} style={styles.artistsModalItem}>
-                        <MaterialCommunityIcons name="account-music" size={18} color={COLORS.textPrimary} style={{ marginRight: 6 }} />
-                        {typeof a.nombre === "string" ? (
-                          <Text style={styles.artistsModalName}>{a.nombre}</Text>
-                        ) : null}
-                      </View>
-                    ))}
-                  </ScrollView>
-                  <TouchableOpacity style={styles.artistsModalCloseBtn} onPress={() => setShowArtistsModal(false)}>
-                    <Text style={styles.artistsModalCloseText}>Cerrar</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
+          <BadgesEvento isLGBT={getEventFlags(eventData).isLGBT} isAfter={getEventFlags(eventData).isAfter} />
 
-            <View style={styles.dataRowImproved}>
-              <MaterialCommunityIcons name="calendar-month" size={20} color={COLORS.textPrimary} style={{ marginRight: 8 }} />
-              <Text style={styles.dataLabelImproved}>Fecha:</Text>
-              <Text style={styles.dataValueImproved}>{eventData.date}</Text>
-            </View>
-            <View style={styles.dataRowImproved}>
-              <MaterialCommunityIcons name="clock-outline" size={20} color={COLORS.textPrimary} style={{ marginRight: 8 }} />
-              <Text style={styles.dataLabelImproved}>Horario:</Text>
-              <Text style={styles.dataValueImproved}>{eventData.timeRange}</Text>
-            </View>
-            <View style={styles.dataRowImproved}>
-              <MaterialCommunityIcons name="map-marker" size={20} color={COLORS.info} style={{ marginRight: 8 }} />
-              <Text style={styles.dataValueImproved}>{eventData.address}</Text>
-              <TouchableOpacity
-                style={styles.arrivalBtnImproved}
-                activeOpacity={0.8}
-                onPress={() => {
-                  const query = encodeURIComponent(eventData.address || "");
-                  const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
-                  Linking.openURL(url);
-                }}
-              >
-                <Text style={styles.arrivalBtnTextImproved}>CÓMO LLEGAR</Text>
-              </TouchableOpacity>
-            </View>
+          <HeroImagen imageUrl={eventData.imageUrl} onPress={() => eventData?.id && console.log("Evento id (image press):", String(eventData.id))} />
 
-            {/* Etiquetas LGBT y AFTER usando getEventFlags */}
-            {eventData && (getEventFlags(eventData).isLGBT || getEventFlags(eventData).isAfter) && (
-              <View style={styles.tagsRowImproved}>
-                {getEventFlags(eventData).isLGBT ? (
-                  <View style={styles.tagItemImproved}>
-                    <MaterialCommunityIcons name="rainbow" size={16} color="#E040FB" style={{ marginRight: 2 }} />
-                    <Text style={styles.tagTextImproved}>LGBT</Text>
-                  </View>
-                ) : null}
-                {getEventFlags(eventData).isAfter ? (
-                  <View style={styles.tagItemImproved}>
-                    <MaterialCommunityIcons name="party-popper" size={16} color="#FF4081" style={{ marginRight: 2 }} />
-                    <Text style={styles.tagTextImproved}>AFTER</Text>
-                  </View>
-                ) : null}
-              </View>
-            )}
-          </View>
+          <BloqueInfoEvento
+            artistas={eventData.artistas}
+            // Pasamos el array de fechas (puede venir vacío)
+            fechas={fechas}
+            // legacy props mantenidos por compatibilidad
+            date={eventData.date}
+            timeRange={eventData.timeRange}
+            address={eventData.address}
+            onSeeAllArtists={() => setShowArtistsModal(true)}
+            onCómoLlegar={() => {
+              console.log("Evento id (cómo llegar):", String(eventData.id));
+              const query = encodeURIComponent(eventData.address || "");
+              const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
+              Linking.openURL(url);
+            }}
+          />
 
-          {/* ...existing code... */}
+          {/* Debug: mostrar las URLs que intentamos renderizar (se moverán debajo de entradas) */}
+          {(() => {
+            console.log("[EventScreen] multimedia URLs -> soundCloud:", soundCloudUrl, " youtube:", youTubeEmbedUrl);
+            return null;
+          })()}
 
-          {/* Video YouTube */}
-          {youTubeEmbedUrl && (
-            <View style={styles.videoSection}>
-              <Text style={styles.sectionTitle}>Video</Text>
-              <View style={styles.videoWrapper}>
-                <WebView
-                  source={{ uri: youTubeEmbedUrl }}
-                  allowsFullscreenVideo
-                  javaScriptEnabled
-                  domStorageEnabled
-                  style={styles.webview}
-                />
-              </View>
-            </View>
-          )}
+          <ModalArtistas artistas={eventData.artistas} visible={showArtistsModal} onClose={() => setShowArtistsModal(false)} />
 
-          {/* Descripción */}
           <Text style={styles.description}>{eventData.description}</Text>
 
-          {/* Entradas */}
-          <View style={styles.ticketSection}>
-            <Text style={styles.sectionTitle}>Selecciona tus entradas</Text>
+          <SeccionEntradas
+            fechas={fechas}
+            entradasPorFecha={entradasPorFecha}
+            loadingEntradas={loadingEntradas}
+            selectedTickets={selectedTickets}
+            updateTicketCount={updateTicketCount}
+            subtotal={subtotal}
+            noEntradasAvailable={noEntradasAvailable}
+            onBuy={handleBuyPress}
+          />
 
-            {loadingEntradas && (
-              <View style={{ paddingVertical: 8 }}>
-                <ActivityIndicator size="small" color={COLORS.primary} />
-              </View>
-            )}
-
-            {!loadingEntradas && noEntradasAvailable ? (
-              <View style={{ paddingVertical: 20, alignItems: "center" }}>
-                <Text style={{ color: COLORS.textSecondary }}>Entradas no disponibles.</Text>
-              </View>
-            ) : (
-              !loadingEntradas &&
-              fechas.map((f, idx) => {
-                const entradas = entradasPorFecha[f.idFecha] || [];
-                return (
-                  <View key={f.idFecha} style={styles.dayBlock}>
-                    <Text style={styles.dayLabel}>
-                      {fechas.length > 1
-                        ? `Día ${idx + 1} de ${fechas.length}`
-                        : "Día único"}
-                    </Text>
-
-                    {entradas.length === 0 ? (
-                      <Text style={{ color: COLORS.textSecondary }}>
-                        No hay entradas para esta fecha.
-                      </Text>
-                    ) : (
-                      entradas.map((ent) => {
-                        const entryKey = `entrada-${ent.idEntrada}`;
-                        return (
-                          <TicketSelector
-                            key={entryKey}
-                            label={`${ent.nombreTipo} ($${ent.precio})`}
-                            maxQty={ent.maxCompra}
-                            currentQty={selectedTickets[entryKey] || 0}
-                            onChange={(d) => updateTicketCount(entryKey, d)}
-                          />
-                        );
-                      })
-                    )}
-                  </View>
-                );
-              })
-            )}
-
-            <View style={styles.subtotalRow}>
-              <Text style={styles.subtotalText}>Subtotal: ${subtotal}</Text>
-              <TouchableOpacity
-                style={[
-                  styles.buyButton,
-                  (noEntradasAvailable || subtotal <= 0) && styles.buyButtonDisabled,
-                ]}
-                onPress={handleBuyPress}
-                disabled={noEntradasAvailable || subtotal <= 0}
-              >
-                <Text style={styles.buyButtonText}>Comprar</Text>
-              </TouchableOpacity>
-            </View>
+          {/* Reproductores multimedia debajo de la sección de entradas */}
+          <View style={{ paddingHorizontal: 16, marginBottom: 24 }}>
+            <ReproductorSoundCloud soundCloudUrl={soundCloudUrl} />
+            <ReproductorYouTube youTubeEmbedUrl={youTubeEmbedUrl} />
           </View>
+
+          {/* Reseñas hardcodeadas */}
+          <ResenasDelEvento />
 
           {/* Reseñas (si se requiere mostrar, agregar lógica aquí) */}
           {/* Ejemplo: <View style={styles.reviewSection}><Text style={styles.sectionTitle}>Reseñas</Text><ReviewComponent reviews={mockReviews} /></View> */}
@@ -798,27 +711,27 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   arrivalBtnImproved: {
-    backgroundColor: "#2196F3", // azul moderno
+    backgroundColor: COLORS.primary, // usar violeta primario de la app
     borderRadius: 22,
     paddingVertical: 7,
     paddingHorizontal: 22,
     marginLeft: 8,
     alignSelf: "center",
     elevation: 2,
-    shadowColor: "#1976D2",
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
   arrivalBtnTextImproved: {
-    color: "#fff",
+    color: COLORS.cardBg,
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.body,
     fontWeight: "bold",
     letterSpacing: 0.5,
-    textShadowColor: "#1976D2",
+    textShadowColor: "rgba(0,0,0,0.06)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 1,
   },
   tagsRowImproved: {
     flexDirection: "row",
@@ -842,6 +755,45 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.body,
     color: COLORS.info,
     fontWeight: "bold",
+  },
+  /* Badges específicos */
+  lgbtTag: {
+    backgroundColor: COLORS.primary,
+    borderColor: "transparent",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 16,
+  },
+  lgbtTagText: {
+    color: COLORS.cardBg,
+    fontWeight: "700",
+    fontSize: FONT_SIZES.body - 1,
+    marginLeft: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  lgbtFlagBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: COLORS.cardBg,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  lgbtFlagEmoji: {
+    fontSize: 12,
+    lineHeight: 12,
+  },
+  afterTag: {
+    backgroundColor: "#FFF4EE",
+    borderColor: "#FFE6D5",
+  },
+  afterTagText: {
+    color: "#FF6D3A",
+    fontWeight: "700",
   },
   eventInfoRow: {
     flexDirection: "row",

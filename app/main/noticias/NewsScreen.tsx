@@ -59,27 +59,38 @@ export default function NewsScreen() {
 
   const currentScreen = path?.split("/").pop() || "";
 
-  // Tabs: aseguramos que NOTICIAS / ARTISTAS estén primero en ese orden
+  // Tabs: si es administrador mostrar "Administrar Noticias" seguido de "Noticias";
+  // si no es administrador mostrar "Noticias" y opcionalmente "Artistas".
   const tabs = useMemo(() => {
+    if (isAdmin) {
+      return [
+        {
+          label: "Administrar Noticias",
+          route: ROUTES.ADMIN.NEWS.MANAGE,
+          isActive: currentScreen === ROUTES.ADMIN.NEWS.MANAGE.split("/").pop(),
+        },
+        {
+          label: "Noticias",
+          route: ROUTES.MAIN.NEWS.LIST,
+          isActive: currentScreen === ROUTES.MAIN.NEWS.LIST.split("/").pop(),
+        },
+      ];
+    }
+
     const baseTabs: any[] = [
       {
         label: "Noticias",
         route: ROUTES.MAIN.NEWS.LIST,
         isActive: currentScreen === ROUTES.MAIN.NEWS.LIST.split("/").pop(),
       },
-      {
+    ];
+
+    // Mostrar "Artistas" sólo si NO es administrador
+    if (!isAdmin) {
+      baseTabs.push({
         label: "Artistas",
         route: ROUTES.MAIN.ARTISTS.LIST,
         isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split("/").pop(),
-      },
-    ];
-
-    if (isAdmin) {
-      // Mostrar administración al final para no romper el orden principal
-      baseTabs.push({
-        label: "Administrar Noticias",
-        route: ROUTES.ADMIN.NEWS.MANAGE,
-        isActive: currentScreen === ROUTES.ADMIN.NEWS.MANAGE.split("/").pop(),
       });
     }
 
