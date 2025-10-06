@@ -13,7 +13,7 @@ import {
   Alert,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
+import { getInfoAsync } from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
@@ -21,6 +21,7 @@ import Footer from "@/components/layout/FooterComponent";
 import { createNews } from "@/utils/news/newsApi";
 import { fetchEvents } from "@/utils/events/eventApi";
 import { mediaApi } from "@/utils/mediaApi";
+import { emit } from "@/utils/eventBus";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function CreateNewScreen() {
@@ -49,13 +50,13 @@ export default function CreateNewScreen() {
 
   const handleSelectImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
       quality: 0.8,
     });
 
     if (!result.canceled && result.assets.length > 0) {
       const asset = result.assets[0];
-      const fileInfo: any = await FileSystem.getInfoAsync(asset.uri);
+  const fileInfo: any = await getInfoAsync(asset.uri);
 
       if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
         Alert.alert("Error", "La imagen supera los 2MB permitidos.");
@@ -99,7 +100,9 @@ export default function CreateNewScreen() {
       }
 
       Alert.alert("Éxito", "Noticia creada correctamente.");
-      router.back();
+  // Notificar al resto de la app que se creó/actualizó una noticia
+  emit("news:updated", { id: nueva.idNoticia });
+  router.back();
     } catch (err: any) {
       console.error("Error al crear noticia:", err);
       const msg =

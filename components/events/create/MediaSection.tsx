@@ -6,6 +6,7 @@ import {
   TextInput,
   Image,
   StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import { COLORS, RADIUS } from "@/styles/globalStyles";
 
@@ -16,6 +17,7 @@ interface Props {
   onSelectPhoto: () => void;
   onChangeVideo: (t: string) => void;
   onChangeMusic: (t: string) => void;
+  isChecking?: boolean;
 }
 
 export default function MediaSection({
@@ -25,6 +27,7 @@ export default function MediaSection({
   onSelectPhoto,
   onChangeVideo,
   onChangeMusic,
+  isChecking = false,
 }: Props) {
   return (
     <View style={styles.card}>
@@ -32,8 +35,17 @@ export default function MediaSection({
         Foto <Text style={{ color: COLORS.negative }}>(obligatoria)</Text>
       </Text>
       <View style={[styles.row, { justifyContent: "space-between" }]}>
-        <TouchableOpacity style={styles.fileBtn} onPress={onSelectPhoto}>
-          <Text style={styles.fileBtnText}>SELECCIONAR ARCHIVO</Text>
+        <TouchableOpacity
+          testID="select-button"
+          style={[styles.fileBtn, isChecking && styles.fileBtnDisabled]}
+          onPress={onSelectPhoto}
+          disabled={isChecking}
+        >
+          {isChecking ? (
+            <ActivityIndicator testID="select-loading" color="#fff" />
+          ) : (
+            <Text style={styles.fileBtnText}>SELECCIONAR ARCHIVO</Text>
+          )}
         </TouchableOpacity>
         <Text style={styles.fileName}>
           {photoFile ? "Archivo seleccionado" : "Ninguno…"}
@@ -90,6 +102,7 @@ const styles = StyleSheet.create({
   },
   fileBtnText: { color: "#fff", fontWeight: "700" },
   fileName: { color: COLORS.textSecondary },
+  fileBtnDisabled: { opacity: 0.7 },
   previewImage: {
     width: "100%",
     height: 160,

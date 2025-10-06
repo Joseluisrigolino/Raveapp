@@ -63,27 +63,33 @@ export default function ArtistasPantalla() {
   };
 
   const currentScreen = path.split("/").pop() || "";
-  const tabs = [
-    {
-      label: "Noticias",
-      route: ROUTES.MAIN.NEWS.LIST,
-      isActive: currentScreen === ROUTES.MAIN.NEWS.LIST.split("/").pop(),
-    },
-    {
-      label: "Artistas",
-      route: ROUTES.MAIN.ARTISTS.LIST,
-      isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split("/").pop(),
-    },
-    ...(isAdmin
-      ? [
-          {
-            label: "Adm Artistas",
-            route: ROUTES.ADMIN.ARTISTS.MANAGE,
-            isActive: currentScreen === ROUTES.ADMIN.ARTISTS.MANAGE.split("/").pop(),
-          },
-        ]
-      : []),
-  ];
+  // Si el usuario es admin, mostrar sólo 'ADM ARTISTAS' seguido de 'ARTISTAS'
+  // Si no, mostrar 'Noticias' y 'Artistas' (como antes)
+  const tabs = isAdmin
+    ? [
+        {
+          label: "ADM ARTISTAS",
+          route: ROUTES.ADMIN.ARTISTS.MANAGE,
+          isActive: currentScreen === ROUTES.ADMIN.ARTISTS.MANAGE.split("/").pop(),
+        },
+        {
+          label: "Artistas",
+          route: ROUTES.MAIN.ARTISTS.LIST,
+          isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split("/").pop(),
+        },
+      ]
+    : [
+        {
+          label: "Noticias",
+          route: ROUTES.MAIN.NEWS.LIST,
+          isActive: currentScreen === ROUTES.MAIN.NEWS.LIST.split("/").pop(),
+        },
+        {
+          label: "Artistas",
+          route: ROUTES.MAIN.ARTISTS.LIST,
+          isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split("/").pop(),
+        },
+      ];
 
   return (
     <ProtectedRoute allowedRoles={["admin", "owner", "user"]}>

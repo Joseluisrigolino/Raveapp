@@ -19,6 +19,7 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { getInfoAsync } from "expo-file-system/legacy";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 import Header from "@/components/layout/HeaderComponent";
@@ -593,10 +594,22 @@ export default function ModifyEventScreen() {
       return;
     }
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+  mediaTypes: 'images',
       quality: 1,
     });
-    if (!res.canceled && res.assets.length) setPhotoFile(res.assets[0].uri);
+    if (!res.canceled && res.assets.length) {
+      const uri = res.assets[0].uri;
+      try {
+        const fileInfo: any = await getInfoAsync(uri);
+        if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
+          Alert.alert("Error", "La imagen supera los 2MB permitidos.");
+          return;
+        }
+      } catch (e) {
+        try { console.debug('[ModificarEventosPantalla] getInfoAsync error', e); } catch {}
+      }
+      setPhotoFile(uri);
+    }
   };
 
   /* Crear artistas nuevos antes de enviar */

@@ -13,8 +13,10 @@ import {
 } from "react-native";
 import { IconButton } from "react-native-paper";
 import { useRouter, usePathname } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { ROUTES } from "../../../routes";
 import * as nav from "@/utils/navigation";
+import { on as onEvent, off as offEvent } from "@/utils/eventBus";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
@@ -39,21 +41,56 @@ export default function ManageNewsScreen() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
+  const isFocused = useIsFocused();
+  const [justRefreshed, setJustRefreshed] = useState(false);
 
+  // Función reusable para cargar noticias
+  const loadNews = async () => {
+    setLoading(true);
+    try {
+      const data = await getNews();
+      setNews(data);
+    } catch (e) {
+      console.error("Error al cargar noticias:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cargar noticias inicialmente y cuando la pantalla gane foco
   useEffect(() => {
-    (async () => {
-      try {
-        const data = await getNews();
-        setNews(data);
-      } catch (e) {
-        console.error("Error al cargar noticias:", e);
-      } finally {
-        setLoading(false);
-      }
-    })();
+    let mounted = true;
+    if (mounted) loadNews();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Volver a cargar cuando la pantalla reciba foco
+  useEffect(() => {
+    if (isFocused) {
+      loadNews();
+    }
+  }, [isFocused]);
+
+  // Suscribirse al eventBus para recargar cuando otra pantalla indique actualización
+  useEffect(() => {
+    const unsub = onEvent("news:updated", () => {
+      console.log("event news:updated received: reloading list");
+      // recargar y mostrar indicador breve
+      (async () => {
+        await loadNews();
+        setJustRefreshed(true);
+        setTimeout(() => setJustRefreshed(false), 1400);
+      })();
+    });
+    return () => {
+      unsub();
+    };
   }, []);
 
   const handleEdit = (idNoticia: string) => {
+    // Navegar a la pantalla de edición usando la constante ROUTES
     nav.push(router, { pathname: ROUTES.ADMIN.NEWS.EDIT, params: { id: idNoticia } });
   };
 

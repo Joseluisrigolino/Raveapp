@@ -1,4 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
+import { getInfoAsync } from "expo-file-system/legacy";
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   SafeAreaView,
@@ -348,6 +349,7 @@ export default function CreateEventScreen() {
 
   /* --- Multimedia --- */
   const [photoFile, setPhotoFile] = useState<string | null>(null);
+  const [isCheckingImage, setIsCheckingImage] = useState(false);
   const [videoLink, setVideoLink] = useState("");
   const [musicLink, setMusicLink] = useState("");
   // Mensaje de error final para mostrar al usuario en pantalla si algo falla durante creación
@@ -710,6 +712,23 @@ export default function CreateEventScreen() {
         Alert.alert('Validación', `La fecha de inicio y fin del día ${i + 1} son obligatorias.`);
         return false;
       }
+      // Rechazar fechas por defecto que algunos backends traducen a 0001-01-01
+      const sYear = new Date(daySchedules[i].start as any).getUTCFullYear();
+      const eYear = new Date(daySchedules[i].end as any).getUTCFullYear();
+      if ((sYear && sYear <= 1) || (eYear && eYear <= 1)) {
+        Alert.alert('Validación', `Las fechas del día ${i + 1} parecen inválidas. Por favor seleccioná fechas válidas.`);
+        return false;
+      }
+      // No permitir fechas anteriores al día de hoy (comparamos por fecha en hora local: año/mes/día)
+      const startDateLocal = new Date(s);
+      const startTupleLocal = [startDateLocal.getFullYear(), startDateLocal.getMonth(), startDateLocal.getDate()];
+      const nowLocal = new Date();
+      const todayTupleLocal = [nowLocal.getFullYear(), nowLocal.getMonth(), nowLocal.getDate()];
+      const startIsBeforeToday = (startTupleLocal[0] < todayTupleLocal[0]) || (startTupleLocal[0] === todayTupleLocal[0] && startTupleLocal[1] < todayTupleLocal[1]) || (startTupleLocal[0] === todayTupleLocal[0] && startTupleLocal[1] === todayTupleLocal[1] && startTupleLocal[2] < todayTupleLocal[2]);
+      if (startIsBeforeToday) {
+        Alert.alert('Validación', `La fecha de inicio del día ${i + 1} no puede ser anterior al día de hoy.`);
+        return false;
+      }
       if (s <= now) {
         Alert.alert('Validación', `La fecha de inicio del día ${i + 1} debe ser posterior al momento actual.`);
         return false;
@@ -726,6 +745,93 @@ export default function CreateEventScreen() {
       const sameHour = Math.abs(e - s) < 60 * 60 * 1000 && new Date(e).getHours() === new Date(s).getHours() && new Date(e).getDate() === new Date(s).getDate();
       if (sameHour) {
         Alert.alert('Validación', `La fecha de fin del día ${i + 1} no puede estar en la misma hora que el inicio.`);
+        return false;
+      }
+
+      // Validar fechas de venta relacionadas (si existen en daySaleConfigs)
+      try {
+        const saleCfg = daySaleConfigs[i];
+        if (saleCfg) {
+          const ss = saleCfg.saleStart ? new Date(saleCfg.saleStart).getTime() : NaN;
+          const se = saleCfg.sellUntil ? new Date(saleCfg.sellUntil).getTime() : NaN;
+          // Si alguno es inválido (NaN) o tiene año por defecto, rechazamos
+          const ssYear = saleCfg.saleStart ? new Date(saleCfg.saleStart as any).getUTCFullYear() : NaN;
+          const seYear = saleCfg.sellUntil ? new Date(saleCfg.sellUntil as any).getUTCFullYear() : NaN;
+          if ((ssYear && ssYear <= 1) || (seYear && seYear <= 1)) {
+            Alert.alert('Validación', `Las fechas de venta del día ${i + 1} parecen inválidas. Por favor seleccioná fechas válidas para la venta de entradas.`);
+            return false;
+          }
+          if (isFinite(ss) && isFinite(se)) {
+            if (se <= ss) {
+              try {
+                const saleRaw = saleCfg.saleStart;
+                const sellRaw = saleCfg.sellUntil;
+                const saleIso = new Date(ss).toISOString();
+                const sellIso = new Date(se).toISOString();
+                const saleLocal = new Date(ss).toLocaleString();
+                const sellLocal = new Date(se).toLocaleString();
+                const tzOffsetSale = new Date(ss).getTimezoneOffset();
+                const tzOffsetSell = new Date(se).getTimezoneOffset();
+                console.debug('[validateBeforeSubmit] saleEnd <= saleStart detected', {
+                  day: i + 1,
+                  saleRaw,
+                  sellRaw,
+                  saleMs: ss,
+                  sellMs: se,
+                  saleIso,
+                  sellIso,
+                  saleLocal,
+                  sellLocal,
+                  tzOffsetSale,
+                  tzOffsetSell,
+                });
+              } catch (logErr) {}
+
+              Alert.alert(
+                'Validación',
+                `La fecha de fin de venta del día ${i + 1} debe ser posterior a la fecha de inicio de venta.\nInicio venta: ${new Date(ss).toLocaleString()}\nFin venta: ${new Date(se).toLocaleString()}`
+              );
+              return false;
+            }
+            // La venta no puede empezar después del inicio del evento (comparamos por fecha, no por hora)
+            // Comparación robusta por (Año,Mes,Día) para evitar problemas de zona horaria
+            const sd = new Date(ss);
+            const ed = new Date(s);
+            // Use UTC components to avoid timezone-induced off-by-one day differences
+            const saleTuple = [sd.getUTCFullYear(), sd.getUTCMonth(), sd.getUTCDate()];
+            const eventTuple = [ed.getUTCFullYear(), ed.getUTCMonth(), ed.getUTCDate()];
+            try {
+              console.debug('[validateBeforeSubmit] saleStart vs eventStart tuples (UTC)', { day: i+1, saleStartRaw: saleCfg.saleStart, eventStartRaw: daySchedules[i].start, saleTuple, eventTuple });
+              console.debug('[validateBeforeSubmit] types & ms', {
+                saleType: typeof saleCfg.saleStart,
+                eventType: typeof daySchedules[i].start,
+                saleMs: Number(new Date(saleCfg.saleStart).getTime()),
+                eventMs: Number(new Date(daySchedules[i].start).getTime()),
+              });
+            } catch {}
+            const saleIsAfterEvent = (saleTuple[0] > eventTuple[0]) || (saleTuple[0] === eventTuple[0] && saleTuple[1] > eventTuple[1]) || (saleTuple[0] === eventTuple[0] && saleTuple[1] === eventTuple[1] && saleTuple[2] > eventTuple[2]);
+            if (saleIsAfterEvent) {
+              Alert.alert(
+                'Validación',
+                `La fecha de inicio de venta del día ${i + 1} no puede ser posterior al inicio del evento.\nInicio venta: ${sd.toLocaleDateString()}\nInicio evento: ${ed.toLocaleDateString()}`
+              );
+              return false;
+            }
+            // No permitir fechas de venta anteriores al día de hoy (comparación por fecha local)
+            const saleStartLocal = new Date(ss);
+            const saleTupleLocal = [saleStartLocal.getFullYear(), saleStartLocal.getMonth(), saleStartLocal.getDate()];
+            const nowLocal2 = new Date();
+            const todayTupleLocal2 = [nowLocal2.getFullYear(), nowLocal2.getMonth(), nowLocal2.getDate()];
+            const saleIsBeforeToday = (saleTupleLocal[0] < todayTupleLocal2[0]) || (saleTupleLocal[0] === todayTupleLocal2[0] && saleTupleLocal[1] < todayTupleLocal2[1]) || (saleTupleLocal[0] === todayTupleLocal2[0] && saleTupleLocal[1] === todayTupleLocal2[1] && saleTupleLocal[2] < todayTupleLocal2[2]);
+            if (saleIsBeforeToday) {
+              Alert.alert('Validación', `La fecha de inicio de venta del día ${i + 1} no puede ser anterior al día de hoy.`);
+              return false;
+            }
+          }
+        }
+      } catch (e) {
+        // Si algo falla en validación, no permitimos proceder por seguridad
+        Alert.alert('Validación', `Error validando las fechas del día ${i + 1}. Revisá y volvé a intentar.`);
         return false;
       }
     }
@@ -1203,7 +1309,55 @@ export default function CreateEventScreen() {
       // Log conciso: fechas que serán enviadas al backend (ISO)
       // fechas payload prepared (silenciado en logs)
 
-      // 3) Crear evento en backend
+      // 3) Validar que las fechas formateadas en el body sean consistentes y válidas
+      try {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const bad = (body.fechas || []).some((f: any, idx: number) => {
+          const inicio = f?.inicio;
+          const fin = f?.fin;
+          const inicioVenta = f?.inicioVenta;
+          const finVenta = f?.finVenta;
+          // Deben existir inicio y fin
+          if (!inicio || !fin) return true;
+          const si = new Date(inicio).getTime();
+          const fi = new Date(fin).getTime();
+          if (!isFinite(si) || !isFinite(fi)) return true;
+          // No permitir años por defecto (0001)
+          const sy = new Date(inicio).getUTCFullYear();
+          const fy = new Date(fin).getUTCFullYear();
+          if ((sy && sy <= 1) || (fy && fy <= 1)) return true;
+          // No permitir inicio anterior a hoy
+          const startOnly = new Date(si); startOnly.setHours(0,0,0,0);
+          if (startOnly.getTime() < today.getTime()) return true;
+          // si existen fechas de venta, validarlas también
+          if (inicioVenta) {
+            const svi = new Date(inicioVenta).getTime();
+            if (!isFinite(svi)) return true;
+            const syv = new Date(inicioVenta).getUTCFullYear();
+            if (syv && syv <= 1) return true;
+            const saleOnly = new Date(svi); saleOnly.setHours(0,0,0,0);
+            if (saleOnly.getTime() < today.getTime()) return true;
+          }
+          if (finVenta) {
+            const sve = new Date(finVenta).getTime();
+            if (!isFinite(sve)) return true;
+            const syv2 = new Date(finVenta).getUTCFullYear();
+            if (syv2 && syv2 <= 1) return true;
+          }
+          return false;
+        });
+
+        if (bad) {
+          Alert.alert('Validación', 'Hay fechas inválidas o anteriores al día de hoy. Revisá las fechas antes de crear el evento.');
+          return;
+        }
+      } catch (e) {
+        Alert.alert('Validación', 'Error validando las fechas. Revisá las fechas e intentá de nuevo.');
+        return;
+      }
+
+      // 4) Crear evento en backend
       let createResult;
       try {
         createResult = await createEvent(body);
@@ -1604,7 +1758,7 @@ export default function CreateEventScreen() {
       }
 
       const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+  mediaTypes: 'images',
         allowsEditing: true,
         quality: 1,
         selectionLimit: 1,
@@ -1615,31 +1769,55 @@ export default function CreateEventScreen() {
       const asset = res.assets[0];
       const uri = asset.uri;
 
-      // 1) Tamaño real del archivo (robusto)
-      const size = await getFileSize(uri);
-      if (size > MAX_IMAGE_BYTES) {
+      // Usar getInfoAsync (como en CreateNewScreen) para comprobar tamaño inmediatamente
+      // Intentar obtener tamaño con getInfoAsync; si no está disponible, fallback a getFileSize
+      setIsCheckingImage(true);
+      let size = 0;
+      try {
+        const fileInfo: any = await getInfoAsync(uri);
+        if (fileInfo && typeof fileInfo.size === 'number') {
+          size = fileInfo.size;
+        }
+      } catch (e) {
+        try { console.debug('[handleSelectPhoto] getInfoAsync error', e); } catch {}
+      }
+
+      if (!size) {
+        // fallback robusto
+        size = await getFileSize(uri).catch((e) => {
+          try { console.debug('[handleSelectPhoto] getFileSize fallback error', e); } catch {}
+          return 0;
+        });
+      }
+
+      setIsCheckingImage(false);
+
+      if (!size || size === 0) {
         Alert.alert(
-          "Imagen demasiado pesada",
-          "La imagen debe pesar menos de 2 MB."
+          "No se pudo determinar el tamaño de la imagen",
+          "No se pudo verificar el tamaño del archivo. Por seguridad, seleccioná otra imagen o probá desde otra fuente."
         );
+        return;
+      }
+
+      if (size > MAX_IMAGE_BYTES) {
+        Alert.alert("Error", "La imagen supera los 2MB permitidos.");
         return; // NO seteamos photoFile
       }
 
-      // 2) Extensión permitida (JPG, JPEG, PNG)
+      // Extensión permitida (JPG, JPEG, PNG)
       const filename = asset.fileName || uri.split("/").pop() || "";
       const allowed = isAllowedExt(filename) || isAllowedExt(uri);
       if (!allowed) {
-        Alert.alert(
-          "Formato no soportado",
-          "La imagen debe ser JPG, JPEG o PNG."
-        );
+        Alert.alert("Formato no soportado", "La imagen debe ser JPG, JPEG o PNG.");
         return; // NO seteamos photoFile
       }
 
-  // Si pasó validaciones, recién ahí lo seteamos
+      // Si pasó validaciones, setear photoFile
+      try { console.debug('[handleSelectPhoto] selected image OK', { uri }); } catch {}
       setPhotoFile(uri);
     } catch (e) {
-  log.error("ImagePicker error", e);
+      log.error("ImagePicker error", e);
       Alert.alert("Error", "No se pudo abrir la galería.");
     }
   }, []);

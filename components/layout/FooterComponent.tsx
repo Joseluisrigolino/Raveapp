@@ -192,50 +192,31 @@ export default function Footer() {
     <>
       {/* ===== Footer ===== */}
       <View style={styles.container}>
-        {!isAdmin && (
-          <IconButton
-            icon="home"
-            size={24}
-            iconColor={COLORS.textPrimary}
-            onPress={handleHomePress}
-          />
-        )}
+        {/* Footer normal: home, noticias, entradas, evento/crear y avatar */}
+        <IconButton
+          icon="home"
+          size={24}
+          iconColor={COLORS.textPrimary}
+          onPress={handleHomePress}
+        />
         <IconButton
           icon="newspaper-variant-multiple"
           size={24}
           iconColor={COLORS.textPrimary}
           onPress={handleNewsPress}
         />
-        {!isAdmin && (
-          <IconButton
-            icon="ticket"
-            size={24}
-            iconColor={COLORS.textPrimary}
-            onPress={handleTicketsPress}
-          />
-        )}
+        <IconButton
+          icon="ticket"
+          size={24}
+          iconColor={COLORS.textPrimary}
+          onPress={handleTicketsPress}
+        />
         <IconButton
           icon={isAdmin ? "calendar-edit" : "calendar-plus"}
           size={24}
           iconColor={COLORS.textPrimary}
           onPress={handleEventManagementPress}
         />
-        {isAdmin && (
-          <IconButton
-            icon="account-music"
-            size={24}
-            iconColor={COLORS.textPrimary}
-            onPress={handleArtistsPress}
-          />
-        )}
-        {isAdmin && (
-          <IconButton
-            icon="file-document"
-            size={24}
-            iconColor={COLORS.textPrimary}
-            onPress={handleTycPress}
-          />
-        )}
         <TouchableOpacity onPress={openSheet} style={styles.avatarWrapper}>
           <Image source={{ uri: profileImageUrl }} style={styles.avatar} />
         </TouchableOpacity>
@@ -277,28 +258,65 @@ export default function Footer() {
                 </View>
               </View>
 
-              {/* Usuario */}
-              <Text style={styles.sectionTitle}>Usuario</Text>
-              <View style={styles.menuSection}>
-                {userItems.map((it) => (
-                  <TouchableOpacity key={it.label} style={styles.menuItem} onPress={() => go(it.route)}>
-                    <MaterialCommunityIcons name={it.icon as any} size={22} color={COLORS.textPrimary} />
-                    <Text style={styles.menuText}>{it.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Opciones de organizador */}
-              {isOwner && (
+              {/* Usuario (oculto para admin) */}
+              {!isAdmin && (
                 <>
-                  <Text style={styles.sectionTitle}>Organizador</Text>
+                  <Text style={styles.sectionTitle}>Usuario</Text>
                   <View style={styles.menuSection}>
-                    {ownerItems.map((it) => (
+                    {userItems.map((it) => (
                       <TouchableOpacity key={it.label} style={styles.menuItem} onPress={() => go(it.route)}>
                         <MaterialCommunityIcons name={it.icon as any} size={22} color={COLORS.textPrimary} />
                         <Text style={styles.menuText}>{it.label}</Text>
                       </TouchableOpacity>
                     ))}
+                  </View>
+
+                  {/* Opciones de organizador (oculto para admin) */}
+                  {isOwner && (
+                    <>
+                      <Text style={styles.sectionTitle}>Organizador</Text>
+                      <View style={styles.menuSection}>
+                        {ownerItems.map((it) => (
+                          <TouchableOpacity key={it.label} style={styles.menuItem} onPress={() => go(it.route)}>
+                            <MaterialCommunityIcons name={it.icon as any} size={22} color={COLORS.textPrimary} />
+                            <Text style={styles.menuText}>{it.label}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* Opciones de administración (solo para admin) */}
+              {isAdmin && (
+                <>
+                  <Text style={styles.sectionTitle}>Administración</Text>
+                  <View style={styles.menuSection}>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.EVENTS_VALIDATE.LIST })}>
+                      <MaterialCommunityIcons name="calendar-check" size={22} color={COLORS.textPrimary} />
+                      <Text style={styles.menuText}>Validar eventos</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.ARTISTS.NEW })}>
+                      <MaterialCommunityIcons name="account-plus" size={22} color={COLORS.textPrimary} />
+                      <Text style={styles.menuText}>Crear artista</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.ARTISTS.MANAGE })}>
+                      <MaterialCommunityIcons name="account-multiple" size={22} color={COLORS.textPrimary} />
+                      <Text style={styles.menuText}>Editar artistas</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.NEWS.CREATE })}>
+                      <MaterialCommunityIcons name="newspaper-plus" size={22} color={COLORS.textPrimary} />
+                      <Text style={styles.menuText}>Crear noticia</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.NEWS.MANAGE })}>
+                      <MaterialCommunityIcons name="newspaper-variant-multiple" size={22} color={COLORS.textPrimary} />
+                      <Text style={styles.menuText}>Editar noticias</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.TYC })}>
+                      <MaterialCommunityIcons name="file-document-edit" size={22} color={COLORS.textPrimary} />
+                      <Text style={styles.menuText}>Actualizar TyC</Text>
+                    </TouchableOpacity>
                   </View>
                 </>
               )}

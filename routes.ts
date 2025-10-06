@@ -35,8 +35,8 @@ export const ROUTES = {
     },
     NEWS: {
       MANAGE: "/admin/NewsScreens/ManageNewScreen",
-      CREATE: "/admin/NewsScreens/CrearNoticiaPantalla",
-      EDIT: "/admin/NewsScreens/EditarNoticiaPantalla",
+      CREATE: "/admin/NewsScreens/CreateNewScreen",
+      EDIT: "/admin/NewsScreens/EditNewScreen",
     },
     EVENTS_VALIDATE: {
       LIST: "/admin/EventsValidateScreens/EventsToValidateScreen",

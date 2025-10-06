@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
+import { getInfoAsync } from "expo-file-system/legacy";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
@@ -23,6 +23,7 @@ import { getNewsById, updateNews } from "@/utils/news/newsApi";
 import { mediaApi } from "@/utils/mediaApi";
 import { fetchEvents } from "@/utils/events/eventApi";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { emit } from "@/utils/eventBus";
 
 export default function EditNewScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -74,13 +75,13 @@ export default function EditNewScreen() {
 
   const handleSelectImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+  mediaTypes: 'images',
       quality: 0.8,
     });
 
     if (!result.canceled && result.assets?.length > 0) {
       const asset = result.assets[0];
-      const fileInfo: any = await FileSystem.getInfoAsync(asset.uri);
+  const fileInfo: any = await getInfoAsync(asset.uri);
       if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
         return Alert.alert("Error", "La imagen supera los 2MB permitidos.");
       }
@@ -132,7 +133,9 @@ export default function EditNewScreen() {
       });
 
       Alert.alert("Noticia actualizada con éxito");
-      router.back();
+  // Notificar a otras pantallas que la noticia fue actualizada
+  emit("news:updated", { id });
+  router.back();
     } catch (err) {
       console.error("Error al actualizar noticia:", err);
       Alert.alert("Error al actualizar la noticia");
