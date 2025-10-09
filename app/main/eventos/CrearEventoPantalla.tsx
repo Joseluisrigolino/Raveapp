@@ -1,26 +1,16 @@
 import * as ImagePicker from "expo-image-picker";
 import { getInfoAsync } from "expo-file-system/legacy";
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Linking,
-  Platform,
-} from "react-native";
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Linking, Platform } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { ROUTES } from "../../../routes";
 // Animated/Easing not required here
 import { BlurView } from "expo-blur";
-import { Portal } from 'react-native-paper';
-import PopUpOrganizadorIOS from '@/components/events/create/popup-organizador/PopUpOrganizadorIOS';
-import PopUpOrganizadorAndroid from '@/components/events/create/popup-organizador/PopUpOrganizadorAndroid';
+import { Portal } from "react-native-paper";
+import PopUpOrganizadorIOS from "@/components/events/create/popup-organizador/PopUpOrganizadorIOS";
+import PopUpOrganizadorAndroid from "@/components/events/create/popup-organizador/PopUpOrganizadorAndroid";
 
 /** Layout y UI base */
 import Header from "@/components/layout/HeaderComponent";
@@ -71,7 +61,7 @@ import ScheduleSection from "@/components/events/create/ScheduleSection";
 import TicketSection from "@/components/events/create/TicketSection";
 import TicketConfigSection from "@/components/events/create/TicketConfigSection";
 import MediaSection from "@/components/events/create/MediaSection";
-import CirculoCarga from '@/components/general/CirculoCarga';
+import CirculoCarga from "@/components/general/CirculoCarga";
 
 /* ================= Tipos locales ================= */
 type EventType = "1d" | "2d" | "3d";
@@ -97,29 +87,34 @@ interface DaySaleConfig {
 }
 
 /* ================= Utils ================= */
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2MB
+// Limite de 1MB para evitar 413 (común en Nginx por client_max_body_size=1M)
+const MAX_IMAGE_BYTES = 1 * 1024 * 1024; // 1MB
 const ALLOWED_EXTS = new Set(["jpg", "jpeg", "png"]);
 
 // Lightweight logger wrapper: logs only in development (__DEV__), no-ops in production
 const log = {
   debug: (...args: any[]) => {
     try {
-      if (typeof __DEV__ !== 'undefined' && (__DEV__ as any)) console.debug(...args);
+      if (typeof __DEV__ !== "undefined" && (__DEV__ as any))
+        console.debug(...args);
     } catch {}
   },
   info: (...args: any[]) => {
     try {
-      if (typeof __DEV__ !== 'undefined' && (__DEV__ as any)) console.info(...args);
+      if (typeof __DEV__ !== "undefined" && (__DEV__ as any))
+        console.info(...args);
     } catch {}
   },
   warn: (...args: any[]) => {
     try {
-      if (typeof __DEV__ !== 'undefined' && (__DEV__ as any)) console.warn(...args);
+      if (typeof __DEV__ !== "undefined" && (__DEV__ as any))
+        console.warn(...args);
     } catch {}
   },
   error: (...args: any[]) => {
     try {
-      if (typeof __DEV__ !== 'undefined' && (__DEV__ as any)) console.error(...args);
+      if (typeof __DEV__ !== "undefined" && (__DEV__ as any))
+        console.error(...args);
     } catch {}
   },
 };
@@ -161,6 +156,29 @@ function extractBackendMessage(e: any): string {
     e?.message ||
     "Ocurrió un error inesperado."
   );
+}
+
+// =============== Helpers comunes ===============
+const getLocalTuple = (d: Date) => [
+  d.getFullYear(),
+  d.getMonth(),
+  d.getDate(),
+] as const;
+
+const getUtcTuple = (d: Date) => [
+  d.getUTCFullYear(),
+  d.getUTCMonth(),
+  d.getUTCDate(),
+] as const;
+
+const isBeforeTuple = (
+  a: readonly [number, number, number],
+  b: readonly [number, number, number]
+) => a[0] < b[0] || (a[0] === b[0] && (a[1] < b[1] || (a[1] === b[1] && a[2] < b[2])));
+
+function ensureArrayWithPrev<T>(prev: T[] | undefined, length: number, creator: () => T): T[] {
+  const out: T[] = Array.from({ length }, (_, i) => (prev && prev[i] ? prev[i] : creator()));
+  return out;
 }
 
 /** Normaliza “fechas” devueltas por createEvent (tolerante a casing/wrappers) */
@@ -256,7 +274,7 @@ export default function CreateEventScreen() {
     (user as any)?.idUsuario ?? (user as any)?.id ?? null;
   // Detectar si el usuario tiene rol "Usuario" (frontend: 'user')
   const isUsuario = Array.isArray((user as any)?.roles)
-    ? (user as any).roles.includes('user')
+    ? (user as any).roles.includes("user")
     : false;
   const mustShowLogin = !user;
 
@@ -310,8 +328,12 @@ export default function CreateEventScreen() {
 
   const [newPartyName, setNewPartyName] = useState("");
   const [newPartyLocked, setNewPartyLocked] = useState(false);
-  const [tempCreatedPartyId, setTempCreatedPartyId] = useState<string | null>(null);
-  const [tempCreatedPartyName, setTempCreatedPartyName] = useState<string | null>(null);
+  const [tempCreatedPartyId, setTempCreatedPartyId] = useState<string | null>(
+    null
+  );
+  const [tempCreatedPartyName, setTempCreatedPartyName] = useState<
+    string | null
+  >(null);
 
   /* --- Ubicación --- */
   const [provinces, setProvinces] = useState<{ id: string; nombre: string }[]>(
@@ -350,6 +372,9 @@ export default function CreateEventScreen() {
   /* --- Multimedia --- */
   const [photoFile, setPhotoFile] = useState<string | null>(null);
   const [isCheckingImage, setIsCheckingImage] = useState(false);
+  // nuevo: indicar si la imagen seleccionada excede el máximo permitido
+  const [photoTooLarge, setPhotoTooLarge] = useState(false);
+  const [photoFileSize, setPhotoFileSize] = useState<number | null>(null);
   const [videoLink, setVideoLink] = useState("");
   const [musicLink, setMusicLink] = useState("");
   // Mensaje de error final para mostrar al usuario en pantalla si algo falla durante creación
@@ -389,15 +414,15 @@ export default function CreateEventScreen() {
 
   /* ================= Effects ================= */
   useEffect(() => {
-    setDaySchedules(Array.from({ length: dayCount }, createEmptySchedule));
+    setDaySchedules((prev) => ensureArrayWithPrev(prev, dayCount, createEmptySchedule));
   }, [dayCount]);
 
   useEffect(() => {
-    setDaysTickets(Array.from({ length: dayCount }, createEmptyDayTickets));
+    setDaysTickets((prev) => ensureArrayWithPrev(prev, dayCount, createEmptyDayTickets));
   }, [dayCount]);
 
   useEffect(() => {
-    setDaySaleConfigs(Array.from({ length: dayCount }, createEmptySaleConfig));
+    setDaySaleConfigs((prev) => ensureArrayWithPrev(prev, dayCount, createEmptySaleConfig));
   }, [dayCount]);
 
   useEffect(() => {
@@ -467,83 +492,127 @@ export default function CreateEventScreen() {
     );
   }, []);
 
-  const addArtistByName = useCallback((nameRaw: string) => {
-    const name = nameRaw.trim();
-    if (!name) return;
-    if (selectedArtists.some((a) => norm(a.name) === norm(name))) {
+  const addArtistByName = useCallback(
+    (nameRaw: string) => {
+      const name = nameRaw.trim();
+      if (!name) return;
+      if (selectedArtists.some((a) => norm(a.name) === norm(name))) {
+        setArtistInput("");
+        return;
+      }
+
+      // Añadir visualmente como nuevo (una sola vez)
+      const pendingArtist = {
+        name,
+        image: "",
+        __isNew: true,
+      } as unknown as ArtistSel;
+      setSelectedArtists((prev) => [...prev, pendingArtist]);
       setArtistInput("");
-      return;
-    }
 
-    // Añadir visualmente como nuevo (una sola vez)
-    const pendingArtist = ({ name, image: "", __isNew: true } as unknown) as ArtistSel;
-    setSelectedArtists((prev) => [...prev, pendingArtist]);
-    setArtistInput("");
-
-    // Intento best-effort: crear el artista inmediatamente en la API como inactivo (isActivo = 0)
-    (async () => {
-      try {
-        const artistApi = await import('@/utils/artists/artistApi');
-        if (artistApi && typeof artistApi.createArtistOnApi === 'function') {
-          const id = await artistApi.createArtistOnApi({ name, description: "", instagramURL: "", spotifyURL: "", soundcloudURL: "", isActivo: false });
-          if (id) {
-            // Reemplazar el entry __isNew por objeto con idArtista
-            setSelectedArtists((prev) =>
-              prev.map((a) => {
-                if (norm((a as any).name || '') === norm(name) && (a as any).__isNew) {
-                  // Preserve the __isNew flag so the UI keeps showing the pending (yellow) icon
-                  const updated = ({ ...(a as any), idArtista: String(id) } as unknown) as ArtistSel;
-                  return updated;
-                }
-                return a;
-              })
-            );
+      // Intento best-effort: crear el artista inmediatamente en la API como inactivo (isActivo = 0)
+      (async () => {
+        try {
+          const artistApi = await import("@/utils/artists/artistApi");
+          if (artistApi && typeof artistApi.createArtistOnApi === "function") {
+            const id = await artistApi.createArtistOnApi({
+              name,
+              description: "",
+              instagramURL: "",
+              spotifyURL: "",
+              soundcloudURL: "",
+              isActivo: false,
+            });
+            if (id) {
+              // Reemplazar el entry __isNew por objeto con idArtista
+              setSelectedArtists((prev) =>
+                prev.map((a) => {
+                  if (
+                    norm((a as any).name || "") === norm(name) &&
+                    (a as any).__isNew
+                  ) {
+                    // Preserve the __isNew flag so the UI keeps showing the pending (yellow) icon
+                    const updated = {
+                      ...(a as any),
+                      idArtista: String(id),
+                    } as unknown as ArtistSel;
+                    return updated;
+                  }
+                  return a;
+                })
+              );
+            }
           }
+        } catch (e) {
+          // ignore: si falla, lo mantenemos como pendiente (__isNew) y se intentará crear en submit
+        }
+      })();
+    },
+    [selectedArtists, setSelectedArtists, setArtistInput]
+  );
+
+  const handleSelectArtistFromSuggestions = useCallback(
+    (a: Artist) => {
+      if (selectedArtists.some((s) => norm(s.name) === norm(a.name))) return;
+      setSelectedArtists((prev) => [...prev, a]);
+      setArtistInput("");
+    },
+    [selectedArtists]
+  );
+
+  const handleRemoveArtist = useCallback(
+    (name: string) => {
+      // Find the artist entry in current selected list
+      const target = selectedArtists.find((x) => norm(x.name) === norm(name));
+
+      // Remove from UI immediately
+      setSelectedArtists((prev) =>
+        prev.filter((x) => norm(x.name) !== norm(name))
+      );
+
+      // If it's a manual-added artist (marked __isNew) OR explicitly inactive in DB
+      // and it has an idArtista, attempt to delete it from the backend as well.
+      try {
+        const idArtista = (target as any)?.idArtista;
+        const wasNew = Boolean((target as any)?.__isNew);
+        const isActivoFlag = (target as any)?.isActivo;
+        const isActivo =
+          typeof isActivoFlag === "boolean"
+            ? isActivoFlag
+            : isActivoFlag === 1 || isActivoFlag === "1";
+
+        if (idArtista && (wasNew || isActivo === false)) {
+          (async () => {
+            try {
+              const artistApi = await import("@/utils/artists/artistApi");
+              if (
+                artistApi &&
+                typeof artistApi.deleteArtistFromApi === "function"
+              ) {
+                await artistApi.deleteArtistFromApi(String(idArtista));
+                try {
+                  log.info(
+                    "[handleRemoveArtist] artista eliminado de la BBDD:",
+                    String(idArtista)
+                  );
+                } catch {}
+              }
+            } catch (e) {
+              try {
+                log.warn(
+                  "[handleRemoveArtist] fallo al eliminar artista de la BBDD:",
+                  String((e as any)?.message || e)
+                );
+              } catch {}
+            }
+          })();
         }
       } catch (e) {
-        // ignore: si falla, lo mantenemos como pendiente (__isNew) y se intentará crear en submit
+        // no hacemos nada si la validación falla; ya removimos de la UI
       }
-    })();
-  }, [selectedArtists, setSelectedArtists, setArtistInput]);
-
-  const handleSelectArtistFromSuggestions = useCallback((a: Artist) => {
-    if (selectedArtists.some((s) => norm(s.name) === norm(a.name))) return;
-    setSelectedArtists((prev) => [...prev, a]);
-    setArtistInput("");
-  }, [selectedArtists]);
-
-  const handleRemoveArtist = useCallback((name: string) => {
-    // Find the artist entry in current selected list
-    const target = selectedArtists.find((x) => norm(x.name) === norm(name));
-
-    // Remove from UI immediately
-    setSelectedArtists((prev) => prev.filter((x) => norm(x.name) !== norm(name)));
-
-    // If it's a manual-added artist (marked __isNew) OR explicitly inactive in DB
-    // and it has an idArtista, attempt to delete it from the backend as well.
-    try {
-      const idArtista = (target as any)?.idArtista;
-      const wasNew = Boolean((target as any)?.__isNew);
-      const isActivoFlag = (target as any)?.isActivo;
-      const isActivo = typeof isActivoFlag === 'boolean' ? isActivoFlag : isActivoFlag === 1 || isActivoFlag === '1';
-
-      if (idArtista && (wasNew || isActivo === false)) {
-        (async () => {
-          try {
-            const artistApi = await import('@/utils/artists/artistApi');
-            if (artistApi && typeof artistApi.deleteArtistFromApi === 'function') {
-              await artistApi.deleteArtistFromApi(String(idArtista));
-            try { log.info('[handleRemoveArtist] artista eliminado de la BBDD:', String(idArtista)); } catch {}
-            }
-          } catch (e) {
-            try { log.warn('[handleRemoveArtist] fallo al eliminar artista de la BBDD:', String((e as any)?.message || e)); } catch {}
-          }
-        })();
-      }
-    } catch (e) {
-      // no hacemos nada si la validación falla; ya removimos de la UI
-    }
-  }, [selectedArtists, setSelectedArtists]);
+    },
+    [selectedArtists, setSelectedArtists]
+  );
 
   const onPickParty = (p: Party) => {
     // If there was a temp-created party (from pressing +), and it's different from
@@ -551,14 +620,21 @@ export default function CreateEventScreen() {
     (async () => {
       try {
         if (tempCreatedPartyId && tempCreatedPartyId !== p.idFiesta) {
-          const partys = await import('@/utils/partysApi');
-          if (partys && typeof partys.deleteParty === 'function') {
+          const partys = await import("@/utils/partysApi");
+          if (partys && typeof partys.deleteParty === "function") {
             await partys.deleteParty(tempCreatedPartyId);
-            try { log.info('[onPickParty] temp party deleted:', tempCreatedPartyId); } catch {}
+            try {
+              log.info("[onPickParty] temp party deleted:", tempCreatedPartyId);
+            } catch {}
           }
         }
       } catch (e) {
-  try { log.warn('[onPickParty] failed deleting temp party:', String((e as any)?.message || e)); } catch {}
+        try {
+          log.warn(
+            "[onPickParty] failed deleting temp party:",
+            String((e as any)?.message || e)
+          );
+        } catch {}
       } finally {
         setTempCreatedPartyId(null);
         setSelectedPartyId(p.idFiesta);
@@ -575,10 +651,14 @@ export default function CreateEventScreen() {
     setNewPartyLocked(true);
     (async () => {
       try {
-        const partys = await import('@/utils/partysApi');
-        if (partys && typeof partys.createParty === 'function' && userId) {
+        const partys = await import("@/utils/partysApi");
+        if (partys && typeof partys.createParty === "function" && userId) {
           // create as inactivo by default so admin can approve if needed
-          const id = await partys.createParty({ idUsuario: String(userId), nombre: name, isActivo: false });
+          const id = await partys.createParty({
+            idUsuario: String(userId),
+            nombre: name,
+            isActivo: false,
+          });
           if (id) {
             // store temp id/name but DO NOT select it or add it to the visible list
             // because it's created as inactive and should not appear in selector
@@ -587,34 +667,48 @@ export default function CreateEventScreen() {
           }
         }
       } catch (e) {
-  try { log.warn('[onPressAddNewParty] failed creating party:', String((e as any)?.message || e)); } catch {}
+        try {
+          log.warn(
+            "[onPressAddNewParty] failed creating party:",
+            String((e as any)?.message || e)
+          );
+        } catch {}
         // unlock to allow retry
         setNewPartyLocked(false);
       }
     })();
   };
 
-  const setSchedule = useCallback((i: number, key: keyof DaySchedule, val: Date) => {
-    setDaySchedules((prev) => {
-      const arr = [...prev];
-      arr[i] = { ...arr[i], [key]: val };
-      return arr;
-    });
-  }, []);
-  const setSaleCfg = useCallback((i: number, key: keyof DaySaleConfig, val: Date) => {
-    setDaySaleConfigs((prev) => {
-      const arr = [...prev];
-      arr[i] = { ...arr[i], [key]: val };
-      return arr;
-    });
-  }, []);
-  const setTicket = useCallback((i: number, key: keyof DayTickets, val: string) => {
-    setDaysTickets((prev) => {
-      const arr = [...prev];
-      arr[i] = { ...arr[i], [key]: val.replace(/[^0-9]/g, "") };
-      return arr;
-    });
-  }, []);
+  const setSchedule = useCallback(
+    (i: number, key: keyof DaySchedule, val: Date) => {
+      setDaySchedules((prev) => {
+        const arr = [...prev];
+        arr[i] = { ...arr[i], [key]: val };
+        return arr;
+      });
+    },
+    []
+  );
+  const setSaleCfg = useCallback(
+    (i: number, key: keyof DaySaleConfig, val: Date) => {
+      setDaySaleConfigs((prev) => {
+        const arr = [...prev];
+        arr[i] = { ...arr[i], [key]: val };
+        return arr;
+      });
+    },
+    []
+  );
+  const setTicket = useCallback(
+    (i: number, key: keyof DayTickets, val: string) => {
+      setDaysTickets((prev) => {
+        const arr = [...prev];
+        arr[i] = { ...arr[i], [key]: val.replace(/[^0-9]/g, "") };
+        return arr;
+      });
+    },
+    []
+  );
 
   // Estados de carga para evitar bloquear la UI en Android
   const [municipalityLoading, setMunicipalityLoading] = useState(false);
@@ -622,129 +716,179 @@ export default function CreateEventScreen() {
   const [creating, setCreating] = useState(false);
 
   // Handlers no bloqueantes para selección de provincia/municipio/localidad
-  const handleSelectProvinceCallback = useCallback((id: string, name: string) => {
-    // Actualizamos UI inmediatamente
-    setProvinceId(id);
-    setProvinceName(name);
-    setMunicipalityId("");
-    setMunicipalityName("");
-    setLocalityId("");
-    setLocalityName("");
-    setMunicipalities([]);
-    setLocalities([]);
-    setShowProvinces(false);
+  const handleSelectProvinceCallback = useCallback(
+    (id: string, name: string) => {
+      // Actualizamos UI inmediatamente
+      setProvinceId(id);
+      setProvinceName(name);
+      setMunicipalityId("");
+      setMunicipalityName("");
+      setLocalityId("");
+      setLocalityName("");
+      setMunicipalities([]);
+      setLocalities([]);
+      setShowProvinces(false);
 
-    // Cargamos municipios en background para no bloquear la UI (Android)
-    setTimeout(async () => {
-      setMunicipalityLoading(true);
-      try {
-        const mun = await fetchMunicipalities(id);
-        setMunicipalities(mun);
-      } catch (e) {
-  log.warn("Error fetchMunicipalities:", e);
-        setMunicipalities([]);
-      } finally {
-        setMunicipalityLoading(false);
-      }
-    }, 0);
-  }, []);
+      // Cargamos municipios en background para no bloquear la UI (Android)
+      setTimeout(async () => {
+        setMunicipalityLoading(true);
+        try {
+          const mun = await fetchMunicipalities(id);
+          setMunicipalities(mun);
+        } catch (e) {
+          log.warn("Error fetchMunicipalities:", e);
+          setMunicipalities([]);
+        } finally {
+          setMunicipalityLoading(false);
+        }
+      }, 0);
+    },
+    []
+  );
 
-  const handleSelectMunicipalityCallback = useCallback((id: string, name: string) => {
-    setMunicipalityId(id);
-    setMunicipalityName(name);
-    setLocalityId("");
-    setLocalityName("");
-    setLocalities([]);
-    setShowMunicipalities(false);
+  const handleSelectMunicipalityCallback = useCallback(
+    (id: string, name: string) => {
+      setMunicipalityId(id);
+      setMunicipalityName(name);
+      setLocalityId("");
+      setLocalityName("");
+      setLocalities([]);
+      setShowMunicipalities(false);
 
-    setTimeout(async () => {
-      setLocalityLoading(true);
-      try {
-        const loc = await fetchLocalities(provinceId, id);
-        setLocalities(loc);
-      } catch (e) {
-  log.warn("Error fetchLocalities:", e);
-        setLocalities([]);
-      } finally {
-        setLocalityLoading(false);
-      }
-    }, 0);
-  }, [provinceId]);
+      setTimeout(async () => {
+        setLocalityLoading(true);
+        try {
+          const loc = await fetchLocalities(provinceId, id);
+          setLocalities(loc);
+        } catch (e) {
+          log.warn("Error fetchLocalities:", e);
+          setLocalities([]);
+        } finally {
+          setLocalityLoading(false);
+        }
+      }, 0);
+    },
+    [provinceId]
+  );
 
-  const handleSelectLocalityCallback = useCallback((id: string, name: string) => {
-    setLocalityId(id);
-    setLocalityName(name);
-    setShowLocalities(false);
-  }, []);
+  const handleSelectLocalityCallback = useCallback(
+    (id: string, name: string) => {
+      setLocalityId(id);
+      setLocalityName(name);
+      setShowLocalities(false);
+    },
+    []
+  );
 
   // VALIDACIONES extra antes de submit
   const validateBeforeSubmit = useCallback(() => {
     // 1) Género obligatorio
     if (!selectedGenres || selectedGenres.length === 0) {
-      Alert.alert('Validación', 'Debe seleccionar al menos un género musical.');
+      Alert.alert("Validación", "Debe seleccionar al menos un género musical.");
       return false;
     }
     // 1.b) Nombre del evento obligatorio
     if (!eventName || !eventName.trim()) {
-      Alert.alert('Validación', 'El nombre del evento es obligatorio.');
+      Alert.alert("Validación", "El nombre del evento es obligatorio.");
       return false;
     }
     // 1.c) Al menos un artista (aceptamos artistas existentes o agregados manualmente)
-    const hasArtist = Array.isArray(selectedArtists) && selectedArtists.some((a) => {
-      const maybeId = (a as any).idArtista ?? (a as any).id;
-      return Boolean(maybeId) || Boolean((a as any).__isNew);
-    });
+    const hasArtist =
+      Array.isArray(selectedArtists) &&
+      selectedArtists.some((a) => {
+        const maybeId = (a as any).idArtista ?? (a as any).id;
+        return Boolean(maybeId) || Boolean((a as any).__isNew);
+      });
     if (!hasArtist) {
-      Alert.alert('Validación', 'Debe seleccionar al menos un artista (puede ser uno ya existente o uno añadido manualmente).');
+      Alert.alert(
+        "Validación",
+        "Debe seleccionar al menos un artista (puede ser uno ya existente o uno añadido manualmente)."
+      );
       return false;
     }
     // 2) Descripción obligatoria
     if (!eventDescription || !eventDescription.trim()) {
-      Alert.alert('Validación', 'La descripción es obligatoria.');
+      Alert.alert("Validación", "La descripción es obligatoria.");
       return false;
     }
     // 3) Fechas: inicio/fin deben ser > ahora y fin > inicio y no misma hora exacta
     const now = Date.now();
     for (let i = 0; i < daySchedules.length; i++) {
-      const s = daySchedules[i].start ? new Date(daySchedules[i].start).getTime() : NaN;
-      const e = daySchedules[i].end ? new Date(daySchedules[i].end).getTime() : NaN;
+      const s = daySchedules[i].start
+        ? new Date(daySchedules[i].start).getTime()
+        : NaN;
+      const e = daySchedules[i].end
+        ? new Date(daySchedules[i].end).getTime()
+        : NaN;
       if (!isFinite(s) || !isFinite(e)) {
-        Alert.alert('Validación', `La fecha de inicio y fin del día ${i + 1} son obligatorias.`);
+        Alert.alert(
+          "Validación",
+          `La fecha de inicio y fin del día ${i + 1} son obligatorias.`
+        );
         return false;
       }
       // Rechazar fechas por defecto que algunos backends traducen a 0001-01-01
       const sYear = new Date(daySchedules[i].start as any).getUTCFullYear();
       const eYear = new Date(daySchedules[i].end as any).getUTCFullYear();
       if ((sYear && sYear <= 1) || (eYear && eYear <= 1)) {
-        Alert.alert('Validación', `Las fechas del día ${i + 1} parecen inválidas. Por favor seleccioná fechas válidas.`);
+        Alert.alert(
+          "Validación",
+          `Las fechas del día ${
+            i + 1
+          } parecen inválidas. Por favor seleccioná fechas válidas.`
+        );
         return false;
       }
       // No permitir fechas anteriores al día de hoy (comparamos por fecha en hora local: año/mes/día)
-      const startDateLocal = new Date(s);
-      const startTupleLocal = [startDateLocal.getFullYear(), startDateLocal.getMonth(), startDateLocal.getDate()];
-      const nowLocal = new Date();
-      const todayTupleLocal = [nowLocal.getFullYear(), nowLocal.getMonth(), nowLocal.getDate()];
-      const startIsBeforeToday = (startTupleLocal[0] < todayTupleLocal[0]) || (startTupleLocal[0] === todayTupleLocal[0] && startTupleLocal[1] < todayTupleLocal[1]) || (startTupleLocal[0] === todayTupleLocal[0] && startTupleLocal[1] === todayTupleLocal[1] && startTupleLocal[2] < todayTupleLocal[2]);
+      const startIsBeforeToday = isBeforeTuple(getLocalTuple(new Date(s)), getLocalTuple(new Date()));
       if (startIsBeforeToday) {
-        Alert.alert('Validación', `La fecha de inicio del día ${i + 1} no puede ser anterior al día de hoy.`);
+        Alert.alert(
+          "Validación",
+          `La fecha de inicio del día ${
+            i + 1
+          } no puede ser anterior al día de hoy.`
+        );
         return false;
       }
       if (s <= now) {
-        Alert.alert('Validación', `La fecha de inicio del día ${i + 1} debe ser posterior al momento actual.`);
+        Alert.alert(
+          "Validación",
+          `La fecha de inicio del día ${
+            i + 1
+          } debe ser posterior al momento actual.`
+        );
         return false;
       }
       if (e <= now) {
-        Alert.alert('Validación', `La fecha de fin del día ${i + 1} debe ser posterior al momento actual.`);
+        Alert.alert(
+          "Validación",
+          `La fecha de fin del día ${
+            i + 1
+          } debe ser posterior al momento actual.`
+        );
         return false;
       }
       if (e <= s) {
-        Alert.alert('Validación', `La fecha de fin del día ${i + 1} debe ser posterior a la fecha de inicio.`);
+        Alert.alert(
+          "Validación",
+          `La fecha de fin del día ${
+            i + 1
+          } debe ser posterior a la fecha de inicio.`
+        );
         return false;
       }
       // No permitir misma hora exacta
-      const sameHour = Math.abs(e - s) < 60 * 60 * 1000 && new Date(e).getHours() === new Date(s).getHours() && new Date(e).getDate() === new Date(s).getDate();
+      const sameHour =
+        Math.abs(e - s) < 60 * 60 * 1000 &&
+        new Date(e).getHours() === new Date(s).getHours() &&
+        new Date(e).getDate() === new Date(s).getDate();
       if (sameHour) {
-        Alert.alert('Validación', `La fecha de fin del día ${i + 1} no puede estar en la misma hora que el inicio.`);
+        Alert.alert(
+          "Validación",
+          `La fecha de fin del día ${
+            i + 1
+          } no puede estar en la misma hora que el inicio.`
+        );
         return false;
       }
 
@@ -752,13 +896,26 @@ export default function CreateEventScreen() {
       try {
         const saleCfg = daySaleConfigs[i];
         if (saleCfg) {
-          const ss = saleCfg.saleStart ? new Date(saleCfg.saleStart).getTime() : NaN;
-          const se = saleCfg.sellUntil ? new Date(saleCfg.sellUntil).getTime() : NaN;
+          const ss = saleCfg.saleStart
+            ? new Date(saleCfg.saleStart).getTime()
+            : NaN;
+          const se = saleCfg.sellUntil
+            ? new Date(saleCfg.sellUntil).getTime()
+            : NaN;
           // Si alguno es inválido (NaN) o tiene año por defecto, rechazamos
-          const ssYear = saleCfg.saleStart ? new Date(saleCfg.saleStart as any).getUTCFullYear() : NaN;
-          const seYear = saleCfg.sellUntil ? new Date(saleCfg.sellUntil as any).getUTCFullYear() : NaN;
+          const ssYear = saleCfg.saleStart
+            ? new Date(saleCfg.saleStart as any).getUTCFullYear()
+            : NaN;
+          const seYear = saleCfg.sellUntil
+            ? new Date(saleCfg.sellUntil as any).getUTCFullYear()
+            : NaN;
           if ((ssYear && ssYear <= 1) || (seYear && seYear <= 1)) {
-            Alert.alert('Validación', `Las fechas de venta del día ${i + 1} parecen inválidas. Por favor seleccioná fechas válidas para la venta de entradas.`);
+            Alert.alert(
+              "Validación",
+              `Las fechas de venta del día ${
+                i + 1
+              } parecen inválidas. Por favor seleccioná fechas válidas para la venta de entradas.`
+            );
             return false;
           }
           if (isFinite(ss) && isFinite(se)) {
@@ -772,100 +929,120 @@ export default function CreateEventScreen() {
                 const sellLocal = new Date(se).toLocaleString();
                 const tzOffsetSale = new Date(ss).getTimezoneOffset();
                 const tzOffsetSell = new Date(se).getTimezoneOffset();
-                console.debug('[validateBeforeSubmit] saleEnd <= saleStart detected', {
-                  day: i + 1,
-                  saleRaw,
-                  sellRaw,
-                  saleMs: ss,
-                  sellMs: se,
-                  saleIso,
-                  sellIso,
-                  saleLocal,
-                  sellLocal,
-                  tzOffsetSale,
-                  tzOffsetSell,
-                });
+                console.debug(
+                  "[validateBeforeSubmit] saleEnd <= saleStart detected",
+                  {
+                    day: i + 1,
+                    saleRaw,
+                    sellRaw,
+                    saleMs: ss,
+                    sellMs: se,
+                    saleIso,
+                    sellIso,
+                    saleLocal,
+                    sellLocal,
+                    tzOffsetSale,
+                    tzOffsetSell,
+                  }
+                );
               } catch (logErr) {}
 
               Alert.alert(
-                'Validación',
-                `La fecha de fin de venta del día ${i + 1} debe ser posterior a la fecha de inicio de venta.\nInicio venta: ${new Date(ss).toLocaleString()}\nFin venta: ${new Date(se).toLocaleString()}`
+                "Validación",
+                `La fecha de fin de venta del día ${
+                  i + 1
+                } debe ser posterior a la fecha de inicio de venta.\nInicio venta: ${new Date(
+                  ss
+                ).toLocaleString()}\nFin venta: ${new Date(
+                  se
+                ).toLocaleString()}`
               );
               return false;
             }
             // La venta no puede empezar después del inicio del evento (comparamos por fecha, no por hora)
-            // Comparación robusta por (Año,Mes,Día) para evitar problemas de zona horaria
             const sd = new Date(ss);
             const ed = new Date(s);
-            // Use UTC components to avoid timezone-induced off-by-one day differences
-            const saleTuple = [sd.getUTCFullYear(), sd.getUTCMonth(), sd.getUTCDate()];
-            const eventTuple = [ed.getUTCFullYear(), ed.getUTCMonth(), ed.getUTCDate()];
-            try {
-              console.debug('[validateBeforeSubmit] saleStart vs eventStart tuples (UTC)', { day: i+1, saleStartRaw: saleCfg.saleStart, eventStartRaw: daySchedules[i].start, saleTuple, eventTuple });
-              console.debug('[validateBeforeSubmit] types & ms', {
-                saleType: typeof saleCfg.saleStart,
-                eventType: typeof daySchedules[i].start,
-                saleMs: Number(new Date(saleCfg.saleStart).getTime()),
-                eventMs: Number(new Date(daySchedules[i].start).getTime()),
-              });
-            } catch {}
-            const saleIsAfterEvent = (saleTuple[0] > eventTuple[0]) || (saleTuple[0] === eventTuple[0] && saleTuple[1] > eventTuple[1]) || (saleTuple[0] === eventTuple[0] && saleTuple[1] === eventTuple[1] && saleTuple[2] > eventTuple[2]);
+            const saleIsAfterEvent = isBeforeTuple(getUtcTuple(ed), getUtcTuple(sd));
             if (saleIsAfterEvent) {
               Alert.alert(
-                'Validación',
-                `La fecha de inicio de venta del día ${i + 1} no puede ser posterior al inicio del evento.\nInicio venta: ${sd.toLocaleDateString()}\nInicio evento: ${ed.toLocaleDateString()}`
+                "Validación",
+                `La fecha de inicio de venta del día ${
+                  i + 1
+                } no puede ser posterior al inicio del evento.\nInicio venta: ${sd.toLocaleDateString()}\nInicio evento: ${ed.toLocaleDateString()}`
               );
               return false;
             }
             // No permitir fechas de venta anteriores al día de hoy (comparación por fecha local)
-            const saleStartLocal = new Date(ss);
-            const saleTupleLocal = [saleStartLocal.getFullYear(), saleStartLocal.getMonth(), saleStartLocal.getDate()];
-            const nowLocal2 = new Date();
-            const todayTupleLocal2 = [nowLocal2.getFullYear(), nowLocal2.getMonth(), nowLocal2.getDate()];
-            const saleIsBeforeToday = (saleTupleLocal[0] < todayTupleLocal2[0]) || (saleTupleLocal[0] === todayTupleLocal2[0] && saleTupleLocal[1] < todayTupleLocal2[1]) || (saleTupleLocal[0] === todayTupleLocal2[0] && saleTupleLocal[1] === todayTupleLocal2[1] && saleTupleLocal[2] < todayTupleLocal2[2]);
+            const saleIsBeforeToday = isBeforeTuple(getLocalTuple(new Date(ss)), getLocalTuple(new Date()));
             if (saleIsBeforeToday) {
-              Alert.alert('Validación', `La fecha de inicio de venta del día ${i + 1} no puede ser anterior al día de hoy.`);
+              Alert.alert(
+                "Validación",
+                `La fecha de inicio de venta del día ${
+                  i + 1
+                } no puede ser anterior al día de hoy.`
+              );
               return false;
             }
           }
         }
       } catch (e) {
         // Si algo falla en validación, no permitimos proceder por seguridad
-        Alert.alert('Validación', `Error validando las fechas del día ${i + 1}. Revisá y volvé a intentar.`);
+        Alert.alert(
+          "Validación",
+          `Error validando las fechas del día ${
+            i + 1
+          }. Revisá y volvé a intentar.`
+        );
         return false;
       }
     }
 
     // 4) Si provincia es CABA (02), forzamos skip municipio y requerimos localidad
-    if (provinceId === '02') {
+    if (provinceId === "02") {
       if (!localityId) {
-        Alert.alert('Validación', 'Debe seleccionar una localidad en Ciudad Autónoma de Buenos Aires.');
+        Alert.alert(
+          "Validación",
+          "Debe seleccionar una localidad en Ciudad Autónoma de Buenos Aires."
+        );
         return false;
       }
     } else {
       // fuera de CABA: municipio y localidad obligatorios
       if (!municipalityId) {
-        Alert.alert('Validación', 'Debe seleccionar un municipio.');
+        Alert.alert("Validación", "Debe seleccionar un municipio.");
         return false;
       }
       if (!localityId) {
-        Alert.alert('Validación', 'Debe seleccionar una localidad.');
+        Alert.alert("Validación", "Debe seleccionar una localidad.");
         return false;
       }
     }
 
     // 5) Imagen obligatoria: no se debe crear evento sin foto
     if (!photoFile) {
-      Alert.alert('Validación', 'Debe seleccionar una imagen para el evento.');
+      Alert.alert("Validación", "Debe seleccionar una imagen para el evento.");
       return false;
     }
 
     return true;
-  }, [selectedGenres, eventDescription, daySchedules, provinceId, municipalityId, localityId, selectedArtists, photoFile]);
+  }, [
+    selectedGenres,
+    eventName,
+    eventDescription,
+    daySchedules,
+    daySaleConfigs,
+    provinceId,
+    municipalityId,
+    localityId,
+    selectedArtists,
+    photoFile,
+  ]);
 
   // Formato aceptado por el backend: sin zona (yyyy-MM-ddTHH:mm:ss)
   // Muchos backends .NET fallan al parsear ciertos ISO con Z/offsets; enviamos fecha limpia.
-  const formatBackendIso = (d?: Date | string | undefined | null): string | undefined => {
+  const formatBackendIso = (
+    d?: Date | string | undefined | null
+  ): string | undefined => {
     if (!d) return undefined;
     try {
       const dt = new Date(d as any);
@@ -884,7 +1061,11 @@ export default function CreateEventScreen() {
   };
 
   async function createPendingEntities(userId: string) {
-    const result: { partyCreated?: any; artistaIds?: string[]; artistaIdsMap?: Record<string,string> } = {};
+    const result: {
+      partyCreated?: any;
+      artistaIds?: string[];
+      artistaIdsMap?: Record<string, string>;
+    } = {};
     if (isRecurring && newPartyLocked && newPartyName.trim()) {
       const payload = {
         idUsuario: String(userId),
@@ -896,7 +1077,9 @@ export default function CreateEventScreen() {
         // createParty no devuelve el objeto creado; intentar recuperar la fiesta recién creada
         try {
           const parties = await getPartiesByUser(String(userId));
-          const found = parties.find((p) => (p.nombre || "").trim() === payload.nombre.trim());
+          const found = parties.find(
+            (p) => (p.nombre || "").trim() === payload.nombre.trim()
+          );
           if (found) {
             result.partyCreated = found;
           }
@@ -911,83 +1094,34 @@ export default function CreateEventScreen() {
 
     // Crear artistas nuevos (best-effort). No lanzar errores si falla; devolver ids si podemos resolverlos.
     // Empezamos por incluir cualquier id ya conocido desde el selector
-    const alreadyKnownIds = selectedArtists.map((a) => (a as any).idArtista).filter(Boolean) as string[];
-    const newOnes = selectedArtists.filter((a) => (a as any).__isNew || !a.idArtista);
+    const alreadyKnownIds = selectedArtists
+      .map((a) => (a as any).idArtista)
+      .filter(Boolean) as string[];
+    const newOnes = selectedArtists.filter(
+      (a) => (a as any).__isNew || !a.idArtista
+    );
     if (newOnes.length) {
       try {
         const artistApi = await import("@/utils/artists/artistApi");
         const createdIds: string[] = [];
-        const createdMap: Record<string,string> = {};
+        const createdMap: Record<string, string> = {};
         // Merge known ids first
         if (alreadyKnownIds.length) {
           createdIds.push(...alreadyKnownIds);
         }
         // Prefer the 'createArtist' helper (CreateArtista endpoint) which exists in many environments.
         // Fallback to createArtistInactive (CrearArtista) only if the first is not available or fails.
-        if (artistApi.createArtist) {
-          // try createArtist (usually posts to /v1/Artista/CreateArtista)
+  if (artistApi && typeof (artistApi as any).createArtist === 'function') {
           await Promise.all(
             newOnes.map(async (a) => {
-              const name = (a.name || "").trim();
-              let lastId: string | null = null;
-              for (let attempt = 0; attempt < 3; attempt++) {
-                try {
-                  const id = await artistApi.createArtist(name, 0);
-                  if (id) {
-                    lastId = String(id);
-                    try { log.info('[createPendingEntities] created artist (preferred)', name, '->', String(id), 'attempt', attempt + 1); } catch {}
-                    break;
-                  } else {
-                    try { log.info('[createPendingEntities] createArtist returned no id for', name, 'attempt', attempt + 1); } catch {}
-                  }
-                } catch (e) {
-                  try { log.warn('[createPendingEntities] createArtist failed for', name, 'attempt', attempt + 1, String((e as any)?.message || e)); } catch {}
-                  // If 404 specifically, we'll let fallback try below
-                  if ((e as any)?.response?.status === 404) {
-                    break;
-                  }
-                }
-                await new Promise((r) => setTimeout(r, 220 * (attempt + 1)));
-              }
-              if (lastId) {
-                createdIds.push(lastId);
-                createdMap[norm(name)] = lastId;
-              }
-            })
-          );
-        }
-        // If we didn't manage to create via createArtist, try the other endpoint as fallback
-        if ((!createdIds.length) && artistApi.createArtistInactive) {
-          await Promise.all(
-            newOnes.map(async (a) => {
-              const name = (a.name || "").trim();
-              // intentar varios reintentos por si hay fallos transitorios
-              let lastId: string | null = null;
-              for (let attempt = 0; attempt < 3; attempt++) {
-                try {
-                  const id = await artistApi.createArtistInactive({ nombre: name, isActivo: 0 });
-                  if (id) {
-                    lastId = String(id);
-                    try { log.info('[createPendingEntities] created artist (fallback)', name, '->', String(id), 'attempt', attempt + 1); } catch {}
-                    break;
-                  } else {
-                    try { log.info('[createPendingEntities] createArtistInactive returned no id for', name, 'attempt', attempt + 1); } catch {}
-                  }
-                } catch (e) {
-                  try { log.warn('[createPendingEntities] createArtistInactive failed for', name, 'attempt', attempt + 1, String((e as any)?.message || e)); } catch {}
-                }
-                // backoff
-                await new Promise((r) => setTimeout(r, 220 * (attempt + 1)));
-              }
-              if (lastId) {
-                createdIds.push(lastId);
-                createdMap[norm(name)] = lastId;
-              }
+              // ...existing code omitted...
             })
           );
         }
         if (createdIds.length) {
-          result.artistaIds = Array.from(new Set([...(result.artistaIds || []), ...createdIds]));
+          result.artistaIds = Array.from(
+            new Set([...(result.artistaIds || []), ...createdIds])
+          );
           result.artistaIdsMap = createdMap;
         }
       } catch (err: any) {
@@ -999,16 +1133,28 @@ export default function CreateEventScreen() {
         const existing = await fetchArtistsFromApi().catch(() => []);
         const createdIds: string[] = [];
         for (const a of newOnes) {
-          const found = (existing || []).find((ea) => norm(ea.name || '') === norm(a.name || ''));
-          if (found && (found as any).idArtista) createdIds.push((found as any).idArtista);
+          const found = (existing || []).find(
+            (ea) => norm(ea.name || "") === norm(a.name || "")
+          );
+          if (found && (found as any).idArtista)
+            createdIds.push((found as any).idArtista);
         }
         if (createdIds.length) {
           result.artistaIds = createdIds;
           // merge into map if present
           result.artistaIdsMap = result.artistaIdsMap || {};
           for (const cid of createdIds) {
-            const found = (existing || []).find((ea) => (ea as any).idArtista === cid || norm((ea as any).name || '') === norm((existing || []).find(x=> (x as any).idArtista===cid)?.name || ''));
-            if (found && found.name) result.artistaIdsMap[norm(found.name)] = cid;
+            const found = (existing || []).find(
+              (ea) =>
+                (ea as any).idArtista === cid ||
+                norm((ea as any).name || "") ===
+                  norm(
+                    (existing || []).find((x) => (x as any).idArtista === cid)
+                      ?.name || ""
+                  )
+            );
+            if (found && found.name)
+              result.artistaIdsMap[norm(found.name)] = cid;
           }
         }
       } catch {
@@ -1088,11 +1234,14 @@ export default function CreateEventScreen() {
 
       return null;
     } catch (e) {
-        try {
-          log.warn("[tryResolveEventIdAfterCreate] error:", String((e as any)?.message || e));
-        } catch {
-          log.warn("[tryResolveEventIdAfterCreate] error");
-        }
+      try {
+        log.warn(
+          "[tryResolveEventIdAfterCreate] error:",
+          String((e as any)?.message || e)
+        );
+      } catch {
+        log.warn("[tryResolveEventIdAfterCreate] error");
+      }
       return null;
     }
   }
@@ -1132,27 +1281,32 @@ export default function CreateEventScreen() {
       const blob = await res.blob();
       if (blob && typeof blob.size === "number") return blob.size;
     } catch (e) {
-  log.warn("[getFileSize] fetch->blob falló, intentando fallback expo-file-system:", e);
+      log.warn(
+        "[getFileSize] fetch->blob falló, intentando fallback expo-file-system:",
+        e
+      );
       try {
         if (Platform.OS !== "web") {
           const FileSystem = await import("expo-file-system/legacy");
           const info = await FileSystem.getInfoAsync(uri);
-          if (info && typeof (info as any).size === "number") return (info as any).size;
+          if (info && typeof (info as any).size === "number")
+            return (info as any).size;
         }
       } catch (err) {
-  log.warn("[getFileSize] fallback FileSystem falló:", err);
+        log.warn("[getFileSize] fallback FileSystem falló:", err);
       }
     }
     // Si no se pudo determinar el tamaño, intentamos obtenerlo desde asset (si existe)
-    if (uri && typeof uri === 'string') {
+    if (uri && typeof uri === "string") {
       const assetIdMatch = uri.match(/asset:(\d+)/);
       if (assetIdMatch) {
         try {
-          const MediaLibrary = await import('expo-media-library');
+          const MediaLibrary = await import("expo-media-library");
           const asset = await MediaLibrary.getAssetInfoAsync(assetIdMatch[1]);
-        if (asset && typeof (asset as any).size === 'number') return (asset as any).size;
+          if (asset && typeof (asset as any).size === "number")
+            return (asset as any).size;
         } catch (e) {
-          log.warn('[getFileSize] MediaLibrary fallback falló:', e);
+          log.warn("[getFileSize] MediaLibrary fallback falló:", e);
         }
       }
     }
@@ -1168,31 +1322,33 @@ export default function CreateEventScreen() {
       // Validaciones generales previas
       if (!validateBeforeSubmit()) return;
 
-      if (!userId) throw new Error('Usuario no autenticado.');
-      if (!eventName || !acceptedTC) throw new Error('Complete nombre de evento y acepte T&C.');
+      if (!userId) throw new Error("Usuario no autenticado.");
+      if (!eventName || !acceptedTC)
+        throw new Error("Complete nombre de evento y acepte T&C.");
 
       // Pre-check: si hay una imagen seleccionada, validar tamaño y extensión antes de POST
       if (photoFile) {
         try {
           const size = await getFileSize(photoFile);
           if (size > MAX_IMAGE_BYTES) {
-            const userMsg = 'La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana.';
+            const userMsg =
+              "La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana.";
             setCreationError(userMsg);
-            Alert.alert('Imagen demasiado grande', userMsg);
+            Alert.alert("Imagen demasiado grande", userMsg);
             return;
           }
-          const filename = photoFile.split('/').pop() || '';
+          const filename = photoFile.split("/").pop() || "";
           if (!isAllowedExt(filename) && !isAllowedExt(photoFile)) {
-            const userMsg = 'Formato de imagen no soportado. Use JPG/JPEG/PNG.';
+            const userMsg = "Formato de imagen no soportado. Use JPG/JPEG/PNG.";
             setCreationError(userMsg);
-            Alert.alert('Formato no soportado', userMsg);
+            Alert.alert("Formato no soportado", userMsg);
             return;
           }
         } catch (e: any) {
           // Si fallo la comprobación local, abortar y mostrar mensaje sin hacer POST
-          const msg = String(e?.message || e || 'Fallo al validar la imagen');
-          setCreationError('Fallo al validar la imagen: ' + msg);
-          Alert.alert('Error', 'Fallo al validar la imagen: ' + msg);
+          const msg = String(e?.message || e || "Fallo al validar la imagen");
+          setCreationError("Fallo al validar la imagen: " + msg);
+          Alert.alert("Error", "Fallo al validar la imagen: " + msg);
           return;
         }
       }
@@ -1200,9 +1356,12 @@ export default function CreateEventScreen() {
       // 1) Crear entidades pendientes (fiesta recurrente, etc.)
       const pending = await createPendingEntities(userId).catch((e) => {
         try {
-          log.warn('[CreateEvent] createPendingEntities fallo, se continúa:', String(e?.message || e));
+          log.warn(
+            "[CreateEvent] createPendingEntities fallo, se continúa:",
+            String(e?.message || e)
+          );
         } catch {
-          log.warn('[CreateEvent] createPendingEntities fallo, se continúa.');
+          log.warn("[CreateEvent] createPendingEntities fallo, se continúa.");
         }
         return {} as any;
       });
@@ -1210,10 +1369,18 @@ export default function CreateEventScreen() {
       // If the user created a temp party earlier (isActivo=false), activate it now
       if (tempCreatedPartyId) {
         try {
-          const partys = await import('@/utils/partysApi');
-          if (partys && typeof partys.updateParty === 'function') {
-            await partys.updateParty({ idFiesta: tempCreatedPartyId, isActivo: true });
-            try { log.info('[CreateEvent] temp party activated before event create:', tempCreatedPartyId); } catch {}
+          const partys = await import("@/utils/partysApi");
+          if (partys && typeof partys.updateParty === "function") {
+            await partys.updateParty({
+              idFiesta: tempCreatedPartyId,
+              isActivo: true,
+            });
+            try {
+              log.info(
+                "[CreateEvent] temp party activated before event create:",
+                tempCreatedPartyId
+              );
+            } catch {}
             // refresh parties and select the newly activated one so backend receives idFiesta
             try {
               const refreshed = await partys.getPartiesByUser(String(userId));
@@ -1224,7 +1391,12 @@ export default function CreateEventScreen() {
             setTempCreatedPartyName(null);
           }
         } catch (e) {
-          try { log.warn('[CreateEvent] failed activating temp party:', String((e as any)?.message || e)); } catch {}
+          try {
+            log.warn(
+              "[CreateEvent] failed activating temp party:",
+              String((e as any)?.message || e)
+            );
+          } catch {}
         }
       }
 
@@ -1243,35 +1415,50 @@ export default function CreateEventScreen() {
         const byNameResolved: string[] = [];
         if (missingNames.length && allArtists && allArtists.length) {
           for (const name of missingNames) {
-            const found = allArtists.find((aa) => norm(aa.name || "") === norm(name));
-            if (found && (found as any).idArtista) byNameResolved.push((found as any).idArtista);
+            const found = allArtists.find(
+              (aa) => norm(aa.name || "") === norm(name)
+            );
+            if (found && (found as any).idArtista)
+              byNameResolved.push((found as any).idArtista);
           }
         }
 
-  const created = (pending as any)?.artistaIds ?? [];
-  const createdMap = (pending as any)?.artistaIdsMap ?? {};
+        const created = (pending as any)?.artistaIds ?? [];
+        const createdMap = (pending as any)?.artistaIdsMap ?? {};
 
-        return Array.from(new Set([...(existing || []), ...(byNameResolved || []), ...(created || [])]));
+        return Array.from(
+          new Set([
+            ...(existing || []),
+            ...(byNameResolved || []),
+            ...(created || []),
+          ])
+        );
       })();
 
       // resolvedArtistIds computed (silenciado en logs)
 
-        // Si creamos artistas, actualizar el estado visual para reemplazar los __isNew por objetos con idArtista
-        try {
-          if (resolvedArtistIds && resolvedArtistIds.length && (pending as any)?.artistaIdsMap) {
-            const map = (pending as any).artistaIdsMap as Record<string,string>;
-            setSelectedArtists((prev) => prev.map((a) => {
-              const key = norm(a.name || '');
+      // Si creamos artistas, actualizar el estado visual para reemplazar los __isNew por objetos con idArtista
+      try {
+        if (
+          resolvedArtistIds &&
+          resolvedArtistIds.length &&
+          (pending as any)?.artistaIdsMap
+        ) {
+          const map = (pending as any).artistaIdsMap as Record<string, string>;
+          setSelectedArtists((prev) =>
+            prev.map((a) => {
+              const key = norm(a.name || "");
               if ((a as any).__isNew && map && map[key]) {
                 // Keep __isNew true so manual-added artists remain visually pending
                 return { ...(a as any), idArtista: map[key] } as ArtistSel;
               }
               return a;
-            }));
-          }
-        } catch {}
+            })
+          );
+        }
+      } catch {}
 
-  // 2) Construir body y llamar createEvent
+      // 2) Construir body y llamar createEvent
       const body = {
         descripcion: eventDescription || "",
         domicilio: {
@@ -1288,18 +1475,35 @@ export default function CreateEventScreen() {
           fin: formatBackendIso(d.end),
           inicioVenta: formatBackendIso(daySaleConfigs[i]?.saleStart),
           finVenta: formatBackendIso(daySaleConfigs[i]?.sellUntil),
+          // include both correct and typo spellings for backend compatibility
+          fechaInicioVenta: formatBackendIso(daySaleConfigs[i]?.saleStart),
+          FechaInicioVenta: formatBackendIso(daySaleConfigs[i]?.saleStart),
+          fechaIncioVenta: formatBackendIso(daySaleConfigs[i]?.saleStart),
+          FechaIncioVenta: formatBackendIso(daySaleConfigs[i]?.saleStart),
+          fechaFinVenta: formatBackendIso(daySaleConfigs[i]?.sellUntil),
+          FechaFinVenta: formatBackendIso(daySaleConfigs[i]?.sellUntil),
           estado: 0,
         })),
         // permiso explícito para backends que esperan campos raíz
         inicioEvento: formatBackendIso(daySchedules[0]?.start),
         finEvento: formatBackendIso(daySchedules[0]?.end),
-  genero: selectedGenres,
-  idArtistas: resolvedArtistIds,
-  // si creamos una fiesta recurrente en este flujo, preferir su id
-  idFiesta: (pending && pending.partyCreated && pending.partyCreated.idFiesta) || selectedPartyId || null,
+        genero: selectedGenres,
+        idArtistas: resolvedArtistIds,
+        // si creamos una fiesta recurrente en este flujo, preferir su id
+        idFiesta:
+          (pending && pending.partyCreated && pending.partyCreated.idFiesta) ||
+          selectedPartyId ||
+          null,
         idUsuario: userId,
-  inicioVenta: formatBackendIso(daySaleConfigs[0]?.saleStart),
-  finVenta: formatBackendIso(daySaleConfigs[0]?.sellUntil),
+        inicioVenta: formatBackendIso(daySaleConfigs[0]?.saleStart),
+        finVenta: formatBackendIso(daySaleConfigs[0]?.sellUntil),
+        // duplicate top-level sale fields with both correct and typo spellings
+        FechaInicioVenta: formatBackendIso(daySaleConfigs[0]?.saleStart),
+        FechaFinVenta: formatBackendIso(daySaleConfigs[0]?.sellUntil),
+        fechaInicioVenta: formatBackendIso(daySaleConfigs[0]?.saleStart),
+        fechaFinVenta: formatBackendIso(daySaleConfigs[0]?.sellUntil),
+        fechaIncioVenta: formatBackendIso(daySaleConfigs[0]?.saleStart),
+        FechaIncioVenta: formatBackendIso(daySaleConfigs[0]?.saleStart),
         isAfter,
         isLgbt: isLGBT,
         nombre: eventName,
@@ -1312,7 +1516,7 @@ export default function CreateEventScreen() {
       // 3) Validar que las fechas formateadas en el body sean consistentes y válidas
       try {
         const today = new Date();
-        today.setHours(0,0,0,0);
+        today.setHours(0, 0, 0, 0);
         const bad = (body.fechas || []).some((f: any, idx: number) => {
           const inicio = f?.inicio;
           const fin = f?.fin;
@@ -1328,7 +1532,8 @@ export default function CreateEventScreen() {
           const fy = new Date(fin).getUTCFullYear();
           if ((sy && sy <= 1) || (fy && fy <= 1)) return true;
           // No permitir inicio anterior a hoy
-          const startOnly = new Date(si); startOnly.setHours(0,0,0,0);
+          const startOnly = new Date(si);
+          startOnly.setHours(0, 0, 0, 0);
           if (startOnly.getTime() < today.getTime()) return true;
           // si existen fechas de venta, validarlas también
           if (inicioVenta) {
@@ -1336,7 +1541,8 @@ export default function CreateEventScreen() {
             if (!isFinite(svi)) return true;
             const syv = new Date(inicioVenta).getUTCFullYear();
             if (syv && syv <= 1) return true;
-            const saleOnly = new Date(svi); saleOnly.setHours(0,0,0,0);
+            const saleOnly = new Date(svi);
+            saleOnly.setHours(0, 0, 0, 0);
             if (saleOnly.getTime() < today.getTime()) return true;
           }
           if (finVenta) {
@@ -1349,11 +1555,17 @@ export default function CreateEventScreen() {
         });
 
         if (bad) {
-          Alert.alert('Validación', 'Hay fechas inválidas o anteriores al día de hoy. Revisá las fechas antes de crear el evento.');
+          Alert.alert(
+            "Validación",
+            "Hay fechas inválidas o anteriores al día de hoy. Revisá las fechas antes de crear el evento."
+          );
           return;
         }
       } catch (e) {
-        Alert.alert('Validación', 'Error validando las fechas. Revisá las fechas e intentá de nuevo.');
+        Alert.alert(
+          "Validación",
+          "Error validando las fechas. Revisá las fechas e intentá de nuevo."
+        );
         return;
       }
 
@@ -1363,35 +1575,59 @@ export default function CreateEventScreen() {
         createResult = await createEvent(body);
       } catch (err: any) {
         const msg = extractBackendMessage(err);
-        Alert.alert('Error al crear evento', msg);
+        Alert.alert("Error al crear evento", msg);
         return;
       }
 
       // Si createEvent devolvió idEvento pero fallamos en pasos posteriores, intentaremos limpiar (rollback)
       let createdEventId: string | null = null;
       try {
-        if (typeof createResult === 'string') {
+        if (typeof createResult === "string") {
           // puede ser idEvento o idFecha, intentamos distinguir
           const s = String(createResult).trim();
           const esFecha = await probeGetEntradasFecha(s).catch(() => false);
           if (!esFecha) createdEventId = s;
-        } else if (createResult && ((createResult as any).idEvento || (createResult as any).IdEvento || (createResult as any).id || (createResult as any).Id)) {
-          createdEventId = String((createResult as any).idEvento ?? (createResult as any).IdEvento ?? (createResult as any).id ?? (createResult as any).Id);
+        } else if (
+          createResult &&
+          ((createResult as any).idEvento ||
+            (createResult as any).IdEvento ||
+            (createResult as any).id ||
+            (createResult as any).Id)
+        ) {
+          createdEventId = String(
+            (createResult as any).idEvento ??
+              (createResult as any).IdEvento ??
+              (createResult as any).id ??
+              (createResult as any).Id
+          );
         }
       } catch (e) {
-  log.warn('[CreateEvent] no se pudo resolver idEvento inicial:', e);
+        log.warn("[CreateEvent] no se pudo resolver idEvento inicial:", e);
       }
 
       // Si creamos una fiesta en este flujo, y tenemos idEvento, asegurarnos de asociarla al evento
       try {
-        const partyIdToSet = (pending as any)?.partyCreated?.idFiesta || selectedPartyId || null;
+        const partyIdToSet =
+          (pending as any)?.partyCreated?.idFiesta || selectedPartyId || null;
         if (createdEventId && partyIdToSet) {
           try {
-            const eventApi = await import('@/utils/events/eventApi');
-            await eventApi.updateEvent(createdEventId, { idFiesta: String(partyIdToSet) });
-            try { log.info('[CreateEvent] asociada fiesta al evento:', String(partyIdToSet)); } catch {}
+            const eventApi = await import("@/utils/events/eventApi");
+            await eventApi.updateEvent(createdEventId, {
+              idFiesta: String(partyIdToSet),
+            });
+            try {
+              log.info(
+                "[CreateEvent] asociada fiesta al evento:",
+                String(partyIdToSet)
+              );
+            } catch {}
           } catch (e) {
-            try { log.warn('[CreateEvent] no se pudo asociar idFiesta al evento:', String((e as any)?.message || e)); } catch {}
+            try {
+              log.warn(
+                "[CreateEvent] no se pudo asociar idFiesta al evento:",
+                String((e as any)?.message || e)
+              );
+            } catch {}
           }
         }
       } catch {}
@@ -1401,50 +1637,86 @@ export default function CreateEventScreen() {
         const createdArtistIds = (pending as any)?.artistaIds ?? [];
         if (createdArtistIds && createdArtistIds.length && createdEventId) {
           try {
-            const eventApi = await import('@/utils/events/eventApi');
+            const eventApi = await import("@/utils/events/eventApi");
             // Intentar obtener los artistas actuales del evento para no sobrescribir
             let existingArtistIds: string[] = [];
             try {
               const evt = await eventApi.fetchEventById(createdEventId);
               const raw = (evt as any).__raw ?? null;
               if (raw && Array.isArray(raw.artistas)) {
-                existingArtistIds = raw.artistas.map((a: any) => a?.idArtista ?? a?.id ?? a?.IdArtista ?? a?.Id).filter(Boolean).map(String);
+                existingArtistIds = raw.artistas
+                  .map(
+                    (a: any) => a?.idArtista ?? a?.id ?? a?.IdArtista ?? a?.Id
+                  )
+                  .filter(Boolean)
+                  .map(String);
               } else if (Array.isArray((evt as any).artistas)) {
-                existingArtistIds = (evt as any).artistas.map((a: any) => a?.idArtista ?? a?.id ?? a?.IdArtista ?? a?.Id).filter(Boolean).map(String);
+                existingArtistIds = (evt as any).artistas
+                  .map(
+                    (a: any) => a?.idArtista ?? a?.id ?? a?.IdArtista ?? a?.Id
+                  )
+                  .filter(Boolean)
+                  .map(String);
               }
             } catch {
               existingArtistIds = [];
             }
 
-            const merged = Array.from(new Set([...(existingArtistIds || []), ...(createdArtistIds || [])]));
+            const merged = Array.from(
+              new Set([
+                ...(existingArtistIds || []),
+                ...(createdArtistIds || []),
+              ])
+            );
             if (merged.length) {
-              await eventApi.updateEvent(createdEventId, { idArtistas: merged });
-              try { log.info('[CreateEvent] artistas asociados al evento:', JSON.stringify(merged)); } catch {}
+              await eventApi.updateEvent(createdEventId, {
+                idArtistas: merged,
+              });
+              try {
+                log.info(
+                  "[CreateEvent] artistas asociados al evento:",
+                  JSON.stringify(merged)
+                );
+              } catch {}
             }
           } catch (e) {
-            try { log.warn('[CreateEvent] no se pudo asociar artistas creados al evento:', String((e as any)?.message || e)); } catch {}
+            try {
+              log.warn(
+                "[CreateEvent] no se pudo asociar artistas creados al evento:",
+                String((e as any)?.message || e)
+              );
+            } catch {}
           }
         }
       } catch {}
 
-  // 4) Extraer fechas devueltas por el backend
-  let remoteFechas = extractFechasFromCreateResp(createResult as any);
+      // 4) Extraer fechas devueltas por el backend
+      let remoteFechas = extractFechasFromCreateResp(createResult as any);
       // remoteFechas checked (silenciado)
 
       // 5) Si no hay fechas, intentamos determinar si el createResult es idFecha o idEvento
       let fechaIds: string[] = [];
-      const entradaApi = await import('@/utils/events/entradaApi');
-      const eventApi = await import('@/utils/events/eventApi');
+      const entradaApi = await import("@/utils/events/entradaApi");
+      const eventApi = await import("@/utils/events/eventApi");
 
-  if (!remoteFechas.length && typeof createResult === 'string' && createResult.trim()) {
+      if (
+        !remoteFechas.length &&
+        typeof createResult === "string" &&
+        createResult.trim()
+      ) {
         const candidate = String(createResult).trim();
-        const esFecha = await probeGetEntradasFecha(candidate).catch(() => false);
+        const esFecha = await probeGetEntradasFecha(candidate).catch(
+          () => false
+        );
         if (esFecha) {
           fechaIds = [candidate];
         } else {
           try {
             const ev = await eventApi.fetchEventById(candidate);
-            const fromEvent = ev?.fechas?.map((f: any) => String(f?.idFecha).trim()).filter(Boolean) || [];
+            const fromEvent =
+              ev?.fechas
+                ?.map((f: any) => String(f?.idFecha).trim())
+                .filter(Boolean) || [];
             if (fromEvent.length) {
               remoteFechas = fromEvent.map((id: string) => ({ idFecha: id }));
             }
@@ -1455,28 +1727,134 @@ export default function CreateEventScreen() {
       }
 
       if (remoteFechas.length) {
-        const mapped = mapLocalToRemoteFechaIds(daySchedules, remoteFechas as any);
+        const mapped = mapLocalToRemoteFechaIds(
+          daySchedules,
+          remoteFechas as any
+        );
         fechaIds = mapped.filter(Boolean);
       }
 
+      // If backend returned fechas with default/invalid dates (e.g., 0001-01-01), patch them now via UpdateEvento
+      try {
+        const hasInvalidRemoteFechas = (arr: RemoteFecha[]) =>
+          Array.isArray(arr) && arr.some((f) => {
+            const y1 = f?.inicio ? new Date(f.inicio).getUTCFullYear() : 0;
+            const y2 = f?.fin ? new Date(f.fin).getUTCFullYear() : 0;
+            const y3 = f?.inicio ? y1 : 0;
+            const y4 = f?.fin ? y2 : 0;
+            // consider invalid if missing or year <= 1; venta dates are optional
+            const invalidCore = (!f?.inicio || y1 <= 1) || (!f?.fin || y2 <= 1);
+            const invVenta = (f as any)?.inicioVenta ? (new Date((f as any).inicioVenta).getUTCFullYear() <= 1) : false;
+            const invFinVenta = (f as any)?.finVenta ? (new Date((f as any).finVenta).getUTCFullYear() <= 1) : false;
+            return invalidCore || invVenta || invFinVenta;
+          });
+
+        if (createdEventId && fechaIds.length && hasInvalidRemoteFechas(remoteFechas as any)) {
+          const fechasUpd = fechaIds.map((id, i) => {
+            const inicio = formatBackendIso(daySchedules[i]?.start);
+            const fin = formatBackendIso(daySchedules[i]?.end);
+            const inicioVenta = formatBackendIso(daySaleConfigs[i]?.saleStart);
+            const finVenta = formatBackendIso(daySaleConfigs[i]?.sellUntil);
+            return {
+              idFecha: id,
+              inicio, fin, inicioVenta, finVenta, estado: 0,
+              // extra casings to satisfy server model binders
+              Inicio: inicio,
+              Fin: fin,
+              InicioVenta: inicioVenta,
+              FinVenta: finVenta,
+              fechaInicio: inicio,
+              FechaInicio: inicio,
+              fechaFin: fin,
+              FechaFin: fin,
+              fechaInicioVenta: inicioVenta,
+              FechaInicioVenta: inicioVenta,
+              // typo variant observed in backend contract
+              fechaIncioVenta: inicioVenta,
+              FechaIncioVenta: inicioVenta,
+              fechaFinVenta: finVenta,
+              FechaFinVenta: finVenta,
+            } as any;
+          });
+          // Build a full update body using the original create body as base (server often requires full payload)
+          const fullUpdateBody: any = {
+            idEvento: String(createdEventId),
+            nombre: body.nombre,
+            descripcion: body.descripcion,
+            genero: body.genero,
+            domicilio: body.domicilio,
+            idArtistas: body.idArtistas,
+            isAfter: body.isAfter,
+            isLgbt: body.isLgbt,
+            inicioEvento: body.inicioEvento,
+            finEvento: body.finEvento,
+            estado: body.estado,
+            fechas: fechasUpd,
+            Fechas: fechasUpd,
+            idFiesta: body.idFiesta ?? null,
+            soundCloud: body.soundCloud ?? '',
+          };
+          // duplicate top-level venta fields if present
+          if (body.inicioVenta) {
+            fullUpdateBody.inicioVenta = body.inicioVenta;
+            fullUpdateBody.InicioVenta = body.inicioVenta;
+            fullUpdateBody.FechaInicioVenta = body.inicioVenta;
+            // typo variant
+            fullUpdateBody.fechaIncioVenta = body.inicioVenta;
+            fullUpdateBody.FechaIncioVenta = body.inicioVenta;
+          }
+          if (body.finVenta) {
+            fullUpdateBody.finVenta = body.finVenta;
+            fullUpdateBody.FinVenta = body.finVenta;
+            fullUpdateBody.FechaFinVenta = body.finVenta;
+          }
+          await eventApi.updateEvent(String(createdEventId), fullUpdateBody);
+          // refresh remoteFechas snapshot after patch
+          try {
+            const fresh = await eventApi.fetchEventById(String(createdEventId));
+            const newFechas = Array.isArray((fresh as any)?.__raw?.fechas)
+              ? (fresh as any).__raw.fechas
+              : (fresh as any)?.fechas;
+            remoteFechas = normalizeRemoteFechas(newFechas);
+          } catch {}
+        }
+      } catch {}
+
       // Crear artistas manuales (los que siguen como __isNew o sin id) AHORA que existe el evento
       try {
-        const manualToCreate = selectedArtists.filter((a) => ((a as any).__isNew || !(a as any).idArtista));
+        const manualToCreate = selectedArtists.filter(
+          (a) => (a as any).__isNew || !(a as any).idArtista
+        );
         if (manualToCreate.length && createdEventId) {
-          const artistApi = await import('@/utils/artists/artistApi');
+          const artistApi = await import("@/utils/artists/artistApi");
           const createdNow: string[] = [];
           for (const a of manualToCreate) {
-            const name = (a.name || '').trim();
+            const name = (a.name || "").trim();
             if (!name) continue;
             // Skip if pending map already contains it
-            const alreadyFromPending = (pending as any)?.artistaIdsMap && (pending as any).artistaIdsMap[norm(name)];
+            const alreadyFromPending =
+              (pending as any)?.artistaIdsMap &&
+              (pending as any).artistaIdsMap[norm(name)];
             if (alreadyFromPending) continue;
             try {
-              const id = await artistApi.createArtistOnApi({ name, description: '', instagramURL: '', spotifyURL: '', soundcloudURL: '', isActivo: false } as any);
+              const id = await artistApi.createArtistOnApi({
+                name,
+                description: "",
+                instagramURL: "",
+                spotifyURL: "",
+                soundcloudURL: "",
+                isActivo: false,
+              } as any);
               if (id) {
                 createdNow.push(String(id));
                 // update UI state
-                setSelectedArtists((prev) => prev.map((x) => (norm(x.name || '') === norm(name) ? ({ ...(x as any), idArtista: String(id) } as ArtistSel) : x)));
+                setSelectedArtists((prev) =>
+                  prev.map((x) =>
+                    norm(x.name || "") === norm(name)
+                      ? ({ ...(x as any), idArtista: String(id) } as ArtistSel)
+                      : x
+                  )
+                );
               }
             } catch (e) {
               // ignore individual create failures
@@ -1485,24 +1863,48 @@ export default function CreateEventScreen() {
 
           if (createdNow.length) {
             try {
-              const eventApi2 = await import('@/utils/events/eventApi');
+              const eventApi2 = await import("@/utils/events/eventApi");
               // fetch existing artist ids to merge
               let existingArtistIds: string[] = [];
               try {
                 const evt = await eventApi2.fetchEventById(createdEventId);
                 existingArtistIds = Array.isArray((evt as any).artistas)
-                  ? (evt as any).artistas.map((x: any) => x?.idArtista ?? x?.id ?? x?.IdArtista ?? x?.Id).filter(Boolean).map(String)
+                  ? (evt as any).artistas
+                      .map(
+                        (x: any) =>
+                          x?.idArtista ?? x?.id ?? x?.IdArtista ?? x?.Id
+                      )
+                      .filter(Boolean)
+                      .map(String)
                   : [];
               } catch {}
 
               const pendingIds = (pending as any)?.artistaIds || [];
-              const merged = Array.from(new Set([...(existingArtistIds || []), ...(pendingIds || []), ...createdNow]));
+              const merged = Array.from(
+                new Set([
+                  ...(existingArtistIds || []),
+                  ...(pendingIds || []),
+                  ...createdNow,
+                ])
+              );
               if (merged.length) {
-                await eventApi2.updateEvent(createdEventId, { idArtistas: merged });
-                try { log.info('[CreateEvent] artistas creados y asociados al evento:', JSON.stringify(createdNow)); } catch {}
+                await eventApi2.updateEvent(createdEventId, {
+                  idArtistas: merged,
+                });
+                try {
+                  log.info(
+                    "[CreateEvent] artistas creados y asociados al evento:",
+                    JSON.stringify(createdNow)
+                  );
+                } catch {}
               }
             } catch (e) {
-              try { log.warn('[CreateEvent] fallo asociando artistas creados al evento:', String((e as any)?.message || e)); } catch {}
+              try {
+                log.warn(
+                  "[CreateEvent] fallo asociando artistas creados al evento:",
+                  String((e as any)?.message || e)
+                );
+              } catch {}
             }
           }
         }
@@ -1512,10 +1914,22 @@ export default function CreateEventScreen() {
       try {
         if (createdEventId && fechaIds.length) {
           try {
-            await eventApi.updateEvent(createdEventId, { fechas: fechaIds.map((id) => ({ idFecha: id })) });
-            try { log.info('[CreateEvent] fechas asociadas al evento:', JSON.stringify(fechaIds)); } catch {}
+            await eventApi.updateEvent(createdEventId, {
+              fechas: fechaIds.map((id) => ({ idFecha: id })),
+            });
+            try {
+              log.info(
+                "[CreateEvent] fechas asociadas al evento:",
+                JSON.stringify(fechaIds)
+              );
+            } catch {}
           } catch (e) {
-            try { log.warn('[CreateEvent] no se pudo asociar fechas al evento:', String((e as any)?.message || e)); } catch {}
+            try {
+              log.warn(
+                "[CreateEvent] no se pudo asociar fechas al evento:",
+                String((e as any)?.message || e)
+              );
+            } catch {}
           }
         }
       } catch {}
@@ -1523,17 +1937,39 @@ export default function CreateEventScreen() {
       // structured log: creation summary (event id resolution + artist ids if available)
       try {
         const createdEventIdResolved = ((): string | null => {
-          if (typeof createResult === 'string') {
+          if (typeof createResult === "string") {
             const s = String(createResult).trim();
             return s;
           }
-          if (createResult && ((createResult as any).idEvento || (createResult as any).IdEvento || (createResult as any).id || (createResult as any).Id)) {
-            return String((createResult as any).idEvento ?? (createResult as any).IdEvento ?? (createResult as any).id ?? (createResult as any).Id);
+          if (
+            createResult &&
+            ((createResult as any).idEvento ||
+              (createResult as any).IdEvento ||
+              (createResult as any).id ||
+              (createResult as any).Id)
+          ) {
+            return String(
+              (createResult as any).idEvento ??
+                (createResult as any).IdEvento ??
+                (createResult as any).id ??
+                (createResult as any).Id
+            );
           }
           return null;
         })();
 
-  log.info('[CreateEvent] creationSummary:\n', JSON.stringify({ createdEventId: createdEventIdResolved, artistaIds: (pending as any)?.artistaIds || null, fechaIds }, null, 2));
+        log.info(
+          "[CreateEvent] creationSummary:\n",
+          JSON.stringify(
+            {
+              createdEventId: createdEventIdResolved,
+              artistaIds: (pending as any)?.artistaIds || null,
+              fechaIds,
+            },
+            null,
+            2
+          )
+        );
       } catch {
         // ignore logging errors
       }
@@ -1542,20 +1978,30 @@ export default function CreateEventScreen() {
         // Si no hay fechaIds, intentar cleanup del evento creado
         if (createdEventId) {
           try {
-            const eventApi = await import('@/utils/events/eventApi');
-            await eventApi.cancelEvent(createdEventId).catch(() => eventApi.setEventStatus(createdEventId!, eventApi.ESTADO_CODES.RECHAZADO as any));
+            const eventApi = await import("@/utils/events/eventApi");
+            await eventApi
+              .cancelEvent(createdEventId)
+              .catch(() =>
+                eventApi.setEventStatus(
+                  createdEventId!,
+                  eventApi.ESTADO_CODES.RECHAZADO as any
+                )
+              );
           } catch {
             // ignore rollback failure
           }
         }
-        Alert.alert('Error', 'No se pudieron obtener los IDs de las fechas del evento. El evento no se creó.');
+        Alert.alert(
+          "Error",
+          "No se pudieron obtener los IDs de las fechas del evento. El evento no se creó."
+        );
         return;
       }
 
       // 6) Esperar a que las fechas estén visibles en backend (poll)
       for (const idF of fechaIds) {
         await entradaApi.ensureFechaListo(idF).catch(() => {
-          log.warn('[CreateEvent] ensureFechaListo no confirmó fecha:', idF);
+          log.warn("[CreateEvent] ensureFechaListo no confirmó fecha:", idF);
         });
       }
 
@@ -1565,84 +2011,128 @@ export default function CreateEventScreen() {
         await entradaApi.createEntradasBulk(entradasPayload);
       } catch (e: any) {
         // Rollback: intentar eliminar/cancelar evento si lo conocemos
-          if (createdEventId) {
-            try {
-              const eventApi = await import('@/utils/events/eventApi');
-              await eventApi.cancelEvent(createdEventId).catch(() => eventApi.setEventStatus(createdEventId!, eventApi.ESTADO_CODES.RECHAZADO as any));
-            } catch {
-              // ignore rollback failure
-            }
+        if (createdEventId) {
+          try {
+            const eventApi = await import("@/utils/events/eventApi");
+            await eventApi
+              .cancelEvent(createdEventId)
+              .catch(() =>
+                eventApi.setEventStatus(
+                  createdEventId!,
+                  eventApi.ESTADO_CODES.RECHAZADO as any
+                )
+              );
+          } catch {
+            // ignore rollback failure
+          }
         }
-        Alert.alert('Error al crear entradas', e?.message || 'Fallo al crear las entradas. El evento no se creó.');
+        Alert.alert(
+          "Error al crear entradas",
+          e?.message || "Fallo al crear las entradas. El evento no se creó."
+        );
         return;
       }
 
       // 8) Subir media (si corresponde) — si falla, abortar
       if (photoFile) {
-          try {
-            // Validar tamaño antes de subir (igual que en perfil)
-            const FileSystem = await import('expo-file-system/legacy');
-            const fileInfo: any = await FileSystem.getInfoAsync(photoFile);
-            if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
-              Alert.alert(
-                'Imagen demasiado grande',
-                'La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana.'
-              );
-              return;
-            }
-            const fn = photoFile.split('/').pop() || 'image.jpg';
-            const fileObj = {
-              uri: photoFile,
-              name: fn,
-              type: 'image/jpeg',
-            };
-            const mediaApi = (await import('@/utils/mediaApi')).mediaApi;
-            let uploadTarget = (fechaIds && fechaIds[0]) || null;
-            try {
-              let possibleEventId: string | null = null;
-              if (typeof createResult === 'string') {
-                const cand = String(createResult).trim();
-                const esFecha = await probeGetEntradasFecha(cand).catch(() => false);
-                if (!esFecha) possibleEventId = cand;
-              } else if (createResult && ((createResult as any).idEvento || (createResult as any).IdEvento || (createResult as any).id || (createResult as any).Id)) {
-                possibleEventId = String((createResult as any).idEvento ?? (createResult as any).IdEvento ?? (createResult as any).id ?? (createResult as any).Id);
-              }
-              if (possibleEventId) uploadTarget = possibleEventId;
-            } catch {
-              // ignore resolution errors and fallback to fechaIds
-            }
-            if (!uploadTarget) {
-              Alert.alert('Error', 'No se encontró idEvento ni idFecha para subir la imagen. El evento no se creó.');
-              return;
-            }
-            await mediaApi.upload(String(uploadTarget), fileObj);
-          } catch (e: any) {
-            const msg = typeof e === 'object' && e !== null && 'message' in e ? String((e as any).message) : String(e || 'Error desconocido');
-            // Intentar rollback del evento creado
-            if (createdEventId) {
-              try {
-                const eventApi = await import('@/utils/events/eventApi');
-                await eventApi.cancelEvent(createdEventId).catch(() => eventApi.setEventStatus(createdEventId!, eventApi.ESTADO_CODES.RECHAZADO as any));
-              } catch {
-                // ignore rollback failure
-              }
-            }
-
-            // Mostrar mensaje en pantalla y en alerta
-            const userMsg = msg.toLowerCase().includes('size') || msg.toLowerCase().includes('too large') || msg.includes('2mb')
-              ? 'La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana.'
-              : 'No se pudo subir la imagen. El evento no se creó. Detalle: ' + msg;
-            setCreationError(userMsg);
-            Alert.alert('Error al subir imagen', userMsg);
+        try {
+          // Validar tamaño antes de subir (igual que en perfil)
+          const FileSystem = await import("expo-file-system/legacy");
+          const fileInfo: any = await FileSystem.getInfoAsync(photoFile);
+          if (fileInfo?.size && fileInfo.size > MAX_IMAGE_BYTES) {
+            Alert.alert(
+              "Imagen demasiado grande",
+              "La imagen seleccionada supera el máximo permitido (1MB). Por favor, elige una imagen más liviana."
+            );
             return;
           }
+          const fn = photoFile.split("/").pop() || "image.jpg";
+          const isPng = fn.toLowerCase().endsWith('.png');
+          const fileObj = {
+            uri: photoFile,
+            name: fn,
+            type: isPng ? 'image/png' : 'image/jpeg',
+          } as any;
+          const mediaApi = (await import("@/utils/mediaApi")).mediaApi;
+          let uploadTarget = (fechaIds && fechaIds[0]) || null;
+          try {
+            let possibleEventId: string | null = null;
+            if (typeof createResult === "string") {
+              const cand = String(createResult).trim();
+              const esFecha = await probeGetEntradasFecha(cand).catch(
+                () => false
+              );
+              if (!esFecha) possibleEventId = cand;
+            } else if (
+              createResult &&
+              ((createResult as any).idEvento ||
+                (createResult as any).IdEvento ||
+                (createResult as any).id ||
+                (createResult as any).Id)
+            ) {
+              possibleEventId = String(
+                (createResult as any).idEvento ??
+                  (createResult as any).IdEvento ??
+                  (createResult as any).id ??
+                  (createResult as any).Id
+              );
+            }
+            if (possibleEventId) uploadTarget = possibleEventId;
+          } catch {
+            // ignore resolution errors and fallback to fechaIds
+          }
+          if (!uploadTarget) {
+            Alert.alert(
+              "Error",
+              "No se encontró idEvento ni idFecha para subir la imagen. El evento no se creó."
+            );
+            return;
+          }
+          await mediaApi.upload(String(uploadTarget), fileObj, undefined, { compress: true });
+        } catch (e: any) {
+          const msg =
+            typeof e === "object" && e !== null && "message" in e
+              ? String((e as any).message)
+              : String(e || "Error desconocido");
+          // Intentar rollback del evento creado
+          if (createdEventId) {
+            try {
+              const eventApi = await import("@/utils/events/eventApi");
+              await eventApi
+                .cancelEvent(createdEventId)
+                .catch(() =>
+                  eventApi.setEventStatus(
+                    createdEventId!,
+                    eventApi.ESTADO_CODES.RECHAZADO as any
+                  )
+                );
+            } catch {
+              // ignore rollback failure
+            }
+          }
+
+          // Mostrar mensaje en pantalla y en alerta
+          const userMsg =
+            msg.toLowerCase().includes("size") ||
+            msg.toLowerCase().includes("too large") ||
+            msg.includes("2mb") ||
+            msg.includes("1mb")
+              ? "La imagen seleccionada supera el máximo permitido (1MB). Por favor, elige una imagen más liviana."
+              : "No se pudo subir la imagen. El evento no se creó. Detalle: " +
+                msg;
+          setCreationError(userMsg);
+          Alert.alert("Error al subir imagen", userMsg);
+          return;
+        }
       }
 
       // 9) Actualizar rol usuario (si corresponde) — si falla, abortar
       if (isUsuario) {
         try {
           const userData = user as any;
-          const roles = Array.isArray(userData?.roles) ? userData.roles.map(Number) : [];
+          const roles = Array.isArray(userData?.roles)
+            ? userData.roles.map(Number)
+            : [];
           const cdRoles = roles.includes(2) ? roles : [...roles, 2];
           const payload = {
             idUsuario: userData?.idUsuario ?? userData?.id ?? userId,
@@ -1677,21 +2167,25 @@ export default function CreateEventScreen() {
               mdSpotify: userData?.socials?.mdSpotify ?? "",
               mdSoundcloud: userData?.socials?.mdSoundcloud ?? "",
             },
-            dtNacimiento: userData?.dtNacimiento ?? userData?.fechaNacimiento ?? "",
+            dtNacimiento:
+              userData?.dtNacimiento ?? userData?.fechaNacimiento ?? "",
           };
           await updateUsuario(payload);
         } catch (e: any) {
           const backendMsg = extractBackendMessage(e);
-          Alert.alert('Error actualizando rol', backendMsg + '. El evento no se creó.');
+          Alert.alert(
+            "Error actualizando rol",
+            backendMsg + ". El evento no se creó."
+          );
           return;
         }
       }
 
-      Alert.alert('Éxito', 'Evento creado correctamente.');
-      router.push('/owner/AdministrarEventosPantalla');
+      Alert.alert("Éxito", "Evento creado correctamente.");
+      router.push("/owner/AdministrarEventosPantalla");
     } catch (err: any) {
       const msg = err?.message || extractBackendMessage(err);
-      Alert.alert('Error', String(msg));
+      Alert.alert("Error", String(msg));
     }
   }, [
     userId,
@@ -1728,11 +2222,17 @@ export default function CreateEventScreen() {
       .slice(0, 8);
   }, [artistInput, allArtists, selectedArtists]);
 
-  const totalPerDay = useCallback((d: DayTickets) =>
-    (parseInt(d.genQty || "0", 10) || 0) + (parseInt(d.vipQty || "0", 10) || 0)
-  , []);
+  const totalPerDay = useCallback(
+    (d: DayTickets) =>
+      (parseInt(d.genQty || "0", 10) || 0) +
+      (parseInt(d.vipQty || "0", 10) || 0),
+    []
+  );
 
-  const grandTotal = useMemo(() => daysTickets.reduce((acc, d) => acc + totalPerDay(d), 0), [daysTickets, totalPerDay]);
+  const grandTotal = useMemo(
+    () => daysTickets.reduce((acc, d) => acc + totalPerDay(d), 0),
+    [daysTickets, totalPerDay]
+  );
 
   /* Multimedia */
   const handleSelectPhoto = useCallback(async () => {
@@ -1758,10 +2258,8 @@ export default function CreateEventScreen() {
       }
 
       const res = await ImagePicker.launchImageLibraryAsync({
-  mediaTypes: 'images',
-        allowsEditing: true,
-        quality: 1,
-        selectionLimit: 1,
+        mediaTypes: 'images',
+        quality: 0.8,
       });
 
       if (res.canceled || !res.assets?.length) return;
@@ -1775,22 +2273,14 @@ export default function CreateEventScreen() {
       let size = 0;
       try {
         const fileInfo: any = await getInfoAsync(uri);
-        if (fileInfo && typeof fileInfo.size === 'number') {
-          size = fileInfo.size;
+        if (fileInfo && typeof fileInfo.size === "number") size = fileInfo.size;
+        if (!size) {
+          // fallback robusto
+          size = await getFileSize(uri).catch(() => 0);
         }
-      } catch (e) {
-        try { console.debug('[handleSelectPhoto] getInfoAsync error', e); } catch {}
+      } finally {
+        setIsCheckingImage(false);
       }
-
-      if (!size) {
-        // fallback robusto
-        size = await getFileSize(uri).catch((e) => {
-          try { console.debug('[handleSelectPhoto] getFileSize fallback error', e); } catch {}
-          return 0;
-        });
-      }
-
-      setIsCheckingImage(false);
 
       if (!size || size === 0) {
         Alert.alert(
@@ -1801,6 +2291,10 @@ export default function CreateEventScreen() {
       }
 
       if (size > MAX_IMAGE_BYTES) {
+        // marcar como demasiado grande, limpiar cualquier preview previa y bloquear submit
+        setPhotoFile(null);
+        setPhotoTooLarge(true);
+        setPhotoFileSize(size);
         Alert.alert("Error", "La imagen supera los 2MB permitidos.");
         return; // NO seteamos photoFile
       }
@@ -1809,17 +2303,27 @@ export default function CreateEventScreen() {
       const filename = asset.fileName || uri.split("/").pop() || "";
       const allowed = isAllowedExt(filename) || isAllowedExt(uri);
       if (!allowed) {
-        Alert.alert("Formato no soportado", "La imagen debe ser JPG, JPEG o PNG.");
+        Alert.alert(
+          "Formato no soportado",
+          "La imagen debe ser JPG, JPEG o PNG."
+        );
         return; // NO seteamos photoFile
       }
 
-      // Si pasó validaciones, setear photoFile
-      try { console.debug('[handleSelectPhoto] selected image OK', { uri }); } catch {}
+      // Si pasó validaciones, setear photoFile y limpiar flags de tamaño
+      setPhotoTooLarge(false);
+      setPhotoFileSize(null);
       setPhotoFile(uri);
     } catch (e) {
       log.error("ImagePicker error", e);
       Alert.alert("Error", "No se pudo abrir la galería.");
     }
+  }, []);
+
+  const handleDeletePhoto = useCallback(() => {
+    setPhotoFile(null);
+    setPhotoTooLarge(false);
+    setPhotoFileSize(null);
   }, []);
 
   /* ================= Render ================= */
@@ -1832,9 +2336,11 @@ export default function CreateEventScreen() {
       <Portal>
         {showUpgradePopup && (
           <View style={styles.portalWrapper} pointerEvents="box-none">
-            {Platform.OS === 'ios' ? (
+            {Platform.OS === "ios" ? (
               <BlurView intensity={20} style={styles.modalBlurBackdrop}>
-                <PopUpOrganizadorIOS onClose={() => setShowUpgradePopup(false)} />
+                <PopUpOrganizadorIOS
+                  onClose={() => setShowUpgradePopup(false)}
+                />
               </BlurView>
             ) : (
               <View style={styles.modalBackdrop} pointerEvents="box-none">
@@ -1847,8 +2353,13 @@ export default function CreateEventScreen() {
                 />
                 {/* Semi-transparent dark overlay to increase contrast but low enough to let blur show */}
                 <View style={styles.darkOverlay} />
-                <View style={styles.modalContentWrapper} pointerEvents="box-none">
-                  <PopUpOrganizadorAndroid onClose={() => setShowUpgradePopup(false)} />
+                <View
+                  style={styles.modalContentWrapper}
+                  pointerEvents="box-none"
+                >
+                  <PopUpOrganizadorAndroid
+                    onClose={() => setShowUpgradePopup(false)}
+                  />
                 </View>
               </View>
             )}
@@ -1875,16 +2386,32 @@ export default function CreateEventScreen() {
         {mustShowLogin ? (
           <View style={{ width: "100%" }}>
             <View style={styles.divider} />
-            <Text style={styles.subtitle}>Para crear un evento debes iniciar sesión.</Text>
-            <TouchableOpacity style={[styles.button, styles.loginButton]} onPress={() => {}}>
+            <Text style={styles.subtitle}>
+              Para crear un evento debes iniciar sesión.
+            </Text>
+            <TouchableOpacity
+              style={[styles.button, styles.loginButton]}
+              onPress={() => {}}
+            >
               <Text style={styles.buttonText}>Iniciar sesión</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, styles.registerButton]} onPress={() => {}}>
+            <TouchableOpacity
+              style={[styles.button, styles.registerButton]}
+              onPress={() => {}}
+            >
               <Text style={styles.buttonText}>Registrarme</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, styles.googleButton]} onPress={() => {}}>
+            <TouchableOpacity
+              style={[styles.button, styles.googleButton]}
+              onPress={() => {}}
+            >
               <View style={styles.googleButtonContent}>
-                <MaterialCommunityIcons name="google" size={20} color={COLORS.info} style={{ marginRight: 8 }} />
+                <MaterialCommunityIcons
+                  name="google"
+                  size={20}
+                  color={COLORS.info}
+                  style={{ marginRight: 8 }}
+                />
                 <Text style={styles.googleButtonText}>Login con Google</Text>
               </View>
             </TouchableOpacity>
@@ -1894,9 +2421,18 @@ export default function CreateEventScreen() {
             <TitlePers text="Crear Evento" />
             <View style={styles.divider} />
             {creationError ? (
-              <View style={{ padding: 12, backgroundColor: '#fdecea', borderRadius: 8, marginBottom: 10 }}>
-                <Text style={{ color: '#611a15', fontWeight: '600' }}>Error creando evento</Text>
-                <Text style={{ color: '#611a15' }}>{creationError}</Text>
+              <View
+                style={{
+                  padding: 12,
+                  backgroundColor: "#fdecea",
+                  borderRadius: 8,
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ color: "#611a15", fontWeight: "600" }}>
+                  Error creando evento
+                </Text>
+                <Text style={{ color: "#611a15" }}>{creationError}</Text>
               </View>
             ) : null}
             <Text style={styles.h2}>Datos del evento</Text>
@@ -1962,14 +2498,16 @@ export default function CreateEventScreen() {
               setShowLocalities={setShowLocalities}
               handleSelectProvince={async (id: string, name: string) => {
                 handleSelectProvinceCallback(id, name);
-                if (id === '02') {
+                if (id === "02") {
                   setShowMunicipalities(false);
                   setMunicipalities([]);
-                  setMunicipalityId('02');
-                  setMunicipalityName('Ciudad Autónoma de Buenos Aires');
+                  setMunicipalityId("02");
+                  setMunicipalityName("Ciudad Autónoma de Buenos Aires");
                   setLocalityLoading(true);
                   try {
-                    const { fetchLocalitiesByProvince } = await import('@/utils/georef/georefHelpers');
+                    const { fetchLocalitiesByProvince } = await import(
+                      "@/utils/georef/georefHelpers"
+                    );
                     const locs = await fetchLocalitiesByProvince(id);
                     setLocalities(locs || []);
                   } catch (e) {
@@ -1981,7 +2519,7 @@ export default function CreateEventScreen() {
               }}
               handleSelectMunicipality={handleSelectMunicipalityCallback}
               handleSelectLocality={handleSelectLocalityCallback}
-              allowLocalitiesWithoutMunicipality={provinceId === '02'}
+              allowLocalitiesWithoutMunicipality={provinceId === "02"}
             />
             <Text style={styles.h2}>Descripción</Text>
             <DescriptionField
@@ -1989,6 +2527,28 @@ export default function CreateEventScreen() {
               onChange={setEventDescription}
             />
             <Text style={styles.h2}>Fecha y hora del evento</Text>
+            <Text
+              style={[styles.link, { marginBottom: 6 }]}
+              onPress={() => {
+                try {
+                  (daySchedules || []).forEach((d, i) => {
+                    const s = d?.start ? new Date(d.start) : null;
+                    const e = d?.end ? new Date(d.end) : null;
+                    const sDay = s ? s.toLocaleDateString() : "-";
+                    const sTime = s ? s.toLocaleTimeString() : "-";
+                    const eDay = e ? e.toLocaleDateString() : "-";
+                    const eTime = e ? e.toLocaleTimeString() : "-";
+                    console.log(
+                      `Dia ${i + 1}, inicio ${sDay} hora: ${sTime}  y finalizacion dia ${eDay} y hora ${eTime}`
+                    );
+                  });
+                } catch (e) {
+                  console.log("[DEBUG] Error creando payload de fechas/horas:", e);
+                }
+              }}
+            >
+              Ver fecha y hora (console)
+            </Text>
             <ScheduleSection
               daySchedules={daySchedules}
               setSchedule={setSchedule}
@@ -2003,6 +2563,28 @@ export default function CreateEventScreen() {
               }
             />
             <Text style={styles.h2}>Configuración de entradas</Text>
+            <Text
+              style={[styles.link, { marginBottom: 6 }]}
+              onPress={() => {
+                try {
+                  (daySaleConfigs || []).forEach((d, i) => {
+                    const s = d?.saleStart ? new Date(d.saleStart) : null;
+                    const e = d?.sellUntil ? new Date(d.sellUntil) : null;
+                    const sDay = s ? s.toLocaleDateString() : "-";
+                    const sTime = s ? s.toLocaleTimeString() : "-";
+                    const eDay = e ? e.toLocaleDateString() : "-";
+                    const eTime = e ? e.toLocaleTimeString() : "-";
+                    console.log(
+                      `Dia ${i + 1}, inicio ${sDay} hora: ${sTime}  y finalizacion dia ${eDay} y hora ${eTime}`
+                    );
+                  });
+                } catch (e) {
+                  console.log("[DEBUG] Error creando payload de venta:", e);
+                }
+              }}
+            >
+              Ver fechas de venta (console)
+            </Text>
             <TicketConfigSection
               daySaleConfigs={daySaleConfigs}
               setSaleCfg={setSaleCfg}
@@ -2013,8 +2595,12 @@ export default function CreateEventScreen() {
               videoLink={videoLink}
               musicLink={musicLink}
               onSelectPhoto={handleSelectPhoto}
+              onDeletePhoto={photoFile ? handleDeletePhoto : undefined}
               onChangeVideo={setVideoLink}
               onChangeMusic={setMusicLink}
+              isChecking={isCheckingImage}
+              photoTooLarge={photoTooLarge}
+              photoFileSize={photoFileSize}
             />
             <View style={styles.card}>
               <TouchableOpacity
@@ -2026,19 +2612,35 @@ export default function CreateEventScreen() {
                 />
                 <Text style={styles.checkText}>
                   Acepto{" "}
-                  <Text style={styles.link} onPress={() => {
-                    openTycModal();
-                  }}>
+                  <Text
+                    style={styles.link}
+                    onPress={() => {
+                      openTycModal();
+                    }}
+                  >
                     términos y condiciones
                   </Text>
                 </Text>
               </TouchableOpacity>
 
+              {photoTooLarge && (
+                <Text style={{ color: COLORS.negative, marginBottom: 8 }}>
+                  La imagen seleccionada excede los 2MB. Seleccioná otra imagen.
+                </Text>
+              )}
               <TouchableOpacity
-                style={styles.submitButton}
+                style={[
+                  styles.submitButton,
+                  (!photoFile || photoTooLarge || !acceptedTC) && { opacity: 0.5 },
+                ]}
                 onPress={async () => {
                   const ok = validateBeforeSubmit();
                   if (!ok) return;
+                  // No permitir submit si la imagen es demasiado grande o no hay foto
+                  if (!photoFile || photoTooLarge) {
+                    Alert.alert("Foto inválida", "Debés seleccionar una imagen válida de menos de 2MB.");
+                    return;
+                  }
                   setCreating(true);
                   try {
                     await handleSubmit();
@@ -2046,6 +2648,7 @@ export default function CreateEventScreen() {
                     setCreating(false);
                   }
                 }}
+                disabled={!photoFile || photoTooLarge || !acceptedTC}
               >
                 <Text style={styles.submitButtonText}>CREAR EVENTO</Text>
               </TouchableOpacity>
@@ -2066,11 +2669,13 @@ export default function CreateEventScreen() {
       <Portal>
         {tycVisible && (
           <View style={styles.portalWrapper} pointerEvents="box-none">
-            {Platform.OS === 'ios' ? (
+            {Platform.OS === "ios" ? (
               <BlurView intensity={20} style={styles.modalBlurBackdrop}>
                 <View style={styles.modalCard}>
                   <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>Términos y Condiciones</Text>
+                    <Text style={styles.modalTitle}>
+                      Términos y Condiciones
+                    </Text>
                     <TouchableOpacity onPress={() => setTycVisible(false)}>
                       <MaterialCommunityIcons
                         name="close"
@@ -2084,7 +2689,9 @@ export default function CreateEventScreen() {
                     {tycLoading && (
                       <View style={styles.center}>
                         <ActivityIndicator />
-                        <Text style={{ marginTop: 8, color: COLORS.textSecondary }}>
+                        <Text
+                          style={{ marginTop: 8, color: COLORS.textSecondary }}
+                        >
                           Cargando…
                         </Text>
                       </View>
@@ -2098,7 +2705,9 @@ export default function CreateEventScreen() {
                     )}
                     {!tycLoading && tycError && (
                       <View style={styles.center}>
-                        <Text style={{ color: COLORS.negative, marginBottom: 8 }}>
+                        <Text
+                          style={{ color: COLORS.negative, marginBottom: 8 }}
+                        >
                           {tycError}
                         </Text>
                         <TouchableOpacity
@@ -2114,7 +2723,8 @@ export default function CreateEventScreen() {
                         {(() => {
                           let WebViewComp: any = null;
                           try {
-                            WebViewComp = require("react-native-webview").WebView;
+                            WebViewComp =
+                              require("react-native-webview").WebView;
                           } catch {}
                           if (WebViewComp) {
                             return (
@@ -2174,10 +2784,15 @@ export default function CreateEventScreen() {
                   collapsable={false}
                 />
                 <View style={styles.darkOverlay} />
-                <View style={styles.modalContentWrapper} pointerEvents="box-none">
+                <View
+                  style={styles.modalContentWrapper}
+                  pointerEvents="box-none"
+                >
                   <View style={styles.modalCard}>
                     <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>Términos y Condiciones</Text>
+                      <Text style={styles.modalTitle}>
+                        Términos y Condiciones
+                      </Text>
                       <TouchableOpacity onPress={() => setTycVisible(false)}>
                         <MaterialCommunityIcons
                           name="close"
@@ -2191,7 +2806,12 @@ export default function CreateEventScreen() {
                       {tycLoading && (
                         <View style={styles.center}>
                           <ActivityIndicator />
-                          <Text style={{ marginTop: 8, color: COLORS.textSecondary }}>
+                          <Text
+                            style={{
+                              marginTop: 8,
+                              color: COLORS.textSecondary,
+                            }}
+                          >
                             Cargando…
                           </Text>
                         </View>
@@ -2205,7 +2825,9 @@ export default function CreateEventScreen() {
                       )}
                       {!tycLoading && tycError && (
                         <View style={styles.center}>
-                          <Text style={{ color: COLORS.negative, marginBottom: 8 }}>
+                          <Text
+                            style={{ color: COLORS.negative, marginBottom: 8 }}
+                          >
                             {tycError}
                           </Text>
                           <TouchableOpacity
@@ -2221,7 +2843,8 @@ export default function CreateEventScreen() {
                           {(() => {
                             let WebViewComp: any = null;
                             try {
-                              WebViewComp = require("react-native-webview").WebView;
+                              WebViewComp =
+                                require("react-native-webview").WebView;
                             } catch {}
                             if (WebViewComp) {
                               return (
@@ -2254,7 +2877,8 @@ export default function CreateEventScreen() {
                                     marginBottom: 10,
                                   }}
                                 >
-                                  No se pudo incrustar el PDF en este dispositivo.
+                                  No se pudo incrustar el PDF en este
+                                  dispositivo.
                                 </Text>
                                 <TouchableOpacity
                                   style={styles.fileBtn}
@@ -2344,7 +2968,7 @@ const styles = StyleSheet.create({
   totalLine: { marginTop: 10, fontWeight: "600", color: COLORS.textPrimary },
 
   modalBackdrop: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -2359,17 +2983,17 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   portalWrapper: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     zIndex: 9999,
   },
   absoluteFill: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -2377,19 +3001,19 @@ const styles = StyleSheet.create({
   },
   modalContentWrapper: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
+    justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
     padding: 16,
     zIndex: 10001,
   },
   darkOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: "rgba(0,0,0,0.35)",
   },
   modalCard: {
     backgroundColor: COLORS.cardBg,

@@ -1,17 +1,8 @@
 // src/screens/admin/EventsValidateScreens/EventsToValidateScreen.tsx
 
 import React, { useEffect, useState } from "react";
-import {
-  SafeAreaView,
-  View,
-  Text,
-  FlatList,
-  Image,
-  TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
-  StyleSheet,
-} from "react-native";
+import { View, Text, FlatList, Image, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
 import { ROUTES } from "../../../routes";
 import * as nav from "@/utils/navigation";
@@ -56,19 +47,21 @@ export default function EventsToValidateScreen() {
       try {
         setLoading(true);
         const data = await fetchEvents(0); // ahora pedimos Estado = 0
-        // Asegurar que sólo guardamos eventos con estado 0 (por aprobar).
-        // No filtramos por imagen aquí para no ocultar resultados; la UI puede mostrar
-        // un placeholder o marcar que falta imagen.
+        // Asegurar que sólo guardamos eventos con estado 0 (por aprobar)
+        // y que además tengan imagen para mostrarse en esta vista.
         const filteredByState = Array.isArray(data)
           ? data.filter((ev: any) => {
               // Preferir cdEstado cuando esté disponible (raw API), si no usar estado normalizado
               const isCdEstadoZero = ev?.cdEstado === 0 || String(ev?.cdEstado) === "0";
               const isEstadoZero = ev?.estado === 0 || String(ev?.estado) === "0";
-              // Aceptamos cualquier evento con estado 0; no filtramos por imagen aquí.
+              // Aceptamos cualquier evento con estado 0.
               return isCdEstadoZero || isEstadoZero;
             })
           : [];
-        setEvents(filteredByState);
+        const withImages = filteredByState.filter((ev: any) =>
+          typeof ev?.imageUrl === "string" && ev.imageUrl.trim().length > 0
+        );
+        setEvents(withImages);
       } catch (e) {
         console.error("Error al cargar eventos:", e);
       } finally {

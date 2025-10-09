@@ -17,8 +17,8 @@ describe('MediaSection', () => {
       />
     );
 
-    // El texto del botón no debe estar (porque muestra ActivityIndicator en su lugar)
-    expect(() => getByText('SELECCIONAR ARCHIVO')).toThrow();
+  // El texto del botón no debe estar (porque muestra ActivityIndicator en su lugar)
+  expect(() => getByText('Seleccionar imagen')).toThrow();
 
     // El botón está deshabilitado y se muestra loading
   const btn = getByTestId('select-button');

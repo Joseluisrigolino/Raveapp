@@ -1,20 +1,10 @@
 // src/screens/admin/EventsValidateScreens/ValidateEventScreen.tsx
 
 import React, { useState, useEffect } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TextInput,
-  TouchableOpacity,
-  Modal,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Modal } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import InputDesc from "@/components/common/inputDesc";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
@@ -236,12 +226,17 @@ export default function ValidateEventScreen() {
 
           <Text style={[styles.rejectTitle, { marginTop: 12 }]}>Motivo de rechazo</Text>
           <Text style={styles.rejectSubtitle}>Es obligatorio escribir un motivo si vas a rechazar el evento. Este motivo se enviará al equipo y al creador del evento vía mail y quedará registrado.</Text>
-          <TextInput
-            style={styles.rejectInput}
-            multiline
-            placeholder="Escribí el motivo..."
+          <InputDesc
+            label="Motivo de rechazo"
             value={rejectReason}
+            isEditing={true}
+            onBeginEdit={() => {}}
             onChangeText={setRejectReason}
+            placeholder="Escribí el motivo..."
+            autoFocus={false}
+            containerStyle={{ width: "100%", alignItems: "stretch" }}
+            labelStyle={{ width: "100%", textAlign: "left" }}
+            inputStyle={{ width: "100%" }}
           />
 
           {/* Confirmación modal antes de rechazar */}

@@ -1,17 +1,8 @@
 // src/screens/admin/NewArtistScreen.tsx
 
 import React, { useState } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Image,
-  Alert,
-} from "react-native";
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Image, Alert } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import { useRouter } from "expo-router";
@@ -24,6 +15,8 @@ import {
 } from "@/utils/artists/artistApi";
 import { mediaApi } from "@/utils/mediaApi";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import InputText from "@/components/common/inputText";
+import InputDesc from "@/components/common/inputDesc";
 
 export default function NewArtistScreen() {
   const router = useRouter();
@@ -88,7 +81,7 @@ export default function NewArtistScreen() {
           type: fileType,
         };
 
-        await mediaApi.upload(creado.idArtista, file);
+  await mediaApi.upload(creado.idArtista, file, undefined, { compress: true });
       }
 
       Alert.alert("Éxito", "Artista creado correctamente.");
@@ -109,12 +102,15 @@ export default function NewArtistScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Ingresar nuevo artista</Text>
 
-        <Text style={styles.label}>Nombre del artista:</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Nombre"
+        <InputText
+          label="Nombre del artista"
           value={name}
+          isEditing={true}
+          onBeginEdit={() => {}}
           onChangeText={setName}
+          containerStyle={{ width: "100%", alignItems: "stretch" }}
+          labelStyle={{ width: "100%", textAlign: "left" }}
+          inputStyle={{ width: "100%" }}
         />
 
         <Text style={styles.label}>Foto del artista:</Text>
@@ -156,37 +152,52 @@ export default function NewArtistScreen() {
           </Text>
         </View>
 
-        <Text style={styles.label}>Información sobre el artista:</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          placeholder="Escribí información sobre el artista"
-          multiline
+        <InputDesc
+          label="Información sobre el artista"
           value={description}
+          isEditing={true}
+          onBeginEdit={() => {}}
           onChangeText={setDescription}
+          autoFocus={false}
+          containerStyle={{ width: "100%", alignItems: "stretch" }}
+          labelStyle={{ width: "100%", textAlign: "left" }}
+          inputStyle={{ width: "100%" }}
         />
 
-        <Text style={styles.label}>URL del Instagram del artista:</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="URL de Instagram"
+        <InputText
+          label="URL del Instagram del artista"
           value={instagramURL}
+          isEditing={true}
+          onBeginEdit={() => {}}
           onChangeText={setInstagramURL}
+          keyboardType="url"
+          containerStyle={{ width: "100%", alignItems: "stretch" }}
+          labelStyle={{ width: "100%", textAlign: "left" }}
+          inputStyle={{ width: "100%" }}
         />
 
-        <Text style={styles.label}>URL del SoundCloud del artista:</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="URL de SoundCloud"
+        <InputText
+          label="URL del SoundCloud del artista"
           value={soundcloudURL}
+          isEditing={true}
+          onBeginEdit={() => {}}
           onChangeText={setSoundcloudURL}
+          keyboardType="url"
+          containerStyle={{ width: "100%", alignItems: "stretch" }}
+          labelStyle={{ width: "100%", textAlign: "left" }}
+          inputStyle={{ width: "100%" }}
         />
 
-        <Text style={styles.label}>URL del Spotify del artista:</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="URL de Spotify"
+        <InputText
+          label="URL del Spotify del artista"
           value={spotifyURL}
+          isEditing={true}
+          onBeginEdit={() => {}}
           onChangeText={setSpotifyURL}
+          keyboardType="url"
+          containerStyle={{ width: "100%", alignItems: "stretch" }}
+          labelStyle={{ width: "100%", textAlign: "left" }}
+          inputStyle={{ width: "100%" }}
         />
 
         <TouchableOpacity style={styles.btn} onPress={handleCreateArtist}>
@@ -221,19 +232,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 4,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
-    borderRadius: RADIUS.card,
-    padding: 10,
-    backgroundColor: COLORS.cardBg,
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: "top",
-  },
+  // input styles now provided by shared components
   imageContainer: {
     alignItems: "center",
     marginVertical: 16,

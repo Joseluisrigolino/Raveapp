@@ -1,17 +1,8 @@
 // src/screens/login/RegisterUserScreen.tsx
 
 import React, { useState } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  StyleSheet,
-  Alert,
-  TouchableWithoutFeedback,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
+import { ScrollView, View, StyleSheet, Alert, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Text, TextInput, Button, useTheme, HelperText, Menu } from "react-native-paper";
 import { useRouter } from "expo-router";
 import * as nav from "@/utils/navigation";

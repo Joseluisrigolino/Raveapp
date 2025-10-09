@@ -1,23 +1,19 @@
 import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  Image,
-  StyleSheet,
-  ActivityIndicator,
-} from "react-native";
+import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator } from "react-native";
 import { COLORS, RADIUS } from "@/styles/globalStyles";
+import InputText from "@/components/common/inputText";
 
 interface Props {
   photoFile: string | null;
   videoLink: string;
   musicLink: string;
   onSelectPhoto: () => void;
+  onDeletePhoto?: () => void;
   onChangeVideo: (t: string) => void;
   onChangeMusic: (t: string) => void;
   isChecking?: boolean;
+  photoTooLarge?: boolean;
+  photoFileSize?: number | null;
 }
 
 export default function MediaSection({
@@ -28,6 +24,9 @@ export default function MediaSection({
   onChangeVideo,
   onChangeMusic,
   isChecking = false,
+  photoTooLarge = false,
+  photoFileSize = null,
+  onDeletePhoto,
 }: Props) {
   return (
     <View style={styles.card}>
@@ -44,7 +43,7 @@ export default function MediaSection({
           {isChecking ? (
             <ActivityIndicator testID="select-loading" color="#fff" />
           ) : (
-            <Text style={styles.fileBtnText}>SELECCIONAR ARCHIVO</Text>
+            <Text style={styles.fileBtnText}>Seleccionar imagen</Text>
           )}
         </TouchableOpacity>
         <Text style={styles.fileName}>
@@ -55,29 +54,51 @@ export default function MediaSection({
         La imagen debe pesar menos de 2MB y ser JPG, JPEG o PNG
       </Text>
 
-      {photoFile && (
-        <View style={{ marginTop: 10 }}>
-          <Text style={styles.label}>Previsualización:</Text>
-          <Image source={{ uri: photoFile }} style={styles.previewImage} />
-        </View>
-      )}
+      <View style={{ marginTop: 10 }}>
+        <Text style={styles.label}>Previsualización:</Text>
+        {photoTooLarge ? (
+          <View style={[styles.previewImage, styles.previewTooLarge]}>
+            <Text style={styles.tooLargeText}>
+              La imagen seleccionada pesa más de 2MB ({photoFileSize ? `${Math.round(photoFileSize/1024)} KB` : ""}).
+            </Text>
+            <Text style={styles.tooLargeSub}>Seleccioná otra imagen más liviana.</Text>
+          </View>
+        ) : photoFile ? (
+          <>
+            <Image source={{ uri: photoFile }} style={styles.previewImage} />
+            {onDeletePhoto ? (
+              <TouchableOpacity style={styles.deleteButton} onPress={onDeletePhoto}>
+                <Text style={styles.deleteButtonText}>Eliminar imagen</Text>
+              </TouchableOpacity>
+            ) : null}
+          </>
+        ) : (
+          <View style={[styles.previewImage, styles.previewEmpty]} />
+        )}
+      </View>
 
-      <Text style={[styles.label, { marginTop: 12 }]}>Video (opcional)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Pega el link de YouTube aquí"
+      <InputText
+        label="Video (opcional)"
         value={videoLink}
+        isEditing={true}
+        onBeginEdit={() => {}}
         onChangeText={onChangeVideo}
+        placeholder="Pega el link de YouTube aquí"
+        keyboardType="url"
+        labelStyle={{ width: "100%" }}
+        inputStyle={{ width: "100%" }}
       />
 
-      <Text style={[styles.label, { marginTop: 12 }]}>
-        Música (SoundCloud – opcional)
-      </Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Pega el link de SoundCloud aquí"
+      <InputText
+        label="Música (SoundCloud – opcional)"
         value={musicLink}
+        isEditing={true}
+        onBeginEdit={() => {}}
         onChangeText={onChangeMusic}
+        placeholder="Pega el link de SoundCloud aquí"
+        keyboardType="url"
+        labelStyle={{ width: "100%", marginTop: 12 }}
+        inputStyle={{ width: "100%" }}
       />
     </View>
   );
@@ -109,20 +130,46 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.card,
     resizeMode: "cover",
   },
+  deleteButton: {
+    backgroundColor: COLORS.negative,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: RADIUS.card,
+    marginTop: 10,
+    alignSelf: 'flex-start',
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  previewEmpty: {
+    backgroundColor: COLORS.backgroundLight,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+  },
+  previewTooLarge: {
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 8,
+  },
+  tooLargeText: {
+    color: COLORS.negative,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  tooLargeSub: {
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    fontSize: 12,
+  },
   label: {
     fontWeight: "700",
     color: COLORS.textPrimary,
     marginBottom: 6,
-  },
-  input: {
-    width: "100%",
-    backgroundColor: COLORS.backgroundLight,
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
-    borderRadius: RADIUS.card,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: COLORS.textPrimary,
   },
   hint: { color: COLORS.textSecondary, fontSize: 12, marginTop: 6 },
 });

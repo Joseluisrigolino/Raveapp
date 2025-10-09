@@ -1,21 +1,7 @@
 // app/owner/ModifyEventScreen.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  Image,
-  Modal,
-  ActivityIndicator,
-  Linking,
-  Platform,
-  useColorScheme,
-} from "react-native";
+import { ScrollView, View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, Image, Modal, ActivityIndicator, Linking, Platform, useColorScheme } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";

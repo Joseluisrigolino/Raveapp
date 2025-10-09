@@ -1,19 +1,8 @@
 // src/screens/ArtistsScreens/ArtistScreen.tsx
 
 import React, { useState, useEffect } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  ActivityIndicator,
-  TouchableOpacity,
-  Dimensions,
-  Linking,
-  Alert,
-} from "react-native";
+import { ScrollView, View, Text, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Dimensions, Linking, Alert } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { IconButton, Avatar } from "react-native-paper";
 import { useLocalSearchParams } from "expo-router";
 

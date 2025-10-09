@@ -1,14 +1,9 @@
 // components/events/create/LocationSelector.tsx
 import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  StyleSheet,
-  ScrollView,
-} from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { COLORS, RADIUS } from "@/styles/globalStyles";
+import SelectField from "@/components/common/selectField";
+import InputText from "@/components/common/inputText";
 
 interface Option {
   id: string;
@@ -81,19 +76,17 @@ export default function LocationSelector(props: Props) {
   return (
     <View style={styles.card}>
       {/* Provincia */}
-      <Text style={styles.label}>Provincia</Text>
-      <TouchableOpacity
-        style={styles.dropdownButton}
+      <SelectField
+        label="Provincia"
+        value={provinceName}
+        placeholder="Seleccione una provincia"
         onPress={() => {
           setShowProvinces(!showProvinces);
           setShowMunicipalities(false);
           setShowLocalities(false);
         }}
-      >
-        <Text style={styles.dropdownText}>
-          {provinceName || "Seleccione una provincia"}
-        </Text>
-      </TouchableOpacity>
+        isOpen={showProvinces}
+      />
       {showProvinces && (
         <View style={styles.dropdownContainer}>
           <ScrollView
@@ -118,20 +111,18 @@ export default function LocationSelector(props: Props) {
       {/* Municipio: ocultar completamente si la provincia es CABA (02) */}
       {provinceId !== '02' && (
         <>
-          <Text style={styles.label}>Municipio</Text>
-          <TouchableOpacity
-            style={styles.dropdownButton}
-            disabled={!provinceId}
+          <SelectField
+            label="Municipio"
+            value={municipalityName}
+            placeholder="Seleccione un municipio"
             onPress={() => {
               setShowMunicipalities(!showMunicipalities);
               setShowProvinces(false);
               setShowLocalities(false);
             }}
-          >
-            <Text style={[styles.dropdownText, !provinceId && { opacity: 0.5 }]}>
-              {municipalityName || "Seleccione un municipio"}
-            </Text>
-          </TouchableOpacity>
+            disabled={!provinceId}
+            isOpen={showMunicipalities}
+          />
           {showMunicipalities && (
             <View style={styles.dropdownContainer}>
               <ScrollView
@@ -156,23 +147,18 @@ export default function LocationSelector(props: Props) {
       )}
 
       {/* Localidad */}
-      <Text style={styles.label}>Localidad</Text>
-      <TouchableOpacity
-        style={styles.dropdownButton}
-        disabled={!municipalityId && !allowLocalitiesWithoutMunicipality}
+      <SelectField
+        label="Localidad"
+        value={localityName}
+        placeholder="Seleccione una localidad"
         onPress={() => {
           setShowLocalities(!showLocalities);
           setShowProvinces(false);
           setShowMunicipalities(false);
         }}
-      >
-        <Text style={[
-          styles.dropdownText,
-          !municipalityId && !allowLocalitiesWithoutMunicipality && { opacity: 0.5 }
-        ]}>
-          {localityName || "Seleccione una localidad"}
-        </Text>
-      </TouchableOpacity>
+        disabled={!municipalityId && !allowLocalitiesWithoutMunicipality}
+        isOpen={showLocalities}
+      />
       {showLocalities && (
         <View style={styles.dropdownContainer}>
           <ScrollView
@@ -195,12 +181,15 @@ export default function LocationSelector(props: Props) {
       )}
 
       {/* Dirección */}
-      <Text style={styles.label}>Dirección</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Dirección del evento"
+      <InputText
+        label="Dirección"
         value={street}
+        isEditing={true}
+        onBeginEdit={() => {}}
         onChangeText={setStreet}
+        placeholder="Dirección del evento"
+        labelStyle={{ width: "100%", alignSelf: "flex-start", marginLeft: 2 }}
+        inputStyle={{ width: "100%" }}
       />
 
       {/* Flags */}
@@ -240,50 +229,7 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 6,
   },
-  input: {
-    width: "90%",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    height: 56,
-    color: "#374151",
-    marginBottom: 4,
-    alignSelf: 'center',
-    // Shadow ligero
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 1,
-  },
-
-  // dropdowns
-  dropdownButton: {
-    width: "90%",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderColor: "#d1d5db",
-    borderWidth: 1,
-    minHeight: 48,
-    padding: 12,
-    marginBottom: 4,
-    justifyContent: 'center',
-    alignSelf: 'center',
-    // Shadow ligero
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  dropdownText: { 
-    color: "#374151",
-    fontSize: 14,
-    fontWeight: '500',
-  },
+  // dropdowns (legacy styles retained for container lists)
   dropdownContainer: {
     width: "90%",
     backgroundColor: "#fff",

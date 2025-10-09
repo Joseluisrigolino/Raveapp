@@ -1,15 +1,7 @@
 // app/main/TicketsScreens/TicketFinalizedScreen.tsx
 import React, { useState, useEffect } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  Image,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-  TextInput,
-} from "react-native";
+import { ScrollView, Image, Text, StyleSheet, TouchableOpacity, View, TextInput } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 

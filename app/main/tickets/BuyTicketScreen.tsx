@@ -1,14 +1,7 @@
 // src/screens/BuyTicketScreen.tsx
 import React, { useState, useEffect } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-} from "react-native";
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, TextInput } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";

@@ -1,18 +1,7 @@
 // src/screens/UserProfileEditScreen.tsx
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  Image,
-  Modal,
-} from "react-native";
+import { ScrollView, View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert, Image, Modal } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Menu } from "react-native-paper";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
@@ -28,6 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getProfile, updateUsuario } from "@/utils/auth/userHelpers";
 import { mediaApi } from "@/utils/mediaApi";
 import { apiClient } from "@/utils/apiConfig";
+import InputText from "@/components/common/inputText";
 
 // Georef
 import {
@@ -405,7 +395,7 @@ export default function UserProfileEditScreen() {
         name: fileName,
         type: "image/jpeg",
       };
-      await mediaApi.upload(apiUser.idUsuario, file);
+  await mediaApi.upload(apiUser.idUsuario, file, undefined, { compress: true });
 
       const media = await mediaApi.getByEntidad(apiUser.idUsuario);
       const m = media?.media?.[0];
@@ -653,74 +643,7 @@ export default function UserProfileEditScreen() {
     );
   }
 
-  // Render auxiliar
-  const RenderEditableField = ({
-    label,
-    value,
-    modeKey,
-    keyboardType,
-    onChangeText,
-  }: {
-    label: string;
-    value: string;
-    modeKey: keyof typeof editMode | string;
-    keyboardType?:
-      | "default"
-      | "email-address"
-      | "numeric"
-      | "phone-pad"
-      | "number-pad";
-    onChangeText: (t: string) => void;
-  }) => {
-    const isEditing = !!editMode[modeKey as string];
-    const inputRef = useRef<TextInput | null>(null);
-
-    // cuando isEditing pasa a true, enfocamos el input automáticamente
-    useEffect(() => {
-      if (isEditing && inputRef.current) {
-        setTimeout(() => inputRef.current && inputRef.current.focus(), 50);
-      }
-    }, [isEditing]);
-    
-    // Saltear el renderizado para birthdate ya que se maneja por separado
-    if (modeKey === "birthdate") {
-      return null;
-    }
-    
-    return (
-      <>
-        <Text style={styles.addressSubtitle}>{label}</Text>
-        {isEditing ? (
-          <TextInput
-            ref={inputRef}
-            style={styles.inputFull}
-            value={value}
-            onChangeText={onChangeText}
-            keyboardType={keyboardType}
-            placeholder={label}
-            blurOnSubmit={false}
-            autoCorrect={false}
-            selectionColor={COLORS.primary}
-            returnKeyType="done"
-          />
-        ) : (
-          <View style={styles.rowNoLabel}>
-            <Text style={[styles.valueText, { flex: 1 }]}>{value || "–"}</Text>
-            <TouchableOpacity
-              onPress={() => setEditMode((m) => ({ ...m, [modeKey as string]: true }))}
-              style={styles.icon}
-            >
-              <MaterialIcons
-                name="edit"
-                size={20}
-                color={COLORS.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
-        )}
-      </>
-    );
-  };
+  // Render auxiliar movido a componente InputText
 
   return (
     <SafeAreaView style={styles.container}>
@@ -768,36 +691,41 @@ export default function UserProfileEditScreen() {
         </Text>
 
         {/* Mi perfil */}
-        <RenderEditableField
+        <InputText
           label="Nombre"
           value={userData.firstName}
-          modeKey="firstName"
+          isEditing={!!editMode["firstName"]}
+          onBeginEdit={() => setEditMode((m) => ({ ...m, firstName: true }))}
           onChangeText={(t) => onChange("firstName", t)}
         />
-        <RenderEditableField
+        <InputText
           label="Apellido"
           value={userData.lastName}
-          modeKey="lastName"
+          isEditing={!!editMode["lastName"]}
+          onBeginEdit={() => setEditMode((m) => ({ ...m, lastName: true }))}
           onChangeText={(t) => onChange("lastName", t)}
         />
-        <RenderEditableField
+        <InputText
           label="DNI"
           value={userData.dni}
-          modeKey="dni"
+          isEditing={!!editMode["dni"]}
+          onBeginEdit={() => setEditMode((m) => ({ ...m, dni: true }))}
           keyboardType="numeric"
           onChangeText={(t) => onChange("dni", t)}
         />
-        <RenderEditableField
+        <InputText
           label="Teléfono"
           value={userData.phone}
-          modeKey="phone"
+          isEditing={!!editMode["phone"]}
+          onBeginEdit={() => setEditMode((m) => ({ ...m, phone: true }))}
           keyboardType="phone-pad"
           onChangeText={(t) => onChange("phone", t)}
         />
-        <RenderEditableField
+        <InputText
           label="Correo"
           value={userData.email}
-          modeKey="email"
+          isEditing={!!editMode["email"]}
+          onBeginEdit={() => setEditMode((m) => ({ ...m, email: true }))}
           keyboardType="email-address"
           onChangeText={(t) => onChange("email", t)}
         />

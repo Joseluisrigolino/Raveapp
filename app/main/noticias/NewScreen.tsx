@@ -1,16 +1,7 @@
 // screens/NewsScreens/NewScreen.tsx
 import React, { useState, useEffect } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  Linking,
-  TouchableOpacity,
-  ActivityIndicator,
-} from "react-native";
+import { ScrollView, View, Text, Image, StyleSheet, Linking, TouchableOpacity, ActivityIndicator } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as nav from "@/utils/navigation";
 import { ROUTES } from "../../../routes";

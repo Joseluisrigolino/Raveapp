@@ -1,15 +1,8 @@
 // app/main/MenuPantalla.tsx
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
+import { ScrollView, View, Text, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, usePathname } from "expo-router";
 import { ROUTES } from "../../../routes";
 import * as nav from "@/utils/navigation";
@@ -266,6 +259,11 @@ export default function MenuPantalla() {
     if (selectedGenres.length) {
       results = results.filter((ev) => selectedGenres.includes((ev as any).type));
     }
+    // Ocultar eventos sin imagen
+    results = results.filter((ev) => {
+      const url = (ev as any).imageUrl;
+      return typeof url === "string" && url.trim().length > 0;
+    });
     return results;
   }, [
     allEvents,

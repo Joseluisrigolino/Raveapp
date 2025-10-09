@@ -1,17 +1,17 @@
 // src/screens/admin/NewsScreens/CreateNewScreen.tsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  SafeAreaView,
   ScrollView,
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   Image,
   Alert,
+  ActivityIndicator,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { getInfoAsync } from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
@@ -23,16 +23,45 @@ import { fetchEvents } from "@/utils/events/eventApi";
 import { mediaApi } from "@/utils/mediaApi";
 import { emit } from "@/utils/eventBus";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import InputText from "@/components/common/inputText";
+import InputDesc from "@/components/common/inputDesc";
+import SelectField from "@/components/common/selectField";
 
 export default function CreateNewScreen() {
   const router = useRouter();
+  // ================= Constantes y helpers =================
+  const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2MB
+  const ALLOWED_EXTS = useMemo(() => new Set(["jpg", "jpeg", "png"]), []);
+
+  const isAllowedExt = useCallback(
+    (nameOrUri?: string | null): boolean => {
+      if (!nameOrUri) return false;
+      const cleaned = String(nameOrUri).split("?")[0].split("#")[0];
+      const parts = cleaned.split(".");
+      if (parts.length < 2) return false;
+      const ext = parts.pop()!.toLowerCase();
+      return ALLOWED_EXTS.has(ext);
+    },
+    [ALLOWED_EXTS]
+  );
+
+  const extractBackendMessage = (e: any): string =>
+    e?.response?.data?.message ||
+    e?.response?.data?.Message ||
+    e?.response?.data?.error ||
+    e?.message ||
+    "Ocurrió un error.";
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [isPicking, setIsPicking] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [eventos, setEventos] = useState<
     { idEvento: string; nombre: string; imageUrl?: string }[]
   >([]);
-  const [eventoSeleccionado, setEventoSeleccionado] = useState<string | null>(null);
+  const [eventoSeleccionado, setEventoSeleccionado] = useState<string | null>(
+    null
+  );
   const [showEventos, setShowEventos] = useState(false);
 
   useEffect(() => {
@@ -48,70 +77,93 @@ export default function CreateNewScreen() {
       .catch((err) => console.error("Error al cargar eventos:", err));
   }, []);
 
-  const handleSelectImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images',
-      quality: 0.8,
-    });
+  const handleSelectImage = useCallback(async () => {
+    if (isPicking) return;
+    setIsPicking(true);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: "images",
+        quality: 0.8,
+      });
 
-    if (!result.canceled && result.assets.length > 0) {
+      if (result.canceled || !result.assets?.length) return;
+
       const asset = result.assets[0];
-  const fileInfo: any = await getInfoAsync(asset.uri);
+      const uri = asset.uri;
 
-      if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
+      // Validar tamaño (2MB)
+      let size = 0;
+      try {
+        const fileInfo: any = await getInfoAsync(uri);
+        if (fileInfo && typeof fileInfo.size === "number") size = fileInfo.size;
+      } catch {}
+
+      if (size && size > MAX_IMAGE_BYTES) {
         Alert.alert("Error", "La imagen supera los 2MB permitidos.");
         return;
       }
 
-      setImageUri(asset.uri);
-    }
-  };
+      // Validar extensión (JPG/JPEG/PNG)
+      const fileName = asset.fileName || uri.split("/").pop() || "image.jpg";
+      const allowed = isAllowedExt(fileName) || isAllowedExt(uri);
+      if (!allowed) {
+        Alert.alert("Formato no soportado", "La imagen debe ser JPG, JPEG o PNG.");
+        return;
+      }
 
-  const handleDeleteImage = () => {
+      setImageUri(uri);
+    } finally {
+      setIsPicking(false);
+    }
+  }, [isPicking, isAllowedExt]);
+
+  const handleDeleteImage = useCallback(() => {
     setImageUri(null);
-  };
+  }, []);
 
-  const handleCreateNews = async () => {
+  const handleCreateNews = useCallback(async () => {
+    if (isCreating) return;
     if (!title.trim() || !body.trim()) {
-      return Alert.alert("Error", "Título y contenido son obligatorios.");
+      Alert.alert("Error", "Título y contenido son obligatorios.");
+      return;
     }
 
+    setIsCreating(true);
     try {
       const nueva = await createNews({
-        titulo: title,
-        contenido: body,
+        titulo: title.trim(),
+        contenido: body.trim(),
         dtPublicado: new Date().toISOString(),
         urlEvento: eventoSeleccionado
           ? `https://raveapp.com.ar/evento/${eventoSeleccionado}`
           : null,
       });
 
-      if (!nueva?.idNoticia) throw new Error("No se pudo crear la noticia correctamente.");
+      if (!nueva?.idNoticia) {
+        throw new Error("No se pudo crear la noticia correctamente.");
+      }
 
       if (imageUri) {
         const fileName = imageUri.split("/").pop() ?? "image.jpg";
-        const fileType = fileName.endsWith(".png") ? "image/png" : "image/jpeg";
+        const isPng = fileName.toLowerCase().endsWith(".png");
         const file: any = {
           uri: imageUri,
           name: fileName,
-          type: fileType,
+          type: isPng ? "image/png" : "image/jpeg",
         };
-        await mediaApi.upload(nueva.idNoticia, file);
+  await mediaApi.upload(nueva.idNoticia, file, undefined, { compress: true });
       }
 
       Alert.alert("Éxito", "Noticia creada correctamente.");
-  // Notificar al resto de la app que se creó/actualizó una noticia
-  emit("news:updated", { id: nueva.idNoticia });
-  router.back();
+      emit("news:updated", { id: nueva.idNoticia });
+      router.back();
     } catch (err: any) {
       console.error("Error al crear noticia:", err);
-      const msg =
-        typeof err?.response?.data === "string"
-          ? err.response.data
-          : JSON.stringify(err?.response?.data || err, null, 2);
-      Alert.alert("Error al crear noticia", msg);
+      Alert.alert("Error al crear noticia", extractBackendMessage(err));
+    } finally {
+      setIsCreating(false);
     }
-  };
+  }, [isCreating, title, body, imageUri, eventoSeleccionado, extractBackendMessage, router]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -119,12 +171,15 @@ export default function CreateNewScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Crear nueva noticia</Text>
 
-        <Text style={styles.label}>Título:</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Título"
+        <InputText
+          label="Título"
           value={title}
+          isEditing={true}
+          onBeginEdit={() => {}}
           onChangeText={setTitle}
+          containerStyle={{ width: "100%", alignItems: "stretch" }}
+          labelStyle={{ width: "100%", textAlign: "left" }}
+          inputStyle={{ width: "100%" }}
         />
 
         <Text style={styles.label}>Imagen:</Text>
@@ -146,10 +201,18 @@ export default function CreateNewScreen() {
           )}
 
           <TouchableOpacity
-            style={styles.selectImageButton}
+            style={[
+              styles.selectImageButton,
+              isPicking && { opacity: 0.6 },
+            ]}
             onPress={handleSelectImage}
+            disabled={isPicking}
           >
-            <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
+            {isPicking ? (
+              <ActivityIndicator color={COLORS.cardBg} />
+            ) : (
+              <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
+            )}
           </TouchableOpacity>
 
           <Text style={styles.imageNotice}>
@@ -157,26 +220,32 @@ export default function CreateNewScreen() {
           </Text>
         </View>
 
-        <Text style={styles.label}>Contenido:</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          placeholder="Escribí el contenido de la noticia"
-          multiline
+        <InputDesc
+          label="Contenido"
           value={body}
+          isEditing={true}
+          onBeginEdit={() => {}}
           onChangeText={setBody}
+          autoFocus={false}
+          containerStyle={{ width: "100%", alignItems: "stretch" }}
+          labelStyle={{ width: "100%", textAlign: "left" }}
+          inputStyle={{ width: "100%" }}
         />
 
-        <Text style={styles.label}>Evento relacionado (opcional):</Text>
-        <TouchableOpacity
-          style={styles.dropdownButton}
+        <SelectField
+          label="Evento relacionado (opcional)"
+          value={
+            eventoSeleccionado
+              ? eventos.find((e) => e.idEvento === eventoSeleccionado)?.nombre
+              : undefined
+          }
+          placeholder="Seleccioná un evento..."
           onPress={() => setShowEventos(!showEventos)}
-        >
-          <Text style={styles.dropdownText}>
-            {eventoSeleccionado
-              ? eventos.find((e) => e.idEvento === eventoSeleccionado)?.nombre || "Evento seleccionado"
-              : "Seleccioná un evento..."}
-          </Text>
-        </TouchableOpacity>
+          isOpen={showEventos}
+          containerStyle={{ width: "100%", alignItems: "stretch" }}
+          labelStyle={{ width: "100%", textAlign: "left" }}
+          fieldStyle={{ width: "100%" }}
+        />
 
         {showEventos && (
           <View style={styles.dropdownContainer}>
@@ -191,9 +260,14 @@ export default function CreateNewScreen() {
               >
                 <View style={styles.eventItem}>
                   {e.imageUrl ? (
-                    <Image source={{ uri: e.imageUrl }} style={styles.eventImage} />
+                    <Image
+                      source={{ uri: e.imageUrl }}
+                      style={styles.eventImage}
+                    />
                   ) : (
-                    <View style={[styles.eventImage, { backgroundColor: "#ccc" }]} />
+                    <View
+                      style={[styles.eventImage, { backgroundColor: "#ccc" }]}
+                    />
                   )}
                   <Text style={styles.eventName}>{e.nombre}</Text>
                 </View>
@@ -202,8 +276,16 @@ export default function CreateNewScreen() {
           </View>
         )}
 
-        <TouchableOpacity style={styles.btn} onPress={handleCreateNews}>
-          <Text style={styles.btnText}>Crear Noticia</Text>
+        <TouchableOpacity
+          style={[styles.btn, isCreating && { opacity: 0.6 }]}
+          onPress={handleCreateNews}
+          disabled={isCreating}
+        >
+          {isCreating ? (
+            <ActivityIndicator color={COLORS.cardBg} />
+          ) : (
+            <Text style={styles.btnText}>Crear Noticia</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
       <Footer />
@@ -234,19 +316,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 4,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
-    borderRadius: RADIUS.card,
-    padding: 10,
-    backgroundColor: COLORS.cardBg,
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: "top",
-  },
+  // label/input styles now provided by shared components
   imageContainer: {
     alignItems: "center",
     marginVertical: 16,
@@ -295,25 +365,14 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodyRegular,
     textAlign: "center",
   },
-  dropdownButton: {
-    backgroundColor: COLORS.cardBg,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: RADIUS.card,
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
-    marginBottom: 8,
-  },
-  dropdownText: {
-    fontFamily: FONTS.bodyRegular,
-    color: COLORS.textPrimary,
-  },
   dropdownContainer: {
     borderWidth: 1,
     borderColor: COLORS.borderInput,
     borderRadius: RADIUS.card,
     backgroundColor: COLORS.cardBg,
     marginBottom: 16,
+    width: "100%",
+    alignSelf: "stretch",
   },
   dropdownItem: {
     paddingVertical: 10,

@@ -1,16 +1,6 @@
 import React, { useEffect, useState } from "react";
-import {
-  SafeAreaView,
-  View,
-  Text,
-  FlatList,
-  Image,
-  TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-} from "react-native";
+import { View, Text, FlatList, Image, TextInput, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { IconButton } from "react-native-paper";
 import { useRouter, usePathname } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";

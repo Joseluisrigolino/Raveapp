@@ -1,15 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-} from "react-native";
+import { ScrollView, View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, usePathname } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { ROUTES } from "../../../routes";

@@ -1,16 +1,18 @@
 // app/owner/PartysScreen.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  SafeAreaView,
   ScrollView,
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { ROUTES } from "../../routes";
 
@@ -28,6 +30,7 @@ import {
   updateParty,
   deleteParty,
 } from "@/utils/partysApi";
+import InputText from "@/components/common/inputText";
 
 /** Tipo mínimo local (coincide con utils/partysApi) */
 type PartyItem = {
@@ -52,6 +55,8 @@ export default function PartysScreen() {
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
 
+  // ---- Editar (modal)
+  const [showEditModal, setShowEditModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
@@ -112,10 +117,12 @@ export default function PartysScreen() {
   function beginEdit(item: PartyItem) {
     setEditingId(item.idFiesta);
     setEditingName(item.nombre ?? "");
+    setShowEditModal(true);
   }
   function cancelEdit() {
     setEditingId(null);
     setEditingName("");
+    setShowEditModal(false);
   }
   async function saveEdit() {
     if (!editingId) return;
@@ -233,20 +240,28 @@ export default function PartysScreen() {
         {/* Agregar nueva */}
         <Text style={styles.subTitle}>Agregar fiesta recurrente:</Text>
         <View style={styles.addRow}>
-          <TextInput
-            style={[styles.input, { flex: 1 }]}
-            placeholder="Nombre de la fiesta"
-            value={newName}
-            onChangeText={setNewName}
-          />
+          <View style={{ flex: 1 }}>
+            <InputText
+              label="Nombre de la fiesta"
+              value={newName}
+              isEditing={true}
+              onBeginEdit={() => {}}
+              onChangeText={setNewName}
+              containerStyle={{ alignItems: "stretch", marginBottom: 0 }}
+              labelStyle={{ width: "100%", marginBottom: 6 }}
+              inputStyle={{ width: "100%", marginBottom: 0 }}
+            />
+          </View>
           <TouchableOpacity
-            style={[styles.btnPrimary, { marginLeft: 10 }]}
+            style={[
+              styles.addIconBtn,
+              { marginLeft: 10, opacity: creating || !newName.trim() ? 0.5 : 1 },
+            ]}
             onPress={handleCreate}
             disabled={creating || !newName.trim()}
+            accessibilityLabel="Agregar fiesta recurrente"
           >
-            <Text style={styles.btnPrimaryText}>
-              {creating ? "..." : "CONFIRMAR"}
-            </Text>
+            <Text style={styles.addIconText}>+</Text>
           </TouchableOpacity>
         </View>
 
@@ -276,24 +291,14 @@ export default function PartysScreen() {
             </View>
 
             {list.map((it) => {
-              const isEditing = editingId === it.idFiesta;
               const nombre = (it.nombre || "").trim();
               return (
                 <View key={it.idFiesta} style={[styles.row, styles.tableRow]}>
-                  {/* Nombre / edición */}
+                  {/* Nombre */}
                   <View style={{ flex: 1.2, paddingRight: 8 }}>
-                    {isEditing ? (
-                      <TextInput
-                        style={styles.input}
-                        value={editingName}
-                        onChangeText={setEditingName}
-                        autoFocus
-                      />
-                    ) : (
-                      <Text style={styles.tdText}>
-                        {nombre.length ? nombre : "(sin nombre)"}
-                      </Text>
-                    )}
+                    <Text style={styles.tdText}>
+                      {nombre.length ? nombre : "(sin nombre)"}
+                    </Text>
                   </View>
 
                   {/* Ver calificaciones */}
@@ -307,34 +312,14 @@ export default function PartysScreen() {
                     </TouchableOpacity>
                   </View>
 
-                  {/* Editar / Guardar */}
+                  {/* Editar */}
                   <View style={{ width: 90, alignItems: "flex-end" }}>
-                    {isEditing ? (
-                      <View style={{ flexDirection: "row" }}>
-                        <TouchableOpacity
-                          style={[styles.smallBtn, styles.smallBtnPrimary]}
-                          onPress={saveEdit}
-                          disabled={savingEdit || !editingName.trim()}
-                        >
-                          <Text style={styles.smallBtnText}>
-                            {savingEdit ? "..." : "Guardar"}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.smallBtn, styles.smallBtnGray]}
-                          onPress={cancelEdit}
-                        >
-                          <Text style={styles.smallBtnText}>Cancelar</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <TouchableOpacity
-                        style={[styles.smallBtn, styles.smallBtnPink]}
-                        onPress={() => beginEdit(it)}
-                      >
-                        <Text style={styles.smallBtnText}>Editar</Text>
-                      </TouchableOpacity>
-                    )}
+                    <TouchableOpacity
+                      style={[styles.smallBtn, styles.smallBtnPink]}
+                      onPress={() => beginEdit(it)}
+                    >
+                      <Text style={styles.smallBtnText}>Editar</Text>
+                    </TouchableOpacity>
                   </View>
 
                   {/* Eliminar */}
@@ -352,6 +337,62 @@ export default function PartysScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Modal para editar */}
+      <Modal
+        visible={showEditModal}
+        transparent
+        animationType="fade"
+        onRequestClose={cancelEdit}
+      >
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            style={styles.modalKeyboardAvoider}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+          >
+            <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Editar fiesta</Text>
+            </View>
+            
+            <View style={styles.modalBody}>
+              <InputText
+                label="Nombre de la fiesta"
+                value={editingName}
+                isEditing={true}
+                onBeginEdit={() => {}}
+                onChangeText={setEditingName}
+                autoFocus={false}
+                containerStyle={{ alignItems: "stretch" }}
+                labelStyle={{ width: "100%" }}
+                inputStyle={{ width: "100%", marginBottom: 0 }}
+              />
+            </View>
+            
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnCancel]}
+                onPress={cancelEdit}
+                disabled={savingEdit}
+              >
+                <Text style={styles.modalBtnCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnSave]}
+                onPress={saveEdit}
+                disabled={savingEdit || !editingName.trim()}
+              >
+                <Text style={styles.modalBtnSaveText}>
+                  {savingEdit ? "Guardando..." : "Guardar"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
 
       <Footer />
     </SafeAreaView>
@@ -410,7 +451,7 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
 
-  addRow: { flexDirection: "row", alignItems: "center" },
+  addRow: { flexDirection: "row", alignItems: "flex-end" },
 
   input: {
     backgroundColor: COLORS.cardBg,
@@ -483,4 +524,90 @@ const styles = StyleSheet.create({
   smallBtnPrimary: { backgroundColor: COLORS.primary },
   smallBtnPink: { backgroundColor: "#e11d48" },
   smallBtnGray: { backgroundColor: COLORS.textSecondary },
+
+  // Estilos del modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  // Wrapper inside overlay that moves with the keyboard while keeping overlay full-screen
+  modalKeyboardAvoider: {
+    flex: 1,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  modalContainer: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    width: "100%",
+    maxWidth: 400,
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  modalHeader: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderInput,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
+    textAlign: "center",
+  },
+  modalBody: {
+    padding: 20,
+  },
+  // input label/field now handled by shared component inside modal
+  modalFooter: {
+    flexDirection: "row",
+    padding: 20,
+    paddingTop: 10,
+    gap: 10,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: RADIUS.card,
+    alignItems: "center",
+  },
+  modalBtnCancel: {
+    backgroundColor: COLORS.textSecondary,
+  },
+  modalBtnCancelText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: FONT_SIZES.body,
+  },
+  modalBtnSave: {
+    backgroundColor: COLORS.primary,
+  },
+  modalBtnSaveText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: FONT_SIZES.body,
+  },
+  // Plus icon button (aligned with input)
+  addIconBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addIconText: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "800",
+    marginTop: -2,
+  },
 });

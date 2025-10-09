@@ -399,9 +399,65 @@ export async function createEvent(body: any): Promise<string> {
     "Content-Type": "application/json",
   };
 
+  // Normalize "fechas" payload to include multiple casing/legacy keys that some backends expect.
+  // This avoids servers defaulting to 0001-01-01 when they miss field mapping.
+  let normalizedBody = body;
+  try {
+    const clone = typeof body === "object" && body ? { ...body } : body;
+    if (clone && Array.isArray(clone.fechas)) {
+      clone.fechas = clone.fechas.map((f: any) => {
+        const inicioVal = f?.inicio ?? f?.Inicio ?? f?.fechaInicio ?? f?.FechaInicio ?? null;
+        const finVal = f?.fin ?? f?.Fin ?? f?.fechaFin ?? f?.FechaFin ?? null;
+        // include typo alias fechaIncioVenta/FechaIncioVenta when reading
+        const inicioVentaVal = f?.inicioVenta ?? f?.InicioVenta ?? f?.fechaInicioVenta ?? f?.FechaInicioVenta ?? f?.fechaIncioVenta ?? f?.FechaIncioVenta ?? null;
+        const finVentaVal = f?.finVenta ?? f?.FinVenta ?? f?.fechaFinVenta ?? f?.FechaFinVenta ?? null;
+        const estadoVal = f?.estado ?? f?.cdEstado ?? f?.Estado ?? 0;
+        return {
+          ...f,
+          // lowercase canonical
+          inicio: inicioVal,
+          fin: finVal,
+          inicioVenta: inicioVentaVal,
+          finVenta: finVentaVal,
+          estado: estadoVal,
+          // PascalCase
+          Inicio: inicioVal,
+          Fin: finVal,
+          InicioVenta: inicioVentaVal,
+          FinVenta: finVentaVal,
+          // legacy/camel variants some APIs use
+          fechaInicio: inicioVal,
+          FechaInicio: inicioVal,
+          fechaFin: finVal,
+          FechaFin: finVal,
+          fechaInicioVenta: inicioVentaVal,
+          FechaInicioVenta: inicioVentaVal,
+          // typo variant observed in backend contract
+          fechaIncioVenta: inicioVentaVal,
+          FechaIncioVenta: inicioVentaVal,
+          fechaFinVenta: finVentaVal,
+          FechaFinVenta: finVentaVal,
+        };
+      });
+      // Some servers map only "Fechas" with uppercase F
+      (clone as any).Fechas = clone.fechas;
+    }
+    // Also duplicate top-level event start/end with multiple casings (defensive)
+    if (clone && (clone.inicioEvento || clone.finEvento)) {
+      (clone as any).InicioEvento = clone.inicioEvento ?? (clone as any).InicioEvento;
+      (clone as any).FinEvento = clone.finEvento ?? (clone as any).FinEvento;
+      // legacy variants occasionally seen
+      (clone as any).FechaInicioEvento = clone.inicioEvento ?? (clone as any).FechaInicioEvento;
+      (clone as any).FechaFinEvento = clone.finEvento ?? (clone as any).FechaFinEvento;
+    }
+    normalizedBody = clone;
+  } catch {
+    normalizedBody = body;
+  }
+
   const resp = await apiClient.post<CreateEventResponse>(
     "/v1/Evento/CrearEvento",
-    body,
+    normalizedBody,
     { headers }
   );
 
@@ -447,6 +503,69 @@ export async function updateEvent(
 
   const token = await login();
   const headers = { Authorization: `Bearer ${token}` };
+
+  // Normalize payload fechas and top-level date fields to multiple variants, similar to createEvent
+  let normalizedPayload = payload;
+  try {
+    if (payload && typeof payload === 'object') {
+      const clone: any = { ...payload };
+      if (Array.isArray(clone.fechas)) {
+        clone.fechas = clone.fechas.map((f: any) => {
+          const inicioVal = f?.inicio ?? f?.Inicio ?? f?.fechaInicio ?? f?.FechaInicio ?? null;
+          const finVal = f?.fin ?? f?.Fin ?? f?.fechaFin ?? f?.FechaFin ?? null;
+          // include typo alias fechaIncioVenta/FechaIncioVenta when reading
+          const inicioVentaVal = f?.inicioVenta ?? f?.InicioVenta ?? f?.fechaInicioVenta ?? f?.FechaInicioVenta ?? f?.fechaIncioVenta ?? f?.FechaIncioVenta ?? null;
+          const finVentaVal = f?.finVenta ?? f?.FinVenta ?? f?.fechaFinVenta ?? f?.FechaFinVenta ?? null;
+          const estadoVal = f?.estado ?? f?.cdEstado ?? f?.Estado ?? undefined;
+          const idFechaVal = f?.idFecha ?? f?.IdFecha ?? f?.id ?? f?.Id;
+          const out: any = {
+            ...f,
+            idFecha: idFechaVal,
+            inicio: inicioVal,
+            fin: finVal,
+            inicioVenta: inicioVentaVal,
+            finVenta: finVentaVal,
+          };
+          if (typeof estadoVal !== 'undefined') out.estado = estadoVal;
+          // duplicados de casing
+          out.Inicio = inicioVal;
+          out.Fin = finVal;
+          out.InicioVenta = inicioVentaVal;
+          out.FinVenta = finVentaVal;
+          out.fechaInicio = inicioVal;
+          out.FechaInicio = inicioVal;
+          out.fechaFin = finVal;
+          out.FechaFin = finVal;
+          out.fechaInicioVenta = inicioVentaVal;
+          out.FechaInicioVenta = inicioVentaVal;
+          // typo variant observed in backend contract
+          out.fechaIncioVenta = inicioVentaVal;
+          out.FechaIncioVenta = inicioVentaVal;
+          out.fechaFinVenta = finVentaVal;
+          out.FechaFinVenta = finVentaVal;
+          return out;
+        });
+        // uppercase collection key some servers expect
+        clone.Fechas = clone.fechas;
+      }
+      if (typeof clone.inicioEvento !== 'undefined' || typeof clone.finEvento !== 'undefined') {
+        if (typeof clone.inicioEvento !== 'undefined') clone.InicioEvento = clone.inicioEvento;
+        if (typeof clone.finEvento !== 'undefined') clone.FinEvento = clone.finEvento;
+        // also duplicate venta fields if present at top-level
+        if (typeof clone.inicioVenta !== 'undefined') {
+          clone.InicioVenta = clone.inicioVenta;
+          clone.FechaInicioVenta = clone.inicioVenta;
+        }
+        if (typeof clone.finVenta !== 'undefined') {
+          clone.FinVenta = clone.finVenta;
+          clone.FechaFinVenta = clone.finVenta;
+        }
+      }
+      normalizedPayload = clone;
+    }
+  } catch {
+    normalizedPayload = payload;
+  }
 
   // If the payload only contains status fields, many backends expect a full event object
   // for UpdateEvento. Try constructing the full body and calling UpdateEvento directly
@@ -510,6 +629,62 @@ export async function updateEvent(
         // continue to generic attempts
       }
     }
+    // fechas-aware: if payload includes fechas, some backends require full body as well
+    try {
+      const hasFechas = payload && (Array.isArray((payload as any).fechas) || Array.isArray((payload as any).Fechas));
+      if (hasFechas) {
+        let raw: any = null;
+        try {
+          const evt = await fetchEventById(id);
+          raw = (evt as any).__raw ?? null;
+        } catch {
+          raw = null;
+        }
+        const buildBodyFromRaw = (r: any) => {
+          if (!r) return { idEvento: id, ...normalizedPayload };
+          return {
+            idEvento: r?.idEvento ?? r?.id ?? id,
+            idArtistas: Array.isArray(r?.artistas) ? r.artistas.map((a: any) => a?.idArtista ?? a?.id) : [],
+            domicilio: r?.domicilio ?? r?.direccion ? {
+              localidad: r?.domicilio?.localidad ?? r?.localidad ?? null,
+              municipio: r?.domicilio?.municipio ?? r?.municipio ?? null,
+              provincia: r?.domicilio?.provincia ?? r?.provincia ?? null,
+              direccion: r?.domicilio?.direccion ?? r?.direccion ?? "",
+              latitud: r?.domicilio?.latitud ?? r?.latitud ?? 0,
+              longitud: r?.domicilio?.longitud ?? r?.longitud ?? 0,
+            } : undefined,
+            nombre: r?.nombre ?? r?.titulo ?? r?.dsNombre,
+            descripcion: r?.descripcion,
+            genero: Array.isArray(r?.genero) ? r.genero : (r?.genero ? [r.genero] : []),
+            isAfter: Boolean(r?.isAfter),
+            isLgbt: Boolean(r?.isLgbt ?? r?.isLGBT),
+            inicioEvento: r?.fechas?.[0]?.inicio ?? r?.inicioEvento ?? r?.inicio,
+            finEvento: r?.fechas?.[0]?.fin ?? r?.finEvento ?? r?.fin,
+            estado: r?.estado ?? undefined,
+            fechas: Array.isArray(r?.fechas)
+              ? r.fechas.map((f: any) => ({
+                  idFecha: f?.idFecha ?? f?.id,
+                  inicio: f?.inicio,
+                  fin: f?.fin,
+                  inicioVenta: f?.inicioVenta,
+                  finVenta: f?.finVenta,
+                  estado: f?.estado,
+                }))
+              : [],
+            idFiesta: r?.idFiesta ?? null,
+            soundCloud: r?.soundCloud ?? r?.musica ?? r?.soundcloud ?? null,
+          };
+        };
+        const fullBody = buildBodyFromRaw(raw);
+        // merge provided fields (normalized) on top
+        Object.assign(fullBody, normalizedPayload || {});
+        await apiClient.put("/v1/Evento/UpdateEvento", fullBody, { headers });
+        return;
+      }
+    } catch (err) {
+      console.warn('[updateEvent] intento fechas-aware con body completo falló, continuando intentos:', String((err as any)?.message || err));
+      // continue to generic attempts
+    }
   } catch {
     // no-op: fall back to generic attempts below
   }
@@ -518,36 +693,36 @@ export async function updateEvent(
     () =>
       apiClient.put(
         "/v1/Evento/UpdateEvento",
-        { idEvento: id, ...payload },
+        { idEvento: id, ...normalizedPayload },
         { headers }
       ),
     () =>
       apiClient.put(
         "/v1/Evento/Update",
-        { idEvento: id, ...payload },
+        { idEvento: id, ...normalizedPayload },
         { headers }
       ),
     () =>
       apiClient.put(
         "/v1/Evento/PutEvento",
-        { idEvento: id, ...payload },
+        { idEvento: id, ...normalizedPayload },
         { headers }
       ),
     () =>
-      apiClient.put(`/v1/Evento/${encodeURIComponent(id)}`, payload, {
+      apiClient.put(`/v1/Evento/${encodeURIComponent(id)}`, normalizedPayload, {
         headers,
       }),
     // posibles endpoints alternativos para cambiar estado
     () =>
       apiClient.post(
         "/v1/Evento/CambiarEstado",
-        { idEvento: id, ...payload },
+        { idEvento: id, ...normalizedPayload },
         { headers }
       ),
     () =>
       apiClient.post(
         "/v1/Evento/SetEstado",
-        { idEvento: id, ...payload },
+        { idEvento: id, ...normalizedPayload },
         { headers }
       ),
   ];
@@ -557,12 +732,12 @@ export async function updateEvent(
   const base = apiClient.defaults.baseURL ?? "";
   // for debugging: list the human-friendly attempted endpoints (in same order)
   const attemptedEndpoints = [
-    { method: "PUT", url: "/v1/Evento/UpdateEvento", fullUrl: `${base}/v1/Evento/UpdateEvento`, body: { idEvento: id, ...payload } },
-    { method: "PUT", url: "/v1/Evento/Update", fullUrl: `${base}/v1/Evento/Update`, body: { idEvento: id, ...payload } },
-    { method: "PUT", url: "/v1/Evento/PutEvento", fullUrl: `${base}/v1/Evento/PutEvento`, body: { idEvento: id, ...payload } },
-    { method: "PUT", url: `/v1/Evento/${encodeURIComponent(id)}`, fullUrl: `${base}/v1/Evento/${encodeURIComponent(id)}`, body: payload },
-    { method: "POST", url: "/v1/Evento/CambiarEstado", fullUrl: `${base}/v1/Evento/CambiarEstado`, body: { idEvento: id, ...payload } },
-    { method: "POST", url: "/v1/Evento/SetEstado", fullUrl: `${base}/v1/Evento/SetEstado`, body: { idEvento: id, ...payload } },
+    { method: "PUT", url: "/v1/Evento/UpdateEvento", fullUrl: `${base}/v1/Evento/UpdateEvento`, body: { idEvento: id, ...normalizedPayload } },
+    { method: "PUT", url: "/v1/Evento/Update", fullUrl: `${base}/v1/Evento/Update`, body: { idEvento: id, ...normalizedPayload } },
+    { method: "PUT", url: "/v1/Evento/PutEvento", fullUrl: `${base}/v1/Evento/PutEvento`, body: { idEvento: id, ...normalizedPayload } },
+    { method: "PUT", url: `/v1/Evento/${encodeURIComponent(id)}`, fullUrl: `${base}/v1/Evento/${encodeURIComponent(id)}`, body: normalizedPayload },
+    { method: "POST", url: "/v1/Evento/CambiarEstado", fullUrl: `${base}/v1/Evento/CambiarEstado`, body: { idEvento: id, ...normalizedPayload } },
+    { method: "POST", url: "/v1/Evento/SetEstado", fullUrl: `${base}/v1/Evento/SetEstado`, body: { idEvento: id, ...normalizedPayload } },
   ];
   for (const fn of attempts) {
     try {

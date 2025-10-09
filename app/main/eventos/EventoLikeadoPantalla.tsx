@@ -1,14 +1,7 @@
 // app/main/EventsScreens/FavEventScreen.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
+import { ScrollView, View, Text, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { ROUTES } from "../../../routes";
 import * as nav from "@/utils/navigation";

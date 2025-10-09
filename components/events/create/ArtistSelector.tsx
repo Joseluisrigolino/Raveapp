@@ -1,15 +1,10 @@
 // components/events/create/ArtistSelector.tsx
 import React from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS, RADIUS } from "@/styles/globalStyles";
 import { Artist } from "@/interfaces/Artist";
+import InputText from "@/components/common/inputText";
 
 type ArtistLike = Artist & { __isNew?: boolean };
 
@@ -41,12 +36,19 @@ export default function ArtistSelector({
     <View style={styles.card}>
       <View style={{ position: "relative" }}>
         <View style={styles.artistRow}>
-          <TextInput
-            style={[styles.input, { flex: 1 }]}
-            placeholder="Escribe el nombre del artista"
-            value={artistInput}
-            onChangeText={setArtistInput}
-          />
+          <View style={{ flex: 1 }}>
+            <InputText
+              label="O crear una nueva"
+              value={artistInput}
+              isEditing={true}
+              onBeginEdit={() => {}}
+              onChangeText={setArtistInput}
+              placeholder="Escribe el nombre del artista"
+              labelStyle={{ width: "100%", alignSelf: "flex-start", marginLeft: 2 }}
+              inputStyle={{ width: "100%" }}
+              autoFocus={false}
+            />
+          </View>
           <TouchableOpacity
             style={styles.addIconBtn}
             onPress={() => onAddManual(artistInput)}

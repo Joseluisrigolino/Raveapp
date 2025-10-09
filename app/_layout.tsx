@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "@/context/AuthContext";
 import { Provider as PaperProvider } from 'react-native-paper';
 import { View, Text, StyleSheet } from "react-native";
@@ -16,6 +17,7 @@ const formatRouteName = (name?: string) => {
 export default function RootLayout() {
   return (
     <PaperProvider>
+      <SafeAreaProvider>
       <AuthProvider>
         <Stack
         initialRouteName="login/login"
@@ -40,11 +42,10 @@ export default function RootLayout() {
         <Stack.Screen name="login/index" options={{ headerShown: false }} />
         <Stack.Screen name="login/login" options={{ title: "Ingresar" }} />
 
-        {/* Segmentos padres (no hace falta listar todo lo demás) */}
-        <Stack.Screen name="admin" options={{ headerShown: false }} />
-        <Stack.Screen name="main" options={{ headerShown: false }} />
+  {/* No declarar segmentos padres sin ruta directa para evitar warnings */}
         </Stack>
       </AuthProvider>
+      </SafeAreaProvider>
     </PaperProvider>
   );
 }

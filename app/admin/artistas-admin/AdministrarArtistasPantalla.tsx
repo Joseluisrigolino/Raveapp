@@ -1,18 +1,8 @@
 // src/screens/admin/ManageArtistsScreen.tsx
 
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  SafeAreaView,
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  Alert,
-  TextInput,
-  TouchableOpacity,
-  Image,
-  ActivityIndicator,
-} from "react-native";
+import { View, Text, StyleSheet, FlatList, Alert, TextInput, TouchableOpacity, Image, ActivityIndicator } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { IconButton } from "react-native-paper";
 import { useRouter, usePathname } from "expo-router";
 import * as nav from "@/utils/navigation";

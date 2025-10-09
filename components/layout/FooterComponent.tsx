@@ -8,12 +8,12 @@ import {
   Modal,
   Pressable,
   Text,
-  SafeAreaView,
   Animated,
   Dimensions,
   PanResponder,
   Easing,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { IconButton } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -192,31 +192,51 @@ export default function Footer() {
     <>
       {/* ===== Footer ===== */}
       <View style={styles.container}>
-        {/* Footer normal: home, noticias, entradas, evento/crear y avatar */}
-        <IconButton
-          icon="home"
-          size={24}
-          iconColor={COLORS.textPrimary}
-          onPress={handleHomePress}
-        />
+        {/* Footer: para admin cambiamos 'home' por 'calendar-edit' y el botón del medio por 'artists' */}
+        {isAdmin ? (
+          <IconButton
+            icon="calendar-edit"
+            size={24}
+            iconColor={COLORS.textPrimary}
+            onPress={handleEventManagementPress}
+          />
+        ) : (
+          <IconButton
+            icon="home"
+            size={24}
+            iconColor={COLORS.textPrimary}
+            onPress={handleHomePress}
+          />
+        )}
         <IconButton
           icon="newspaper-variant-multiple"
           size={24}
           iconColor={COLORS.textPrimary}
           onPress={handleNewsPress}
         />
-        <IconButton
-          icon="ticket"
-          size={24}
-          iconColor={COLORS.textPrimary}
-          onPress={handleTicketsPress}
-        />
-        <IconButton
-          icon={isAdmin ? "calendar-edit" : "calendar-plus"}
-          size={24}
-          iconColor={COLORS.textPrimary}
-          onPress={handleEventManagementPress}
-        />
+        {isAdmin ? (
+          <IconButton
+            icon="account-music"
+            size={24}
+            iconColor={COLORS.textPrimary}
+            onPress={handleArtistsPress}
+          />
+        ) : (
+          <IconButton
+            icon="ticket"
+            size={24}
+            iconColor={COLORS.textPrimary}
+            onPress={handleTicketsPress}
+          />
+        )}
+        {!isAdmin && (
+          <IconButton
+            icon="calendar-plus"
+            size={24}
+            iconColor={COLORS.textPrimary}
+            onPress={handleEventManagementPress}
+          />
+        )}
         <TouchableOpacity onPress={openSheet} style={styles.avatarWrapper}>
           <Image source={{ uri: profileImageUrl }} style={styles.avatar} />
         </TouchableOpacity>
@@ -288,6 +308,19 @@ export default function Footer() {
                 </>
               )}
 
+              {/* Perfil (visible también para admin) */}
+              {isAdmin && (
+                <>
+                  <Text style={styles.sectionTitle}>Perfil</Text>
+                  <View style={styles.menuSection}>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.MAIN.USER.PROFILE_EDIT })}>
+                      <MaterialCommunityIcons name="account" size={22} color={COLORS.textPrimary} />
+                      <Text style={styles.menuText}>Mi perfil</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+
               {/* Opciones de administración (solo para admin) */}
               {isAdmin && (
                 <>
@@ -302,7 +335,7 @@ export default function Footer() {
                       <Text style={styles.menuText}>Crear artista</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.ARTISTS.MANAGE })}>
-                      <MaterialCommunityIcons name="account-multiple" size={22} color={COLORS.textPrimary} />
+                      <MaterialCommunityIcons name="account-music" size={22} color={COLORS.textPrimary} />
                       <Text style={styles.menuText}>Editar artistas</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.NEWS.CREATE })}>

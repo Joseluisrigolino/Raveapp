@@ -1,14 +1,8 @@
 // src/screens/ArtistsScreens/ArtistsScreen.tsx
 
 import React, { useState, useEffect, useMemo } from "react";
-import {
-  SafeAreaView,
-  View,
-  ScrollView,
-  Text,
-  ActivityIndicator,
-  StyleSheet,
-} from "react-native";
+import { View, ScrollView, Text, ActivityIndicator, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, usePathname } from "expo-router";
 import { ROUTES } from "../../../routes";
 import * as nav from "@/utils/navigation";

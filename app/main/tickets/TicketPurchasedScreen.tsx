@@ -1,17 +1,7 @@
 // app/main/TicketsScreens/TicketPurchasedScreen.tsx
 import React, { useState, useEffect } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  Image,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-  ActivityIndicator,
-  Dimensions,
-  Linking,
-} from "react-native";
+import { ScrollView, Image, Text, StyleSheet, TouchableOpacity, View, ActivityIndicator, Dimensions, Linking } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import QRCode from "react-native-qrcode-svg";
 import * as Print from "expo-print";

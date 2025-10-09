@@ -1,13 +1,8 @@
 // src/screens/admin/Tyc.tsx
 
 import React, { useState, useEffect } from "react";
-import {
-  SafeAreaView,
-  View,
-  StyleSheet,
-  ActivityIndicator,
-  Dimensions,
-} from "react-native";
+import { View, StyleSheet, ActivityIndicator, Dimensions } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";

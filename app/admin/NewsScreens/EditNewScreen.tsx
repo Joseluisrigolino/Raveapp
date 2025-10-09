@@ -1,18 +1,8 @@
 // src/screens/admin/NewsScreens/EditNewScreen.tsx
 
 import React, { useEffect, useState } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Image,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator, Alert } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { getInfoAsync } from "expo-file-system/legacy";
@@ -24,6 +14,9 @@ import { mediaApi } from "@/utils/mediaApi";
 import { fetchEvents } from "@/utils/events/eventApi";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { emit } from "@/utils/eventBus";
+import InputText from "@/components/common/inputText";
+import InputDesc from "@/components/common/inputDesc";
+import SelectField from "@/components/common/selectField";
 
 export default function EditNewScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -117,7 +110,7 @@ export default function EditNewScreen() {
           name: fileName,
           type: "image/jpeg",
         };
-        await mediaApi.upload(id, file);
+  await mediaApi.upload(id, file, undefined, { compress: true });
       }
 
       const urlEventoFinal = eventoSeleccionado
@@ -160,11 +153,15 @@ export default function EditNewScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Editar Noticia</Text>
 
-        <Text style={styles.label}>Título:</Text>
-        <TextInput
-          style={styles.input}
+        <InputText
+          label="Título"
           value={newsTitle}
+          isEditing={true}
+          onBeginEdit={() => {}}
           onChangeText={setNewsTitle}
+          containerStyle={{ width: "100%", alignItems: "stretch" }}
+          labelStyle={{ width: "100%", textAlign: "left" }}
+          inputStyle={{ width: "100%" }}
         />
 
         <Text style={styles.label}>Imagen:</Text>
@@ -197,25 +194,32 @@ export default function EditNewScreen() {
           </Text>
         </View>
 
-        <Text style={styles.label}>Contenido:</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          multiline
+        <InputDesc
+          label="Contenido"
           value={newsBody}
+          isEditing={true}
+          onBeginEdit={() => {}}
           onChangeText={setNewsBody}
+          autoFocus={false}
+          containerStyle={{ width: "100%", alignItems: "stretch" }}
+          labelStyle={{ width: "100%", textAlign: "left" }}
+          inputStyle={{ width: "100%" }}
         />
 
-        <Text style={styles.label}>Evento relacionado (opcional):</Text>
-        <TouchableOpacity
-          style={styles.dropdownButton}
+        <SelectField
+          label="Evento relacionado (opcional)"
+          value={
+            eventoSeleccionado
+              ? eventos.find((e) => e.idEvento === eventoSeleccionado)?.nombre
+              : undefined
+          }
+          placeholder="Seleccionar evento..."
           onPress={() => setShowEventos(!showEventos)}
-        >
-          <Text style={styles.dropdownButtonText}>
-            {eventoSeleccionado
-              ? eventos.find((e) => e.idEvento === eventoSeleccionado)?.nombre || "Evento seleccionado"
-              : "Seleccionar evento..."}
-          </Text>
-        </TouchableOpacity>
+          isOpen={showEventos}
+          containerStyle={{ width: "100%", alignItems: "stretch" }}
+          labelStyle={{ width: "100%", textAlign: "left" }}
+          fieldStyle={{ width: "100%" }}
+        />
         {showEventos && (
           <View style={styles.dropdownContainer}>
             {eventos.map((e, index) => (
@@ -367,6 +371,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderInput,
     borderRadius: RADIUS.card,
     backgroundColor: COLORS.cardBg,
+    width: "100%",
+    alignSelf: "stretch",
   },
   dropdownItem: {
     padding: 10,

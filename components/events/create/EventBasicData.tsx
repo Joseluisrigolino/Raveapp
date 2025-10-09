@@ -1,14 +1,10 @@
 import React from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { Party } from "@/utils/partysApi";
+import InputText from "@/components/common/inputText";
+import SelectField from "@/components/common/selectField";
 
 type EventType = "1d" | "2d" | "3d";
 
@@ -57,12 +53,15 @@ export default function EventBasicData(props: Props) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.label}>Nombre del evento</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Nombre del evento"
+      <InputText
+        label="Nombre del evento"
         value={eventName}
+        isEditing={true}
+        onBeginEdit={() => {}}
         onChangeText={onChangeEventName}
+        placeholder="Nombre del evento"
+        labelStyle={{ width: "100%", alignSelf: "flex-start", marginLeft: 2 }}
+        inputStyle={{ width: "100%" }}
       />
 
       <View style={[styles.flagsRow, { marginTop: 10 }]}>
@@ -77,27 +76,22 @@ export default function EventBasicData(props: Props) {
 
       {isRecurring && (
         <View style={styles.recurringBox}>
-          <Text style={styles.recurringTitle}>Seleccioná una fiesta:</Text>
-
-          <TouchableOpacity
-            style={styles.dropdownButton}
-            onPress={() => setShowPartyDropdown(!showPartyDropdown)}
-          >
-            <Text style={styles.dropdownText}>
-              {partyLoading
+          <SelectField
+            label="Seleccioná una fiesta"
+            value={
+              partyLoading
                 ? "Cargando…"
                 : selectedPartyId
-                ? myParties.find((p) => p.idFiesta === selectedPartyId)?.nombre ||
-                  "Sin nombre"
-                : "Seleccioná una opción"}
-            </Text>
-            <MaterialCommunityIcons
-              name={showPartyDropdown ? "chevron-up" : "chevron-down"}
-              size={20}
-              color={COLORS.textPrimary}
-              style={{ position: "absolute", right: 10 }}
-            />
-          </TouchableOpacity>
+                ? myParties.find((p) => p.idFiesta === selectedPartyId)?.nombre || "Sin nombre"
+                : ""
+            }
+            placeholder={partyLoading ? "Cargando…" : "Seleccioná una opción"}
+            onPress={() => setShowPartyDropdown(!showPartyDropdown)}
+            isOpen={showPartyDropdown}
+            containerStyle={{ width: "100%" }}
+            labelStyle={{ width: "100%", marginLeft: 2 }}
+            fieldStyle={{ width: "100%" }}
+          />
 
           {showPartyDropdown && (
             <View style={styles.dropdownContainer}>
@@ -124,27 +118,22 @@ export default function EventBasicData(props: Props) {
             </View>
           )}
 
-          <Text style={[styles.recurringTitle, { marginTop: 12 }]}>
-            O crear una nueva:
-          </Text>
-
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <TextInput
-              style={[
-                styles.input,
-                { flex: 1 },
-                newPartyLocked && styles.inputDisabled,
-              ]}
-              placeholder="Nombre de la nueva fiesta"
-              value={newPartyName}
-              onChangeText={setNewPartyName}
-              editable={!newPartyLocked}
-            />
+          <View style={{ flexDirection: "row", alignItems: "center", columnGap: 8, marginTop: 12 }}>
+            <View style={{ flex: 1 }}>
+              <InputText
+                label="O crear una nueva"
+                value={newPartyName}
+                isEditing={true}
+                onBeginEdit={() => {}}
+                onChangeText={setNewPartyName}
+                placeholder="Nombre de la nueva fiesta"
+                labelStyle={{ width: "100%", alignSelf: "flex-start", marginLeft: 2 }}
+                inputStyle={{ width: "100%" }}
+                editable={!newPartyLocked}
+              />
+            </View>
             <TouchableOpacity
-              style={[
-                styles.addIconBtn,
-                { marginLeft: 8, opacity: newPartyLocked ? 0.5 : 1 },
-              ]}
+              style={[styles.addIconBtn, { opacity: newPartyLocked || !newPartyName.trim() ? 0.5 : 1 }]}
               onPress={props.onPressAddNewParty}
               disabled={newPartyLocked || !newPartyName.trim()}
             >
@@ -230,7 +219,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.borderInput,
     borderRadius: RADIUS.card,
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
   },
   recurringTitle: {
     fontWeight: "700",
@@ -260,7 +250,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   dropdownItem: {
-    padding: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },

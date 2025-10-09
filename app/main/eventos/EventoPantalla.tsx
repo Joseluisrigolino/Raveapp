@@ -1,16 +1,7 @@
 // app/main/EventsScreens/EventScreen.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
+import { ScrollView, View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { IconButton } from "react-native-paper";
 import { WebView } from "react-native-webview";
