@@ -14,6 +14,8 @@ interface Props {
   isChecking?: boolean;
   photoTooLarge?: boolean;
   photoFileSize?: number | null;
+  // Máximo permitido en bytes (para mostrar mensajes consistentes con el límite real)
+  maxImageBytes?: number;
 }
 
 export default function MediaSection({
@@ -27,7 +29,19 @@ export default function MediaSection({
   photoTooLarge = false,
   photoFileSize = null,
   onDeletePhoto,
+  maxImageBytes = 1 * 1024 * 1024,
 }: Props) {
+  const fmtBytes = (bytes: number) => {
+    if (!Number.isFinite(bytes) || bytes <= 0) return "";
+    if (bytes >= 1024 * 1024) {
+      const mb = bytes / (1024 * 1024);
+      const val = mb >= 10 ? Math.round(mb) : Math.round(mb * 10) / 10;
+      return `${val} MB`;
+    }
+    const kb = bytes / 1024;
+    const val = kb >= 10 ? Math.round(kb) : Math.round(kb * 10) / 10;
+    return `${val} KB`;
+  };
   return (
     <View style={styles.card}>
       <Text style={styles.label}>
@@ -51,7 +65,7 @@ export default function MediaSection({
         </Text>
       </View>
       <Text style={styles.hint}>
-        La imagen debe pesar menos de 2MB y ser JPG, JPEG o PNG
+        La imagen debe pesar menos de {fmtBytes(maxImageBytes)} y ser JPG, JPEG o PNG
       </Text>
 
       <View style={{ marginTop: 10 }}>
@@ -59,7 +73,8 @@ export default function MediaSection({
         {photoTooLarge ? (
           <View style={[styles.previewImage, styles.previewTooLarge]}>
             <Text style={styles.tooLargeText}>
-              La imagen seleccionada pesa más de 2MB ({photoFileSize ? `${Math.round(photoFileSize/1024)} KB` : ""}).
+              La imagen seleccionada supera {fmtBytes(maxImageBytes)}
+              {photoFileSize ? ` (${Math.round(photoFileSize/1024)} KB).` : "."}
             </Text>
             <Text style={styles.tooLargeSub}>Seleccioná otra imagen más liviana.</Text>
           </View>

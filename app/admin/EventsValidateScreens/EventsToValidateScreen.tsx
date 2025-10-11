@@ -12,7 +12,8 @@ import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 
-import { fetchEvents } from "@/utils/events/eventApi";
+import { fetchEvents, fetchGenres, ApiGenero } from "@/utils/events/eventApi";
+import { getProfile, getUsuarioById } from "@/utils/auth/userHelpers";
 import { EventItem } from "@/interfaces/EventItem";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
@@ -24,6 +25,7 @@ export default function EventsToValidateScreen() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
+  const [genreMap, setGenreMap] = useState<Map<number, string>>(new Map());
 
   const { refresh } = useLocalSearchParams<{ refresh?: string }>();
   const path = usePathname();
@@ -46,7 +48,13 @@ export default function EventsToValidateScreen() {
     (async () => {
       try {
         setLoading(true);
-        const data = await fetchEvents(0); // ahora pedimos Estado = 0
+        // Cargar mapa de géneros para poder mostrar varios por evento
+        try {
+          const gen = await fetchGenres();
+          const map = new Map<number, string>(gen.map((g: ApiGenero) => [g.cdGenero, g.dsGenero]));
+          setGenreMap(map);
+        } catch {}
+  const data = await fetchEvents(0); // ahora pedimos Estado = 0
         // Asegurar que sólo guardamos eventos con estado 0 (por aprobar)
         // y que además tengan imagen para mostrarse en esta vista.
         const filteredByState = Array.isArray(data)
@@ -61,7 +69,56 @@ export default function EventsToValidateScreen() {
         const withImages = filteredByState.filter((ev: any) =>
           typeof ev?.imageUrl === "string" && ev.imageUrl.trim().length > 0
         );
-        setEvents(withImages);
+
+        // Enriquecer con datos reales del propietario (nombre y correo) buscando por email o id
+        const emailCache = new Map<string, any>();
+        const idCache = new Map<string, any>();
+        const enriched = await Promise.all(
+          withImages.map(async (ev: any) => {
+            const raw: any = ev;
+            const fallbackName = raw.ownerName ?? raw.owner?.name ?? raw.propietario?.nombre ?? raw.ownerDisplayName ?? null;
+            const fallbackEmail = raw.ownerEmail ?? raw.owner?.email ?? raw.propietario?.correo ?? raw.email ?? null;
+            const idUsuario = raw.ownerId ?? raw.propietario?.idUsuario ?? raw.usuario?.idUsuario ?? null;
+
+            let profile: any = null;
+            // Primero intentamos por email si lo tenemos, suele ser más directo
+            if (fallbackEmail) {
+              const key = String(fallbackEmail).toLowerCase();
+              if (emailCache.has(key)) {
+                profile = emailCache.get(key);
+              } else {
+                try {
+                  profile = await getProfile(key);
+                  if (profile) emailCache.set(key, profile);
+                } catch {}
+              }
+            }
+            // Si no hay email o falló, probamos por ID de usuario
+            if (!profile && idUsuario) {
+              const key = String(idUsuario);
+              if (idCache.has(key)) {
+                profile = idCache.get(key);
+              } else {
+                try {
+                  profile = await getUsuarioById(key);
+                  if (profile) idCache.set(key, profile);
+                } catch {}
+              }
+            }
+
+            if (profile) {
+              return {
+                ...ev,
+                ownerName: profile.nombre ? `${profile.nombre} ${profile.apellido ?? ""}`.trim() : fallbackName ?? "N/D",
+                ownerEmail: profile.correo ?? fallbackEmail ?? undefined,
+                ownerId: profile.idUsuario ?? idUsuario ?? undefined,
+              } as EventItem;
+            }
+            return ev as EventItem;
+          })
+        );
+
+        setEvents(enriched);
       } catch (e) {
         console.error("Error al cargar eventos:", e);
       } finally {
@@ -70,10 +127,30 @@ export default function EventsToValidateScreen() {
     })();
   }, [refresh]);
 
+  // Helper: genera el texto de géneros a partir de los códigos (si están) o del type simple
+  const getGenresText = (ev: EventItem): string => {
+    const raw: any = ev as any;
+    const codes: number[] = Array.isArray(raw?.genero) ? raw.genero : [];
+    if (codes.length && genreMap.size) {
+      const names = codes
+        .map((c) => genreMap.get(Number(c)) || null)
+        .filter((n): n is string => Boolean(n));
+      if (names.length) return names.join(", ");
+    }
+    // fallback al type normalizado (un solo género)
+    return ev.type || "Otros";
+  };
+
   const filtered = events.filter((ev) => {
     const q = searchText.toLowerCase();
+    const raw: any = ev as any;
+    const ownerName = raw.ownerName ?? raw.owner?.name ?? raw.propietario?.nombre ?? raw.ownerDisplayName ?? "";
+    const ownerEmail = raw.ownerEmail ?? raw.owner?.email ?? raw.propietario?.correo ?? raw.email ?? "";
     return (
-      ev.title.toLowerCase().includes(q) || ev.address.toLowerCase().includes(q)
+      ev.title.toLowerCase().includes(q) ||
+      ev.address.toLowerCase().includes(q) ||
+      String(ownerName).toLowerCase().includes(q) ||
+      String(ownerEmail).toLowerCase().includes(q)
     );
   });
 
@@ -82,7 +159,7 @@ export default function EventsToValidateScreen() {
   };
 
   const renderItem = ({ item }: { item: EventItem }) => (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => handleVerify(item.id)}>
       <Image
         source={{ uri: item.imageUrl || PLACEHOLDER_IMAGE }}
         style={styles.image}
@@ -94,9 +171,9 @@ export default function EventsToValidateScreen() {
           <Text style={styles.bold}>Fecha(s): </Text>
           {item.date}
         </Text>
-        <Text style={styles.label}>
+        <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
           <Text style={styles.bold}>Género(s): </Text>
-          {item.type}
+          {getGenresText(item)}
         </Text>
         {}
         {(() => {
@@ -105,11 +182,15 @@ export default function EventsToValidateScreen() {
           const ownerName = raw.ownerName ?? raw.owner?.name ?? raw.propietario?.nombre ?? raw.ownerDisplayName ?? "N/D";
           const ownerEmail = raw.ownerEmail ?? raw.owner?.email ?? raw.propietario?.correo ?? raw.email ?? null;
           return (
-            <Text style={styles.label}>
-              <Text style={styles.bold}>Propietario: </Text>
-              {ownerName}
-              {ownerEmail ? ` — ${ownerEmail}` : ""}
-            </Text>
+            <>
+              <Text style={styles.label}>
+                <Text style={styles.bold}>Propietario: </Text>
+                {ownerName}
+              </Text>
+              {ownerEmail ? (
+                <Text style={styles.labelEmail}>{ownerEmail}</Text>
+              ) : null}
+            </>
           );
         })()}
 
@@ -120,7 +201,7 @@ export default function EventsToValidateScreen() {
           <Text style={styles.buttonText}>VERIFICAR</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -235,6 +316,13 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.body,
     color: COLORS.textSecondary,
     marginBottom: 2,
+  },
+  labelEmail: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textSecondary,
+    marginBottom: 2,
+    marginLeft: 0,
   },
   bold: {
     fontFamily: FONTS.subTitleMedium,

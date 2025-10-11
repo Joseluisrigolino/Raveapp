@@ -34,8 +34,8 @@ export default function BloqueInfoEvento({ artistas = [], date, timeRange, fecha
     try {
       if (!iso) return "";
       const d = new Date(iso);
-      // hour12 por defecto en es-AR, fuerza formato HH:MM a.m./p.m.
-      return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+      // Forzar 12 horas con a.m./p.m. como en la web
+      return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: true });
     } catch {
       return "";
     }
@@ -61,21 +61,28 @@ export default function BloqueInfoEvento({ artistas = [], date, timeRange, fecha
         </View>
       )}
 
-      {/* Fechas: si vienen múltiples fechas las mostramos todas con su horario */}
+      {/* Fechas: cada fecha en una fila con el icono de calendario a la izquierda y dos líneas (arriba Fecha, abajo Horario) */}
       {Array.isArray(fechas) && fechas.length > 0 ? (
         fechas.map((f, idx) => {
           const fechaTxt = fmtDate(f.inicio);
           const inicioTxt = fmtTime(f.inicio);
           const finTxt = fmtTime(f.fin);
-          const timeRangeCombined = inicioTxt ? (finTxt ? `${inicioTxt} - ${finTxt}` : inicioTxt) : "";
-          const combined = [fechaTxt, timeRangeCombined].filter(Boolean).join("  •  ");
+          const rango = inicioTxt ? (finTxt ? `${inicioTxt} - ${finTxt}` : inicioTxt) : "";
           return (
             <View style={styles.infoRowCompact} key={f.idFecha || idx}>
               <View style={styles.iconCircle}>
                 <MaterialCommunityIcons name="calendar-month" size={16} color="#222" />
               </View>
-              <Text style={styles.infoLabel}>Fecha:</Text>
-              <Text style={styles.infoValue}>{combined}</Text>
+              <View style={styles.twoLineContainer}>
+                <Text style={styles.infoLabel}>
+                  Fecha: <Text style={styles.infoValueInline}>{fechaTxt}</Text>
+                </Text>
+                {rango ? (
+                  <Text style={styles.infoLabel}>
+                    Horario: <Text style={styles.infoValueInline}>{rango}</Text>
+                  </Text>
+                ) : null}
+              </View>
             </View>
           );
         })

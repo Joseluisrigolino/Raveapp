@@ -1332,7 +1332,9 @@ export default function CreateEventScreen() {
           const size = await getFileSize(photoFile);
           if (size > MAX_IMAGE_BYTES) {
             const userMsg =
-              "La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana.";
+              `La imagen seleccionada supera el máximo permitido (${Math.round(
+                MAX_IMAGE_BYTES / 1024
+              )}KB). Por favor, elige una imagen más liviana.`;
             setCreationError(userMsg);
             Alert.alert("Imagen demasiado grande", userMsg);
             return;
@@ -1734,7 +1736,7 @@ export default function CreateEventScreen() {
         fechaIds = mapped.filter(Boolean);
       }
 
-      // If backend returned fechas with default/invalid dates (e.g., 0001-01-01), patch them now via UpdateEvento
+  // If backend returned fechas with default/invalid dates (e.g., 0001-01-01), patch them now via UpdateEvento (exact body, ISO Z)
       try {
         const hasInvalidRemoteFechas = (arr: RemoteFecha[]) =>
           Array.isArray(arr) && arr.some((f) => {
@@ -1750,34 +1752,16 @@ export default function CreateEventScreen() {
           });
 
         if (createdEventId && fechaIds.length && hasInvalidRemoteFechas(remoteFechas as any)) {
-          const fechasUpd = fechaIds.map((id, i) => {
-            const inicio = formatBackendIso(daySchedules[i]?.start);
-            const fin = formatBackendIso(daySchedules[i]?.end);
-            const inicioVenta = formatBackendIso(daySaleConfigs[i]?.saleStart);
-            const finVenta = formatBackendIso(daySaleConfigs[i]?.sellUntil);
-            return {
-              idFecha: id,
-              inicio, fin, inicioVenta, finVenta, estado: 0,
-              // extra casings to satisfy server model binders
-              Inicio: inicio,
-              Fin: fin,
-              InicioVenta: inicioVenta,
-              FinVenta: finVenta,
-              fechaInicio: inicio,
-              FechaInicio: inicio,
-              fechaFin: fin,
-              FechaFin: fin,
-              fechaInicioVenta: inicioVenta,
-              FechaInicioVenta: inicioVenta,
-              // typo variant observed in backend contract
-              fechaIncioVenta: inicioVenta,
-              FechaIncioVenta: inicioVenta,
-              fechaFinVenta: finVenta,
-              FechaFinVenta: finVenta,
-            } as any;
-          });
-          // Build a full update body using the original create body as base (server often requires full payload)
-          const fullUpdateBody: any = {
+          const { updateEventExact, formatIsoZulu } = await import("@/utils/events/eventApi");
+          const fechasUpd = fechaIds.map((id, i) => ({
+            idFecha: id,
+            inicio: formatIsoZulu(daySchedules[i]?.start),
+            fin: formatIsoZulu(daySchedules[i]?.end),
+            inicioVenta: formatIsoZulu(daySaleConfigs[i]?.saleStart),
+            finVenta: formatIsoZulu(daySaleConfigs[i]?.sellUntil),
+            estado: 0,
+          }));
+          const exactBody: any = {
             idEvento: String(createdEventId),
             nombre: body.nombre,
             descripcion: body.descripcion,
@@ -1786,29 +1770,14 @@ export default function CreateEventScreen() {
             idArtistas: body.idArtistas,
             isAfter: body.isAfter,
             isLgbt: body.isLgbt,
-            inicioEvento: body.inicioEvento,
-            finEvento: body.finEvento,
+            inicioEvento: formatIsoZulu(daySchedules[0]?.start),
+            finEvento: formatIsoZulu(daySchedules[0]?.end),
             estado: body.estado,
             fechas: fechasUpd,
-            Fechas: fechasUpd,
             idFiesta: body.idFiesta ?? null,
             soundCloud: body.soundCloud ?? '',
           };
-          // duplicate top-level venta fields if present
-          if (body.inicioVenta) {
-            fullUpdateBody.inicioVenta = body.inicioVenta;
-            fullUpdateBody.InicioVenta = body.inicioVenta;
-            fullUpdateBody.FechaInicioVenta = body.inicioVenta;
-            // typo variant
-            fullUpdateBody.fechaIncioVenta = body.inicioVenta;
-            fullUpdateBody.FechaIncioVenta = body.inicioVenta;
-          }
-          if (body.finVenta) {
-            fullUpdateBody.finVenta = body.finVenta;
-            fullUpdateBody.FinVenta = body.finVenta;
-            fullUpdateBody.FechaFinVenta = body.finVenta;
-          }
-          await eventApi.updateEvent(String(createdEventId), fullUpdateBody);
+          await updateEventExact(exactBody);
           // refresh remoteFechas snapshot after patch
           try {
             const fresh = await eventApi.fetchEventById(String(createdEventId));
@@ -2117,7 +2086,9 @@ export default function CreateEventScreen() {
             msg.toLowerCase().includes("too large") ||
             msg.includes("2mb") ||
             msg.includes("1mb")
-              ? "La imagen seleccionada supera el máximo permitido (1MB). Por favor, elige una imagen más liviana."
+              ? `La imagen seleccionada supera el máximo permitido (${Math.round(
+                  MAX_IMAGE_BYTES / 1024
+                )}KB). Por favor, elige una imagen más liviana.`
               : "No se pudo subir la imagen. El evento no se creó. Detalle: " +
                 msg;
           setCreationError(userMsg);
@@ -2295,7 +2266,7 @@ export default function CreateEventScreen() {
         setPhotoFile(null);
         setPhotoTooLarge(true);
         setPhotoFileSize(size);
-        Alert.alert("Error", "La imagen supera los 2MB permitidos.");
+  Alert.alert("Error", "La imagen supera el 1MB permitido.");
         return; // NO seteamos photoFile
       }
 
@@ -2499,7 +2470,10 @@ export default function CreateEventScreen() {
               handleSelectProvince={async (id: string, name: string) => {
                 handleSelectProvinceCallback(id, name);
                 if (id === "02") {
+                  // Cerrar desplegables y dejar campos deshabilitados y grises
+                  setShowProvinces(false);
                   setShowMunicipalities(false);
+                  setShowLocalities(false);
                   setMunicipalities([]);
                   setMunicipalityId("02");
                   setMunicipalityName("Ciudad Autónoma de Buenos Aires");
@@ -2510,8 +2484,27 @@ export default function CreateEventScreen() {
                     );
                     const locs = await fetchLocalitiesByProvince(id);
                     setLocalities(locs || []);
+                    // Autoseleccionar la localidad "Ciudad Autónoma de Buenos Aires" si existe
+                    const CABA_NAME = "Ciudad Autónoma de Buenos Aires";
+                    const pick = (locs || []).find(
+                      (l: any) => norm(l?.nombre || "") === norm(CABA_NAME)
+                    ) ||
+                    (locs || []).find(
+                      (l: any) => norm(l?.nombre || "").includes("ciudad autonoma")
+                    );
+                    if (pick) {
+                      setLocalityId(String(pick.id));
+                      setLocalityName(String(pick.nombre));
+                    } else {
+                      // Fallback: setear explícitamente CABA aunque no esté en la lista
+                      setLocalityId("02");
+                      setLocalityName(CABA_NAME);
+                    }
                   } catch (e) {
                     setLocalities([]);
+                    // En caso de fallo, igual autocompletar con CABA para no bloquear el flujo
+                    setLocalityId("02");
+                    setLocalityName("Ciudad Autónoma de Buenos Aires");
                   } finally {
                     setLocalityLoading(false);
                   }
@@ -2601,6 +2594,7 @@ export default function CreateEventScreen() {
               isChecking={isCheckingImage}
               photoTooLarge={photoTooLarge}
               photoFileSize={photoFileSize}
+              maxImageBytes={MAX_IMAGE_BYTES}
             />
             <View style={styles.card}>
               <TouchableOpacity
@@ -2625,7 +2619,7 @@ export default function CreateEventScreen() {
 
               {photoTooLarge && (
                 <Text style={{ color: COLORS.negative, marginBottom: 8 }}>
-                  La imagen seleccionada excede los 2MB. Seleccioná otra imagen.
+                  La imagen seleccionada excede {Math.round(MAX_IMAGE_BYTES/1024)}KB. Seleccioná otra imagen.
                 </Text>
               )}
               <TouchableOpacity
@@ -2638,7 +2632,10 @@ export default function CreateEventScreen() {
                   if (!ok) return;
                   // No permitir submit si la imagen es demasiado grande o no hay foto
                   if (!photoFile || photoTooLarge) {
-                    Alert.alert("Foto inválida", "Debés seleccionar una imagen válida de menos de 2MB.");
+                    Alert.alert(
+                      "Foto inválida",
+                      `Debés seleccionar una imagen válida de menos de ${Math.round(MAX_IMAGE_BYTES/1024)}KB.`
+                    );
                     return;
                   }
                   setCreating(true);

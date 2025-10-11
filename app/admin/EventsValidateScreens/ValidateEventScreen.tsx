@@ -1,27 +1,34 @@
 // src/screens/admin/EventsValidateScreens/ValidateEventScreen.tsx
 
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Modal } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Modal, Image, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import InputDesc from "@/components/common/inputDesc";
+import InputText from "@/components/common/inputText";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
-import { fetchEvents, setEventStatus, ESTADO_CODES, getEventFlags, EventItemWithExtras } from "@/utils/events/eventApi";
+import { fetchEvents, setEventStatus, ESTADO_CODES, getEventFlags, EventItemWithExtras, fetchGenres, ApiGenero } from "@/utils/events/eventApi";
+import { fetchEntradasFechaRaw, ApiEntradaFechaRaw, getTipoMap } from "@/utils/events/entradaApi";
 import { apiClient, login } from "@/utils/apiConfig";
 import * as nav from "@/utils/navigation";
 import ROUTES from "@/routes";
 import { EventItem } from "@/interfaces/EventItem";
-import TituloEvento from "@/components/events/evento/TituloEvento";
 import HeroImagen from "@/components/events/evento/HeroImagen";
-import BloqueInfoEvento from "@/components/events/evento/BloqueInfoEvento";
 import BadgesEvento from "@/components/events/evento/BadgesEvento";
 import ReproductorSoundCloud from "@/components/events/evento/ReproductorSoundCloud";
 import ReproductorYouTube from "@/components/events/evento/ReproductorYouTube";
 // Las reseñas no se muestran en el preview de validación
 import { COLORS } from "@/styles/globalStyles";
+import Icon from "react-native-vector-icons/MaterialIcons";
+import { getProfile, getUsuarioById } from "@/utils/auth/userHelpers";
+import { updateArtistOnApi, fetchOneArtistFromApi } from "@/utils/artists/artistApi";
+import { mediaApi } from "@/utils/mediaApi";
+import eventBus from "@/utils/eventBus";
 
 export default function ValidateEventScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -31,6 +38,58 @@ export default function ValidateEventScreen() {
   const [loading, setLoading] = useState(true);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [genreMap, setGenreMap] = useState<Map<number, string>>(new Map());
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [entradasByFecha, setEntradasByFecha] = useState<Record<string, ApiEntradaFechaRaw[]>>({});
+  const [entradasLoading, setEntradasLoading] = useState(false);
+  const [tipoMap, setTipoMap] = useState<Map<number, string>>(new Map());
+  // Popup de edición/activación inline (igual a EditarArtistaPantalla)
+  const [editVisible, setEditVisible] = useState(false);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [instagramURL, setInstagramURL] = useState("");
+  const [spotifyURL, setSpotifyURL] = useState("");
+  const [soundcloudURL, setSoundcloudURL] = useState("");
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [idMedia, setIdMedia] = useState<string | null>(null);
+  const [idSocial, setIdSocial] = useState<string | null>(null);
+  const [newImageLocalUri, setNewImageLocalUri] = useState<string | null>(null);
+  // track subscriptions
+  useEffect(() => {
+    // Listen for artist activation updates coming back from EditarArtistaPantalla
+    const off = eventBus.on("artist:activated", (payload: any) => {
+      const activatedId = String(payload?.id ?? "");
+      if (!activatedId) return;
+      // reflect locally and inform the user
+      setEventData((prev) => {
+        if (!prev) return prev;
+        const list = Array.isArray((prev as any).artistas) ? [ ...((prev as any).artistas) ] : [];
+        const idx = list.findIndex((a: any) => String(a?.idArtista ?? a?.id ?? "") === activatedId);
+        if (idx >= 0) {
+          const a = { ...list[idx] };
+          a.isActivo = true; a.activo = true; a.isActive = true; a.estado = 1; a.cdEstado = 1; a.status = 1;
+          if (payload?.name) {
+            a.nombre = payload.name; a.name = payload.name; a.dsNombre = payload.name; a.titulo = payload.name; a.tituloArtist = payload.name; a.artistName = payload.name;
+          }
+          list[idx] = a;
+        }
+        return { ...(prev as any), artistas: list } as any;
+      });
+      // iOS-style alert (Alert.alert renders native on iOS)
+      Alert.alert("Artista activado", "Se activó correctamente el artista y se actualizó la vista.");
+      // Optional: re-fetch the event to ensure fresh data from backend
+      (async () => {
+        try {
+          const pendientes = await fetchEvents(0);
+          const updated = pendientes.find(e => String(e.id) === String(id || ""));
+          if (updated) setEventData(updated);
+        } catch {}
+      })();
+    });
+    return () => { off?.(); };
+  }, []);
 
   useEffect(() => {
     if (!id) {
@@ -47,6 +106,12 @@ export default function ValidateEventScreen() {
           console.log("ValidateEventScreen - evento encontrado (normalizado):", found);
           setEventData(found);
         }
+        // precargar géneros para poder mostrar múltiples géneros por nombre
+        try {
+          const gen = await fetchGenres();
+          const map = new Map<number, string>(gen.map((g: ApiGenero) => [g.cdGenero, g.dsGenero]));
+          setGenreMap(map);
+        } catch {}
       } catch (err) {
         console.error("Error al cargar evento para validar:", err);
       } finally {
@@ -54,6 +119,47 @@ export default function ValidateEventScreen() {
       }
     })();
   }, [id]);
+
+  // Cargar mapa de tipos de entradas (cdTipo -> dsTipo)
+  useEffect(() => {
+    (async () => {
+      try {
+        const map = await getTipoMap();
+        setTipoMap(map);
+      } catch {}
+    })();
+  }, []);
+
+  // Cargar entradas por fecha del evento
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!eventData || !Array.isArray((eventData as any).fechas) || !(eventData as any).fechas.length) {
+          setEntradasByFecha({});
+          return;
+        }
+        setEntradasLoading(true);
+        const fechas = ((eventData as any).fechas as Array<{ idFecha: string }>).map((f) => String(f.idFecha)).filter(Boolean);
+        const pairs = (await Promise.all(
+          fechas.map(async (idF) => {
+            try {
+              const arr = await fetchEntradasFechaRaw(idF);
+              return [idF, Array.isArray(arr) ? arr : []] as [string, ApiEntradaFechaRaw[]];
+            } catch {
+              return [idF, [] as ApiEntradaFechaRaw[]];
+            }
+          })
+        )) as Array<[string, ApiEntradaFechaRaw[]]>;
+        const map: Record<string, ApiEntradaFechaRaw[]> = {};
+        pairs.forEach(([k, v]) => {
+          map[String(k)] = Array.isArray(v) ? v : [];
+        });
+        setEntradasByFecha(map);
+      } finally {
+        setEntradasLoading(false);
+      }
+    })();
+  }, [eventData?.id, (eventData as any)?.fechas]);
 
   // Si no tenemos email del creador, intentar pedirlo a la API de usuarios
   useEffect(() => {
@@ -77,27 +183,36 @@ export default function ValidateEventScreen() {
         (eventData as any).__raw?.usuario?.idUsuario ||
         (eventData as any).__raw?.idUsuarioPropietario;
       console.log("ValidateEventScreen - ownerId candidates, usado:", ownerId);
-      if (!ownerId) return;
 
-      try {
-        const token = await login().catch(() => null);
-        const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-        console.log("ValidateEventScreen - llamando a /v1/Usuario/GetUsuario con idUsuario=", ownerId);
-        const resp = await apiClient.get<{ usuarios: any[] }>("/v1/Usuario/GetUsuario", { params: { idUsuario: ownerId }, headers });
-        console.log("ValidateEventScreen - respuesta usuario:", resp?.data);
-        const u = resp?.data?.usuarios?.[0] ?? null;
-        if (u?.correo) {
-          const updated = (prev: EventItemWithExtras | null): EventItemWithExtras | null =>
-            prev ? { ...prev, ownerEmail: u.correo, ownerName: u.nombre ?? prev.ownerName } : prev;
-          setEventData(prev => {
-            const out = updated(prev);
-            console.log("ValidateEventScreen - eventData actualizado con ownerEmail:", out);
-            return out;
-          });
+      // caches locales simples para esta pantalla
+      const emailCache = new Map<string, any>();
+      const idCache = new Map<string, any>();
+
+      const fallbackEmail = (eventData as any)?.ownerEmail || (eventData as any)?.__raw?.correo || null;
+      let profile: any = null;
+
+      if (fallbackEmail) {
+        const key = String(fallbackEmail).toLowerCase();
+        if (emailCache.has(key)) profile = emailCache.get(key);
+        else {
+          try { profile = await getProfile(key); if (profile) emailCache.set(key, profile); } catch {}
         }
-      } catch (e) {
-        // no crítico
-        console.warn("No se pudo obtener email del creador:", e);
+      }
+      if (!profile && ownerId) {
+        const key = String(ownerId);
+        if (idCache.has(key)) profile = idCache.get(key);
+        else {
+          try { profile = await getUsuarioById(key); if (profile) idCache.set(key, profile); } catch {}
+        }
+      }
+
+      if (profile) {
+        setEventData(prev => prev ? ({
+          ...prev,
+          ownerName: profile.nombre ? `${profile.nombre} ${profile.apellido ?? ""}`.trim() : (prev.ownerName ?? undefined),
+          ownerEmail: profile.correo ?? prev.ownerEmail,
+          ownerId: profile.idUsuario ?? prev.ownerId,
+        }) : prev);
       }
     })();
   }, [eventData]);
@@ -180,11 +295,274 @@ export default function ValidateEventScreen() {
 
   // Intentar obtener el email del creador desde distintas fuentes (normalizado o raw)
   const creatorEmail =
-    eventData?.ownerEmail ||
+    (eventData as any)?.ownerEmail ||
     (eventData as any)?.__raw?.ownerEmail ||
     (eventData as any)?.__raw?.propietario?.correo ||
     (eventData as any)?.propietario?.correo ||
+    (eventData as any)?.usuario?.correo ||
     "";
+
+  // Resolver nombre del propietario (preferir perfil enriquecido)
+  const ownerName =
+    (eventData as any)?.ownerName ||
+    (eventData as any)?.__raw?.propietario?.nombre ||
+    (eventData as any)?.__raw?.usuario?.nombre ||
+    (eventData as any)?.ownerDisplayName ||
+    "N/D";
+
+  // Helper: géneros como nombres desde los códigos (o type simple)
+  const getGenresText = (ev: EventItemWithExtras): string => {
+    const raw: any = ev as any;
+    const codes: number[] = Array.isArray(raw?.genero) ? raw.genero : [];
+    if (codes.length && genreMap.size) {
+      const names = codes
+        .map((c) => genreMap.get(Number(c)) || null)
+        .filter((n): n is string => Boolean(n));
+      if (names.length) return names.join(", ");
+    }
+    return (ev as any).type || "Otros";
+  };
+
+  // Helper: lista de artistas con tolerancia a distintos shapes
+  const getArtistsText = (arr: any[]): string => {
+    if (!Array.isArray(arr) || !arr.length) return "";
+    const names = arr
+      .map((a) => {
+        if (!a) return null;
+        if (typeof a === "string") return a;
+        return (
+          a.nombre || a.name || a.dsNombre || a.titulo || a.tituloArtist || a.artistName || null
+        );
+      })
+      .filter((v): v is string => Boolean(v));
+    return names.join(", ");
+  };
+
+  // Helper: separar artistas activos vs inactivos (tolerante a distintos flags)
+  const splitArtistsByActive = (arr: any[]): { active: string[]; inactive: string[] } => {
+    const names = (a: any) => {
+      if (!a) return null;
+      if (typeof a === "string") return a;
+      return a.nombre || a.name || a.dsNombre || a.titulo || a.tituloArtist || a.artistName || null;
+    };
+    const isActive = (a: any) => {
+      const v = a?.isActivo ?? a?.activo ?? a?.isActive ?? a?.estaActivo ?? a?.enabled ?? null;
+      if (typeof v === "boolean") return v;
+      if (typeof v === "number") return v === 1;
+      const st = a?.estado ?? a?.cdEstado ?? a?.status;
+      if (typeof st === "number") return st === 1;
+      if (typeof st === "string") return ["1", "aprobado", "activo", "true"].includes(st.toLowerCase());
+      return true; // por defecto, considerar activo si no hay info
+    };
+    const active: string[] = [];
+    const inactive: string[] = [];
+    if (Array.isArray(arr)) {
+      for (const a of arr) {
+        const n = names(a);
+        if (!n) continue;
+        (isActive(a) ? active : inactive).push(n);
+      }
+    }
+    return { active, inactive };
+  };
+
+  // Helper: obtener id y nombre de artistas
+  const parseArtists = (arr: any[]): { id: string | null; name: string; active: boolean; raw: any }[] => {
+    const toName = (a: any) => {
+      if (!a) return "";
+      if (typeof a === "string") return a;
+      return a.nombre || a.name || a.dsNombre || a.titulo || a.tituloArtist || a.artistName || "";
+    };
+    const toId = (a: any) => String(a?.idArtista ?? a?.id ?? a?.artistId ?? a?.idUsuario ?? "" ) || null;
+    const activeFlag = (a: any) => {
+      const v = a?.isActivo ?? a?.activo ?? a?.isActive ?? a?.estaActivo ?? a?.enabled ?? null;
+      if (typeof v === "boolean") return v;
+      if (typeof v === "number") return v === 1;
+      const st = a?.estado ?? a?.cdEstado ?? a?.status;
+      if (typeof st === "number") return st === 1;
+      if (typeof st === "string") return ["1", "aprobado", "activo", "true"].includes(st.toLowerCase());
+      return true;
+    };
+    if (!Array.isArray(arr)) return [];
+    return arr.map((a) => ({ id: toId(a), name: toName(a), active: activeFlag(a), raw: a }));
+  };
+
+  const openEditArtistPopup = async (artist: { id: string | null; name: string }) => {
+    if (!artist?.id) {
+      Alert.alert("No se puede activar", "Este artista no tiene un ID válido.");
+      return;
+    }
+    try {
+      setEditBusy(true);
+      setEditId(String(artist.id));
+      // cargar datos actuales
+      const a = await fetchOneArtistFromApi(String(artist.id));
+      setName(a?.name || artist.name || "");
+      setDescription(a?.description || "");
+      setInstagramURL(a?.instagramURL || "");
+      setSpotifyURL(a?.spotifyURL || "");
+      setSoundcloudURL(a?.soundcloudURL || "");
+      setIdSocial(a?.idSocial ?? null);
+      setImageUri(a?.image || null);
+      // obtener media por entidad
+      try {
+        const media = await mediaApi.getByEntidad(String(artist.id));
+        if (Array.isArray(media.media) && media.media.length > 0) {
+          setIdMedia(media.media[0].idMedia || null);
+        } else {
+          setIdMedia(null);
+        }
+      } catch {
+        setIdMedia(null);
+      }
+      setNewImageLocalUri(null);
+      setEditVisible(true);
+    } catch (e) {
+      // Si falla la carga, al menos abrir con el nombre previo
+      setName(artist.name || "");
+      setEditId(String(artist.id));
+      setEditVisible(true);
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const handleSelectImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets?.length > 0) {
+      const asset = result.assets[0];
+      const fileInfo: any = await FileSystem.getInfoAsync(asset.uri);
+      if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
+        Alert.alert("Error", "La imagen supera los 2MB permitidos.");
+        return;
+      }
+      setNewImageLocalUri(asset.uri);
+      setImageUri(asset.uri);
+    }
+  };
+
+  const handleDeleteImage = async () => {
+    if (!idMedia) {
+      return Alert.alert("Error", "No se encontró imagen para eliminar.");
+    }
+    try {
+      await mediaApi.delete(idMedia);
+      setImageUri(null);
+      setIdMedia(null);
+      Alert.alert("Imagen eliminada correctamente.");
+    } catch (error) {
+      Alert.alert("Error", "No se pudo eliminar la imagen.");
+    }
+  };
+
+  const handleConfirmEditAndActivate = async () => {
+    if (!editId || !name.trim()) {
+      Alert.alert("Error", "El nombre del artista es obligatorio.");
+      return;
+    }
+    try {
+      setEditBusy(true);
+      if (newImageLocalUri) {
+        const fileName = newImageLocalUri.split("/").pop() ?? "foto.jpg";
+        const file: any = { uri: newImageLocalUri, name: fileName, type: "image/jpeg" };
+        await mediaApi.upload(editId, file, undefined, { compress: true });
+        setNewImageLocalUri(null);
+      }
+      await updateArtistOnApi({
+        idArtista: editId,
+        name,
+        description,
+        instagramURL,
+        spotifyURL,
+        soundcloudURL,
+        idSocial,
+        isActivo: true,
+      });
+      // Actualizar UI local
+      setEventData((prev) => {
+        if (!prev) return prev;
+        const list = Array.isArray((prev as any).artistas) ? [ ...((prev as any).artistas) ] : [];
+        const idx = list.findIndex((a: any) => String(a?.idArtista ?? a?.id ?? "") === String(editId));
+        if (idx >= 0) {
+          const a = { ...list[idx] };
+          a.isActivo = true; a.activo = true; a.isActive = true; a.estado = 1; a.cdEstado = 1; a.status = 1;
+          a.nombre = name; a.name = name; a.dsNombre = name; a.titulo = name; a.tituloArtist = name; a.artistName = name;
+          list[idx] = a;
+        }
+        return { ...(prev as any), artistas: list } as any;
+      });
+      setEditVisible(false);
+      Alert.alert("Artista activado", "Se activó correctamente el artista y se actualizó la vista.");
+    } catch (err: any) {
+      Alert.alert("Error", err?.message || "No se pudo actualizar/activar el artista.");
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  // confirmActivateArtist: reemplazado por handleConfirmEditAndActivate con popup completo
+
+  // Helper: fecha de creación (arriba) y formatos
+  const formatDate = (iso?: string | null) => {
+    if (!iso) return "";
+    const d = new Date(String(iso));
+    if (!isFinite(d.getTime())) return "";
+    return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  };
+  const formatHHmm = (iso?: string | null) => {
+    if (!iso) return "";
+    const d = new Date(String(iso));
+    if (!isFinite(d.getTime())) return "";
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${pad(d.getHours())}:${pad(d.getMinutes())} hs`;
+  };
+  const getCreationDate = (ev: EventItemWithExtras): string => {
+    const raw: any = (ev as any)?.__raw ?? {};
+    const cands = [
+      (ev as any)?.fechaCreacion,
+      (ev as any)?.createdAt,
+      raw?.fechaCreacion,
+      raw?.dtCreacion,
+      raw?.dtAlta,
+      raw?.createdAt,
+      raw?.creationDate,
+      raw?.fecAlta,
+    ].filter(Boolean);
+    const first = cands[0];
+    return formatDate(first);
+  };
+
+  // Helper: formato de moneda ARS sin decimales
+  const formatCurrency = (n?: number) => {
+    const val = Number(n ?? 0);
+    try {
+      return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(val);
+    } catch {
+      return `$${Math.round(val)}`;
+    }
+  };
+
+  // Helper: nombre del tipo de entrada
+  const getTipoNombreEntrada = (e: ApiEntradaFechaRaw): string => {
+    const nameRaw = e?.tipo?.dsTipo;
+    const rawCd: any = (e?.tipo?.cdTipo ?? (e as any)?.cdTipo ?? (e as any)?.tipo);
+    const cd = Number(rawCd);
+    const fromMap = Number.isFinite(cd) ? tipoMap.get(cd) : undefined;
+    if (nameRaw && String(nameRaw).trim()) return String(nameRaw);
+    if (fromMap && String(fromMap).trim()) return String(fromMap);
+    return Number.isFinite(cd) ? `Tipo ${cd}` : "Tipo";
+  };
+
+  // Google Maps deep link
+  const openMapsForAddress = (address?: string) => {
+    const q = String(address || "").trim();
+    if (!q) return;
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+    Linking.openURL(url).catch(() => {});
+  };
 
   // Preview: reusar componentes de EventScreen para mostrar cómo se vería el evento
   return (
@@ -192,37 +570,203 @@ export default function ValidateEventScreen() {
       <SafeAreaView style={styles.container}>
         <Header />
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.previewNoteWrap}>
-            <Text style={styles.previewNote}>
-              PREVIEW: Esto es sólo una vista previa. Si validás este evento, se publicará y lo verán los usuarios finales de la aplicación.
-            </Text>
+          {/* Encabezado como en la web (sin card) */}
+          <Text style={styles.pageTitle}>Evento a validar:</Text>
+          <View style={[styles.infoCard, styles.summaryContainer]}>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Nombre de evento:</Text>
+              <Text style={styles.summaryValue}>{eventData.title}</Text>
+            </View>
+            {getCreationDate(eventData) ? (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Fecha de creación:</Text>
+                <Text style={styles.summaryValue}>{getCreationDate(eventData)}</Text>
+              </View>
+            ) : null}
+            <View style={[styles.summaryRow, { alignItems: "flex-start" }]}>
+              <Icon name="person" size={18} color={COLORS.textSecondary || "#666"} style={{ marginRight: 6, marginTop: 2 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.summaryLabelInline}><Text style={styles.summaryLabel}>Propietario:</Text> <Text style={styles.summaryValue}>{ownerName}</Text></Text>
+                {creatorEmail ? <Text style={styles.summaryEmail}>({creatorEmail})</Text> : null}
+              </View>
+            </View>
+            <View style={[styles.summaryRow, { alignItems: "flex-start" }]}>
+              <Icon name="music-note" size={18} color={COLORS.textSecondary || "#666"} style={{ marginRight: 6, marginTop: 2 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.summaryLabelInline}><Text style={styles.summaryLabel}>Género:</Text> <Text style={styles.summaryValue}>{getGenresText(eventData)}</Text></Text>
+              </View>
+            </View>
           </View>
-          <TituloEvento title={eventData.title} isFavorite={false} favBusy={false} onToggleFavorite={() => {}} showFavorite={false} />
+          {/* Badges de la vista previa del evento (sin título repetido) */}
           <BadgesEvento isLGBT={getEventFlags(eventData).isLGBT} isAfter={getEventFlags(eventData).isAfter} />
-          <HeroImagen imageUrl={(eventData as any).imageUrl} onPress={() => {}} />
+          <HeroImagen imageUrl={(eventData as any).imageUrl} onPress={() => setImageModalVisible(true)} />
+          <Text style={styles.imageHint}>Tocar imagen para verla completa</Text>
 
-          <BloqueInfoEvento
-            artistas={(eventData as any).artistas}
-            fechas={(eventData as any).fechas}
-            date={(eventData as any).date}
-            timeRange={(eventData as any).timeRange}
-            address={(eventData as any).address}
-            onSeeAllArtists={() => {}}
-            onCómoLlegar={() => {}}
-          />
+          {/* Detalles del evento */}
+          <Text style={styles.sectionTitle}>Detalles del evento</Text>
+          <View style={[styles.infoCard, styles.sectionContainer]}>
+            {/* Fechas de inicio/fin (con ícono calendario) */}
+            <View style={[styles.summaryRow, { alignItems: "flex-start" }]}>
+              <Icon name="event" size={18} color={COLORS.textSecondary || "#666"} style={{ marginRight: 6, marginTop: 2 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.summaryLabelInline}>
+                  <Text style={styles.summaryLabel}>Fecha inicio:</Text>
+                  <Text style={styles.summaryValue}>
+                    {" "}
+                    {formatDate(
+                      (eventData as any)?.fechas?.[0]?.inicio ||
+                        (eventData as any)?.__raw?.inicio ||
+                        (eventData as any)?.__raw?.inicioEvento ||
+                        null
+                    )}
+                  </Text>
+                </Text>
+                <Text style={styles.summaryLabelInline}>
+                  <Text style={styles.summaryLabel}>Fecha fin:</Text>
+                  <Text style={styles.summaryValue}>
+                    {" "}
+                    {formatDate(
+                      (eventData as any)?.fechas?.[0]?.fin ||
+                        (eventData as any)?.__raw?.fin ||
+                        (eventData as any)?.__raw?.finEvento ||
+                        null
+                    )}
+                  </Text>
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.summaryRow, { alignItems: "flex-start" }]}>
+              <Icon name="schedule" size={18} color={COLORS.textSecondary || "#666"} style={{ marginRight: 6, marginTop: 2 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.summaryLabelInline}>
+                  <Text style={styles.summaryLabel}>Inicio:</Text>
+                  <Text style={styles.summaryValue}> {formatHHmm((eventData as any)?.fechas?.[0]?.inicio || (eventData as any)?.__raw?.inicio || (eventData as any)?.__raw?.inicioEvento || "")}</Text>
+                </Text>
+                <Text style={styles.summaryLabelInline}>
+                  <Text style={styles.summaryLabel}>Fin:</Text>
+                  <Text style={styles.summaryValue}> {formatHHmm((eventData as any)?.fechas?.[0]?.fin || (eventData as any)?.__raw?.fin || (eventData as any)?.__raw?.finEvento || "")}</Text>
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.summaryRow, { alignItems: "flex-start" }]}>
+              <Icon name="place" size={18} color={COLORS.textSecondary || "#666"} style={{ marginRight: 6, marginTop: 2 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.summaryLabelInline}>
+                  <Text style={styles.summaryLabel}>Dirección:</Text> <Text style={styles.summaryValue}>{(eventData as any).address || ""}</Text>
+                </Text>
+              </View>
+              {(eventData as any).address ? (
+                <TouchableOpacity style={styles.linkBtn} onPress={() => openMapsForAddress((eventData as any).address)}>
+                  <Text style={styles.linkBtnText}>Cómo llegar</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <View style={[styles.summaryRow, { alignItems: "flex-start" }]}>
+              <Icon name="mic" size={18} color={COLORS.textSecondary || "#666"} style={{ marginRight: 6, marginTop: 2 }} />
+              <View style={{ flex: 1 }}>
+                {(() => {
+                  const parsed = parseArtists((eventData as any).artistas || []);
+                  const active = parsed.filter((a) => a.active).map((a) => a.name).filter(Boolean);
+                  const inactive = parsed.filter((a) => !a.active);
+                  return (
+                    <>
+                      <Text style={styles.summaryLabel}>Artistas activos:</Text>
+                      {active.length ? (
+                        <View style={styles.chipsWrap}>
+                          {active.map((n) => (
+                            <View key={n} style={styles.chip}>
+                              <Icon name="check-circle" size={14} color={COLORS.primary} style={{ marginRight: 4 }} />
+                              <Text style={styles.chipText}>{n}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        <Text style={styles.summaryValue}>—</Text>
+                      )}
+                      <Text style={[styles.summaryLabel, { marginTop: 6 }]}>Artistas inactivos:</Text>
+                      {inactive.length === 0 ? (
+                        <Text style={styles.summaryValue}>—</Text>
+                      ) : (
+                        inactive.map((a) => (
+                          <View key={`${a.id ?? a.name}`} style={styles.inactiveRow}>
+                            <Text style={styles.summaryValue}>{a.name || "(sin nombre)"}</Text>
+                            {a.id ? (
+                              <TouchableOpacity style={styles.activateBtn} onPress={() => openEditArtistPopup({ id: a.id!, name: a.name })}>
+                                <Text style={styles.activateBtnText}>Activar</Text>
+                              </TouchableOpacity>
+                            ) : null}
+                          </View>
+                        ))
+                      )}
+                    </>
+                  );
+                })()}
+              </View>
+            </View>
+          </View>
 
-          <Text style={[styles.label, { marginTop: 12 }]}>Descripción:</Text>
-          <View style={styles.descriptionBox}>
-            <Text>{(eventData as any).description}</Text>
+          {/* Entradas del evento (por fecha) */}
+          <Text style={styles.sectionTitle}>Entradas</Text>
+          <View style={[styles.infoCard, styles.sectionContainer]}>
+            {entradasLoading ? (
+              <View style={{ paddingVertical: 8 }}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              </View>
+            ) : (() => {
+              const fechas = Array.isArray((eventData as any).fechas) ? (eventData as any).fechas : [];
+              // calcular si todas las fechas no tienen entradas
+              const totalEntradas = fechas.reduce((acc: number, f: any) => acc + ((entradasByFecha[String(f.idFecha)] || []).length), 0);
+              if (!fechas.length || totalEntradas === 0) {
+                return <Text style={styles.summaryValue}>No hay entradas configuradas.</Text>;
+              }
+              return (
+                <View>
+                  {fechas.map((f: any) => {
+                    const idF = String(f?.idFecha || "");
+                    const list = entradasByFecha[idF] || [];
+                    const fechaLabel = formatDate(f?.inicio || f?.FechaInicio || f?.dtInicio || "");
+                    return (
+                      <View key={idF} style={{ marginBottom: 8 }}>
+                        <Text style={styles.ticketsDate}>Fecha: {fechaLabel || "—"}</Text>
+                        {list.length === 0 ? (
+                          <Text style={styles.summaryValue}>—</Text>
+                        ) : (
+                          list.map((e, idx) => (
+                            <Text key={`${idF}-${idx}`} style={styles.ticketLine}>
+                              {getTipoNombreEntrada(e)}: Precio: {formatCurrency(e?.precio)} - Cantidad: {Number(e?.cantidad ?? 0)}
+                            </Text>
+                          ))
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            })()}
+          </View>
+
+          <Text style={styles.sectionTitle}>Descripción</Text>
+          <View style={[styles.infoCard, styles.sectionContainer]}>
+            <Text style={styles.descriptionText}>{(eventData as any).description || ""}</Text>
           </View>
 
           {/* La imagen principal ya se muestra en HeroImagen arriba; evitamos duplicados */}
 
-          {/* Multimedia preview */}
-          <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
-            <ReproductorSoundCloud soundCloudUrl={(eventData as any).musica || (eventData as any).soundCloud || null} />
-            <ReproductorYouTube youTubeEmbedUrl={null} />
-          </View>
+          {/* Multimedia (mostrar solo si existe contenido) */}
+          {(() => {
+            const scUrl = (eventData as any)?.musica || (eventData as any)?.soundCloud || (eventData as any)?.soundcloud || null;
+            const ytUrl = (eventData as any)?.youTubeEmbedUrl || (eventData as any)?.youtubeUrl || (eventData as any)?.youtube || null;
+            if (!scUrl && !ytUrl) return null;
+            return (
+              <>
+                <Text style={styles.sectionTitle}>Multimedia</Text>
+                <View style={[styles.infoCard, { marginTop: 8, paddingHorizontal: 8, paddingVertical: 8 }]}> 
+                  {scUrl ? <ReproductorSoundCloud soundCloudUrl={scUrl} /> : null}
+                  {ytUrl ? <ReproductorYouTube youTubeEmbedUrl={ytUrl} /> : null}
+                </View>
+              </>
+            );
+          })()}
 
           <Text style={[styles.rejectTitle, { marginTop: 12 }]}>Motivo de rechazo</Text>
           <Text style={styles.rejectSubtitle}>Es obligatorio escribir un motivo si vas a rechazar el evento. Este motivo se enviará al equipo y al creador del evento vía mail y quedará registrado.</Text>
@@ -271,6 +815,115 @@ export default function ValidateEventScreen() {
           </View>
 
           
+
+          {/* Modal de imagen en pantalla completa */}
+          <Modal visible={imageModalVisible} transparent animationType="fade" onRequestClose={() => setImageModalVisible(false)}>
+            <View style={styles.imageModalOverlay}>
+              <Image source={{ uri: (eventData as any).imageUrl }} style={styles.imageModalImage} resizeMode="contain" />
+              <TouchableOpacity style={styles.imageModalCloseBtn} onPress={() => setImageModalVisible(false)}>
+                <Text style={styles.imageModalCloseText}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
+          </Modal>
+
+          {/* Popup: Editar/Activar artista (igual a EditarArtistaPantalla) */}
+          <Modal visible={editVisible} transparent animationType="fade" onRequestClose={() => setEditVisible(false)}>
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalContent, { maxHeight: "90%" }]}> 
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingBottom: 12 }}
+                >
+                  <Text style={styles.modalTitle}>Editar y activar artista</Text>
+                  <InputText
+                    label="Nombre del artista"
+                    value={name}
+                    isEditing={true}
+                    onBeginEdit={() => {}}
+                    onChangeText={setName}
+                    containerStyle={{ width: "100%", alignItems: "stretch" }}
+                    labelStyle={{ width: "100%", textAlign: "left" }}
+                    inputStyle={{ width: "100%" }}
+                  />
+                  <Text style={[styles.summaryLabel, { marginTop: 12, marginBottom: 4 }]}>Foto del artista:</Text>
+                  <View style={{ alignItems: "center", marginBottom: 8 }}>
+                    {imageUri ? (
+                      <>
+                        <Image source={{ uri: imageUri }} style={{ width: 140, height: 140, borderRadius: 70, marginBottom: 12 }} />
+                        {idMedia ? (
+                          <TouchableOpacity style={[styles.button, styles.modalCancel]} onPress={handleDeleteImage}>
+                            <Text style={styles.buttonText}>Eliminar imagen actual</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </>
+                    ) : (
+                      <View style={{ width: 140, height: 140, borderRadius: 70, backgroundColor: "#ddd", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                        <Text style={{ color: "#666" }}>Sin imagen</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity style={[styles.button, styles.validateButton]} onPress={handleSelectImage}>
+                      <Text style={styles.buttonText}>Seleccionar imagen</Text>
+                    </TouchableOpacity>
+                    <Text style={{ marginTop: 6, fontSize: 12, color: "#666" }}>Se permiten imágenes JPG, JPEG o PNG. Peso máximo: 2MB.</Text>
+                  </View>
+                  <InputDesc
+                    label="Información sobre el artista"
+                    value={description}
+                    isEditing={true}
+                    onBeginEdit={() => {}}
+                    onChangeText={setDescription}
+                    autoFocus={false}
+                    containerStyle={{ width: "100%", alignItems: "stretch" }}
+                    labelStyle={{ width: "100%", textAlign: "left" }}
+                    inputStyle={{ width: "100%" }}
+                  />
+                  <InputText
+                    label="URL del Instagram del artista"
+                    value={instagramURL}
+                    isEditing={true}
+                    onBeginEdit={() => {}}
+                    onChangeText={setInstagramURL}
+                    keyboardType="url"
+                    containerStyle={{ width: "100%", alignItems: "stretch" }}
+                    labelStyle={{ width: "100%", textAlign: "left" }}
+                    inputStyle={{ width: "100%" }}
+                  />
+                  <InputText
+                    label="URL del SoundCloud del artista"
+                    value={soundcloudURL}
+                    isEditing={true}
+                    onBeginEdit={() => {}}
+                    onChangeText={setSoundcloudURL}
+                    keyboardType="url"
+                    containerStyle={{ width: "100%", alignItems: "stretch" }}
+                    labelStyle={{ width: "100%", textAlign: "left" }}
+                    inputStyle={{ width: "100%" }}
+                  />
+                  <InputText
+                    label="URL del Spotify del artista"
+                    value={spotifyURL}
+                    isEditing={true}
+                    onBeginEdit={() => {}}
+                    onChangeText={setSpotifyURL}
+                    keyboardType="url"
+                    containerStyle={{ width: "100%", alignItems: "stretch" }}
+                    labelStyle={{ width: "100%", textAlign: "left" }}
+                    inputStyle={{ width: "100%" }}
+                  />
+                  <View style={[styles.modalButtonsRow, { marginTop: 12 }]}>
+                    <TouchableOpacity style={[styles.button, styles.modalCancel]} onPress={() => setEditVisible(false)} disabled={editBusy}>
+                      <Text style={styles.buttonText}>Cancelar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.button, styles.modalConfirm]} onPress={handleConfirmEditAndActivate} disabled={editBusy}>
+                      <Text style={styles.buttonText}>{editBusy ? "Guardando..." : "Confirmar y Activar"}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
 
         </ScrollView>
         <Footer />
@@ -421,5 +1074,165 @@ const styles = StyleSheet.create({
   },
   modalConfirm: {
     backgroundColor: COLORS.negative,
+  },
+  // Summary (encabezado similar a la web)
+  pageTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: COLORS.textPrimary || "#222",
+    marginTop: 6,
+    paddingBottom: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#cfd3da",
+    marginBottom: 8,
+  },
+  summaryContainer: {
+    marginBottom: 10,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  summaryLabel: {
+    fontWeight: "700",
+    color: COLORS.textPrimary || "#222",
+    marginRight: 6,
+  },
+  summaryValue: {
+    color: COLORS.textSecondary || "#444",
+    flexShrink: 1,
+  },
+  summaryLabelInline: {
+    color: COLORS.textSecondary || "#444",
+  },
+  summaryEmail: {
+    color: COLORS.textSecondary || "#555",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  sectionContainer: {
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  imageHint: {
+    fontSize: 10,
+    color: COLORS.textSecondary || "#777",
+    marginTop: 4,
+    marginLeft: 4,
+  },
+  linkBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.primary,
+    alignSelf: "center",
+    marginLeft: 8,
+  },
+  linkBtnText: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  ticketsDate: {
+    fontWeight: "700",
+    color: COLORS.textPrimary || "#222",
+    marginBottom: 4,
+  },
+  ticketLine: {
+    color: COLORS.textSecondary || "#555",
+    fontSize: 13,
+    marginLeft: 6,
+    marginBottom: 2,
+  },
+  // Polished cards and sections
+  infoCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#e5e7eb",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: COLORS.textPrimary || "#222",
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  chipsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 4,
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#eef2ff",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.primary,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  chipText: {
+    color: COLORS.textPrimary || "#222",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  descriptionText: {
+    color: COLORS.textSecondary || "#444",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  // Fullscreen image modal
+  imageModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.95)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imageModalImage: {
+    width: "100%",
+    height: "80%",
+  },
+  imageModalCloseBtn: {
+    position: "absolute",
+    top: 40,
+    right: 20,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
+  imageModalCloseText: {
+    color: "#fff",
+    fontWeight: "700",
+  },
+  inactiveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 4,
+  },
+  activateBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: COLORS.primary,
+    marginLeft: 8,
+  },
+  activateBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 12,
   },
 });

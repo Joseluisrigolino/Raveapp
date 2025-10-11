@@ -40,6 +40,21 @@ function formatTimeRange(startIso?: string, endIso?: string): string {
   return `${pad(s.getHours())}hs a ${pad(e.getHours())}hs`;
 }
 
+/**
+ * Formatea fecha a ISO Zulu (UTC) con milisegundos, p.ej. 2025-10-09T12:12:35.197Z
+ * Útil cuando el backend requiere DateTimeOffset o exactitud a nivel UTC
+ */
+export function formatIsoZulu(d?: Date | string | null | undefined): string | undefined {
+  if (!d) return undefined;
+  try {
+    const dt = new Date(d as any);
+    if (!isFinite(dt.getTime())) return undefined;
+    return dt.toISOString();
+  } catch {
+    return undefined;
+  }
+}
+
 /** ---------- media (SIEMPRE imagen, nunca youtube) ---------- */
 const PLACEHOLDER_IMAGE = "";
 
@@ -765,6 +780,17 @@ export async function updateEvent(
   }
   const msg = `${String(baseMsg)} | diagnostics: ${JSON.stringify(diag)}`;
   throw new Error(msg);
+}
+
+/**
+ * Update "exacto" del evento: envía el body tal cual lo armamos (sin normalizaciones/aliases),
+ * pensado para casos donde el backend exige un shape preciso con horas exactas en UTC (Z).
+ */
+export async function updateEventExact(body: any): Promise<void> {
+  if (!body || !body.idEvento) throw new Error("updateEventExact: falta idEvento en body");
+  const token = await login();
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } as const;
+  await apiClient.put("/v1/Evento/UpdateEvento", body, { headers });
 }
 
 /** ---------- Cambiar estado (helper genérico) ---------- */

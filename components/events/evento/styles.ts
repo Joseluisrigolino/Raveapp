@@ -172,6 +172,19 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
 
+  // Container to stack "Fecha" (top) and "Horario" (bottom) next to the calendar icon
+  twoLineContainer: {
+    flex: 1,
+    flexDirection: "column",
+  },
+  // Inline value style when nesting inside a label Text (keeps weight/color consistent)
+  infoValueInline: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body + 1,
+    color: COLORS.primary,
+    fontWeight: "normal",
+  },
+
   dataRowImproved: {
     flexDirection: "row",
     alignItems: "center",

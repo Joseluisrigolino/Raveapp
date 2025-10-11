@@ -184,6 +184,10 @@ export default function ManageNewsScreen() {
 
           {loading ? (
             <ActivityIndicator size="large" color={COLORS.primary} />
+          ) : filtered.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No hay noticias por mostrar</Text>
+            </View>
           ) : (
             <FlatList
               data={filtered}
@@ -288,5 +292,15 @@ const styles = StyleSheet.create({
     color: COLORS.cardBg,
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.button,
+  },
+  emptyState: {
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyText: {
+    color: COLORS.textSecondary,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
   },
 });

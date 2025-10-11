@@ -42,6 +42,12 @@ export default function RootLayout() {
         <Stack.Screen name="login/index" options={{ headerShown: false }} />
         <Stack.Screen name="login/login" options={{ title: "Ingresar" }} />
 
+        {/* Presentar edición de artista como modal (popup) */}
+        <Stack.Screen
+          name="admin/artistas-admin/EditarArtistaPantalla"
+          options={{ presentation: "modal", headerShown: false }}
+        />
+
   {/* No declarar segmentos padres sin ruta directa para evitar warnings */}
         </Stack>
       </AuthProvider>

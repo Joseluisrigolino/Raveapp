@@ -4,23 +4,21 @@ import React, { useEffect, useState } from "react";
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Image, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 
-import {
-  fetchOneArtistFromApi,
-  updateArtistOnApi,
-} from "@/utils/artists/artistApi";
+import { fetchOneArtistFromApi, updateArtistOnApi } from "@/utils/artists/artistApi";
 import { mediaApi } from "@/utils/mediaApi";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import InputText from "@/components/common/inputText";
 import InputDesc from "@/components/common/inputDesc";
+import eventBus from "@/utils/eventBus";
 
 export default function EditArtistScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, activate, prefillName } = useLocalSearchParams<{ id: string; activate?: string; prefillName?: string }>();
   const router = useRouter();
 
   const [name, setName] = useState("");
@@ -43,13 +41,15 @@ export default function EditArtistScreen() {
     const loadArtist = async () => {
       try {
         const a = await fetchOneArtistFromApi(id);
-        setName(a.name);
+        setName(prefillName && String(prefillName).trim().length ? String(prefillName) : a.name);
         setDescription(a.description || "");
         setInstagramURL(a.instagramURL || "");
         setSpotifyURL(a.spotifyURL || "");
         setSoundcloudURL(a.soundcloudURL || "");
         setIdSocial(a.idSocial ?? null);
-        setIsActivo(a.isActivo ?? true);
+        // Si venimos con activate=1, forzar previsualización como activo
+        const shouldActivate = String(activate || "0") === "1";
+        setIsActivo(shouldActivate ? true : (a.isActivo ?? true));
         setImageUri(a.image || null);
 
         const media = await mediaApi.getByEntidad(id);
@@ -68,7 +68,7 @@ export default function EditArtistScreen() {
 
   const handleSelectImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-  mediaTypes: 'images',
+      mediaTypes: ['images'],
       quality: 0.8,
     });
 
@@ -115,10 +115,11 @@ export default function EditArtistScreen() {
           type: "image/jpeg",
         };
 
-  await mediaApi.upload(id, file, undefined, { compress: true }); // sube la imagen nueva
+        await mediaApi.upload(id, file, undefined, { compress: true }); // sube la imagen nueva
         setNewImageLocalUri(null); // limpia estado
       }
 
+      const shouldActivate = String(activate || "0") === "1";
       await updateArtistOnApi({
         idArtista: id,
         name,
@@ -127,11 +128,20 @@ export default function EditArtistScreen() {
         spotifyURL,
         soundcloudURL,
         idSocial,
-        isActivo,
+        isActivo: shouldActivate ? true : isActivo,
       });
 
-      Alert.alert("Éxito", "Artista actualizado correctamente.");
+      // Emitir evento global sólo si se activó (o ya estaba activo)
+      // Volver a la pantalla anterior y luego notificar (para que el Alert se muestre allí)
       router.back();
+      setTimeout(() => {
+        if (shouldActivate || isActivo === true) {
+          eventBus.emit("artist:activated", { id, name });
+        } else {
+          // si no fue un flujo de activación, mostramos el aviso local
+          Alert.alert("Éxito", "Artista actualizado correctamente.");
+        }
+      }, 250);
     } catch (err: any) {
       console.error("Error al actualizar artista:", err?.response?.data || err);
       const msg =

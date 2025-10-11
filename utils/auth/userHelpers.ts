@@ -64,6 +64,44 @@ export async function getProfile(correo: string): Promise<ApiUserFull> {
   return data.usuarios[0];
 }
 
+// 1.1) Traer perfil por ID de usuario (robusto con varios intentos)
+export async function getUsuarioById(idUsuario: string): Promise<ApiUserFull> {
+  const id = String(idUsuario || "").trim();
+  if (!id) throw new Error("ID de usuario vacío");
+
+  // Intentos tolerantes: distintos parámetros/formatos que podría aceptar la API
+  const attempts: Array<() => Promise<any>> = [
+    () =>
+      apiClient.get<{ usuarios: ApiUserFull[] }>(
+        "/v1/Usuario/GetUsuario",
+        { params: { IdUsuario: id, IsActivo: true } }
+      ),
+    () =>
+      apiClient.get<{ usuarios: ApiUserFull[] }>(
+        "/v1/Usuario/GetUsuario",
+        { params: { idUsuario: id, IsActivo: true } }
+      ),
+    () => apiClient.get<ApiUserFull>(`/v1/Usuario/GetUsuario/${encodeURIComponent(id)}`),
+  ];
+
+  let lastErr: any = null;
+  for (const fn of attempts) {
+    try {
+      const resp = await fn();
+      // La API puede devolver { usuarios: [...] } o un objeto directo
+      const data = resp?.data;
+      if (Array.isArray(data?.usuarios) && data.usuarios.length) return data.usuarios[0];
+      if (data && typeof data === "object" && (data as any).idUsuario) return data as ApiUserFull;
+    } catch (e: any) {
+      // Si es 404, probamos el siguiente intento; guardamos último error
+      lastErr = e;
+    }
+  }
+  const status = lastErr?.response?.status;
+  if (status === 404) throw Object.assign(new Error("Usuario no encontrado"), { code: 404 });
+  throw lastErr ?? new Error("No se pudo obtener el usuario por id");
+}
+
 // 2) Actualizar perfil
 export async function updateUsuario(payload: UpdateUsuarioPayload): Promise<void> {
   console.log("updateUsuario - Payload recibido:", JSON.stringify(payload, null, 2));

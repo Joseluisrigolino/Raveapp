@@ -1,10 +1,16 @@
 import React from "react";
 import { View, StyleSheet, Text } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 
 export default function HeaderComponent({ title }: { title?: string }) {
+  const insets = useSafeAreaInsets();
+  // Mover el header hacia arriba el tamaño del safe-area superior sin cambiar su altura
+  const containerDynamic = {
+    marginTop: -insets.top,
+  } as const;
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, containerDynamic]}>
       <Text style={styles.title}>{title ?? "RaveApp"}</Text>
     </View>
   );

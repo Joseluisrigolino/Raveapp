@@ -144,6 +144,7 @@ export async function fetchOneArtistFromApi(
       instagramURL: api.socials.mdInstagram ?? "",
       spotifyURL: api.socials.mdSpotify ?? "",
       soundcloudURL: api.socials.mdSoundcloud ?? "",
+      idSocial: api.socials?.idSocial ?? null,
       image: await fetchArtistImage(api.idArtista),
       likes: api.likes,
       likedByIds,
@@ -219,17 +220,23 @@ export async function updateArtistOnApi(
   artist: Partial<Artist>
 ): Promise<void> {
   const token = await login();
-  const body = {
+  // Build socials object only with provided, non-empty fields
+  const socials: Record<string, string> = {};
+  if (artist.idSocial) socials.idSocial = artist.idSocial;
+  if (artist.instagramURL) socials.mdInstagram = artist.instagramURL;
+  if (artist.spotifyURL) socials.mdSpotify = artist.spotifyURL;
+  if (artist.soundcloudURL) socials.mdSoundcloud = artist.soundcloudURL;
+
+  const body: any = {
     idArtista: artist.idArtista,
     nombre: artist.name,
-    bio: artist.description,
-    socials: {
-      mdInstagram: artist.instagramURL ?? "",
-      mdSpotify: artist.spotifyURL ?? "",
-      mdSoundcloud: artist.soundcloudURL ?? "",
-    },
+    bio: artist.description ?? "",
+    // API contract expects a boolean here
     isActivo: artist.isActivo === true,
   };
+  if (Object.keys(socials).length > 0) {
+    body.socials = socials;
+  }
   await apiClient.put("/v1/Artista/UpdateArtista", body, {
     headers: {
       Authorization: `Bearer ${token}`,

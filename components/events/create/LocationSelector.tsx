@@ -73,6 +73,10 @@ export default function LocationSelector(props: Props) {
     allowLocalitiesWithoutMunicipality,
   } = props;
 
+  const isCABA = provinceId === '02';
+  const disabledMunicipality = isCABA; // bloquear cuando es CABA
+  const disabledLocality = isCABA; // bloquear cuando es CABA
+
   return (
     <View style={styles.card}>
       {/* Provincia */}
@@ -108,42 +112,41 @@ export default function LocationSelector(props: Props) {
         </View>
       )}
 
-      {/* Municipio: ocultar completamente si la provincia es CABA (02) */}
-      {provinceId !== '02' && (
-        <>
-          <SelectField
-            label="Municipio"
-            value={municipalityName}
-            placeholder="Seleccione un municipio"
-            onPress={() => {
-              setShowMunicipalities(!showMunicipalities);
-              setShowProvinces(false);
-              setShowLocalities(false);
-            }}
-            disabled={!provinceId}
-            isOpen={showMunicipalities}
-          />
-          {showMunicipalities && (
-            <View style={styles.dropdownContainer}>
-              <ScrollView
-                style={styles.menuScrollView}
-                contentContainerStyle={{ paddingVertical: 4 }}
-                keyboardShouldPersistTaps="handled"
-                nestedScrollEnabled
+      {/* Municipio: siempre visible; si CABA, deshabilitado y con lista abierta si el padre lo indica */}
+      <SelectField
+        label="Municipio"
+        value={municipalityName}
+        placeholder="Seleccione un municipio"
+        onPress={() => {
+          setShowMunicipalities(!showMunicipalities);
+          setShowProvinces(false);
+          setShowLocalities(false);
+        }}
+        disabled={!provinceId || disabledMunicipality}
+        isOpen={showMunicipalities}
+      />
+      {showMunicipalities && (
+        <View style={[styles.dropdownContainer, disabledMunicipality && { opacity: 0.6 }] }>
+          <ScrollView
+            style={styles.menuScrollView}
+            contentContainerStyle={{ paddingVertical: 4 }}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+          >
+            {municipalities.map((m) => (
+              <TouchableOpacity
+                key={m.id}
+                style={styles.dropdownItem}
+                disabled={disabledMunicipality}
+                onPress={() => {
+                  if (!disabledMunicipality) handleSelectMunicipality(m.id, m.nombre);
+                }}
               >
-                {municipalities.map((m) => (
-                  <TouchableOpacity
-                    key={m.id}
-                    style={styles.dropdownItem}
-                    onPress={() => handleSelectMunicipality(m.id, m.nombre)}
-                  >
-                    <Text>{m.nombre}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-        </>
+                <Text>{m.nombre}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
       )}
 
       {/* Localidad */}
@@ -156,11 +159,11 @@ export default function LocationSelector(props: Props) {
           setShowProvinces(false);
           setShowMunicipalities(false);
         }}
-        disabled={!municipalityId && !allowLocalitiesWithoutMunicipality}
+        disabled={disabledLocality || (!municipalityId && !allowLocalitiesWithoutMunicipality)}
         isOpen={showLocalities}
       />
       {showLocalities && (
-        <View style={styles.dropdownContainer}>
+        <View style={[styles.dropdownContainer, disabledLocality && { opacity: 0.6 }] }>
           <ScrollView
             style={styles.menuScrollView}
             contentContainerStyle={{ paddingVertical: 4 }}
@@ -171,7 +174,10 @@ export default function LocationSelector(props: Props) {
               <TouchableOpacity
                 key={l.id}
                 style={styles.dropdownItem}
-                onPress={() => handleSelectLocality(l.id, l.nombre)}
+                disabled={disabledLocality}
+                onPress={() => {
+                  if (!disabledLocality) handleSelectLocality(l.id, l.nombre);
+                }}
               >
                 <Text>{l.nombre}</Text>
               </TouchableOpacity>
