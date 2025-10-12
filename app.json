@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.raveapp",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -38,6 +39,16 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "96c3aafd-0d8e-456b-9f69-0181bad4c833"
+      },
+      "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "",
+      "EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID": "",
+      "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "",
+      "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": ""
     }
   }
 }

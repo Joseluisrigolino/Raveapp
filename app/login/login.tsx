@@ -1,5 +1,5 @@
 // app/login/Login.tsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -11,21 +11,52 @@ import {
 } from "react-native";
 import { Text, TextInput, Button } from "react-native-paper";
 import { Link, useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+import * as Google from "expo-auth-session/providers/google";
+import Constants from "expo-constants";
+import * as AuthSession from "expo-auth-session";
+import { makeRedirectUri } from "expo-auth-session";
+import { jwtDecode } from "jwt-decode";
 import * as nav from "@/utils/navigation";
 import { ROUTES } from "../../routes";
 
 import TitlePers from "@/components/common/TitleComponent";
 import globalStyles from "@/styles/globalStyles";
 import { useAuth } from "@/context/AuthContext";
+import { GOOGLE_CONFIG, ensureGoogleClientId } from "@/utils/auth/googleConfig";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  // Necesario para iOS (cerrar el navegador web auth)
+  useEffect(() => {
+    WebBrowser.maybeCompleteAuthSession();
+  }, []);
+
+  const clientId = ensureGoogleClientId();
+  const androidId = GOOGLE_CONFIG.androidClientId || undefined;
+  const iosId = GOOGLE_CONFIG.iosClientId || undefined;
+  const webId = GOOGLE_CONFIG.webClientId || undefined;
+  const expoId = GOOGLE_CONFIG.expoClientId || undefined;
+  const isAndroid = Platform.OS === "android";
+  const isIOS = Platform.OS === "ios";
+  const isExpoGo = Constants.appOwnership === "expo"; // Expo Go runtime
+  // En Expo Go se debe usar expoClientId/webClientId; en standalone nativo usar android/ios
+  const canUseExpoFlow = isExpoGo && !!(expoId || webId);
+  // Solo montamos el hook cuando la configuración requerida realmente existe
+  const canInitGoogle = isExpoGo
+    ? !!(expoId || webId)
+    : isAndroid
+    ? !!androidId
+    : isIOS
+    ? !!iosId
+    : !!webId;
 
   const canSubmit = useMemo(
     () => username.trim().length > 0 && password.length > 0 && !submitting,
@@ -53,13 +84,29 @@ export default function LoginScreen() {
   };
 
   const handleGoogleLogin = async () => {
-    try {
-      setSubmitting(true);
-      // TODO: Implementar OAuth con Google
-      Alert.alert("Aviso", "Inicio de sesión con Google no implementado aún.");
-    } finally {
-      setSubmitting(false);
+    // En Expo Go es obligatorio un Web/Expo Client ID para evitar invalid_request con exp://
+    if (isExpoGo && !webId && !expoId) {
+      Alert.alert(
+        "Configuración requerida",
+        "En Expo Go necesitás EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (o EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID)."
+      );
+      return;
     }
+    if (!canInitGoogle) {
+      Alert.alert(
+        "Configuración requerida",
+        isExpoGo
+          ? "Falta EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (o EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID) para Expo Go."
+          : isAndroid
+          ? "Falta EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID (Android OAuth Client)."
+          : isIOS
+          ? "Falta EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID (iOS OAuth Client)."
+          : "Falta EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (Web OAuth Client)."
+      );
+      return;
+    }
+    // Si la configuración ya está lista, mostramos una guía para usar el botón renderizado
+    Alert.alert("Listo", "Usá el botón de Google que aparece abajo.");
   };
 
   return (
@@ -136,17 +183,40 @@ export default function LoginScreen() {
               }}
             />
 
-            <Button
-              mode="outlined"
-              onPress={handleGoogleLogin}
-              icon="google"
-              contentStyle={styles.googleButtonContent}
-              style={styles.googleButton}
-              labelStyle={{ color: "#111827", fontWeight: "700" }}
-              disabled={submitting}
-            >
-              Ingresar con Google
-            </Button>
+            {canInitGoogle ? (
+              <GoogleButton
+                isExpoGo={isExpoGo}
+                androidId={androidId}
+                iosId={iosId}
+                webId={webId}
+                expoId={expoId}
+                onResult={async (idToken) => {
+                  try {
+                    const decoded: any = jwtDecode(idToken);
+                    if (!decoded?.email) console.warn("id_token sin email visible");
+                  } catch {}
+                  const u = await loginWithGoogle(idToken);
+                  if (!u) {
+                    Alert.alert("Error", "No se pudo iniciar sesión con Google");
+                    return;
+                  }
+                  nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
+                }}
+                disabled={submitting}
+              />
+            ) : (
+              <Button
+                mode="outlined"
+                onPress={handleGoogleLogin}
+                icon="google"
+                contentStyle={styles.googleButtonContent}
+                style={styles.googleButton}
+                labelStyle={{ color: "#111827", fontWeight: "700" }}
+                disabled={submitting}
+              >
+                Ingresar con Google
+              </Button>
+            )}
 
             <Button
               mode="contained"
@@ -185,6 +255,68 @@ export default function LoginScreen() {
   );
 }
 
+function GoogleButton({ isExpoGo, androidId, iosId, webId, expoId, onResult, disabled }: {
+  isExpoGo: boolean;
+  androidId?: string;
+  iosId?: string;
+  webId?: string;
+  expoId?: string;
+  onResult: (idToken: string) => Promise<void> | void;
+  disabled?: boolean;
+}) {
+  // Construimos la config minimizando campos para evitar validaciones innecesarias
+  const config: any = {
+    webClientId: webId || expoId,
+    scopes: ["openid", "profile", "email"],
+    responseType: "id_token",
+    redirectUri: (makeRedirectUri as any)({ useProxy: true }),
+  };
+  if (isExpoGo) {
+    // En Expo Go usamos el proxy con client id web/expo
+    config.expoClientId = expoId || webId;
+    // No seteamos androidClientId/iosClientId en Expo Go para no gatillar invariant
+  } else {
+    // En builds nativos, proveer el id específico por plataforma
+    if (Platform.OS === "android" && androidId) config.androidClientId = androidId;
+    if (Platform.OS === "ios" && iosId) config.iosClientId = iosId;
+  }
+  const [request, response, promptAsync] = Google.useAuthRequest(config);
+  const [busy, setBusy] = React.useState(false);
+
+  return (
+    <Button
+      mode="outlined"
+      onPress={async () => {
+        if (busy || disabled) return;
+        try {
+          setBusy(true);
+          if (!request) {
+            Alert.alert("Cargando", "Preparando Google Sign-In, intenta de nuevo en unos segundos.");
+            return;
+          }
+          const res = await promptAsync();
+          if (res.type !== "success") return;
+          const idToken = res.authentication?.idToken || (res.params?.id_token as string | undefined);
+          if (!idToken) {
+            Alert.alert("Error", "No se recibió id_token de Google");
+            return;
+          }
+          await onResult(idToken);
+        } finally {
+          setBusy(false);
+        }
+      }}
+      icon="google"
+      contentStyle={styles.googleButtonContent}
+      style={styles.googleButton}
+      labelStyle={{ color: "#111827", fontWeight: "700" }}
+      disabled={disabled || busy}
+      loading={busy}
+    >
+      Ingresar con Google
+    </Button>
+  );
+}
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -1,19 +1,38 @@
 // src/screens/login/RegisterUserScreen.tsx
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ScrollView, View, StyleSheet, Alert, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text, TextInput, Button, useTheme, HelperText, Menu } from "react-native-paper";
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+import * as Google from "expo-auth-session/providers/google";
+import Constants from "expo-constants";
+import { makeRedirectUri } from "expo-auth-session";
+import { jwtDecode } from "jwt-decode";
 import * as nav from "@/utils/navigation";
 import { ROUTES } from "../../routes";
 
 import globalStyles from "@/styles/globalStyles";
 import { apiClient, login as apiLogin } from "@/utils/apiConfig";
+import { useAuth } from "@/context/AuthContext";
+import { GOOGLE_CONFIG, ensureGoogleClientId } from "@/utils/auth/googleConfig";
 
 export default function RegisterUserScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const { loginWithGoogle } = useAuth();
+  useEffect(() => { WebBrowser.maybeCompleteAuthSession(); }, []);
+  const clientId = ensureGoogleClientId();
+  const androidId = GOOGLE_CONFIG.androidClientId || undefined;
+  const iosId = GOOGLE_CONFIG.iosClientId || undefined;
+  const webId = GOOGLE_CONFIG.webClientId || undefined;
+  const expoId = GOOGLE_CONFIG.expoClientId || undefined;
+  const isAndroid = Platform.OS === "android";
+  const isIOS = Platform.OS === "ios";
+  const isExpoGo = Constants.appOwnership === "expo";
+  const canUseExpoFlow = isExpoGo && !!(expoId || webId);
+  const canInitGoogle = isExpoGo ? !!(expoId || webId) : isAndroid ? !!androidId : isIOS ? !!iosId : !!webId;
 
   const [form, setForm] = useState({
     firstName: "",
@@ -176,25 +195,49 @@ export default function RegisterUserScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
             <View style={styles.card}>
-              <Button
-                mode="outlined"
-                onPress={async () => {
-                  setLoading(true);
-                  try {
-                    // TODO: Implementar OAuth con Google para registro
-                    Alert.alert("Aviso", "Registro con Google no implementado aún.");
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                icon="google"
-                contentStyle={styles.googleButtonContent}
-                style={styles.googleButtonTop}
-                labelStyle={{ color: globalStyles.COLORS.primary, fontWeight: "700" }}
-                disabled={loading}
-              >
-                Registrarse con Google
-              </Button>
+              {canInitGoogle ? (
+                <GoogleButton
+                  isExpoGo={isExpoGo}
+                  androidId={androidId}
+                  iosId={iosId}
+                  webId={webId}
+                  expoId={expoId}
+                  onResult={async (idToken) => {
+                    try { jwtDecode(idToken); } catch {}
+                    const u = await loginWithGoogle(idToken);
+                    if (!u) {
+                      Alert.alert("Error", "No se pudo registrar/iniciar con Google");
+                      return;
+                    }
+                    nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
+                  }}
+                  disabled={loading}
+                  label="Registrarse con Google"
+                />
+              ) : (
+                <Button
+                  mode="outlined"
+                  onPress={() => {
+                    Alert.alert(
+                      "Configuración requerida",
+                      isExpoGo
+                        ? "Falta EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (o EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID) para Expo Go."
+                        : isAndroid
+                        ? "Falta EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID (Android OAuth Client)."
+                        : isIOS
+                        ? "Falta EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID (iOS OAuth Client)."
+                        : "Falta EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (Web OAuth Client)."
+                    );
+                  }}
+                  icon="google"
+                  contentStyle={styles.googleButtonContent}
+                  style={styles.googleButtonTop}
+                  labelStyle={{ color: globalStyles.COLORS.primary, fontWeight: "700" }}
+                  disabled={loading}
+                >
+                  Registrarse con Google
+                </Button>
+              )}
 
               <Text variant="headlineMedium" style={[styles.title, { color: globalStyles.COLORS.textPrimary }]}>
                 Registrarse
@@ -432,6 +475,66 @@ export default function RegisterUserScreen() {
         </KeyboardAvoidingView>
       </SafeAreaView>
     </TouchableWithoutFeedback>
+  );
+}
+
+function GoogleButton({ isExpoGo, androidId, iosId, webId, expoId, onResult, disabled, label }: {
+  isExpoGo: boolean;
+  androidId?: string;
+  iosId?: string;
+  webId?: string;
+  expoId?: string;
+  onResult: (idToken: string) => Promise<void> | void;
+  disabled?: boolean;
+  label?: string;
+}) {
+  const config: any = {
+    webClientId: webId || expoId,
+    scopes: ["openid", "profile", "email"],
+    responseType: "id_token",
+    redirectUri: (makeRedirectUri as any)({ useProxy: true }),
+  };
+  if (isExpoGo) {
+    config.expoClientId = expoId || webId;
+  } else {
+    if (Platform.OS === "android" && androidId) config.androidClientId = androidId;
+    if (Platform.OS === "ios" && iosId) config.iosClientId = iosId;
+  }
+  const [request, response, promptAsync] = Google.useAuthRequest(config);
+  const [busy, setBusy] = React.useState(false);
+
+  return (
+    <Button
+      mode="outlined"
+      onPress={async () => {
+        if (busy || disabled) return;
+        try {
+          setBusy(true);
+          if (!request) {
+            Alert.alert("Cargando", "Preparando Google Sign-In, intenta nuevamente en unos segundos.");
+            return;
+          }
+          const res = await promptAsync();
+          if (res.type !== "success") return;
+          const idToken = res.authentication?.idToken || (res.params?.id_token as string | undefined);
+          if (!idToken) {
+            Alert.alert("Error", "No se recibió id_token de Google");
+            return;
+          }
+          await onResult(idToken);
+        } finally {
+          setBusy(false);
+        }
+      }}
+      icon="google"
+      contentStyle={styles.googleButtonContent}
+      style={styles.googleButtonTop}
+      labelStyle={{ color: globalStyles.COLORS.primary, fontWeight: "700" }}
+      disabled={disabled || busy}
+      loading={busy}
+    >
+      {label || "Registrarse con Google"}
+    </Button>
   );
 }
 
