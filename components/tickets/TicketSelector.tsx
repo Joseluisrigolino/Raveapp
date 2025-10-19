@@ -1,51 +1,94 @@
 // components/TicketSelector/TicketSelector.tsx
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useMemo, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, TouchableWithoutFeedback } from "react-native";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import SelectField from "@/components/common/selectField";
 
 /**
- * Componente para incrementar/decrementar la cantidad de entradas de un tipo.
+ * Componente para seleccionar cantidad con input numérico (0 - max).
  */
 interface TicketSelectorProps {
   label: string;
-  maxQty: number;
-  currentQty: number;
-  onChange: (delta: number) => void;
+  maxQty: number; // límite superior permitido para la compra
+  currentQty: number; // cantidad actual seleccionada
+  onChangeQty: (qty: number) => void; // establece cantidad absoluta
+  disabled?: boolean;
 }
 
 export default function TicketSelector({
   label,
   maxQty,
   currentQty,
-  onChange,
+  onChangeQty,
+  disabled = false,
 }: TicketSelectorProps) {
+  const clampedValue = useMemo(() => {
+    const n = Number.isFinite(currentQty) ? currentQty : 0;
+    if (n < 0) return 0;
+    if (n > maxQty) return maxQty;
+    return n;
+  }, [currentQty, maxQty]);
+
+  const [open, setOpen] = useState(false);
+  const maxAllowed = Math.min(10, Math.max(0, maxQty || 0));
+  const options = useMemo(() => Array.from({ length: maxAllowed + 1 }, (_, i) => i), [maxAllowed]);
+
   return (
-    <View style={styles.ticketSelectorRow}>
-      <Text style={styles.ticketSelectorLabel}>{label}</Text>
-      <View style={styles.ticketSelectorActions}>
-        <TouchableOpacity
-          style={styles.qtyButton}
-          onPress={() => onChange(-1)}
-          disabled={currentQty <= 0}
-        >
-          <Text style={styles.qtyButtonText}>-</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.qtyNumber}>{currentQty}</Text>
-
-        <TouchableOpacity
-          style={styles.qtyButton}
-          onPress={() => onChange(+1)}
-          disabled={currentQty >= maxQty}
-        >
-          <Text style={styles.qtyButtonText}>+</Text>
-        </TouchableOpacity>
+    <View style={styles.containerRelative}>
+      <View style={styles.ticketSelectorRow}>
+        <Text style={styles.ticketSelectorLabel}>{label}</Text>
+        <View style={styles.ticketSelectorActions}>
+          <SelectField
+            label=""
+            value={String(clampedValue)}
+            placeholder="0"
+            onPress={() => { if (!disabled) setOpen((v) => !v); }}
+            isOpen={open}
+            disabled={disabled}
+            containerStyle={{ width: 96, alignItems: "flex-end", marginBottom: 0 }}
+            fieldStyle={{ width: 96, height: 36, borderRadius: 12, paddingHorizontal: 10 }}
+            labelStyle={{ width: 0, height: 0, marginBottom: 0 }}
+            valueStyle={{ textAlign: "center" }}
+          />
+        </View>
       </View>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <TouchableWithoutFeedback onPress={() => setOpen(false)}>
+          <View style={styles.modalOverlay} />
+        </TouchableWithoutFeedback>
+        <View style={styles.modalContentWrapper}>
+          <View style={styles.modalCard}>
+            <ScrollView
+              style={styles.menuScrollView}
+              contentContainerStyle={{ paddingVertical: 4 }}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
+            >
+              {options.map((n) => (
+                <TouchableOpacity
+                  key={n}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    onChangeQty(n);
+                    setOpen(false);
+                  }}
+                >
+                  <Text style={{ color: COLORS.textPrimary, textAlign: "center", fontSize: 16 }}>{n}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  containerRelative: {
+    position: "relative",
+    zIndex: 10,
+  },
   ticketSelectorRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -61,24 +104,40 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  qtyButton: {
-    backgroundColor: COLORS.textPrimary,
-    borderRadius: RADIUS.card,
-    width: 32,
-    height: 32,
+  modalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.25)",
+  },
+  modalContentWrapper: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginHorizontal: 6,
   },
-  qtyButtonText: {
-    color: COLORS.cardBg,
-    fontWeight: "bold",
-    fontSize: 18,
+  modalCard: {
+    width: 180,
+    maxHeight: 260,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingVertical: 8,
+    // Shadow
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 12,
+    elevation: 6,
+    overflow: "hidden",
   },
-  qtyNumber: {
-    minWidth: 24,
-    textAlign: "center",
-    color: COLORS.textPrimary,
-    fontSize: FONT_SIZES.body,
+  menuScrollView: {
+    maxHeight: 180,
+  },
+  dropdownItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
   },
 });

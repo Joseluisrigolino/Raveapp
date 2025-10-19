@@ -19,11 +19,12 @@ export interface InputTextProps {
   onChangeText: (text: string) => void;
   keyboardType?: KeyboardKind;
   placeholder?: string;
-  containerStyle?: ViewStyle;
-  inputStyle?: TextStyle;
-  labelStyle?: TextStyle;
+  containerStyle?: ViewStyle | ViewStyle[];
+  inputStyle?: TextStyle | TextStyle[];
+  labelStyle?: TextStyle | TextStyle[];
   editable?: boolean;
   autoFocus?: boolean;
+  labelNumberOfLines?: number;
 }
 
 export default function InputText({
@@ -39,6 +40,7 @@ export default function InputText({
   labelStyle,
   editable = true,
   autoFocus = false,
+  labelNumberOfLines = 1,
 }: InputTextProps) {
   const inputRef = useRef<TextInput | null>(null);
 
@@ -51,7 +53,7 @@ export default function InputText({
 
   return (
     <View style={[styles.wrapper, containerStyle]}>
-      <Text style={[styles.label, labelStyle]}>{label}</Text>
+  <Text style={[styles.label, labelStyle]} numberOfLines={labelNumberOfLines} ellipsizeMode="tail">{label}</Text>
       {isEditing ? (
         <TextInput
           ref={inputRef}

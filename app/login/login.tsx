@@ -1,5 +1,4 @@
-// app/login/Login.tsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -11,12 +10,18 @@ import {
 } from "react-native";
 import { Text, TextInput, Button } from "react-native-paper";
 import { Link, useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+import * as Google from "expo-auth-session/providers/google";
+import * as AuthSession from "expo-auth-session"; // ✅ Necesario para el redirectUri
 import * as nav from "@/utils/navigation";
 import { ROUTES } from "../../routes";
-
 import TitlePers from "@/components/common/TitleComponent";
 import globalStyles from "@/styles/globalStyles";
 import { useAuth } from "@/context/AuthContext";
+import { getProfile, createUsuario } from "@/utils/auth/userHelpers";
+
+// ✅ Obligatorio para cerrar correctamente el flujo OAuth en Expo
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -32,18 +37,38 @@ export default function LoginScreen() {
     [username, password, submitting]
   );
 
+  // --- CONFIGURACIÓN DE LOGIN CON GOOGLE ---
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    androidClientId:
+      "728778718807-imc5ad9jh3om4oj48ohkaiv81o4e7gsv.apps.googleusercontent.com",
+    iosClientId:
+      "728778718807-r65km9pj3scldf126tmo9plvpnuri2tl.apps.googleusercontent.com",
+    webClientId:
+      "728778718807-otcuqi0nkfvpgua16ong1c3s6qqto00k.apps.googleusercontent.com", // ✅ Nuevo cliente web proporcionado
+    redirectUri: AuthSession.makeRedirectUri({
+      useProxy: true, // ✅ Clave para que funcione en Expo Go
+      native: "myapp://auth", // ✅ Para builds nativas
+    }),
+  });
+
+  // --- EFECTO PARA CAPTURAR RESPUESTA GOOGLE ---
+  useEffect(() => {
+    if (response?.type === "success") {
+      const { authentication } = response;
+      handleGoogleResponse(authentication?.accessToken);
+    }
+  }, [response]);
+
+  // --- LOGIN CLÁSICO ---
   const handleLogin = async () => {
     if (!canSubmit) return;
-
     try {
       setSubmitting(true);
       const u = await login(username.trim(), password);
-
       if (!u) {
         Alert.alert("Error", "Usuario o contraseña incorrectos.");
         return;
       }
-
       nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
     } catch (e) {
       Alert.alert("Error", "Ocurrió un problema al iniciar sesión.");
@@ -52,23 +77,92 @@ export default function LoginScreen() {
     }
   };
 
+  // --- LOGIN CON GOOGLE ---
   const handleGoogleLogin = async () => {
     try {
-      setSubmitting(true);
-      // TODO: Implementar OAuth con Google
-      Alert.alert("Aviso", "Inicio de sesión con Google no implementado aún.");
+      await promptAsync();
+    } catch (err) {
+      Alert.alert("Error", "No se pudo iniciar sesión con Google.");
+    }
+  };
+
+  // --- PROCESAR DATOS DEL TOKEN GOOGLE ---
+  const handleGoogleResponse = async (token: string | undefined) => {
+    if (!token) {
+      Alert.alert("Error", "No se obtuvo token de Google.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("https://www.googleapis.com/userinfo/v2/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const userInfo = await res.json();
+
+      if (!userInfo?.email) {
+        Alert.alert("Error", "No se pudo obtener la información del usuario.");
+        return;
+      }
+
+      // Si el usuario ya existe, lo logueamos
+      try {
+        const existingUser = await getProfile(userInfo.email);
+        console.log("Usuario existente:", existingUser);
+        nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
+      } catch {
+        // Si no existe, creamos uno nuevo
+        await createUsuario({
+          nombre: userInfo.given_name || "",
+          apellido: userInfo.family_name || "",
+          correo: userInfo.email,
+          cbu: "",
+          dni: "",
+          telefono: "",
+          nombreFantasia: "",
+          bio: "",
+          password: "google_auth",
+          dtNacimiento: new Date().toISOString(),
+          domicilio: {
+            direccion: "",
+            latitud: 0,
+            longitud: 0,
+            localidad: { nombre: "", codigo: "" },
+            municipio: { nombre: "", codigo: "" },
+            provincia: { nombre: "", codigo: "" },
+          },
+          socials: {
+            idSocial: "",
+            mdInstagram: "",
+            mdSpotify: "",
+            mdSoundcloud: "",
+          },
+        });
+
+        Alert.alert("Cuenta creada", "Se creó una nueva cuenta con Google.");
+        nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
+      }
+    } catch (error) {
+      console.error("Error login Google:", error);
+      Alert.alert("Error", "No se pudo completar el inicio de sesión con Google.");
     } finally {
       setSubmitting(false);
     }
   };
 
+  // --- UI ---
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <KeyboardAvoidingView
         behavior={Platform.select({ ios: "padding", android: undefined })}
         style={{ flex: 1 }}
       >
-        <View style={[styles.container, { backgroundColor: globalStyles.COLORS.backgroundLight }]}>
+        <View
+          style={[
+            styles.container,
+            { backgroundColor: globalStyles.COLORS.backgroundLight },
+          ]}
+        >
           <View style={styles.card}>
             <TitlePers text="Bienvenido a RaveApp" />
             <Text style={styles.subtitle}>Iniciá sesión para continuar</Text>
@@ -83,23 +177,13 @@ export default function LoginScreen() {
               value={username}
               onChangeText={setUsername}
               style={styles.input}
-              textColor={'#0f172a'}
-              placeholderTextColor={'#4b5563'}
-              selectionColor={'#0f172a'}
-              caretHidden={false}
+              textColor={"#0f172a"}
+              placeholderTextColor={"#4b5563"}
+              selectionColor={"#0f172a"}
               outlineColor={"#e6e9ef"}
               activeOutlineColor={globalStyles.COLORS.primary}
               outlineStyle={{ borderRadius: 16 }}
               right={<TextInput.Icon icon="email-outline" color="#6b7280" />}
-              theme={{
-                colors: {
-                  primary: globalStyles.COLORS.primary,
-                  background: styles.input.backgroundColor,
-                  text: "#0f172a",
-                  placeholder: "#4b5563",
-                },
-                roundness: 16,
-              }}
             />
 
             <TextInput
@@ -110,10 +194,9 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
               style={styles.input}
-              textColor={'#0f172a'}
-              placeholderTextColor={'#4b5563'}
-              selectionColor={'#0f172a'}
-              caretHidden={false}
+              textColor={"#0f172a"}
+              placeholderTextColor={"#4b5563"}
+              selectionColor={"#0f172a"}
               outlineColor={"#e6e9ef"}
               activeOutlineColor={globalStyles.COLORS.primary}
               outlineStyle={{ borderRadius: 16 }}
@@ -125,15 +208,6 @@ export default function LoginScreen() {
                   forceTextInputFocus={false}
                 />
               }
-              theme={{
-                colors: {
-                  primary: globalStyles.COLORS.primary,
-                  background: styles.input.backgroundColor,
-                  text: "#0f172a",
-                  placeholder: "#4b5563",
-                },
-                roundness: 16,
-              }}
             />
 
             <Button
@@ -162,7 +236,10 @@ export default function LoginScreen() {
 
             <View style={styles.linksRow}>
               <Text variant="bodySmall" style={styles.linkText}>
-                <Link href={ROUTES.LOGIN.REGISTER} style={{ color: globalStyles.COLORS.primary }}>
+                <Link
+                  href={ROUTES.LOGIN.REGISTER}
+                  style={{ color: globalStyles.COLORS.primary }}
+                >
                   ¿No tenés cuenta? Registrate
                 </Link>
               </Text>
@@ -173,7 +250,10 @@ export default function LoginScreen() {
                 mode="text"
                 onPress={() => nav.replace(router, ROUTES.MAIN.EVENTS.MENU)}
                 compact
-                labelStyle={{ color: globalStyles.COLORS.primary, fontWeight: "600" }}
+                labelStyle={{
+                  color: globalStyles.COLORS.primary,
+                  fontWeight: "600",
+                }}
               >
                 Entrar como invitado
               </Button>
@@ -196,9 +276,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     backgroundColor: "#fff",
     borderRadius: 14,
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
-  overflow: 'visible',
     padding: 20,
     shadowColor: "#000",
     shadowOpacity: 0.06,
@@ -217,19 +294,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     backgroundColor: "#fff",
     borderRadius: 16,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    overflow: 'hidden',
+    overflow: "hidden",
     height: 56,
     paddingHorizontal: 16,
-    paddingRight: 12,
-    // border handled by TextInput outlined mode
-    // Shadow para iOS
     shadowColor: "#000",
     shadowOpacity: 0.04,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 8,
-    // Elevation para Android
     elevation: 2,
   },
   googleButton: {
@@ -246,7 +317,6 @@ const styles = StyleSheet.create({
     height: 50,
     justifyContent: "center",
     backgroundColor: globalStyles.COLORS.primary,
-    // sombra
     shadowColor: globalStyles.COLORS.primary,
     shadowOpacity: 0.18,
     shadowOffset: { width: 0, height: 6 },

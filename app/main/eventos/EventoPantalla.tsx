@@ -14,7 +14,6 @@ import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import ReviewComponent from "@/components/events/ReviewComponent";
-import TicketSelector from "@/components/tickets/TicketSelector";
 
 import TituloEvento from "@/components/events/evento/TituloEvento";
 import HeroImagen from "@/components/events/evento/HeroImagen";
@@ -204,7 +203,8 @@ export default function EventScreen() {
         const results = await Promise.all(
           fechas.map(async (f): Promise<[string, UiEntrada[]]> => {
             // Traemos raw para conservar idEntrada, cantidad, tipo.dsTipo, etc.
-            const raw = await fetchEntradasFechaRaw(f.idFecha).catch(() => []);
+            // Solo estado 0
+            const raw = await fetchEntradasFechaRaw(f.idFecha, 0).catch(() => []);
 
             // Antes filtrábamos entradas por estado (EN_VENTA). Quitamos esa restricción
             // para mostrar todas las entradas independientemente del estado.
@@ -326,12 +326,8 @@ export default function EventScreen() {
   };
 
   // Selección y subtotal
-  const updateTicketCount = (key: string, delta: number) => {
-    setSelectedTickets((prev) => {
-      const next = (prev[key] || 0) + delta;
-      if (next < 0) return prev;
-      return { ...prev, [key]: next };
-    });
+  const setTicketQty = (key: string, qty: number) => {
+    setSelectedTickets((prev) => ({ ...prev, [key]: Math.max(0, Math.min(10, qty)) }));
   };
 
   const subtotal = useMemo(() => {
@@ -419,7 +415,7 @@ export default function EventScreen() {
             entradasPorFecha={entradasPorFecha}
             loadingEntradas={loadingEntradas}
             selectedTickets={selectedTickets}
-            updateTicketCount={updateTicketCount}
+            setTicketQty={setTicketQty}
             subtotal={subtotal}
             noEntradasAvailable={noEntradasAvailable}
             onBuy={handleBuyPress}

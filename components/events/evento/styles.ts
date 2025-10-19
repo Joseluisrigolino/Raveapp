@@ -335,6 +335,7 @@ export const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 24,
     elevation: 2,
+    overflow: "visible",
   },
   sectionTitle: {
     fontFamily: FONTS.subTitleMedium,
@@ -342,7 +343,19 @@ export const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 12,
   },
-  dayBlock: { marginBottom: 16 },
+  dayBlock: { marginBottom: 16, overflow: "visible", position: "relative" },
+  clearDayBtn: {
+    position: "absolute",
+    top: -8,
+    right: 8,
+    backgroundColor: COLORS.negative,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 4,
+  },
   dayLabel: {
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.body,

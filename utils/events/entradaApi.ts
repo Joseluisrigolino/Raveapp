@@ -79,6 +79,7 @@ export type ReservarEntradasBody = {
 
 export type ReservarEntradasResponse = {
   idCompra?: string;
+  body?: any;
   [k: string]: any;
 };
 
@@ -369,17 +370,91 @@ export async function reservarEntradas(
   body: ReservarEntradasBody
 ): Promise<ReservarEntradasResponse> {
   const token = await login();
-  const { data } = await apiClient.put<ReservarEntradasResponse>(
-    "/v1/Entrada/ReservarEntradas",
-    body,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+
+  // Helper de normalización del idCompra (con soporte a body string)
+  const normalizeIdCompra = (data: any) => {
+    try {
+      // Si la API devuelve texto plano, intentar extraer idCompra del texto
+      if (typeof data === "string") {
+        const text = data as string;
+        let extracted: string | undefined = undefined;
+        // 1) etiqueta id compra
+        const m1 = text.match(/id\s*compra[^A-Za-z0-9]*([A-Za-z0-9-]+)/i);
+        if (m1 && m1[1]) extracted = String(m1[1]);
+        // 2) UUID
+        if (!extracted) {
+          const m2 = text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+          if (m2 && m2[0]) extracted = String(m2[0]);
+        }
+        // 3) número largo (6+ dígitos)
+        if (!extracted) {
+          const m3 = text.match(/\b\d{6,}\b/);
+          if (m3 && m3[0]) extracted = String(m3[0]);
+        }
+        const obj: any = { body: text };
+        if (extracted) obj.idCompra = extracted;
+        return obj as ReservarEntradasResponse;
+      }
+      let bodyObj = (data as any)?.body ?? (data as any)?.Body;
+      if (typeof bodyObj === "string") {
+        try {
+          bodyObj = JSON.parse(bodyObj);
+        } catch {}
+      }
+      const maybeId = (data as any)?.idCompra
+        ?? (data as any)?.IdCompra
+        ?? (data as any)?.IDCOMPRA
+        ?? (bodyObj as any)?.idCompra
+        ?? (bodyObj as any)?.IdCompra
+        ?? (bodyObj as any)?.IDCOMPRA;
+      if (maybeId && typeof (data as any) === "object") {
+        (data as any).idCompra = String(maybeId);
+      }
+      return data;
+    } catch {
+      return data;
     }
-  );
-  return data ?? {};
+  };
+
+  // Intento camelCase
+  try {
+    const { data } = await apiClient.put<ReservarEntradasResponse>(
+      "/v1/Entrada/ReservarEntradas",
+      body,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return normalizeIdCompra(data ?? {});
+  } catch (e: any) {
+    const st = e?.response?.status;
+    // Fallback con PascalCase solo si falló (p.ej. 400/415/422)
+    if (st && st >= 400 && st < 500) {
+      const pascal = {
+        IdUsuario: body.idUsuario,
+        IdFecha: body.idFecha,
+        Entradas: body.entradas.map((it) => ({
+          TipoEntrada: it.tipoEntrada,
+          Cantidad: it.cantidad,
+        })),
+      } as any;
+      const { data } = await apiClient.put<ReservarEntradasResponse>(
+        "/v1/Entrada/ReservarEntradas",
+        pascal,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      return normalizeIdCompra(data ?? {});
+    }
+    throw e;
+  }
 }
 
 export async function cancelarReserva(idCompra: string): Promise<void> {
@@ -404,6 +479,34 @@ export async function fetchReservaActiva(
     if (e?.response?.status === 400 || e?.response?.status === 404) return null;
     throw e;
   }
+}
+
+/** =========================================================================
+ *                                  PAGOS
+ *  ======================================================================= */
+
+export type CrearPagoBody = {
+  idCompra: string;
+  subtotal: number;
+  cargoServicio: number;
+  backUrl: string;
+};
+
+export type CrearPagoResponse = {
+  idPago?: string;
+  initPoint?: string;
+  [k: string]: any;
+};
+
+export async function createPago(body: CrearPagoBody): Promise<CrearPagoResponse> {
+  const token = await login();
+  const { data } = await apiClient.post<CrearPagoResponse>("/v1/Pago/CrearPago", body, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  return data ?? {};
 }
 
 /** =========================================================================

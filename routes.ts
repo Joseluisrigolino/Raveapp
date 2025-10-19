@@ -19,6 +19,7 @@ export const ROUTES = {
       FINALIZED: "/main/tickets/TicketFinalizedScreen",
       PURCHASED: "/main/tickets/TicketPurchasedScreen",
       BUY: "/main/tickets/BuyTicketScreen",
+      RETURN: "/main/tickets/VueltaCompraPantalla",
     },
     USER: {
       // The physical file is named `PerfilDeUsuarioPantalla.tsx` (exports UserProfileEditScreen),
