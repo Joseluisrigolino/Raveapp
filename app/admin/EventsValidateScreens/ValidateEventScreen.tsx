@@ -683,21 +683,21 @@ export default function ValidateEventScreen() {
                       ) : (
                         <Text style={styles.summaryValue}>—</Text>
                       )}
-                      <Text style={[styles.summaryLabel, { marginTop: 6 }]}>Artistas inactivos:</Text>
-                      {inactive.length === 0 ? (
-                        <Text style={styles.summaryValue}>—</Text>
-                      ) : (
-                        inactive.map((a) => (
-                          <View key={`${a.id ?? a.name}`} style={styles.inactiveRow}>
-                            <Text style={styles.summaryValue}>{a.name || "(sin nombre)"}</Text>
-                            {a.id ? (
-                              <TouchableOpacity style={styles.activateBtn} onPress={() => openEditArtistPopup({ id: a.id!, name: a.name })}>
-                                <Text style={styles.activateBtnText}>Activar</Text>
-                              </TouchableOpacity>
-                            ) : null}
-                          </View>
-                        ))
-                      )}
+                      {inactive.length > 0 ? (
+                        <>
+                          <Text style={[styles.summaryLabel, { marginTop: 6 }]}>Artistas inactivos:</Text>
+                          {inactive.map((a) => (
+                            <View key={`${a.id ?? a.name}`} style={styles.inactiveRow}>
+                              <Text style={styles.summaryValue}>{a.name || "(sin nombre)"}</Text>
+                              {a.id ? (
+                                <TouchableOpacity style={styles.activateBtn} onPress={() => openEditArtistPopup({ id: a.id!, name: a.name })}>
+                                  <Text style={styles.activateBtnText}>Activar</Text>
+                                </TouchableOpacity>
+                              ) : null}
+                            </View>
+                          ))}
+                        </>
+                      ) : null}
                     </>
                   );
                 })()}

@@ -239,6 +239,30 @@ function BuyTicketScreenContent() {
     })();
   }, [user]);
 
+  // Al volver desde Mercado Pago (backUrl), cerrar la sesión del navegador y navegar a la pantalla de vuelta
+  useEffect(() => {
+    const sub = Linking.addEventListener("url", async (event: any) => {
+      try {
+        const url: string | undefined = event?.url;
+        if (!url) return;
+        // Si el deep link coincide con nuestra pantalla de retorno, cerramos el web browser
+        if (url.includes(ROUTES.MAIN.TICKETS.RETURN)) {
+          try { await WebBrowser.dismissAuthSession(); } catch {}
+          try { await WebBrowser.dismissBrowser(); } catch {}
+          // Navegar/asegurar estar en la pantalla de retorno con el id si viene
+          try {
+            const parsed = Linking.parse(url) as any;
+            const idParam = parsed?.queryParams?.id;
+            router.replace({ pathname: ROUTES.MAIN.TICKETS.RETURN, params: idParam ? { id: String(idParam) } : undefined });
+          } catch {}
+        }
+      } catch {}
+    });
+    return () => {
+      try { sub.remove(); } catch {}
+    };
+  }, [router]);
+
   // Función reutilizable para cancelar todas las reservas activas
   const cancelAllReservations = useCallback(async () => {
     try {

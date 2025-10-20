@@ -26,7 +26,7 @@ import SeccionEntradas from "@/components/events/evento/SeccionEntradas";
 import ModalArtistas from "@/components/events/evento/ModalArtistas";
 import ResenasDelEvento from "@/components/events/evento/ResenasDelEvento";
 
-import { fetchEvents, getEventFlags } from "@/utils/events/eventApi";
+import { fetchEventById, getEventFlags } from "@/utils/events/eventApi";
 import { ReviewItem } from "@/interfaces/ReviewProps";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 
@@ -160,17 +160,15 @@ export default function EventScreen() {
           return;
         }
         setLoading(true);
-
-        const all = await fetchEvents();
-        const found = all.find((e) => String(e.id) === String(id));
-        if (found && mounted) {
-          setEventData(found);
-          setFechas(found.fechas || []);
+        const evt = await fetchEventById(String(id));
+        if (evt && mounted) {
+          setEventData(evt);
+          setFechas(evt.fechas || []);
 
           if (userId) {
             try {
               const favIds = await getEventosFavoritos(String(userId));
-              setIsFavorite(favIds.map(String).includes(String(found.id)));
+              setIsFavorite(favIds.map(String).includes(String(evt.id)));
             } catch {}
           }
         }

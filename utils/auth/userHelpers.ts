@@ -183,3 +183,36 @@ export async function getEventosFavoritos(
     throw err;
   }
 }
+
+/**
+ * 6) Listar entradas compradas por un usuario
+ * GET /v1/Usuario/GetEntradas?idUsuario={...}
+ * Respuestas posibles observadas:
+ *  - { entradas: [...] }
+ *  - [ ... ]
+ *  - { items: [...] }
+ * Devuelve siempre un array.
+ */
+export async function getEntradasUsuario(
+  idUsuario: string
+): Promise<any[]> {
+  const id = String(idUsuario || "").trim();
+  if (!id) return [];
+  try {
+    const { data } = await apiClient.get(
+      "/v1/Usuario/GetEntradas",
+      { params: { idUsuario: id } }
+    );
+
+    if (Array.isArray(data)) return data;
+    if (Array.isArray((data as any)?.entradas)) return (data as any).entradas;
+    if (Array.isArray((data as any)?.items)) return (data as any).items;
+    // En algunos casos la API puede envolver en { data: [...] }
+    if (Array.isArray((data as any)?.data)) return (data as any).data;
+    return [];
+  } catch (err: any) {
+    // Si la API responde 404, devolvemos array vacío
+    if (err?.response?.status === 404) return [];
+    throw err;
+  }
+}
