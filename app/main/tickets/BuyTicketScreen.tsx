@@ -57,13 +57,33 @@ function BuyTicketScreenContent() {
       const found = getEventById(Number(id));
       setEventData(found);
     }
-    if (selection) {
-      try {
-        const parsed = JSON.parse(decodeURIComponent(selection));
-        setSelectedTickets(parsed);
-      } catch (err) {
-        console.log("Error al parsear selection:", err);
+    
+    // Reset selectedTickets if selection is empty or invalid
+    if (!selection) {
+      setSelectedTickets({});
+      return;
+    }
+    
+    // Safely parse the selection parameter
+    try {
+      const decodedSelection = decodeURIComponent(selection);
+      // Validate it's not empty after decoding
+      if (!decodedSelection || decodedSelection.trim() === '') {
+        setSelectedTickets({});
+        return;
       }
+      
+      const parsed = JSON.parse(decodedSelection);
+      // Validate parsed data is an object
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        setSelectedTickets(parsed);
+      } else {
+        console.log("Invalid selection format - expected object, got:", typeof parsed);
+        setSelectedTickets({});
+      }
+    } catch (err) {
+      console.log("Error al parsear selection:", err);
+      setSelectedTickets({});
     }
   }, [id, selection]);
 
