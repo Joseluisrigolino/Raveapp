@@ -27,7 +27,11 @@
     "@react-navigation/native": "^7.0.14",
     "axios": "^1.8.4",
     "expo": "54.0.12",
+<<<<<<< HEAD
     "expo-auth-session": "~7.0.8",
+=======
+    "expo-auth-session": "^7.0.8",
+>>>>>>> 05a4b9fdd7e869071b9595c6953abe5048d987f2
     "expo-blur": "~15.0.7",
     "expo-constants": "~18.0.8",
     "expo-crypto": "~15.0.7",
@@ -46,6 +50,7 @@
     "expo-symbols": "~1.0.7",
     "expo-system-ui": "~6.0.7",
     "expo-web-browser": "~15.0.8",
+    "jwt-decode": "^4.0.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.4",

@@ -1,6 +1,6 @@
 // src/context/AuthContext.tsx
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { loginUser, AuthUser } from "@/utils/auth/authHelpers";
+import { loginUser, AuthUser, loginOrRegisterWithGoogleIdToken } from "@/utils/auth/authHelpers";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 interface AuthContextValue {
   user: AuthUser | null;
   login: (u: string, p: string) => Promise<AuthUser | null>;
+  loginWithGoogle: (idToken: string) => Promise<AuthUser | null>;
   logout: () => void;
   isAuthenticated: boolean;
   hasRole: (role: string) => boolean;
@@ -30,6 +31,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   login: async () => null,
+  loginWithGoogle: async () => null,
   logout: () => {},
   isAuthenticated: false,
   hasRole: () => false,
@@ -71,6 +73,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.removeItem('raveapp_user');
   }
 
+  async function loginWithGoogle(idToken: string) {
+    try {
+      const u = await loginOrRegisterWithGoogleIdToken(idToken);
+      setUser(u);
+      await AsyncStorage.setItem('raveapp_user', JSON.stringify(u));
+      return u;
+    } catch (e) {
+      return null;
+    }
+  }
+
   // utilidades memoizadas para evitar recrearlas en cada render
   const isAuthenticated = useMemo(() => !!user, [user]);
 
@@ -96,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, isAuthenticated, hasRole, hasAnyRole, updateUsuario }}
+      value={{ user, login, loginWithGoogle, logout, isAuthenticated, hasRole, hasAnyRole, updateUsuario }}
     >
       {children}
     </AuthContext.Provider>
