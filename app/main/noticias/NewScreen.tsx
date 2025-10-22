@@ -17,6 +17,7 @@ import { getSafeImageSource } from "@/utils/image";
 import { fetchEventById } from "@/utils/events/eventApi";
 import { mediaApi } from "@/utils/mediaApi";
 import { getProfile, getUsuarioById } from "@/utils/auth/userHelpers";
+import CirculoCarga from "@/components/general/CirculoCarga";
 
 export default function NewScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -29,6 +30,8 @@ export default function NewScreen() {
   const [authorIdResolved, setAuthorIdResolved] = useState<string | null>(null);
   const [authorNameResolved, setAuthorNameResolved] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingRelatedEvent, setLoadingRelatedEvent] = useState(false);
+  const [loadingImages, setLoadingImages] = useState(false);
 
   const router = useRouter();
 
@@ -78,6 +81,7 @@ export default function NewScreen() {
         }
         return;
       }
+      if (active) setLoadingRelatedEvent(true);
       try {
         const ev = await fetchEventById(linkedEventId);
         if (active && ev) {
@@ -90,6 +94,8 @@ export default function NewScreen() {
           setRelatedEventTitle(null);
           setRelatedEventImage(null);
         }
+      } finally {
+        if (active) setLoadingRelatedEvent(false);
       }
     })();
     return () => {
@@ -219,6 +225,39 @@ export default function NewScreen() {
     };
   }, [newsItem, relatedOwnerId]);
 
+  // Prefetch de imágenes (noticia, evento relacionado, avatar autor) para que renderice todo junto
+  useEffect(() => {
+    let mounted = true;
+    const urls = [newsItem?.imagen, relatedEventImage, authorAvatarUrl]
+      .filter(Boolean)
+      .map(String)
+      // evitar duplicados exactos
+      .filter((url, idx, arr) => arr.indexOf(url) === idx);
+
+    if (urls.length === 0) {
+      setLoadingImages(false);
+      return;
+    }
+
+    setLoadingImages(true);
+
+    const withTimeout = <T,>(p: Promise<T>, ms = 4000): Promise<T> => {
+      return new Promise((resolve, reject) => {
+        const to = setTimeout(() => reject(new Error("timeout")), ms);
+        p.then((v) => { clearTimeout(to); resolve(v); })
+         .catch((e) => { clearTimeout(to); reject(e); });
+      });
+    };
+
+    Promise.allSettled(
+      urls.map((u) => withTimeout(Image.prefetch(u)))
+    ).finally(() => {
+      if (mounted) setLoadingImages(false);
+    });
+
+    return () => { mounted = false; };
+  }, [newsItem?.imagen, relatedEventImage, authorAvatarUrl]);
+
   const linkifyText = (text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const tokens = text.split(urlRegex);
@@ -279,12 +318,13 @@ export default function NewScreen() {
     }
   }, [newsItem?.dtPublicado]);
 
-  if (loading) {
+  const busy = loading || loadingRelatedEvent || loadingImages;
+  if (busy) {
     return (
       <SafeAreaView style={styles.container}>
         <Header />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <CirculoCarga visible text="Cargando noticia…" />
         </View>
         <Footer />
       </SafeAreaView>

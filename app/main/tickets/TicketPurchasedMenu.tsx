@@ -191,6 +191,7 @@ function TicketsPurchasedMenuContent() {
                 text={item.description}
                 date={item.date}
                 foto={item.imageUrl}
+                hideFavorite
                 onPress={() => handlePress(item)}
               />
             ))}

@@ -1,22 +1,14 @@
 // app/owner/PartyRatingsScreen.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
-  Image,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { getPartyById } from "@/utils/partysApi";
+import SearchBarComponent from "@/components/common/SearchBarComponent";
 
 type Review = {
   id: string;
@@ -169,16 +161,11 @@ export default function PartyRatingsScreen() {
         <Text style={styles.title}>Reseñas - {partyName || "Fiesta"}</Text>
 
         {/* Search bar */}
-        <View style={styles.searchWrap}>
-          <MaterialCommunityIcons name="magnify" size={18} color={COLORS.textSecondary} style={{ marginHorizontal: 10 }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar reseñas..."
-            placeholderTextColor={COLORS.textSecondary}
-            value={q}
-            onChangeText={setQ}
-          />
-        </View>
+        <SearchBarComponent
+          value={q}
+          onChangeText={setQ}
+          placeholder="Buscar reseñas..."
+        />
 
         {/* Sort row */}
         <View style={styles.sortRow}>

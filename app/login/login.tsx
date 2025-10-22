@@ -402,14 +402,15 @@ export default function LoginScreen() {
             )}
           </View>
 
-          {/* Link a registro (fuera del card) */}
+          {/* Link a registro (fuera del card) - toda la frase es clickable */}
           <View style={styles.linksRowOutside}>
-            <Text variant="bodySmall" style={styles.linkText}>
-              ¿No tienes cuenta?{' '}
-              <Link href={ROUTES.LOGIN.REGISTER} style={{ color: globalStyles.COLORS.primary }}>
-                Regístrate aquí
-              </Link>
-            </Text>
+            <Link href={ROUTES.LOGIN.REGISTER} asChild>
+              <Pressable accessibilityRole="link">
+                <Text variant="bodySmall" style={styles.linkText}>
+                  ¿No tienes cuenta? Regístrate aquí
+                </Text>
+              </Pressable>
+            </Link>
           </View>
 
           </View>

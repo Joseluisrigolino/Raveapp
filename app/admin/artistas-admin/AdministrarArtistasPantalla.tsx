@@ -13,6 +13,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import Header from "@/components/layout/HeaderComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import Footer from "@/components/layout/FooterComponent";
+import SearchBarComponent from "@/components/common/SearchBarComponent";
 import {
   fetchArtistsFromApi,
   deleteArtistFromApi,
@@ -157,13 +158,13 @@ export default function ManageArtistsScreen() {
 
       <View style={styles.buttonsRow}>
         <TouchableOpacity
-          style={[styles.fullButton, styles.editBtn]}
+          style={[styles.actionBtn, styles.modifyBtn]}
           onPress={() => handleEdit(item.idArtista)}
         >
-          <Text style={[styles.editBtnText, { fontFamily: FONTS.bodyRegular, fontSize: FONT_SIZES.smallText }]}>Modificar</Text>
+          <Text style={styles.modifyBtnText}>Modificar</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.fullButton, styles.deleteBtn]}
+          style={[styles.actionBtn, styles.deleteBtn]}
           onPress={() => handleDelete(item.idArtista)}
         >
           <Text style={styles.deleteBtnText}>Eliminar</Text>
@@ -185,16 +186,11 @@ export default function ManageArtistsScreen() {
 
         <Text style={styles.screenTitle}>Gestionar Artistas</Text>
 
-        <View style={styles.searchRow}>
-          <MaterialCommunityIcons name="magnify" size={18} color={COLORS.textSecondary} style={{ marginHorizontal: 10 }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar artista..."
-            value={searchText}
-            onChangeText={handleSearch}
-            placeholderTextColor={COLORS.textSecondary}
-          />
-        </View>
+        <SearchBarComponent
+          value={searchText}
+          onChangeText={handleSearch}
+          placeholder="Buscar artista..."
+        />
 
         {loading ? (
           <ActivityIndicator
@@ -227,18 +223,20 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   createBtn: {
-    backgroundColor: COLORS.textPrimary,
-    borderRadius: RADIUS.card,
-    paddingVertical: 12,
+    // Mismo color que el tab activo del TabMenuComponent (#0F172A)
+    backgroundColor: "#0F172A",
+    borderRadius: 14,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
     flexDirection: "row",
+    gap: 8,
   },
   createText: {
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.button,
-    color: COLORS.cardBg,
+    color: COLORS.backgroundLight,
   },
   screenTitle: {
     fontFamily: FONTS.subTitleMedium,
@@ -320,26 +318,27 @@ const styles = StyleSheet.create({
     marginTop: 8,
     gap: 8,
   },
-  fullButton: {
+  actionBtn: {
     flex: 1,
-    borderRadius: 10,
-    paddingVertical: 10,
+    height: 40,
+    borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
   },
-  editBtn: {
-    backgroundColor: COLORS.cardBg,
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
+  modifyBtn: {
+    backgroundColor: "#F1F5F9",
   },
-  editBtnText: {
+  modifyBtnText: {
     color: COLORS.textPrimary,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
   },
   deleteBtn: {
-    backgroundColor: COLORS.textSecondary,
+    backgroundColor: "#374151",
   },
   deleteBtnText: {
-    color: COLORS.cardBg,
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.smallText,
+    color: COLORS.backgroundLight,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
   },
 });

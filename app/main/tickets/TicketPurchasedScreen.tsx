@@ -6,6 +6,8 @@ import { useLocalSearchParams } from "expo-router";
 import QRCode from "react-native-qrcode-svg";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import CirculoCarga from "@/components/general/CirculoCarga";
 
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
@@ -27,6 +29,7 @@ type UiUserEntry = {
   tipoCd?: number;
   tipoDs?: string;
   precio?: number;
+  nroEntrada?: number;
 };
 
 function TicketPurchasedScreenContent() {
@@ -37,6 +40,85 @@ function TicketPurchasedScreenContent() {
   const ticketsCount = typeof count === "string" && count.trim() ? Number(count) : undefined;
   const [entries, setEntries] = useState<UiUserEntry[]>([]);
   const qrRefs = useRef<Record<string, any>>({});
+
+  // Helpers para Maps: construir destino robusto a partir de la dirección
+  const getText = (v: any): string => {
+    if (v === null || v === undefined) return "";
+    if (typeof v === "string") return v;
+    if (typeof v === "number") return String(v);
+    if (typeof v === "object") {
+      return (
+        getText(v?.nombre) ||
+        getText(v?.dsNombre) ||
+        getText(v?.localidad) ||
+        getText(v?.municipio) ||
+        getText(v?.provincia) ||
+        ""
+      );
+    }
+    return "";
+  };
+
+  const addressDisplay = (() => {
+    const parts = [
+      getText(eventData?.address),
+      getText((eventData as any)?.localidad),
+      getText((eventData as any)?.municipio),
+      getText((eventData as any)?.provincia),
+    ]
+      .map((s) => (s || "").trim())
+      .filter(Boolean);
+    // evitar duplicados consecutivos sencillos
+    const dedup: string[] = [];
+    for (const p of parts) if (!dedup.includes(p)) dedup.push(p);
+    return dedup.join(", ");
+  })();
+
+  const openMapsDirections = () => {
+    const pieces = [
+      getText(eventData?.address),
+      getText((eventData as any)?.localidad),
+      getText((eventData as any)?.municipio),
+      getText((eventData as any)?.provincia),
+      "Argentina",
+    ]
+      .map((s) => (s || "").trim())
+      .filter(Boolean);
+    const uniq: string[] = [];
+    for (const p of pieces) if (!uniq.includes(p)) uniq.push(p);
+    const destination = uniq.join(", ");
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination || eventData?.title || "")}`;
+    Linking.openURL(url);
+  };
+
+  // Formateador de fecha legible en español (ej: 28 Marzo 2025)
+  const formatDateEs = (raw: string | undefined | null): string => {
+    const s = String(raw ?? '').trim();
+    if (!s) return '';
+    // Intentar parsear ISO o formatos comunes
+    const tryList = [s];
+    // Si viene como dd/mm/yyyy, reordenar
+    const m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+    if (m) {
+      const d = m[1].padStart(2, '0');
+      const mo = m[2].padStart(2, '0');
+      const y = m[3];
+      tryList.push(`${y}-${mo}-${d}T12:00:00Z`);
+    }
+    for (const cand of tryList) {
+      const dt = new Date(cand);
+      if (!isNaN(dt.getTime())) {
+        const dia = dt.getUTCDate();
+        const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+        const mes = meses[dt.getUTCMonth()];
+        const anio = dt.getUTCFullYear();
+        return `${dia} ${mes} ${anio}`;
+      }
+    }
+    return s;
+  };
+
+  const formatTicketCode = (n: number) => `#${String(n).padStart(3, '0')}`;
 
   useEffect(() => {
     (async () => {
@@ -80,6 +162,9 @@ function TicketPurchasedScreenContent() {
               tipo?.dsTipo ?? r?.dsTipo ?? (Number.isFinite(tipoCd) ? (tipoMap.get(tipoCd as number) ?? "") : "")
             ).trim() || undefined;
             const precio = Number(r?.precio ?? r?.entrada?.precio ?? NaN);
+            const nroEntradaRaw = Number(
+              r?.nroEntrada ?? r?.entrada?.nroEntrada ?? r?.numero ?? r?.nro ?? NaN
+            );
             return {
               idEntrada,
               idFecha: idFecha || undefined,
@@ -87,6 +172,7 @@ function TicketPurchasedScreenContent() {
               tipoCd: Number.isFinite(tipoCd) ? (tipoCd as number) : undefined,
               tipoDs,
               precio: Number.isFinite(precio) ? (precio as number) : undefined,
+              nroEntrada: Number.isFinite(nroEntradaRaw) ? (nroEntradaRaw as number) : undefined,
             };
           });
           setEntries(mapped);
@@ -125,17 +211,18 @@ function TicketPurchasedScreenContent() {
         <head>
           <meta charset="utf-8" />
           <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f7f8fa; margin: 0; padding: 24px; }
-            .card { max-width: 720px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 24px; box-shadow: 0 6px 24px rgba(0,0,0,0.08); }
+            @page { size: A4; margin: 20mm; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f7f8fa; margin: 0; padding: 0; }
+            .card { max-width: 720px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 18mm; box-shadow: 0 6px 24px rgba(0,0,0,0.08); }
             .title { font-size: 22px; font-weight: 700; text-align: center; margin: 0 0 12px; color: #111827; }
             .subtitle { font-size: 14px; text-align: center; color: #6b7280; margin: 0 0 16px; }
-            .hero { text-align: center; margin-bottom: 16px; }
+            .hero { text-align: center; margin: 4mm 0 6mm; }
             .hero img { max-width: 100%; border-radius: 10px; }
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
             .item { background: #f9fafb; border-radius: 8px; padding: 10px 12px; }
             .item b { color: #374151; }
-            .qrWrap { text-align: center; padding: 16px 0; }
-            .qrWrap img { width: 340px; height: 340px; image-rendering: pixelated; }
+            .qrWrap { text-align: center; padding: 8mm 0; }
+            .qrWrap img { width: 70mm; height: 70mm; image-rendering: pixelated; }
             .footer { text-align: center; color: #9ca3af; font-size: 12px; margin-top: 12px; }
             .note { background: #eef2ff; color: #3730a3; border-radius: 8px; padding: 10px 12px; font-size: 12px; }
           </style>
@@ -172,13 +259,86 @@ function TicketPurchasedScreenContent() {
     }
   };
 
+  // Generar UN SOLO PDF con TODAS las entradas para evitar múltiples diálogos de compartir
+  const handleDownloadAll = async () => {
+    if (!eventData || !entries.length) return;
+
+    // Obtener dataURL para cada QR ya renderizado
+    const qrImages: { entry: UiUserEntry; dataUrl?: string; text: string }[] = [];
+    for (const e of entries) {
+      const qrText = e.mdQR || `Entrada:${e.idEntrada}|Evento:${eventData.id}|Fecha:${e.idFecha ?? ''}`;
+      let dataUrl: string | undefined;
+      try {
+        const ref = qrRefs.current[e.idEntrada];
+        if (ref && typeof ref.toDataURL === 'function') {
+          // eslint-disable-next-line no-await-in-loop
+          dataUrl = await new Promise<string>((resolve) => ref.toDataURL((data: string) => resolve(`data:image/png;base64,${data}`)));
+        }
+      } catch {}
+      qrImages.push({ entry: e, dataUrl, text: qrText });
+    }
+
+    const htmlSections = qrImages.map(({ entry, dataUrl, text }, idx) => {
+      const tipo = entry.tipoDs ?? (entry.tipoCd ?? 'Entrada');
+      const ticketNumber = Number.isFinite(entry.nroEntrada as number) ? (entry.nroEntrada as number) : (idx + 1);
+      const code = formatTicketCode(ticketNumber);
+      const price = typeof entry.precio === 'number' ? `$${entry.precio}` : '';
+      const valido = formatDateEs(eventData.date);
+      return `
+        <div class="entry">
+          <div class="row">
+            <div class="left">${tipo}</div>
+            <div class="right">${code}</div>
+          </div>
+          <div class="sub">${price}</div>
+          <div class="qr">${dataUrl ? `<img src="${dataUrl}" alt="QR" />` : `<div class="note">${text}</div>`}</div>
+          <div class="valid">Entrada válida para el ${valido}</div>
+        </div>`;
+    }).join('\n');
+
+    const html = `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            @page { size: A4; margin: 20mm; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f7f8fa; margin: 0; padding: 0; }
+            .card { max-width: 760px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 18mm; box-shadow: 0 6px 24px rgba(0,0,0,0.08); }
+            .title { font-size: 22px; font-weight: 700; text-align: center; margin: 0 0 12px; color: #111827; }
+            .hero { text-align: center; margin: 4mm 0 6mm; }
+            .hero img { max-width: 100%; border-radius: 10px; }
+            .entry { border-top: 1px solid #eee; padding-top: 5mm; margin-top: 5mm; page-break-inside: avoid; }
+            .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+            .left { font-weight: 600; color: #111827; }
+            .right { color: #6b7280; font-weight: 600; }
+            .sub { color: #374151; font-size: 14px; margin: 2mm 0 4mm; text-align: center; }
+            .qr { text-align: center; margin: 4mm 0 3mm; }
+            .qr img { width: 70mm; height: 70mm; image-rendering: pixelated; }
+            .note { background: #eef2ff; color: #3730a3; border-radius: 8px; padding: 8px 10px; font-size: 12px; text-align: center; }
+            .valid { color: #6b7280; font-size: 12px; text-align: center; margin-bottom: 2mm; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1 class="title">${eventData.title}</h1>
+            <div class="hero"><img src="${eventData.imageUrl}" alt="Evento" /></div>
+            ${htmlSections}
+          </div>
+        </body>
+      </html>`;
+    try {
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri, { mimeType: 'application/pdf' });
+    } catch (err) {
+      console.error('Error generando PDF combinado:', err);
+    }
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.loaderWrapper}>
         <Header />
-        <View style={styles.notFoundContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
+        <CirculoCarga visible text="Cargando entradas..." />
         <Footer />
       </SafeAreaView>
     );
@@ -198,75 +358,118 @@ function TicketPurchasedScreenContent() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header />
+      <Header title="Mis Entradas" />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-  <Image source={getSafeImageSource(eventData.imageUrl)} style={styles.eventImage} />
+        <Image source={getSafeImageSource(eventData.imageUrl)} style={styles.eventImage} />
 
-        <Text style={styles.title}>Entrada a: {eventData.title}</Text>
+        <Text style={styles.title}>{eventData.title}</Text>
         {typeof ticketsCount === 'number' && ticketsCount > 1 ? (
           <Text style={styles.countBadge}>x{ticketsCount} entradas</Text>
         ) : null}
 
-        {entries.length === 0 ? (
-          <Text style={styles.noEntriesText}>No se encontraron entradas para este evento.</Text>
-        ) : (
-          <View style={{ width: '100%', rowGap: 12 }}>
-            {entries.map((en, idx) => {
-              const qrText = en.mdQR || `Entrada:${en.idEntrada}|Evento:${eventData.id}|Fecha:${en.idFecha ?? ''}`;
+        {/* Información del evento */}
+        <View style={styles.infoCard}>
+          <Text style={styles.sectionTitle}>Información del Evento</Text>
+          <View style={styles.infoRow}>
+            <MaterialCommunityIcons name="calendar-blank-outline" size={16} color={COLORS.textSecondary} />
+            <Text style={styles.infoText}>{eventData.date}</Text>
+          </View>
+          {!!eventData.timeRange && (
+            <View style={styles.infoRow}>
+              <MaterialCommunityIcons name="clock-time-three-outline" size={16} color={COLORS.textSecondary} />
+              <Text style={styles.infoText}>{eventData.timeRange}</Text>
+            </View>
+          )}
+          {addressDisplay ? (
+            <TouchableOpacity style={styles.infoRow} onPress={openMapsDirections} activeOpacity={0.8}>
+              <MaterialCommunityIcons name="map-marker-outline" size={16} color={COLORS.textSecondary} />
+              <Text style={[styles.infoText, styles.linkText]}>{addressDisplay}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {/* Artistas (si hay) */}
+        {Array.isArray((eventData as any)?.artistas) && (eventData as any).artistas.length > 0 ? (
+          <View style={styles.infoCard}>
+            <Text style={styles.sectionTitle}>Artistas</Text>
+            {((eventData as any).artistas as any[]).map((a, idx) => {
+              const name = a?.name || a?.nombre || a?.dsNombre || String(a?.idArtista || a?.id || idx);
               return (
-                <View key={`${en.idEntrada}-${idx}`} style={styles.entryCard}>
-                  <Text style={styles.entryTitle}>Entrada #{idx + 1}</Text>
-                  <View style={{ alignItems: 'center' }}>
-                    <QRCode
-                      value={qrText}
-                      size={QR_SIZE}
-                      color={COLORS.textPrimary}
-                      backgroundColor={COLORS.cardBg}
-                      getRef={(c: any) => { if (c) { qrRefs.current[en.idEntrada] = c; } }}
-                    />
-                  </View>
-                  <Text style={styles.entryInfo}>
-                    🆔 {en.idEntrada}{"\n"}
-                    🏷️ {en.tipoDs ?? (en.tipoCd ?? '')}{"\n"}
-                    💵 {typeof en.precio === 'number' ? `$${en.precio}` : ''}{"\n"}
-                    📅 {eventData.date} {eventData.timeRange ? `· ${eventData.timeRange}` : ''}
-                  </Text>
-                  <TouchableOpacity
-                    style={[styles.mapButton, { marginTop: 6 }]}
-                    onPress={() => handleDownloadEntryPDF(en)}
-                  >
-                    <Text style={styles.mapButtonText}>Descargar entrada (PDF)</Text>
-                  </TouchableOpacity>
+                <View key={`${name}-${idx}`} style={styles.infoRow}>
+                  <MaterialCommunityIcons name="music-note-outline" size={16} color={COLORS.textSecondary} />
+                  <Text style={styles.infoText}>{name}</Text>
                 </View>
               );
             })}
           </View>
+        ) : null}
+
+        {/* Descripción */}
+        {!!eventData.description && (
+          <View style={styles.infoCard}>
+            <Text style={styles.sectionTitle}>Descripción</Text>
+            <Text style={styles.sectionText}>{eventData.description}</Text>
+          </View>
         )}
 
-        <TouchableOpacity
-          style={styles.mapButton}
-          onPress={() =>
-            Linking.openURL(
-              `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                eventData.title
-              )}`
-            )
-          }
-        >
-          <Text style={styles.mapButtonText}>Cómo llegar</Text>
+        {/* Mis Entradas */}
+        <View style={[styles.infoCard, { paddingBottom: 8 }]}>
+          <Text style={styles.sectionTitle}>Mis Entradas</Text>
+          {entries.length === 0 ? (
+            <Text style={styles.noEntriesText}>No se encontraron entradas para este evento.</Text>
+          ) : (
+            <View style={{ width: '100%', rowGap: 12 }}>
+              {entries.map((en, idx) => {
+                const qrText = en.mdQR || `Entrada:${en.idEntrada}|Evento:${eventData.id}|Fecha:${en.idFecha ?? ''}`;
+                const tipo = en.tipoDs ?? (en.tipoCd ?? 'Entrada');
+                const ticketNumber = Number.isFinite(en.nroEntrada as number) ? (en.nroEntrada as number) : (idx + 1);
+                const code = formatTicketCode(ticketNumber);
+                const price = typeof en.precio === 'number' ? `$${en.precio}` : '';
+                const valido = formatDateEs(eventData.date);
+                return (
+                  <View key={`${en.idEntrada}-${idx}`} style={styles.entryCard}>
+                    <View style={styles.entryHeaderRow}>
+                      <Text style={styles.entryHeaderLeft}>{String(tipo)}</Text>
+                      <Text style={styles.entryHeaderRight}>{code}</Text>
+                    </View>
+                    <Text style={styles.entryPriceLine}>{price}</Text>
+                    <View style={{ alignItems: 'center', marginTop: 6 }}>
+                      <QRCode
+                        value={qrText}
+                        size={QR_SIZE}
+                        color={COLORS.textPrimary}
+                        backgroundColor={COLORS.cardBg}
+                        getRef={(c: any) => { if (c) { qrRefs.current[en.idEntrada] = c; } }}
+                      />
+                    </View>
+                    <Text style={styles.entryValidText}>Entrada válida para el {valido}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        {/* Botón principal Descargar PDF (todas las entradas) */}
+        {entries.length > 0 && (
+          <TouchableOpacity style={styles.primaryButton} onPress={handleDownloadAll} activeOpacity={0.85}>
+            <MaterialCommunityIcons name="download" size={18} color={COLORS.backgroundLight} style={{ marginRight: 8 }} />
+            <Text style={styles.primaryButtonText}>Descargar PDF</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Botón secundario Cómo llegar (outline) */}
+        <TouchableOpacity style={styles.secondaryButton} onPress={openMapsDirections} activeOpacity={0.85}>
+          <MaterialCommunityIcons name="navigation-variant" size={18} color={COLORS.textPrimary} style={{ marginRight: 8 }} />
+          <Text style={styles.secondaryButtonText}>Cómo llegar</Text>
         </TouchableOpacity>
 
         <Text style={styles.reviewNote}>
           * Una vez finalizado el evento, podrás dejar tu reseña...
         </Text>
 
-        <View style={styles.descriptionSection}>
-          <Text style={styles.sectionTitle}>Descripción del evento</Text>
-          <Text style={styles.sectionText}>
-            {eventData.description || ""}
-          </Text>
-        </View>
+        {/* Descripción adicional ya mostrada arriba */}
       </ScrollView>
 
       <Footer />
@@ -376,6 +579,31 @@ const styles = StyleSheet.create({
     lineHeight: FONT_SIZES.body * 1.5,
     textAlign: "justify",
   },
+  infoCard: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    padding: 16,
+    elevation: 2,
+    width: "100%",
+    marginBottom: 12,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  infoText: {
+    marginLeft: 8,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
+    flexShrink: 1,
+    flexGrow: 1,
+    flexBasis: 'auto',
+  },
+  linkText: {
+    color: COLORS.primary,
+  },
   countBadge: {
     marginTop: -8,
     marginBottom: 12,
@@ -402,13 +630,33 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
   },
-  entryInfo: {
+  entryHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  entryHeaderLeft: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
+  },
+  entryHeaderRight: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textSecondary,
+  },
+  entryPriceLine: {
+    marginTop: 2,
     fontFamily: FONTS.bodyRegular,
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
+  },
+  entryValidText: {
+    marginTop: 6,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
+    color: COLORS.textSecondary,
     textAlign: 'center',
-    marginTop: 8,
-    lineHeight: FONT_SIZES.body * 1.5,
   },
   noEntriesText: {
     fontFamily: FONTS.bodyRegular,
@@ -416,5 +664,41 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     marginVertical: 8,
+  },
+  primaryButton: {
+    marginTop: 8,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.textPrimary,
+    borderRadius: RADIUS.card,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  primaryButtonText: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
+    color: COLORS.backgroundLight,
+    textAlign: 'center',
+  },
+  secondaryButton: {
+    marginTop: 10,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  secondaryButtonText: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
   }
 });

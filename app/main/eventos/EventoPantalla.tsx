@@ -282,6 +282,77 @@ export default function EventScreen() {
     return url || null;
   }, [eventData]);
 
+  // Dirección + Localidad ("Calle 123, Localidad") y apertura en Google Maps
+  const addressDisplay = useMemo(() => {
+    const addr = String(eventData?.address ?? "").trim();
+
+    const getText = (val: any): string => {
+      if (typeof val === "string") return val;
+      if (typeof val === "number") return String(val);
+      if (val && typeof val === "object") {
+        return (
+          val.nombre || val.dsNombre || val.localidad || val.municipio || val.provincia || ""
+        );
+      }
+      return "";
+    };
+
+    const loc = String(getText((eventData as any)?.domicilio?.localidad) ?? "").trim();
+    const mun = String(getText((eventData as any)?.domicilio?.municipio) ?? "").trim();
+    const prov = String(getText((eventData as any)?.domicilio?.provincia) ?? "").trim();
+
+    // Elegir el mejor sufijo disponible en orden: localidad > municipio > provincia
+    const suffix = loc || mun || prov || "";
+
+    if (addr && suffix) {
+      // Evitar duplicar el sufijo si ya está dentro de la dirección
+      return addr.toLowerCase().includes(suffix.toLowerCase()) ? addr : `${addr}, ${suffix}`;
+    }
+    return addr || suffix || "-";
+  }, [eventData?.address, (eventData as any)?.domicilio?.localidad, (eventData as any)?.domicilio?.municipio, (eventData as any)?.domicilio?.provincia]);
+
+  const openMapsDirections = () => {
+    const getText = (val: any): string => {
+      if (typeof val === "string") return val;
+      if (typeof val === "number") return String(val);
+      if (val && typeof val === "object") {
+        return (
+          val.nombre || val.dsNombre || val.localidad || val.municipio || val.provincia || ""
+        );
+      }
+      return "";
+    };
+
+    const addr = String(eventData?.address ?? "").trim();
+    const loc = String(getText((eventData as any)?.domicilio?.localidad) ?? "").trim();
+    const mun = String(getText((eventData as any)?.domicilio?.municipio) ?? "").trim();
+    const prov = String(getText((eventData as any)?.domicilio?.provincia) ?? "").trim();
+
+    const parts = [addr, loc, mun, prov, "Argentina"]
+      .map((s) => String(s || "").trim())
+      .filter(Boolean);
+
+    // de-duplicate conservando el orden, case-insensitive
+    const seen = new Set<string>();
+    const unique = parts.filter((p) => {
+      const k = p.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+
+    const destination = unique.join(", ");
+    if (!destination) return;
+
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+    Linking.openURL(url).catch(() => {
+      try {
+        const fallback = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`;
+        Linking.openURL(fallback);
+      } catch {}
+    });
+  };
+
   // --- helpers UI para el mock ---
   const formatFechaRango = (fs: FechaLite[]): string | null => {
     try {
@@ -479,12 +550,22 @@ export default function EventScreen() {
           {/* Tarjeta: Dirección */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Dirección</Text>
-            <View style={[styles.listRow, { flexWrap: 'wrap' }]}>
-              <MaterialCommunityIcons name="map-marker-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} />
-              <Text style={[styles.listText, { color: COLORS.info }]}>
-                {eventData.address || "-"}
+            <TouchableOpacity
+              onPress={openMapsDirections}
+              disabled={!addressDisplay || addressDisplay === "-"}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.listRow, { flexWrap: 'wrap' }]}>
+                <MaterialCommunityIcons name="map-marker-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} />
+                <Text style={[styles.listText, { color: COLORS.info, textDecorationLine: 'underline', fontWeight: 'bold' }]}>
+                  {addressDisplay}
+                </Text>
+                <MaterialCommunityIcons name="open-in-new" size={16} color={COLORS.info} style={{ marginLeft: 6 }} />
+              </View>
+              <Text style={[styles.listText, { color: COLORS.textSecondary, marginLeft: 26 }]}>
+                Tocar para ver cómo llegar en Google Maps
               </Text>
-            </View>
+            </TouchableOpacity>
           </View>
 
           {/* Debug: mostrar las URLs que intentamos renderizar (se moverán debajo de entradas) */}

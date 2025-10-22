@@ -23,6 +23,7 @@ interface CardProps {
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
   disableFavorite?: boolean;
+  hideFavorite?: boolean; // si true, no renderiza el corazón
 }
 
 export default function CardComponent({
@@ -34,6 +35,7 @@ export default function CardComponent({
   isFavorite = false,
   onToggleFavorite,
   disableFavorite = false,
+  hideFavorite = false,
 }: CardProps) {
   const handleHeartPress = (e: GestureResponderEvent) => {
     e.stopPropagation();
@@ -45,20 +47,22 @@ export default function CardComponent({
       <View style={styles.imageWrapper}>
         <Image source={getSafeImageSource(foto)} style={styles.image} />
 
-        {/* Corazón dentro de chip circular blanco */}
-        <TouchableOpacity
-          onPress={handleHeartPress}
-          disabled={disableFavorite || !onToggleFavorite}
-          style={styles.heartChip}
-          hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-          activeOpacity={0.8}
-        >
-          <MaterialCommunityIcons
-            name={isFavorite ? "heart" : "heart-outline"}
-            size={20}
-            color={COLORS.negative}
-          />
-        </TouchableOpacity>
+        {/* Corazón dentro de chip circular blanco (oculto si hideFavorite) */}
+        {!hideFavorite && (
+          <TouchableOpacity
+            onPress={handleHeartPress}
+            disabled={disableFavorite || !onToggleFavorite}
+            style={styles.heartChip}
+            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons
+              name={isFavorite ? "heart" : "heart-outline"}
+              size={20}
+              color={COLORS.negative}
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.infoContainer}>

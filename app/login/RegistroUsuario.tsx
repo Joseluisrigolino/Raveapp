@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { ScrollView, View, StyleSheet, Alert, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Text, TextInput, Button, useTheme, HelperText, Menu } from "react-native-paper";
+import { Text, TextInput, Button, useTheme, HelperText, Menu, Portal, Modal } from "react-native-paper";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
@@ -17,6 +17,7 @@ import globalStyles from "@/styles/globalStyles";
 import { apiClient, login as apiLogin } from "@/utils/apiConfig";
 import { useAuth } from "@/context/AuthContext";
 import { getProfile, updateUsuario, createUsuario } from "@/utils/auth/userHelpers";
+import { mailsApi } from "@/utils/mails/mailsApi";
 // Google Cloud config removed; registration can be adapted to Firebase if needed.
 
 export default function RegisterUserScreen() {
@@ -77,6 +78,9 @@ export default function RegisterUserScreen() {
   const [loading, setLoading] = useState(false);
   const [securePass, setSecurePass] = useState(true);
   const [secureConfirm, setSecureConfirm] = useState(true);
+  // Modal de éxito (en lugar de Alert): control de visibilidad y mensaje
+  const [successVisible, setSuccessVisible] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   // Generar opciones para los selectores
   const days = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, '0'));
@@ -296,8 +300,25 @@ export default function RegisterUserScreen() {
         headers: { "Content-Type": "application/json" },
       });
 
-      Alert.alert("¡Éxito!", "Tu cuenta se ha registrado correctamente.");
-      nav.replace(router, ROUTES.LOGIN.LOGIN);
+      // Enviar email de confirmación (best-effort): si falla, no interrumpe el registro
+      let mailOk = false;
+      try {
+        await mailsApi.sendConfirmEmail({
+          to: form.email.trim(),
+          name: form.firstName.trim(),
+          confirmationUrl: "https://raveapp.com.ar/confirmacion-mail",
+        });
+        mailOk = true;
+      } catch (mailErr) {
+        console.warn("sendConfirmEmail fallo (no bloquea registro):", mailErr);
+      }
+
+      const email = form.email.trim();
+      const msg = mailOk
+        ? `Tu registro se realizó con éxito. Te enviamos un correo a ${email} para confirmar tu email. Si no lo ves, revisa la carpeta de spam/promociones.`
+        : "Tu cuenta se ha registrado correctamente.";
+      setSuccessMessage(msg);
+      setSuccessVisible(true);
     } catch (err: any) {
       console.error("Error CreateUsuario:", err);
       if (err.response?.data?.errors) {
@@ -315,9 +336,39 @@ export default function RegisterUserScreen() {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <SafeAreaView style={[styles.root, { backgroundColor: theme.colors.background }]}>
+      {/* Alineamos el fondo con Login: fondo claro consistente, evita negro en iOS */}
+      <SafeAreaView style={[styles.root, { backgroundColor: globalStyles.COLORS.backgroundLight }]}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            style={{ flex: 1, backgroundColor: globalStyles.COLORS.backgroundLight }}
+            contentContainerStyle={styles.container}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Modal de éxito personalizado */}
+            <Portal>
+              <Modal
+                visible={successVisible}
+                onDismiss={() => { /* No cerrar tocando fuera: navegar solo con "Aceptar" */ }}
+                contentContainerStyle={styles.successModal}
+              >
+                <View style={styles.successHeaderIcon}>
+                  <Text style={styles.successCheck}>✓</Text>
+                </View>
+                <Text style={styles.successTitle}>¡Registro exitoso!</Text>
+                <Text style={styles.successText}>{successMessage}</Text>
+                <Button
+                  mode="contained"
+                  style={styles.successButton}
+                  contentStyle={{ height: 48 }}
+                  onPress={() => {
+                    setSuccessVisible(false);
+                    nav.replace(router, ROUTES.LOGIN.LOGIN);
+                  }}
+                >
+                  Aceptar
+                </Button>
+              </Modal>
+            </Portal>
             <View style={styles.card}>
               {/* Registro mediante Google (Firebase) y/o email/contraseña */}
 
@@ -691,6 +742,52 @@ const styles = StyleSheet.create({
     padding: 20,
     justifyContent: "center",
     alignItems: "center",
+  },
+  /* Modal de éxito */
+  successModal: {
+    backgroundColor: "#ffffff",
+    padding: 20,
+    borderRadius: 14,
+    width: "90%",
+    maxWidth: 400,
+    alignSelf: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  successHeaderIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#eaf7ef",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  successCheck: {
+    color: "#16a34a",
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  successTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  successText: {
+    color: "#374151",
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  successButton: {
+    alignSelf: "stretch",
+    borderRadius: 12,
+    backgroundColor: "#0f172a",
   },
   card: {
     width: "100%",

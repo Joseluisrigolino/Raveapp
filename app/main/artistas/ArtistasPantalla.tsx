@@ -1,7 +1,7 @@
 // src/screens/ArtistsScreens/ArtistsScreen.tsx
 
 import React, { useState, useEffect, useMemo } from "react";
-import { View, ScrollView, Text, ActivityIndicator, StyleSheet, TextInput } from "react-native";
+import { View, ScrollView, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, usePathname } from "expo-router";
 import { ROUTES } from "../../../routes";
@@ -17,7 +17,7 @@ import { Artist } from "@/interfaces/Artist";
 import { fetchArtistsFromApi } from "@/utils/artists/artistApi";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import SearchBarComponent from "@/components/common/SearchBarComponent";
 
 export default function ArtistasPantalla() {
   const router = useRouter();
@@ -92,16 +92,11 @@ export default function ArtistasPantalla() {
         <TabMenuComponent tabs={tabs} />
 
         <View style={styles.searchWrapper}>
-          <View style={styles.searchRow}>
-            <MaterialCommunityIcons name="magnify" size={18} color={COLORS.textSecondary} style={{ marginHorizontal: 10 }} />
-            <TextInput
-              style={styles.searchInput}
-              value={searchText}
-              onChangeText={setSearchText}
-              placeholder="Buscar artista..."
-              placeholderTextColor={COLORS.textSecondary}
-            />
-          </View>
+          <SearchBarComponent
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholder="Buscar artista..."
+          />
         </View>
 
         {loading ? (
