@@ -26,6 +26,8 @@ import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import InputText from "@/components/common/inputText";
 import InputDesc from "@/components/common/inputDesc";
 import SelectField from "@/components/common/selectField";
+import ProtectedRoute from "@/utils/auth/ProtectedRoute";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 export default function CreateNewScreen() {
   const router = useRouter();
@@ -166,130 +168,128 @@ export default function CreateNewScreen() {
   }, [isCreating, title, body, imageUri, eventoSeleccionado, extractBackendMessage, router]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header />
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Crear nueva noticia</Text>
+    <ProtectedRoute allowedRoles={["admin"]}>
+      <SafeAreaView style={styles.container}>
+        <Header title="EventApp" />
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text style={styles.title}>Crear noticia</Text>
 
-        <InputText
-          label="Título"
-          value={title}
-          isEditing={true}
-          onBeginEdit={() => {}}
-          onChangeText={setTitle}
-          containerStyle={{ width: "100%", alignItems: "stretch" }}
-          labelStyle={{ width: "100%", textAlign: "left" }}
-          inputStyle={{ width: "100%" }}
-        />
+          <InputText
+            label="Título"
+            value={title}
+            isEditing={true}
+            onBeginEdit={() => {}}
+            onChangeText={setTitle}
+            placeholder="Ingresa el título de la noticia..."
+            containerStyle={{ width: "100%", alignItems: "stretch" }}
+            labelStyle={{ width: "100%", textAlign: "left" }}
+            inputStyle={{ width: "100%" }}
+          />
 
-        <Text style={styles.label}>Imagen:</Text>
-        <View style={styles.imageContainer}>
-          {imageUri ? (
-            <>
-              <Image source={{ uri: imageUri }} style={styles.newsImage} />
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={handleDeleteImage}
-              >
+          <Text style={styles.label}>Imagen</Text>
+          <View style={styles.imageContainer}>
+            {imageUri ? (
+              <Image source={{ uri: imageUri }} style={styles.previewBoxImage} />
+            ) : (
+              <View style={[styles.previewBox, styles.imageFallback]}>
+                <MaterialCommunityIcons name="image-outline" size={40} color={COLORS.textSecondary} />
+                <Text style={styles.imagePreviewText}>Vista previa de la imagen</Text>
+              </View>
+            )}
+
+            {/* Select image button (light style) */}
+            <TouchableOpacity
+              style={[styles.selectImageButtonLight, isPicking && { opacity: 0.6 }]}
+              onPress={handleSelectImage}
+              disabled={isPicking}
+              activeOpacity={0.85}
+            >
+              {isPicking ? (
+                <ActivityIndicator color={COLORS.textPrimary} />
+              ) : (
+                <Text style={styles.selectImageButtonLightText}>Seleccionar imagen</Text>
+              )}
+            </TouchableOpacity>
+
+            {imageUri && (
+              <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteImage}>
                 <Text style={styles.deleteButtonText}>Eliminar imagen</Text>
               </TouchableOpacity>
-            </>
-          ) : (
-            <View style={[styles.newsImage, styles.imageFallback]}>
-              <Text style={styles.imagePlaceholderText}>Sin imagen</Text>
+            )}
+
+            <Text style={styles.imageNotice}>
+              Se permite imágenes JPG, JPEG o PNG. Peso máximo: 2MB
+            </Text>
+          </View>
+
+          <InputDesc
+            label="Contenido"
+            value={body}
+            isEditing={true}
+            onBeginEdit={() => {}}
+            onChangeText={setBody}
+            placeholder="Escribe el contenido de la noticia..."
+            autoFocus={false}
+            containerStyle={{ width: "100%", alignItems: "stretch" }}
+            labelStyle={{ width: "100%", textAlign: "left" }}
+            inputStyle={{ width: "100%" }}
+          />
+
+          <SelectField
+            label="Vincular evento"
+            value={
+              eventoSeleccionado
+                ? eventos.find((e) => e.idEvento === eventoSeleccionado)?.nombre
+                : undefined
+            }
+            placeholder="Seleccionar evento (opcional)"
+            onPress={() => setShowEventos(!showEventos)}
+            isOpen={showEventos}
+            containerStyle={{ width: "100%", alignItems: "stretch" }}
+            labelStyle={{ width: "100%", textAlign: "left" }}
+            fieldStyle={{ width: "100%" }}
+          />
+
+          {showEventos && (
+            <View style={styles.dropdownContainer}>
+              {eventos.map((e, index) => (
+                <TouchableOpacity
+                  key={e.idEvento || `evento-${index}`}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setEventoSeleccionado(e.idEvento);
+                    setShowEventos(false);
+                  }}
+                >
+                  <View style={styles.eventItem}>
+                    {e.imageUrl ? (
+                      <Image source={{ uri: e.imageUrl }} style={styles.eventImage} />
+                    ) : (
+                      <View style={[styles.eventImage, { backgroundColor: "#ccc" }]} />
+                    )}
+                    <Text style={styles.eventName}>{e.nombre}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
             </View>
           )}
 
           <TouchableOpacity
-            style={[
-              styles.selectImageButton,
-              isPicking && { opacity: 0.6 },
-            ]}
-            onPress={handleSelectImage}
-            disabled={isPicking}
+            style={[styles.btn, isCreating && { opacity: 0.6 }]}
+            onPress={handleCreateNews}
+            disabled={isCreating}
+            activeOpacity={0.9}
           >
-            {isPicking ? (
-              <ActivityIndicator color={COLORS.cardBg} />
+            {isCreating ? (
+              <ActivityIndicator color={COLORS.backgroundLight} />
             ) : (
-              <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
+              <Text style={styles.btnText}>Crear noticia</Text>
             )}
           </TouchableOpacity>
-
-          <Text style={styles.imageNotice}>
-            Se permiten imágenes JPG, JPEG o PNG. Peso máximo: 2MB.
-          </Text>
-        </View>
-
-        <InputDesc
-          label="Contenido"
-          value={body}
-          isEditing={true}
-          onBeginEdit={() => {}}
-          onChangeText={setBody}
-          autoFocus={false}
-          containerStyle={{ width: "100%", alignItems: "stretch" }}
-          labelStyle={{ width: "100%", textAlign: "left" }}
-          inputStyle={{ width: "100%" }}
-        />
-
-        <SelectField
-          label="Evento relacionado (opcional)"
-          value={
-            eventoSeleccionado
-              ? eventos.find((e) => e.idEvento === eventoSeleccionado)?.nombre
-              : undefined
-          }
-          placeholder="Seleccioná un evento..."
-          onPress={() => setShowEventos(!showEventos)}
-          isOpen={showEventos}
-          containerStyle={{ width: "100%", alignItems: "stretch" }}
-          labelStyle={{ width: "100%", textAlign: "left" }}
-          fieldStyle={{ width: "100%" }}
-        />
-
-        {showEventos && (
-          <View style={styles.dropdownContainer}>
-            {eventos.map((e, index) => (
-              <TouchableOpacity
-                key={e.idEvento || `evento-${index}`}
-                style={styles.dropdownItem}
-                onPress={() => {
-                  setEventoSeleccionado(e.idEvento);
-                  setShowEventos(false);
-                }}
-              >
-                <View style={styles.eventItem}>
-                  {e.imageUrl ? (
-                    <Image
-                      source={{ uri: e.imageUrl }}
-                      style={styles.eventImage}
-                    />
-                  ) : (
-                    <View
-                      style={[styles.eventImage, { backgroundColor: "#ccc" }]}
-                    />
-                  )}
-                  <Text style={styles.eventName}>{e.nombre}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={[styles.btn, isCreating && { opacity: 0.6 }]}
-          onPress={handleCreateNews}
-          disabled={isCreating}
-        >
-          {isCreating ? (
-            <ActivityIndicator color={COLORS.cardBg} />
-          ) : (
-            <Text style={styles.btnText}>Crear Noticia</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-      <Footer />
-    </SafeAreaView>
+        </ScrollView>
+        <Footer />
+      </SafeAreaView>
+    </ProtectedRoute>
   );
 }
 
@@ -299,15 +299,16 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.backgroundLight,
   },
   content: {
-    padding: 16,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 24,
   },
   title: {
     fontFamily: FONTS.titleBold,
     fontSize: FONT_SIZES.titleMain,
     color: COLORS.textPrimary,
-    textAlign: "center",
+    textAlign: "left",
     marginBottom: 16,
-    textDecorationLine: "underline",
   },
   label: {
     fontFamily: FONTS.subTitleMedium,
@@ -320,22 +321,36 @@ const styles = StyleSheet.create({
   imageContainer: {
     alignItems: "center",
     marginVertical: 16,
-  },
-  newsImage: {
     width: "100%",
-    height: 180,
-    borderRadius: RADIUS.card,
+  },
+  previewBox: {
+    width: "100%",
+    height: 200,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: COLORS.borderInput,
+    backgroundColor: "#e5e7eb",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
     marginBottom: 12,
   },
-  imageFallback: {
+  previewBoxImage: {
+    width: "100%",
+    height: 200,
+    borderRadius: 16,
+    marginBottom: 12,
     backgroundColor: COLORS.borderInput,
+  },
+  imageFallback: {
     justifyContent: "center",
     alignItems: "center",
   },
-  imagePlaceholderText: {
+  imagePreviewText: {
     fontFamily: FONTS.bodyRegular,
     color: COLORS.textSecondary,
-    fontSize: 14,
+    fontSize: 16,
   },
   deleteButton: {
     backgroundColor: COLORS.negative,
@@ -348,18 +363,29 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: FONTS.bodyRegular,
   },
-  selectImageButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: RADIUS.card,
+  selectImageButtonLight: {
+    width: "100%",
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e6e9ef",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 8,
   },
-  selectImageButtonText: {
-    color: COLORS.cardBg,
+  selectImageButtonLightText: {
+    color: COLORS.textPrimary,
     fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
   },
   imageNotice: {
-    marginTop: 8,
+    marginTop: 6,
     fontSize: 12,
     color: COLORS.textSecondary,
     fontFamily: FONTS.bodyRegular,
@@ -395,14 +421,15 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   btn: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 14,
-    borderRadius: RADIUS.card,
+    backgroundColor: "#0F172A",
+    height: 56,
+    borderRadius: 14,
     marginTop: 24,
     alignItems: "center",
+    justifyContent: "center",
   },
   btnText: {
-    color: COLORS.cardBg,
+    color: COLORS.backgroundLight,
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.button,
   },

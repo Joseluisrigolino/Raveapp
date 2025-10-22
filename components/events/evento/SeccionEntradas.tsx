@@ -33,41 +33,26 @@ export default function SeccionEntradas({ fechas, entradasPorFecha, loadingEntra
   }, [fechas, entradasPorFecha, selectedTickets]);
 
   return (
-    <View style={styles.ticketSection}>
-      <Text style={styles.sectionTitle}>Selecciona tus entradas</Text>
-
+    <View>
       {loadingEntradas && (
-        <View style={{ paddingVertical: 8 }}>
+        <View style={{ paddingVertical: 8, alignItems: 'center' }}>
           <Text>Cargando entradas...</Text>
         </View>
       )}
 
       {!loadingEntradas && noEntradasAvailable ? (
-        <View style={{ paddingVertical: 20, alignItems: "center" }}>
+        <View style={[styles.ticketSection, { alignItems: 'center' }]}>
           <Text style={{ color: COLORS.textSecondary }}>Entradas no disponibles.</Text>
         </View>
       ) : (
-        !loadingEntradas &&
-        fechas.map((f, idx) => {
+        !loadingEntradas && fechas.map((f, idx) => {
           const entradas = entradasPorFecha[f.idFecha] || [];
           const disabledDay = activeDayId !== null && activeDayId !== f.idFecha;
-          const dayHasQty = entradas.some((ent) => (selectedTickets[`entrada-${ent.idEntrada}`] || 0) > 0);
           return (
-            <View key={f.idFecha} style={[styles.dayBlock, disabledDay && { opacity: 0.45 }]}>
-              <Text style={styles.dayLabel}>
-                {fechas.length > 1 ? `Día ${idx + 1} de ${fechas.length}` : "Día único"}
-              </Text>
-
-              {dayHasQty && (
-                <TouchableOpacity
-                  accessibilityLabel="Limpiar selección del día"
-                  style={styles.clearDayBtn}
-                  onPress={() => {
-                    entradas.forEach((ent) => setTicketQty(`entrada-${ent.idEntrada}`, 0));
-                  }}
-                >
-                  <MaterialCommunityIcons name="trash-can" size={18} color="#fff" />
-                </TouchableOpacity>
+            <View key={f.idFecha} style={styles.ticketSection}>
+              <Text style={styles.sectionTitle}>Seleccionar Entradas</Text>
+              {fechas.length > 1 && (
+                <Text style={styles.dayLabel}>{`Día ${idx + 1}`}</Text>
               )}
 
               {entradas.length === 0 ? (
@@ -78,7 +63,9 @@ export default function SeccionEntradas({ fechas, entradasPorFecha, loadingEntra
                   return (
                     <TicketSelector
                       key={entryKey}
-                      label={`${ent.nombreTipo} ($${ent.precio})`}
+                      label={ent.nombreTipo}
+                      rightText={`$${ent.precio}`}
+                      stacked
                       maxQty={Math.min(10, ent.maxCompra ?? 10)}
                       currentQty={selectedTickets[entryKey] || 0}
                       onChangeQty={(qty) => setTicketQty(entryKey, qty)}
@@ -92,20 +79,20 @@ export default function SeccionEntradas({ fechas, entradasPorFecha, loadingEntra
         })
       )}
 
-      <View style={styles.subtotalRow}>
+      {/* Subtotal arriba del botón a lo largo */}
+      <View style={{ marginHorizontal: 16, marginTop: 8 }}>
         <Text style={styles.subtotalText}>Subtotal: ${subtotal}</Text>
         <TouchableOpacity
           style={[
-            styles.buyButton,
+            styles.buyButtonFull,
             (noEntradasAvailable || subtotal <= 0) && styles.buyButtonDisabled,
           ]}
           onPress={onBuy}
           disabled={noEntradasAvailable || subtotal <= 0}
         >
-          <Text style={styles.buyButtonText}>Comprar</Text>
+          <Text style={styles.buyButtonText}>Comprar Entradas</Text>
         </TouchableOpacity>
       </View>
-
     </View>
   );
 }

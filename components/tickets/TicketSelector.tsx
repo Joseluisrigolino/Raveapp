@@ -9,6 +9,8 @@ import SelectField from "@/components/common/selectField";
  */
 interface TicketSelectorProps {
   label: string;
+  rightText?: string; // texto alineado a la derecha (ej: precio)
+  stacked?: boolean; // si true, muestra el selector debajo en otra fila
   maxQty: number; // límite superior permitido para la compra
   currentQty: number; // cantidad actual seleccionada
   onChangeQty: (qty: number) => void; // establece cantidad absoluta
@@ -17,6 +19,8 @@ interface TicketSelectorProps {
 
 export default function TicketSelector({
   label,
+  rightText,
+  stacked = false,
   maxQty,
   currentQty,
   onChangeQty,
@@ -35,20 +39,23 @@ export default function TicketSelector({
 
   return (
     <View style={styles.containerRelative}>
-      <View style={styles.ticketSelectorRow}>
-        <Text style={styles.ticketSelectorLabel}>{label}</Text>
-        <View style={styles.ticketSelectorActions}>
+      <View style={styles.ticketCard}>
+        <View style={styles.ticketSelectorRow}>
+          <Text style={styles.ticketSelectorLabel}>{label}</Text>
+          {rightText ? <Text style={styles.priceText}>{rightText}</Text> : null}
+        </View>
+        <View style={[styles.ticketSelectorActions, stacked && { marginTop: 6, justifyContent: 'flex-start' }]}>
           <SelectField
             label=""
             value={String(clampedValue)}
-            placeholder="0"
+            placeholder="0 entradas"
             onPress={() => { if (!disabled) setOpen((v) => !v); }}
             isOpen={open}
             disabled={disabled}
-            containerStyle={{ width: 96, alignItems: "flex-end", marginBottom: 0 }}
-            fieldStyle={{ width: 96, height: 36, borderRadius: 12, paddingHorizontal: 10 }}
+            containerStyle={{ width: stacked ? '100%' as any : 96, alignItems: stacked ? 'stretch' as any : 'flex-end', marginBottom: 0 }}
+            fieldStyle={{ width: stacked ? '100%' as any : 96, height: 36, borderRadius: 12, paddingHorizontal: 10 }}
             labelStyle={{ width: 0, height: 0, marginBottom: 0 }}
-            valueStyle={{ textAlign: "center" }}
+            valueStyle={{ textAlign: stacked ? 'left' as any : 'center' }}
           />
         </View>
       </View>
@@ -89,17 +96,27 @@ const styles = StyleSheet.create({
     position: "relative",
     zIndex: 10,
   },
+  ticketCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e6e9ef",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
   ticketSelectorRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginVertical: 4,
-    marginLeft: 12,
+    marginVertical: 2,
   },
   ticketSelectorLabel: {
     flex: 1,
     color: COLORS.textPrimary,
+    fontWeight: "700",
   },
+  priceText: { color: COLORS.textPrimary, fontWeight: "700" },
   ticketSelectorActions: {
     flexDirection: "row",
     alignItems: "center",

@@ -17,7 +17,8 @@ import ReviewComponent from "@/components/events/ReviewComponent";
 
 import TituloEvento from "@/components/events/evento/TituloEvento";
 import HeroImagen from "@/components/events/evento/HeroImagen";
-import BloqueInfoEvento from "@/components/events/evento/BloqueInfoEvento";
+// BloqueInfoEvento reemplazado por tarjetas locales para replicar el mock visual
+// import BloqueInfoEvento from "@/components/events/evento/BloqueInfoEvento";
 import BadgesEvento from "@/components/events/evento/BadgesEvento";
 import ReproductorSoundCloud from "@/components/events/evento/ReproductorSoundCloud";
 import ReproductorYouTube from "@/components/events/evento/ReproductorYouTube";
@@ -281,6 +282,51 @@ export default function EventScreen() {
     return url || null;
   }, [eventData]);
 
+  // --- helpers UI para el mock ---
+  const formatFechaRango = (fs: FechaLite[]): string | null => {
+    try {
+      if (!fs || fs.length === 0) return null;
+      const dates = fs
+        .map((f) => new Date(f.inicio))
+        .sort((a, b) => a.getTime() - b.getTime());
+      if (dates.length === 0 || isNaN(dates[0].getTime())) return null;
+      const first = dates[0];
+      const last = dates[dates.length - 1];
+      const monthNames = [
+        "Enero",
+        "Febrero",
+        "Marzo",
+        "Abril",
+        "Mayo",
+        "Junio",
+        "Julio",
+        "Agosto",
+        "Septiembre",
+        "Octubre",
+        "Noviembre",
+        "Diciembre",
+      ];
+      const sameMonth = first.getMonth() === last.getMonth() && first.getFullYear() === last.getFullYear();
+      if (sameMonth) {
+        return `${first.getDate()}-${last.getDate()} ${monthNames[first.getMonth()]} ${last.getFullYear()}`;
+      }
+      return `${first.getDate()} ${monthNames[first.getMonth()]} ${first.getFullYear()} - ${last.getDate()} ${monthNames[last.getMonth()]} ${last.getFullYear()}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const displayDate = useMemo(() => {
+    return eventData?.date || formatFechaRango(fechas) || "";
+  }, [eventData?.date, fechas]);
+
+  const displayTime = useMemo(() => {
+    return eventData?.timeRange || "";
+  }, [eventData?.timeRange]);
+
+  const getArtistName = (a: any): string =>
+    a?.nombreArtistico || a?.name || a?.nombre || (typeof a === "string" ? a : "");
+
   // Loggear el id del evento cuando lo tenemos (para validar en Swagger)
   useEffect(() => {
     if (eventData?.id) {
@@ -375,28 +421,71 @@ export default function EventScreen() {
       <SafeAreaView style={styles.container}>
         <Header />
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <TituloEvento title={eventData.title} isFavorite={isFavorite} favBusy={favBusy} onToggleFavorite={toggleFavorite} />
+          {/* Hero con chips superpuestos en la esquina superior derecha */}
+          <View style={styles.heroContainer}>
+            <HeroImagen
+              imageUrl={eventData.imageUrl}
+              onPress={() => eventData?.id && console.log("Evento id (image press):", String(eventData.id))}
+            />
+            <View style={styles.badgesOverlay} pointerEvents="box-none">
+              <BadgesEvento
+                isLGBT={getEventFlags(eventData).isLGBT}
+                isAfter={getEventFlags(eventData).isAfter}
+              />
+            </View>
+          </View>
 
-          <BadgesEvento isLGBT={getEventFlags(eventData).isLGBT} isAfter={getEventFlags(eventData).isAfter} />
-
-          <HeroImagen imageUrl={eventData.imageUrl} onPress={() => eventData?.id && console.log("Evento id (image press):", String(eventData.id))} />
-
-          <BloqueInfoEvento
-            artistas={eventData.artistas}
-            // Pasamos el array de fechas (puede venir vacío)
-            fechas={fechas}
-            // legacy props mantenidos por compatibilidad
-            date={eventData.date}
-            timeRange={eventData.timeRange}
-            address={eventData.address}
-            onSeeAllArtists={() => setShowArtistsModal(true)}
-            onCómoLlegar={() => {
-              console.log("Evento id (cómo llegar):", String(eventData.id));
-              const query = encodeURIComponent(eventData.address || "");
-              const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
-              Linking.openURL(url);
-            }}
+          {/* Título y favorito */}
+          <TituloEvento
+            title={eventData.title}
+            isFavorite={isFavorite}
+            favBusy={favBusy}
+            onToggleFavorite={toggleFavorite}
           />
+
+          {/* Tarjeta: Artistas */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Artistas</Text>
+            {(Array.isArray(eventData.artistas) ? eventData.artistas : [])
+              .slice(0, 8)
+              .map((art, idx) => (
+                <View key={idx} style={styles.listRow}>
+                  <MaterialCommunityIcons name="music" size={18} color={COLORS.info} style={{ marginRight: 8 }} />
+                  <Text style={styles.listText}>{getArtistName(art)}</Text>
+                </View>
+              ))}
+            {(!eventData.artistas || eventData.artistas.length === 0) && (
+              <Text style={styles.listTextMuted}>Próximamente</Text>
+            )}
+          </View>
+
+          {/* Tarjeta: Fecha y Horario */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Fecha y Horario</Text>
+            {!!displayDate && (
+              <View style={styles.listRow}>
+                <MaterialCommunityIcons name="calendar-blank-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} />
+                <Text style={styles.listText}>{displayDate}</Text>
+              </View>
+            )}
+            {!!displayTime && (
+              <View style={styles.listRow}>
+                <MaterialCommunityIcons name="clock-time-four-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} />
+                <Text style={styles.listText}>{displayTime}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Tarjeta: Dirección */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Dirección</Text>
+            <View style={[styles.listRow, { flexWrap: 'wrap' }]}>
+              <MaterialCommunityIcons name="map-marker-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} />
+              <Text style={[styles.listText, { color: COLORS.info }]}>
+                {eventData.address || "-"}
+              </Text>
+            </View>
+          </View>
 
           {/* Debug: mostrar las URLs que intentamos renderizar (se moverán debajo de entradas) */}
           {(() => {
@@ -406,7 +495,7 @@ export default function EventScreen() {
 
           <ModalArtistas artistas={eventData.artistas} visible={showArtistsModal} onClose={() => setShowArtistsModal(false)} />
 
-          <Text style={styles.description}>{eventData.description}</Text>
+          {/* Descripción oculta para coincidir con el mock */}
 
           <SeccionEntradas
             fechas={fechas}
@@ -420,7 +509,8 @@ export default function EventScreen() {
           />
 
           {/* Reproductores multimedia debajo de la sección de entradas */}
-          <View style={{ paddingHorizontal: 16, marginBottom: 24 }}>
+          <View style={styles.mediaSection}
+          >
             <ReproductorSoundCloud soundCloudUrl={soundCloudUrl} />
             <ReproductorYouTube youTubeEmbedUrl={youTubeEmbedUrl} />
           </View>
@@ -440,6 +530,15 @@ export default function EventScreen() {
 const HERO_RATIO = 16 / 9;
 
 const styles = StyleSheet.create({
+  heroContainer: {
+    position: "relative",
+    marginBottom: 12,
+  },
+  badgesOverlay: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+  },
   artistRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -545,6 +644,38 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.backgroundLight },
   loaderWrapper: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContent: { paddingBottom: 32 },
+  mediaSection: { paddingHorizontal: 16, marginBottom: 24 },
+  /* Tarjetas base */
+  card: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#e6e9ef',
+  },
+  cardTitle: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.subTitle,
+    color: COLORS.textPrimary,
+    marginBottom: 10,
+  },
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  listText: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
+  },
+  listTextMuted: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: '#6b7280',
+  },
 
   titleRow: {
     paddingHorizontal: 16,

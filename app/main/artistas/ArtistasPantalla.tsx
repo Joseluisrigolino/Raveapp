@@ -1,7 +1,7 @@
 // src/screens/ArtistsScreens/ArtistsScreen.tsx
 
 import React, { useState, useEffect, useMemo } from "react";
-import { View, ScrollView, Text, ActivityIndicator, StyleSheet } from "react-native";
+import { View, ScrollView, Text, ActivityIndicator, StyleSheet, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, usePathname } from "expo-router";
 import { ROUTES } from "../../../routes";
@@ -12,12 +12,12 @@ import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import ArtistCard from "@/components/artists/ArtistCardComponent";
-import SearchBar from "@/components/common/SearchBarComponent";
 
 import { Artist } from "@/interfaces/Artist";
 import { fetchArtistsFromApi } from "@/utils/artists/artistApi";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 export default function ArtistasPantalla() {
   const router = useRouter();
@@ -62,7 +62,7 @@ export default function ArtistasPantalla() {
   const tabs = isAdmin
     ? [
         {
-          label: "ADM ARTISTAS",
+          label: "Administrar artistas",
           route: ROUTES.ADMIN.ARTISTS.MANAGE,
           isActive: currentScreen === ROUTES.ADMIN.ARTISTS.MANAGE.split("/").pop(),
         },
@@ -92,11 +92,16 @@ export default function ArtistasPantalla() {
         <TabMenuComponent tabs={tabs} />
 
         <View style={styles.searchWrapper}>
-          <SearchBar
-            value={searchText}
-            onChangeText={setSearchText}
-            placeholder="Buscar artista"
-          />
+          <View style={styles.searchRow}>
+            <MaterialCommunityIcons name="magnify" size={18} color={COLORS.textSecondary} style={{ marginHorizontal: 10 }} />
+            <TextInput
+              style={styles.searchInput}
+              value={searchText}
+              onChangeText={setSearchText}
+              placeholder="Buscar artista..."
+              placeholderTextColor={COLORS.textSecondary}
+            />
+          </View>
         </View>
 
         {loading ? (
@@ -116,17 +121,16 @@ export default function ArtistasPantalla() {
               );
               if (!group.length) return null;
 
-              const rowStyle =
-                group.length === 1
-                  ? styles.rowOne
-                  : group.length === 2
-                  ? styles.rowTwo
-                  : styles.rowThree;
+              const rowStyle = styles.rowTwo;
 
               return (
                 <View key={letter} style={styles.letterGroup}>
-                  {letter !== alphabet[0] && <View style={styles.separator} />}
-                  <Text style={styles.letterTitle}>{letter}</Text>
+                  <View style={styles.letterHeader}>
+                    <View style={styles.letterBubble}>
+                      <Text style={styles.letterBubbleText}>{letter}</Text>
+                    </View>
+                    <View style={styles.letterDivider} />
+                  </View>
                   <View style={[styles.cardsRow, rowStyle]}>
                     {group.map(artist => (
                       <View
@@ -163,6 +167,22 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     backgroundColor: COLORS.cardBg,
   },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.cardBg,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingRight: 12,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
+  },
   loaderContainer: {
     flex: 1,
     justifyContent: "center",
@@ -186,28 +206,45 @@ const styles = StyleSheet.create({
   letterGroup: {
     marginTop: 16,
   },
-  letterTitle: {
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.subTitle,
-    color: COLORS.textPrimary,
+  letterHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
     marginBottom: 8,
+  },
+  letterBubble: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.textPrimary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  letterBubbleText: {
+    color: COLORS.cardBg,
+    fontFamily: FONTS.subTitleMedium,
+  },
+  letterDivider: {
+    height: 1,
+    flex: 1,
+    backgroundColor: COLORS.borderInput,
   },
   cardsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
   },
   rowOne: {
-    justifyContent: "center",
+    justifyContent: "flex-start",
   },
   rowTwo: {
-    justifyContent: "space-evenly",
+    justifyContent: "space-between",
   },
   rowThree: {
     justifyContent: "space-between",
   },
   cardWrapper: {
-    width: "30%",
+    width: "48%",
     marginBottom: 16,
-    marginHorizontal: "1.5%",
+    marginHorizontal: "1%",
   },
 });

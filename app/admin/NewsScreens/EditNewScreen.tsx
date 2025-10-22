@@ -3,12 +3,13 @@
 import React, { useEffect, useState } from "react";
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, usePathname } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { getInfoAsync } from "expo-file-system/legacy";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
+import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import { getNewsById, updateNews } from "@/utils/news/newsApi";
 import { mediaApi } from "@/utils/mediaApi";
 import { fetchEvents } from "@/utils/events/eventApi";
@@ -17,10 +18,14 @@ import { emit } from "@/utils/eventBus";
 import InputText from "@/components/common/inputText";
 import InputDesc from "@/components/common/inputDesc";
 import SelectField from "@/components/common/selectField";
+import { ROUTES } from "../../../routes";
+import ProtectedRoute from "@/utils/auth/ProtectedRoute";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 export default function EditNewScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
+  const path = usePathname();
 
   const [newsTitle, setNewsTitle] = useState("");
   const [newsBody, setNewsBody] = useState("");
@@ -137,89 +142,107 @@ export default function EditNewScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Header />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
-        <Footer />
-      </SafeAreaView>
+      <ProtectedRoute allowedRoles={["admin"]}>
+        <SafeAreaView style={styles.container}>
+          <Header title="EventApp" />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+          <Footer />
+        </SafeAreaView>
+      </ProtectedRoute>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header />
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Editar Noticia</Text>
-
-        <InputText
-          label="Título"
-          value={newsTitle}
-          isEditing={true}
-          onBeginEdit={() => {}}
-          onChangeText={setNewsTitle}
-          containerStyle={{ width: "100%", alignItems: "stretch" }}
-          labelStyle={{ width: "100%", textAlign: "left" }}
-          inputStyle={{ width: "100%" }}
+    <ProtectedRoute allowedRoles={["admin"]}>
+      <SafeAreaView style={styles.container}>
+        <Header title="EventApp" />
+        <TabMenuComponent
+          tabs={[
+            {
+              label: "Administrar noticias",
+              route: ROUTES.ADMIN.NEWS.MANAGE,
+              isActive:
+                path === ROUTES.ADMIN.NEWS.MANAGE ||
+                path === ROUTES.ADMIN.NEWS.CREATE ||
+                path === ROUTES.ADMIN.NEWS.EDIT,
+            },
+            {
+              label: "Noticias",
+              route: ROUTES.MAIN.NEWS.LIST,
+              isActive: path === ROUTES.MAIN.NEWS.LIST,
+            },
+          ]}
         />
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text style={styles.title}>Editar noticia</Text>
 
-        <Text style={styles.label}>Imagen:</Text>
-        <View style={styles.imageContainer}>
-          {selectedImage ? (
-            <>
-              <Image source={{ uri: selectedImage }} style={styles.imageBanner} />
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={handleDeleteImage}
-              >
+          <InputText
+            label="Título"
+            value={newsTitle}
+            isEditing={true}
+            onBeginEdit={() => {}}
+            onChangeText={setNewsTitle}
+            placeholder="Ingresa el título de la noticia..."
+            containerStyle={{ width: "100%", alignItems: "stretch" }}
+            labelStyle={{ width: "100%", textAlign: "left" }}
+            inputStyle={{ width: "100%" }}
+          />
+
+          <Text style={styles.label}>Imagen</Text>
+          <View style={styles.imageContainer}>
+            {selectedImage ? (
+              <Image source={{ uri: selectedImage }} style={styles.previewBoxImage} />
+            ) : (
+              <View style={[styles.previewBox, styles.imageFallback]}>
+                <MaterialCommunityIcons name="image-outline" size={40} color={COLORS.textSecondary} />
+                <Text style={styles.imagePreviewText}>Vista previa de la imagen</Text>
+              </View>
+            )}
+
+            <TouchableOpacity style={styles.selectImageButtonLight} onPress={handleSelectImage} activeOpacity={0.85}>
+              <Text style={styles.selectImageButtonLightText}>Seleccionar imagen</Text>
+            </TouchableOpacity>
+
+            {selectedImage && (
+              <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteImage}>
                 <Text style={styles.deleteButtonText}>Eliminar imagen</Text>
               </TouchableOpacity>
-            </>
-          ) : (
-            <View style={styles.imageFallback}>
-              <Text style={styles.imagePlaceholderText}>Sin imagen</Text>
-            </View>
-          )}
+            )}
 
-          <TouchableOpacity
-            style={styles.selectImageButton}
-            onPress={handleSelectImage}
-          >
-            <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
-          </TouchableOpacity>
+            <Text style={styles.imageNotice}>
+              Se permite imágenes JPG, JPEG o PNG. Peso máximo: 2MB
+            </Text>
+          </View>
 
-          <Text style={styles.imageNotice}>
-            Se permiten imágenes JPG, JPEG o PNG. Peso máximo: 2MB.
-          </Text>
-        </View>
+          <InputDesc
+            label="Contenido"
+            value={newsBody}
+            isEditing={true}
+            onBeginEdit={() => {}}
+            onChangeText={setNewsBody}
+            placeholder="Escribe el contenido de la noticia..."
+            autoFocus={false}
+            containerStyle={{ width: "100%", alignItems: "stretch" }}
+            labelStyle={{ width: "100%", textAlign: "left" }}
+            inputStyle={{ width: "100%" }}
+          />
 
-        <InputDesc
-          label="Contenido"
-          value={newsBody}
-          isEditing={true}
-          onBeginEdit={() => {}}
-          onChangeText={setNewsBody}
-          autoFocus={false}
-          containerStyle={{ width: "100%", alignItems: "stretch" }}
-          labelStyle={{ width: "100%", textAlign: "left" }}
-          inputStyle={{ width: "100%" }}
-        />
-
-        <SelectField
-          label="Evento relacionado (opcional)"
-          value={
-            eventoSeleccionado
-              ? eventos.find((e) => e.idEvento === eventoSeleccionado)?.nombre
-              : undefined
-          }
-          placeholder="Seleccionar evento..."
-          onPress={() => setShowEventos(!showEventos)}
-          isOpen={showEventos}
-          containerStyle={{ width: "100%", alignItems: "stretch" }}
-          labelStyle={{ width: "100%", textAlign: "left" }}
-          fieldStyle={{ width: "100%" }}
-        />
+          <SelectField
+            label="Vincular evento"
+            value={
+              eventoSeleccionado
+                ? eventos.find((e) => e.idEvento === eventoSeleccionado)?.nombre
+                : undefined
+            }
+            placeholder="Seleccionar evento (opcional)"
+            onPress={() => setShowEventos(!showEventos)}
+            isOpen={showEventos}
+            containerStyle={{ width: "100%", alignItems: "stretch" }}
+            labelStyle={{ width: "100%", textAlign: "left" }}
+            fieldStyle={{ width: "100%" }}
+          />
         {showEventos && (
           <View style={styles.dropdownContainer}>
             {eventos.map((e, index) => (
@@ -244,25 +267,25 @@ export default function EditNewScreen() {
           </View>
         )}
 
-        <TouchableOpacity style={styles.btn} onPress={handleUpdateNews}>
-          <Text style={styles.btnText}>Guardar cambios</Text>
-        </TouchableOpacity>
-      </ScrollView>
-      <Footer />
-    </SafeAreaView>
+          <TouchableOpacity style={styles.btn} onPress={handleUpdateNews} activeOpacity={0.9}>
+            <Text style={styles.btnText}>Guardar cambios</Text>
+          </TouchableOpacity>
+        </ScrollView>
+        <Footer />
+      </SafeAreaView>
+    </ProtectedRoute>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.backgroundLight },
-  content: { padding: 16 },
+  content: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 24 },
   title: {
     fontFamily: FONTS.titleBold,
     fontSize: FONT_SIZES.titleMain,
     color: COLORS.textPrimary,
-    textAlign: "center",
-    marginBottom: 20,
-    textDecorationLine: "underline",
+    textAlign: "left",
+    marginBottom: 16,
   },
   label: {
     fontFamily: FONTS.subTitleMedium,
@@ -271,42 +294,39 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 4,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
-    borderRadius: RADIUS.card,
-    padding: 10,
-    backgroundColor: COLORS.cardBg,
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: "top",
-  },
   imageContainer: {
     alignItems: "center",
     marginVertical: 16,
-  },
-  imageBanner: {
     width: "100%",
-    height: 180,
-    borderRadius: RADIUS.card,
-    marginBottom: 12,
   },
   imageFallback: {
-    width: "100%",
-    height: 180,
-    backgroundColor: COLORS.borderInput,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: RADIUS.card,
+  },
+  previewBox: {
+    width: "100%",
+    height: 200,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: COLORS.borderInput,
+    backgroundColor: "#e5e7eb",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
     marginBottom: 12,
   },
-  imagePlaceholderText: {
+  previewBoxImage: {
+    width: "100%",
+    height: 200,
+    borderRadius: 16,
+    marginBottom: 12,
+    backgroundColor: COLORS.borderInput,
+  },
+  imagePreviewText: {
     fontFamily: FONTS.bodyRegular,
     color: COLORS.textSecondary,
-    fontSize: 14,
+    fontSize: 16,
   },
   deleteButton: {
     backgroundColor: COLORS.negative,
@@ -319,32 +339,44 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: FONTS.bodyRegular,
   },
-  selectImageButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: RADIUS.card,
+  selectImageButtonLight: {
+    width: "100%",
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e6e9ef",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 8,
   },
-  selectImageButtonText: {
-    color: COLORS.cardBg,
+  selectImageButtonLightText: {
+    color: COLORS.textPrimary,
     fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
   },
   imageNotice: {
-    marginTop: 8,
+    marginTop: 6,
     fontSize: 12,
     color: COLORS.textSecondary,
     fontFamily: FONTS.bodyRegular,
     textAlign: "center",
   },
   btn: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 14,
-    borderRadius: RADIUS.card,
+    backgroundColor: "#0F172A",
+    height: 56,
+    borderRadius: 14,
     marginTop: 24,
     alignItems: "center",
+    justifyContent: "center",
   },
   btnText: {
-    color: COLORS.cardBg,
+    color: COLORS.backgroundLight,
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.button,
   },
@@ -388,8 +420,8 @@ const styles = StyleSheet.create({
   eventImage: {
     width: 30,
     height: 30,
-    borderRadius: 15,
-    marginRight: 10,
+    borderRadius: 4,
+    marginRight: 8,
   },
   eventName: {
     fontFamily: FONTS.bodyRegular,

@@ -13,12 +13,11 @@
       "bundleIdentifier": "com.raveapp.mobile" 
     },
     "android": {
-      "package": "com.raveapp",
+        "package": "com.raveapp.mobile",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      },
-      "package": "com.raveapp.mobile"
+        }
     },
     "web": {
       "bundler": "metro",
@@ -47,10 +46,18 @@
       "eas": {
         "projectId": "96c3aafd-0d8e-456b-9f69-0181bad4c833"
       },
-      "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "",
-      "EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID": "",
-      "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "",
-      "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": ""
+    "EXPO_PUBLIC_USE_FIREBASE_AUTH": true,
+    "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyA7zCVm8DrxszAd9pBiOKaTc9TOIhP4iKI",
+    "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "raveapp-mobile-4bd22.firebaseapp.com",
+    "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "raveapp-mobile-4bd22",
+    "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "raveapp-mobile-4bd22.appspot.com",
+    "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "10891592127",
+    "EXPO_PUBLIC_FIREBASE_APP_ID": "1:10891592127:ios:9b05ff3f21417fcc08a10a",
+    "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "",
+    "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "",
+    "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "",
+    "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "",
+    "EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID": ""
     }
   }
 }

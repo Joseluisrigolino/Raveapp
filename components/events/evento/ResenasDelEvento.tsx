@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { Image } from "react-native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
@@ -21,35 +22,49 @@ export default function ResenasDelEvento() {
       </View>
 
       <View style={styles.reviewItem}>
-        <View style={styles.reviewHeader}>
-          <Text style={styles.reviewerName}>Carlos Menem</Text>
-          <Text style={styles.timeAgo}>3 días atrás</Text>
+        <View style={styles.reviewRow}>
+          <View style={styles.avatarCircle}>
+            <MaterialCommunityIcons name="account" size={20} color={COLORS.textPrimary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={styles.reviewHeader}>
+              <Text style={styles.reviewerName}>Carlos Menem</Text>
+              <Text style={styles.timeAgo}>3 días atrás</Text>
+            </View>
+            <View style={styles.starsRow}>
+              <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
+              <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
+              <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
+              <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
+              <MaterialCommunityIcons name="star-outline" size={18} color="#FFCC00" />
+            </View>
+            <Text style={styles.comment}>Excelente evento, me encantó la música y el ambiente.</Text>
+          </View>
         </View>
-        <View style={styles.starsRow}>
-          <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
-          <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
-          <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
-          <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
-          <MaterialCommunityIcons name="star-outline" size={18} color="#FFCC00" />
-        </View>
-        <Text style={styles.comment}>Excelente evento, me encantó la música y el ambiente.</Text>
       </View>
 
       <View style={styles.divider} />
 
       <View style={styles.reviewItem}>
-        <View style={styles.reviewHeader}>
-          <Text style={styles.reviewerName}>Teté Coustarot</Text>
-          <Text style={styles.timeAgo}>5 días atrás</Text>
+        <View style={styles.reviewRow}>
+          <View style={styles.avatarCircle}>
+            <MaterialCommunityIcons name="account" size={20} color={COLORS.textPrimary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={styles.reviewHeader}>
+              <Text style={styles.reviewerName}>Teté Coustarot</Text>
+              <Text style={styles.timeAgo}>5 días atrás</Text>
+            </View>
+            <View style={styles.starsRow}>
+              <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
+              <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
+              <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
+              <MaterialCommunityIcons name="star-outline" size={18} color="#FFCC00" />
+              <MaterialCommunityIcons name="star-outline" size={18} color="#FFCC00" />
+            </View>
+            <Text style={styles.comment}>¡Increíble experiencia! Sin duda volvería a asistir.</Text>
+          </View>
         </View>
-        <View style={styles.starsRow}>
-          <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
-          <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
-          <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
-          <MaterialCommunityIcons name="star-outline" size={18} color="#FFCC00" />
-          <MaterialCommunityIcons name="star-outline" size={18} color="#FFCC00" />
-        </View>
-        <Text style={styles.comment}>¡Increíble experiencia! Sin duda volvería a asistir.</Text>
       </View>
     </View>
   );
@@ -85,6 +100,16 @@ const styles = StyleSheet.create({
   avgText: { color: COLORS.primary, fontFamily: FONTS.bodyRegular, fontSize: FONT_SIZES.body - 1 },
 
   reviewItem: { paddingVertical: 8 },
+  reviewRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  avatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e5e7eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
   reviewHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   reviewerName: { fontFamily: FONTS.subTitleMedium, color: COLORS.textPrimary, fontSize: FONT_SIZES.body },
   timeAgo: { color: COLORS.primary, fontSize: FONT_SIZES.body - 2 },

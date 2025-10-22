@@ -31,6 +31,5 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.titleMain,           // 22px
     color: COLORS.textPrimary,                // Gris oscuro
     textAlign: "center",                      // Centra el texto
-    // textTransform y letterSpacing eliminados para respetar mayúsculas/minúsculas
   },
 });

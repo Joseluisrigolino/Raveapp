@@ -1,104 +1,223 @@
-<<<<<<< HEAD
-=======
 // app/login/Login.tsx
->>>>>>> 05a4b9fdd7e869071b9595c6953abe5048d987f2
 import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
   Alert,
-  TouchableWithoutFeedback,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Image,
+  Pressable,
+  ScrollView,
 } from "react-native";
 import { Text, TextInput, Button } from "react-native-paper";
+import Icon from "react-native-vector-icons/MaterialIcons";
 import { Link, useRouter } from "expo-router";
+import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
-<<<<<<< HEAD
-import * as AuthSession from "expo-auth-session"; // ✅ Necesario para el redirectUri
-=======
-import Constants from "expo-constants";
-import * as AuthSession from "expo-auth-session";
-import { makeRedirectUri } from "expo-auth-session";
-import { jwtDecode } from "jwt-decode";
->>>>>>> 05a4b9fdd7e869071b9595c6953abe5048d987f2
 import * as nav from "@/utils/navigation";
 import { ROUTES } from "../../routes";
-import TitlePers from "@/components/common/TitleComponent";
 import globalStyles from "@/styles/globalStyles";
 import { useAuth } from "@/context/AuthContext";
-<<<<<<< HEAD
-import { getProfile, createUsuario } from "@/utils/auth/userHelpers";
-
-// ✅ Obligatorio para cerrar correctamente el flujo OAuth en Expo
-WebBrowser.maybeCompleteAuthSession();
-=======
-import { GOOGLE_CONFIG, ensureGoogleClientId } from "@/utils/auth/googleConfig";
->>>>>>> 05a4b9fdd7e869071b9595c6953abe5048d987f2
+import { apiClient, login as apiLogin } from "@/utils/apiConfig";
+import { getProfile, updateUsuario, createUsuario } from "@/utils/auth/userHelpers";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+// Google Cloud config removed; we rely on Firebase when Google is enabled.
 
 export default function LoginScreen() {
+  // Checkbox cuadrado personalizado
+  const SquareCheckbox = ({ checked, onPress }: { checked: boolean; onPress: () => void }) => (
+    <Pressable onPress={onPress} accessibilityRole="checkbox" accessibilityState={{ checked }}>
+      <View style={[styles.checkboxBox, checked && styles.checkboxBoxChecked]}
+      >
+        {checked ? <Text style={styles.checkboxTick}>✓</Text> : null}
+      </View>
+    </Pressable>
+  );
   const router = useRouter();
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, loginWithGooglePopup } = useAuth();
+  const EX = (Constants?.expoConfig as any)?.extra || (Constants as any)?.manifest2?.extra || {};
+  const USE_FIREBASE = !!EX.EXPO_PUBLIC_USE_FIREBASE_AUTH;
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [remember, setRemember] = useState(false);
 
-  // Necesario para iOS (cerrar el navegador web auth)
+  // Completar sesiones OAuth de navegador (requerido por expo-auth-session en móvil)
   useEffect(() => {
     WebBrowser.maybeCompleteAuthSession();
   }, []);
 
-  const clientId = ensureGoogleClientId();
-  const androidId = GOOGLE_CONFIG.androidClientId || undefined;
-  const iosId = GOOGLE_CONFIG.iosClientId || undefined;
-  const webId = GOOGLE_CONFIG.webClientId || undefined;
-  const expoId = GOOGLE_CONFIG.expoClientId || undefined;
-  const isAndroid = Platform.OS === "android";
-  const isIOS = Platform.OS === "ios";
-  const isExpoGo = Constants.appOwnership === "expo"; // Expo Go runtime
-  // En Expo Go se debe usar expoClientId/webClientId; en standalone nativo usar android/ios
-  const canUseExpoFlow = isExpoGo && !!(expoId || webId);
-  // Solo montamos el hook cuando la configuración requerida realmente existe
-  const canInitGoogle = isExpoGo
-    ? !!(expoId || webId)
-    : isAndroid
-    ? !!androidId
-    : isIOS
-    ? !!iosId
-    : !!webId;
+  // Cargar estado de "Recordarme" y último email
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await AsyncStorage.getItem('raveapp_remember');
+        const remembered = r === 'true';
+        setRemember(remembered);
+        if (remembered) {
+          const last = await AsyncStorage.getItem('raveapp_last_email');
+          if (last) setUsername(last);
+        }
+      } catch {}
+    })();
+  }, []);
+
+  const isExpoGo = Constants.appOwnership === "expo";
+
+  // Google via Firebase: web usa popup; móvil usa expo-auth-session (requiere clientIds)
+  const isWeb = Platform.OS === "web";
+  const isMobile = !isWeb;
+
+  // Client IDs (provistos por Firebase/Google)
+  const expoClientId = EX.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || EX.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || undefined;
+  const iosClientId = EX.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || undefined;
+  const androidClientId = EX.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || undefined;
+  const webClientId = EX.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || undefined;
+
+  const googleConfig: any = {
+    expoClientId,
+    iosClientId,
+    androidClientId,
+    webClientId,
+    scopes: ["openid", "profile", "email"],
+    responseType: "id_token",
+  };
+
+  const hasAnyClientId = !!(iosClientId || androidClientId || expoClientId);
+
+  // Helper para sincronizar con API después del login con Google
+  const syncWithApiAfterGoogle = async (u: any) => {
+    if (!u) return false;
+    try {
+      const rootToken = await apiLogin();
+      apiClient.defaults.headers.common.Authorization = `Bearer ${rootToken}`;
+      const correo = (u as any)?.username || "";
+      const displayName = `${(u as any)?.nombre ?? ""} ${(u as any)?.apellido ?? ""}`.trim();
+      const [nombreFB, ...restFB] = displayName.split(" ");
+      const apellidoFB = restFB.join(" ").trim();
+
+      try {
+        const perfil = await getProfile(correo);
+        const payload = {
+          idUsuario: perfil.idUsuario,
+          nombre: nombreFB || perfil.nombre,
+          apellido: apellidoFB || perfil.apellido,
+          correo: perfil.correo,
+          dni: perfil.dni || "",
+          telefono: perfil.telefono || "",
+          cbu: perfil.cbu || "",
+          nombreFantasia: perfil.nombreFantasia || "",
+          bio: perfil.bio || "",
+          dtNacimiento: perfil.dtNacimiento || new Date().toISOString(),
+          domicilio: perfil.domicilio || {
+            localidad: { nombre: "", codigo: "" },
+            municipio: { nombre: "", codigo: "" },
+            provincia: { nombre: "", codigo: "" },
+            direccion: "",
+            latitud: 0,
+            longitud: 0,
+          },
+          cdRoles: perfil.cdRoles || [],
+          socials: perfil.socials || {
+            idSocial: "",
+            mdInstagram: "",
+            mdSpotify: "",
+            mdSoundcloud: "",
+          },
+        } as const;
+        await updateUsuario(payload as any);
+      } catch (err: any) {
+        const randomPassword = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+        const [nombre, ...rest] = (displayName || "").split(" ");
+        const apellido = rest.join(" ").trim();
+        const createPayload = {
+          domicilio: {
+            localidad: { nombre: "", codigo: "" },
+            municipio: { nombre: "", codigo: "" },
+            provincia: { nombre: "", codigo: "" },
+            direccion: "",
+            latitud: 0,
+            longitud: 0,
+          },
+          nombre: nombre || "",
+          apellido: apellido || "",
+          correo,
+          cbu: "",
+          dni: "",
+          telefono: "",
+          nombreFantasia: "",
+          bio: "",
+          password: randomPassword,
+          socials: { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
+          dtNacimiento: new Date().toISOString(),
+        };
+        await createUsuario(createPayload as any);
+      }
+      return true;
+    } catch (syncErr) {
+      console.error("Google sync error:", syncErr);
+      Alert.alert("Atención", "Iniciaste sesión con Google pero no se pudo sincronizar con la base de datos.");
+      return false;
+    }
+  };
+
+  // Subcomponente: sólo en móvil con clientId disponibles
+  const GoogleMobileButton = () => {
+    const [request, response, promptAsync] = Google.useAuthRequest(googleConfig);
+    return (
+      <Button
+        mode="outlined"
+        onPress={async () => {
+          try {
+            setSubmitting(true);
+            if (!request) {
+              Alert.alert("Cargando", "Preparando Google Sign-In, intenta de nuevo en unos segundos.");
+              return;
+            }
+            const res = await (promptAsync as any)({ useProxy: isExpoGo });
+            if (res.type !== "success") return;
+            const idToken = res.authentication?.idToken || (res.params?.id_token as string | undefined);
+            const accessToken = res.authentication?.accessToken as string | undefined;
+            const tokenToUse = idToken || (accessToken ? `access:${accessToken}` : undefined);
+            if (!tokenToUse) {
+              Alert.alert("Error", "No se recibió id_token de Google");
+              return;
+            }
+            const u = await loginWithGoogle(tokenToUse);
+            if (!u) {
+              Alert.alert("Error", "No se pudo iniciar sesión con Google (Firebase)");
+              return;
+            }
+            const ok = await syncWithApiAfterGoogle(u);
+            if (ok) nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
+          } catch (e) {
+            Alert.alert("Error", "No se pudo iniciar sesión con Google");
+          } finally {
+            setSubmitting(false);
+          }
+        }}
+        icon="google"
+        contentStyle={styles.googleButtonContent}
+        style={[styles.googleButton, styles.socialBtn]}
+        labelStyle={{ color: "#111827", fontWeight: "700" }}
+        disabled={submitting}
+      >
+        Ingresar con Google
+      </Button>
+    );
+  };
 
   const canSubmit = useMemo(
     () => username.trim().length > 0 && password.length > 0 && !submitting,
     [username, password, submitting]
   );
 
-  // --- CONFIGURACIÓN DE LOGIN CON GOOGLE ---
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId:
-      "728778718807-imc5ad9jh3om4oj48ohkaiv81o4e7gsv.apps.googleusercontent.com",
-    iosClientId:
-      "728778718807-r65km9pj3scldf126tmo9plvpnuri2tl.apps.googleusercontent.com",
-    webClientId:
-      "728778718807-otcuqi0nkfvpgua16ong1c3s6qqto00k.apps.googleusercontent.com", // ✅ Nuevo cliente web proporcionado
-    redirectUri: AuthSession.makeRedirectUri({
-      useProxy: true, // ✅ Clave para que funcione en Expo Go
-      native: "myapp://auth", // ✅ Para builds nativas
-    }),
-  });
-
-  // --- EFECTO PARA CAPTURAR RESPUESTA GOOGLE ---
-  useEffect(() => {
-    if (response?.type === "success") {
-      const { authentication } = response;
-      handleGoogleResponse(authentication?.accessToken);
-    }
-  }, [response]);
-
-  // --- LOGIN CLÁSICO ---
+  // Login clásico con usuario/contraseña
   const handleLogin = async () => {
     if (!canSubmit) return;
     try {
@@ -108,133 +227,54 @@ export default function LoginScreen() {
         Alert.alert("Error", "Usuario o contraseña incorrectos.");
         return;
       }
-      nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
-    } catch (e) {
-      Alert.alert("Error", "Ocurrió un problema al iniciar sesión.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // --- LOGIN CON GOOGLE ---
-  const handleGoogleLogin = async () => {
-<<<<<<< HEAD
-    try {
-      await promptAsync();
-    } catch (err) {
-      Alert.alert("Error", "No se pudo iniciar sesión con Google.");
-    }
-  };
-
-  // --- PROCESAR DATOS DEL TOKEN GOOGLE ---
-  const handleGoogleResponse = async (token: string | undefined) => {
-    if (!token) {
-      Alert.alert("Error", "No se obtuvo token de Google.");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const res = await fetch("https://www.googleapis.com/userinfo/v2/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const userInfo = await res.json();
-
-      if (!userInfo?.email) {
-        Alert.alert("Error", "No se pudo obtener la información del usuario.");
-        return;
-      }
-
-      // Si el usuario ya existe, lo logueamos
+      // Persistir preferencia de recordarme y email
       try {
-        const existingUser = await getProfile(userInfo.email);
-        console.log("Usuario existente:", existingUser);
-        nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
-      } catch {
-        // Si no existe, creamos uno nuevo
-        await createUsuario({
-          nombre: userInfo.given_name || "",
-          apellido: userInfo.family_name || "",
-          correo: userInfo.email,
-          cbu: "",
-          dni: "",
-          telefono: "",
-          nombreFantasia: "",
-          bio: "",
-          password: "google_auth",
-          dtNacimiento: new Date().toISOString(),
-          domicilio: {
-            direccion: "",
-            latitud: 0,
-            longitud: 0,
-            localidad: { nombre: "", codigo: "" },
-            municipio: { nombre: "", codigo: "" },
-            provincia: { nombre: "", codigo: "" },
-          },
-          socials: {
-            idSocial: "",
-            mdInstagram: "",
-            mdSpotify: "",
-            mdSoundcloud: "",
-          },
-        });
-
-        Alert.alert("Cuenta creada", "Se creó una nueva cuenta con Google.");
-        nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
-      }
+        await AsyncStorage.setItem('raveapp_remember', remember ? 'true' : 'false');
+        if (remember) await AsyncStorage.setItem('raveapp_last_email', username.trim());
+        else await AsyncStorage.removeItem('raveapp_last_email');
+      } catch {}
+      nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
     } catch (error) {
-      console.error("Error login Google:", error);
-      Alert.alert("Error", "No se pudo completar el inicio de sesión con Google.");
+      console.error("Login error:", error);
+      Alert.alert("Error", "No se pudo iniciar sesión.");
     } finally {
       setSubmitting(false);
-=======
-    // En Expo Go es obligatorio un Web/Expo Client ID para evitar invalid_request con exp://
-    if (isExpoGo && !webId && !expoId) {
-      Alert.alert(
-        "Configuración requerida",
-        "En Expo Go necesitás EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (o EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID)."
-      );
-      return;
->>>>>>> 05a4b9fdd7e869071b9595c6953abe5048d987f2
     }
-    if (!canInitGoogle) {
-      Alert.alert(
-        "Configuración requerida",
-        isExpoGo
-          ? "Falta EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (o EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID) para Expo Go."
-          : isAndroid
-          ? "Falta EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID (Android OAuth Client)."
-          : isIOS
-          ? "Falta EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID (iOS OAuth Client)."
-          : "Falta EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (Web OAuth Client)."
-      );
-      return;
-    }
-    // Si la configuración ya está lista, mostramos una guía para usar el botón renderizado
-    Alert.alert("Listo", "Usá el botón de Google que aparece abajo.");
   };
 
-  // --- UI ---
+  // Sin mensajes de Google Cloud; sólo Firebase popup en web
+
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <KeyboardAvoidingView
-        behavior={Platform.select({ ios: "padding", android: undefined })}
-        style={{ flex: 1 }}
+    <KeyboardAvoidingView
+      behavior={Platform.select({ ios: "padding", android: undefined })}
+      style={{ flex: 1 }}
+    >
+      <ScrollView
+        style={{ flex: 1, backgroundColor: globalStyles.COLORS.backgroundLight }}
+        contentContainerStyle={styles.containerScroll}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        bounces={false}
+        alwaysBounceVertical={false}
+        overScrollMode="never"
       >
-        <View
-          style={[
-            styles.container,
-            { backgroundColor: globalStyles.COLORS.backgroundLight },
-          ]}
-        >
+          {/* Header con logo y tagline */}
+          <View style={styles.headerBox}>
+            <View style={styles.logoCircle}>
+              <Icon name="music-note" size={28} color="#ffffff" />
+            </View>
+            <Text style={styles.brandTitle}>RaveApp</Text>
+            <Text style={styles.brandSubtitle}>Tu puerta al mejor entretenimiento</Text>
+          </View>
+
+          {/* Card del formulario */}
           <View style={styles.card}>
-            <TitlePers text="Bienvenido a RaveApp" />
-            <Text style={styles.subtitle}>Iniciá sesión para continuar</Text>
+            <Text style={styles.formTitle}>Iniciar Sesión</Text>
 
             <TextInput
               mode="outlined"
-              label="Correo"
-              placeholder="email@ejemplo.com"
+              label="Email"
+              placeholder="tu@email.com"
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
@@ -245,9 +285,9 @@ export default function LoginScreen() {
               placeholderTextColor={"#4b5563"}
               selectionColor={"#0f172a"}
               outlineColor={"#e6e9ef"}
-              activeOutlineColor={globalStyles.COLORS.primary}
+              activeOutlineColor="#0f172a"
               outlineStyle={{ borderRadius: 16 }}
-              right={<TextInput.Icon icon="email-outline" color="#6b7280" />}
+              left={<TextInput.Icon icon="email-outline" color="#6b7280" />}
             />
 
             <TextInput
@@ -262,7 +302,7 @@ export default function LoginScreen() {
               placeholderTextColor={"#4b5563"}
               selectionColor={"#0f172a"}
               outlineColor={"#e6e9ef"}
-              activeOutlineColor={globalStyles.COLORS.primary}
+              activeOutlineColor="#0f172a"
               outlineStyle={{ borderRadius: 16 }}
               right={
                 <TextInput.Icon
@@ -272,43 +312,25 @@ export default function LoginScreen() {
                   forceTextInputFocus={false}
                 />
               }
+              left={<TextInput.Icon icon="lock-outline" color="#6b7280" />}
             />
 
-            {canInitGoogle ? (
-              <GoogleButton
-                isExpoGo={isExpoGo}
-                androidId={androidId}
-                iosId={iosId}
-                webId={webId}
-                expoId={expoId}
-                onResult={async (idToken) => {
-                  try {
-                    const decoded: any = jwtDecode(idToken);
-                    if (!decoded?.email) console.warn("id_token sin email visible");
-                  } catch {}
-                  const u = await loginWithGoogle(idToken);
-                  if (!u) {
-                    Alert.alert("Error", "No se pudo iniciar sesión con Google");
-                    return;
-                  }
-                  nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
-                }}
-                disabled={submitting}
-              />
-            ) : (
-              <Button
-                mode="outlined"
-                onPress={handleGoogleLogin}
-                icon="google"
-                contentStyle={styles.googleButtonContent}
-                style={styles.googleButton}
-                labelStyle={{ color: "#111827", fontWeight: "700" }}
-                disabled={submitting}
-              >
-                Ingresar con Google
-              </Button>
-            )}
+            {/* Recordarme + ¿Olvidaste tu contraseña? (misma fila) */}
+            <View style={styles.rowBetween}>
+              <View style={styles.rememberRow}>
+                <SquareCheckbox checked={remember} onPress={() => setRemember((r) => !r)} />
+                <Pressable onPress={() => setRemember((r) => !r)}>
+                  <Text style={styles.rememberText}>Recordarme</Text>
+                </Pressable>
+              </View>
+              <Pressable onPress={() => Alert.alert('Recuperar contraseña', 'Esta función estará disponible próximamente.') }>
+                <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
+              </Pressable>
+            </View>
 
+            {/* El botón social se muestra más abajo (sólo Google) */}
+
+            {/* Botón principal */}
             <Button
               mode="contained"
               onPress={handleLogin}
@@ -318,108 +340,141 @@ export default function LoginScreen() {
               disabled={!canSubmit}
               loading={submitting}
             >
-              Ingresar
+              Iniciar Sesión
             </Button>
 
-            <View style={styles.linksRow}>
-              <Text variant="bodySmall" style={styles.linkText}>
-                <Link
-                  href={ROUTES.LOGIN.REGISTER}
-                  style={{ color: globalStyles.COLORS.primary }}
-                >
-                  ¿No tenés cuenta? Registrate
-                </Link>
-              </Text>
-            </View>
+            {/* Divider */}
+          {/* Divider fuera del card */}
+          <View style={styles.dividerRowOutside}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>O continúa con</Text>
+            <View style={styles.dividerLine} />
+          </View>
 
-            <View style={styles.linksRow}>
+          {/* Socials: Google y Apple (lado a lado) */}
+          <View style={styles.socialRow}>
+            {isWeb ? (
               <Button
-                mode="text"
-                onPress={() => nav.replace(router, ROUTES.MAIN.EVENTS.MENU)}
-                compact
-                labelStyle={{
-                  color: globalStyles.COLORS.primary,
-                  fontWeight: "600",
+                mode="outlined"
+                onPress={async () => {
+                  try {
+                    setSubmitting(true);
+                    const u = await loginWithGooglePopup?.();
+                    if (!u) {
+                      Alert.alert("Error", "No se pudo iniciar sesión con Google (Firebase)");
+                      return;
+                    }
+                    const ok = await syncWithApiAfterGoogle(u);
+                    if (ok) nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
+                  } catch (e) {
+                    Alert.alert("Error", "No se pudo iniciar sesión con Google");
+                  } finally {
+                    setSubmitting(false);
+                  }
                 }}
+                icon="google"
+                contentStyle={styles.socialBtnContent}
+                style={[styles.googleButton, styles.socialBtn]}
+                labelStyle={{ color: "#111827", fontWeight: "700" }}
+                disabled={submitting}
               >
-                Entrar como invitado
+                Ingresar con Google
               </Button>
+            ) : hasAnyClientId ? (
+              <GoogleMobileButton />
+            ) : (
+              <Button
+                mode="outlined"
+                onPress={() =>
+                  Alert.alert(
+                    "Configuración requerida",
+                    "Faltan clientIds de Google en app.json (EXPO_PUBLIC_GOOGLE_*) para usar Google en móvil."
+                  )
+                }
+                icon="google"
+                contentStyle={styles.socialBtnContent}
+                style={[styles.googleButton, styles.socialBtn]}
+                labelStyle={{ color: "#111827", fontWeight: "700" }}
+                disabled={submitting}
+              >
+                Ingresar con Google
+              </Button>
+            )}
+          </View>
+
+          {/* Link a registro (fuera del card) */}
+          <View style={styles.linksRowOutside}>
+            <Text variant="bodySmall" style={styles.linkText}>
+              ¿No tienes cuenta?{' '}
+              <Link href={ROUTES.LOGIN.REGISTER} style={{ color: globalStyles.COLORS.primary }}>
+                Regístrate aquí
+              </Link>
+            </Text>
+          </View>
+
+          </View>
+
+          {/* Sección de beneficios */}
+          <View style={styles.benefitsBox}>
+            <Text style={styles.benefitsTitle}>¿Por qué RaveApp?</Text>
+            <View style={styles.benefitRow}>
+              <View style={styles.benefitIconCircle}><Icon name="confirmation-number" size={20} color="#0f172a" /></View>
+              <Text style={styles.benefitText}>Entradas verificadas al instante</Text>
+            </View>
+            <View style={styles.benefitRow}>
+              <View style={styles.benefitIconCircle}><Icon name="verified-user" size={20} color="#0f172a" /></View>
+              <Text style={styles.benefitText}>Compra 100% segura</Text>
+            </View>
+            <View style={styles.benefitRow}>
+              <View style={styles.benefitIconCircle}><Icon name="event" size={20} color="#0f172a" /></View>
+              <Text style={styles.benefitText}>Los mejores eventos cerca de ti</Text>
             </View>
           </View>
-        </View>
-      </KeyboardAvoidingView>
-    </TouchableWithoutFeedback>
+
+          {/* Términos y privacidad */}
+          <View style={styles.termsRow}>
+            <Text style={styles.termsText}>Al continuar, aceptas nuestros </Text>
+            <Pressable onPress={() => Alert.alert('Términos de Servicio', 'Próximamente.')}><Text style={styles.termsLink}>Términos de Servicio</Text></Pressable>
+            <Text style={styles.termsText}>  </Text>
+            <Pressable onPress={() => Alert.alert('Política de Privacidad', 'Próximamente.') }><Text style={styles.termsLink}>Política de Privacidad</Text></Pressable>
+          </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-function GoogleButton({ isExpoGo, androidId, iosId, webId, expoId, onResult, disabled }: {
-  isExpoGo: boolean;
-  androidId?: string;
-  iosId?: string;
-  webId?: string;
-  expoId?: string;
-  onResult: (idToken: string) => Promise<void> | void;
-  disabled?: boolean;
-}) {
-  // Construimos la config minimizando campos para evitar validaciones innecesarias
-  const config: any = {
-    webClientId: webId || expoId,
-    scopes: ["openid", "profile", "email"],
-    responseType: "id_token",
-    redirectUri: (makeRedirectUri as any)({ useProxy: true }),
-  };
-  if (isExpoGo) {
-    // En Expo Go usamos el proxy con client id web/expo
-    config.expoClientId = expoId || webId;
-    // No seteamos androidClientId/iosClientId en Expo Go para no gatillar invariant
-  } else {
-    // En builds nativos, proveer el id específico por plataforma
-    if (Platform.OS === "android" && androidId) config.androidClientId = androidId;
-    if (Platform.OS === "ios" && iosId) config.iosClientId = iosId;
-  }
-  const [request, response, promptAsync] = Google.useAuthRequest(config);
-  const [busy, setBusy] = React.useState(false);
+// GoogleButton via expo-auth-session removed. Using Firebase popup on web only.
 
-  return (
-    <Button
-      mode="outlined"
-      onPress={async () => {
-        if (busy || disabled) return;
-        try {
-          setBusy(true);
-          if (!request) {
-            Alert.alert("Cargando", "Preparando Google Sign-In, intenta de nuevo en unos segundos.");
-            return;
-          }
-          const res = await promptAsync();
-          if (res.type !== "success") return;
-          const idToken = res.authentication?.idToken || (res.params?.id_token as string | undefined);
-          if (!idToken) {
-            Alert.alert("Error", "No se recibió id_token de Google");
-            return;
-          }
-          await onResult(idToken);
-        } finally {
-          setBusy(false);
-        }
-      }}
-      icon="google"
-      contentStyle={styles.googleButtonContent}
-      style={styles.googleButton}
-      labelStyle={{ color: "#111827", fontWeight: "700" }}
-      disabled={disabled || busy}
-      loading={busy}
-    >
-      Ingresar con Google
-    </Button>
-  );
-}
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  containerScroll: {
+    flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 20,
     paddingBottom: 40,
+  },
+  headerBox: {
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  logoCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
+    backgroundColor: '#0f172a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  brandTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  brandSubtitle: {
+    color: '#6b7280',
+    marginBottom: 12,
   },
   card: {
     marginHorizontal: 12,
@@ -433,6 +488,13 @@ const styles = StyleSheet.create({
     elevation: 4,
     borderWidth: 1,
     borderColor: "#e6e9ef",
+  },
+  formTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 12,
+    textAlign: 'left',
   },
   subtitle: {
     textAlign: "center",
@@ -452,6 +514,34 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  rowBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  rememberRow: { flexDirection: 'row', alignItems: 'center' },
+  rememberText: { color: '#374151', marginLeft: 4, marginRight: 12 },
+  forgotText: { color: '#0f172a', fontWeight: '600' },
+  checkboxBox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: '#0f172a',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
+  checkboxBoxChecked: {
+    backgroundColor: '#0f172a',
+  },
+  checkboxTick: {
+    color: '#ffffff',
+    fontSize: 14,
+    lineHeight: 14,
+    fontWeight: '700',
+  },
   googleButton: {
     borderRadius: 25,
     borderColor: "#d1d5db",
@@ -465,8 +555,8 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     height: 50,
     justifyContent: "center",
-    backgroundColor: globalStyles.COLORS.primary,
-    shadowColor: globalStyles.COLORS.primary,
+    backgroundColor: '#0f172a',
+    shadowColor: '#0f172a',
     shadowOpacity: 0.18,
     shadowOffset: { width: 0, height: 6 },
     shadowRadius: 12,
@@ -475,4 +565,48 @@ const styles = StyleSheet.create({
   buttonContent: { height: 50 },
   linksRow: { marginTop: 12, alignItems: "center" },
   linkText: { color: globalStyles.COLORS.primary },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  dividerRowOutside: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 12,
+    marginHorizontal: 12,
+  },
+  linksRowOutside: { marginTop: 8, alignItems: 'center' },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#e5e7eb' },
+  dividerText: { marginHorizontal: 8, color: '#6b7280' },
+  benefitsBox: {
+    marginTop: 16,
+    marginHorizontal: 12,
+    backgroundColor: '#f9fafb',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e6e9ef',
+  },
+  benefitsTitle: { fontWeight: '700', color: '#111827', marginBottom: 8, textAlign: 'center' },
+  benefitRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 6 },
+  benefitIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#eef2ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#e6e9ef',
+  },
+  benefitText: { color: '#374151' },
+  socialRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginHorizontal: 12 },
+  socialBtn: { flex: 1 },
+  socialBtnContent: { height: 50 },
+  termsRow: { marginTop: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap' },
+  termsText: { color: '#6b7280' },
+  termsLink: { color: '#0f172a', fontWeight: '600' },
 });

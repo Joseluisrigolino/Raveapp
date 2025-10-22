@@ -23,7 +23,8 @@ import { useAuth } from "@/context/AuthContext";
 import { mediaApi } from "@/utils/mediaApi";
 import { getProfile } from "@/utils/auth/userHelpers";
 import { apiClient } from "@/utils/apiConfig";
-import { COLORS } from "@/styles/globalStyles";
+import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
+import { getSafeImageSource } from "@/utils/image";
 
 export default function Footer() {
   const router = useRouter();
@@ -178,68 +179,67 @@ export default function Footer() {
   // ---- Ítems
   // Mostrar siempre "Mis eventos favoritos" y "Mi perfil"
   const userItems = [
-    { icon: "heart", label: "Mis eventos favoritos", route: { pathname: ROUTES.MAIN.EVENTS.FAV } },
-    { icon: "ticket-confirmation", label: "Mis entradas", route: { pathname: ROUTES.MAIN.TICKETS.MENU } },
-    { icon: "account", label: "Mi perfil", route: { pathname: ROUTES.MAIN.USER.PROFILE_EDIT } },
+    { icon: "heart-outline", label: "Mis eventos favoritos", route: { pathname: ROUTES.MAIN.EVENTS.FAV } },
+    { icon: "ticket-outline", label: "Mis entradas", route: { pathname: ROUTES.MAIN.TICKETS.MENU } },
+    { icon: "account-outline", label: "Mi perfil", route: { pathname: ROUTES.MAIN.USER.PROFILE_EDIT } },
   ];
   const ownerItems = [
-  { icon: "calendar-multiselect", label: "Mis eventos creados", route: { pathname: ROUTES.OWNER.MANAGE_EVENTS } },
+  { icon: "calendar-plus", label: "Mis eventos creados", route: { pathname: ROUTES.OWNER.MANAGE_EVENTS } },
   { icon: "repeat", label: "Mis fiestas recurrentes", route: { pathname: ROUTES.OWNER.PARTYS } },
-  { icon: "ticket-percent", label: "Entradas vendidas", route: { pathname: ROUTES.OWNER.TICKET_SOLD } },
+  { icon: "chart-bar", label: "Entradas vendidas", route: { pathname: ROUTES.OWNER.TICKET_SOLD } },
   ];
 
   return (
     <>
       {/* ===== Footer ===== */}
       <View style={styles.container}>
-        {/* Footer: para admin cambiamos 'home' por 'calendar-edit' y el botón del medio por 'artists' */}
         {isAdmin ? (
-          <IconButton
-            icon="calendar-edit"
-            size={24}
-            iconColor={COLORS.textPrimary}
-            onPress={handleEventManagementPress}
-          />
+          <>
+            <TouchableOpacity style={styles.tabItem} onPress={handleEventManagementPress}>
+              <MaterialCommunityIcons name="clipboard-edit-outline" size={24} color={COLORS.textSecondary} />
+              <Text style={styles.tabLabel}>Eventos</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabItem} onPress={handleNewsPress}>
+              <MaterialCommunityIcons name="newspaper-variant-outline" size={24} color={COLORS.textSecondary} />
+              <Text style={styles.tabLabel}>Noticias</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabItem} onPress={handleArtistsPress}>
+              <MaterialCommunityIcons name="music" size={24} color={COLORS.textSecondary} />
+              <Text style={styles.tabLabel}>Artistas</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabItem} onPress={openSheet}>
+              <View style={styles.avatarWrapper}>
+                <Image source={getSafeImageSource(profileImageUrl)} style={styles.avatar} />
+              </View>
+              <Text style={styles.tabLabel}>Perfil</Text>
+            </TouchableOpacity>
+          </>
         ) : (
-          <IconButton
-            icon="home"
-            size={24}
-            iconColor={COLORS.textPrimary}
-            onPress={handleHomePress}
-          />
+          <>
+            <TouchableOpacity style={styles.tabItem} onPress={handleHomePress}>
+              <MaterialCommunityIcons name="home" size={24} color={COLORS.textSecondary} />
+              <Text style={styles.tabLabel}>Inicio</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabItem} onPress={handleNewsPress}>
+              <MaterialCommunityIcons name="newspaper-variant-outline" size={24} color={COLORS.textSecondary} />
+              <Text style={styles.tabLabel}>Noticias</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabItem} onPress={handleTicketsPress}>
+              <MaterialCommunityIcons name="ticket-outline" size={24} color={COLORS.textSecondary} />
+              <Text style={styles.tabLabel}>Tickets</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabItem} onPress={handleEventManagementPress}>
+              <MaterialCommunityIcons name="calendar-plus" size={24} color={COLORS.textSecondary} />
+              <Text style={styles.tabLabel}>Crear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabItem} onPress={openSheet}>
+              <View style={styles.avatarWrapper}>
+                <Image source={getSafeImageSource(profileImageUrl)} style={styles.avatar} />
+              </View>
+              <Text style={styles.tabLabel}>Perfil</Text>
+            </TouchableOpacity>
+          </>
         )}
-        <IconButton
-          icon="newspaper-variant-multiple"
-          size={24}
-          iconColor={COLORS.textPrimary}
-          onPress={handleNewsPress}
-        />
-        {isAdmin ? (
-          <IconButton
-            icon="account-music"
-            size={24}
-            iconColor={COLORS.textPrimary}
-            onPress={handleArtistsPress}
-          />
-        ) : (
-          <IconButton
-            icon="ticket"
-            size={24}
-            iconColor={COLORS.textPrimary}
-            onPress={handleTicketsPress}
-          />
-        )}
-        {!isAdmin && (
-          <IconButton
-            icon="calendar-plus"
-            size={24}
-            iconColor={COLORS.textPrimary}
-            onPress={handleEventManagementPress}
-          />
-        )}
-        <TouchableOpacity onPress={openSheet} style={styles.avatarWrapper}>
-          <Image source={{ uri: profileImageUrl }} style={styles.avatar} />
-        </TouchableOpacity>
       </View>
 
       {/* ===== Modal + Bottom Sheet ===== */}
@@ -262,19 +262,22 @@ export default function Footer() {
                 </TouchableOpacity>
               </View>
 
+              {/* Sheet title */}
+              <View style={styles.sheetTitleRow}>
+                <Text style={styles.sheetTitleText}>{isAdmin ? "Panel de Administración" : "Mi Perfil"}</Text>
+              </View>
+
               {/* Header: avatar + nombre, avatar animado */}
               <View style={styles.profileHeader}>
                 <Animated.Image
-                  source={{ uri: profileImageUrl }}
+                  source={getSafeImageSource(profileImageUrl)}
                   style={[styles.bigAvatar, { transform: [{ scale: avatarScale }] }]}
                 />
                 <View style={{ marginLeft: 14, flex: 1 }}>
                   <Text style={styles.nameText}>
                     {user?.displayName || user?.name || user?.username || "Usuario"}
                   </Text>
-                  <Text style={styles.usernameText}>
-                    {user?.email ? user.email : ""}
-                  </Text>
+                  <Text style={styles.usernameText}>{isAdmin ? "Administrador" : "Usuario"}</Text>
                 </View>
               </View>
 
@@ -311,11 +314,10 @@ export default function Footer() {
               {/* Perfil (visible también para admin) */}
               {isAdmin && (
                 <>
-                  <Text style={styles.sectionTitle}>Perfil</Text>
                   <View style={styles.menuSection}>
                     <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.MAIN.USER.PROFILE_EDIT })}>
-                      <MaterialCommunityIcons name="account" size={22} color={COLORS.textPrimary} />
-                      <Text style={styles.menuText}>Mi perfil</Text>
+                      <MaterialCommunityIcons name="account-outline" size={22} color={COLORS.textPrimary} />
+                      <Text style={styles.menuText}>Mi Perfil</Text>
                     </TouchableOpacity>
                   </View>
                 </>
@@ -327,27 +329,27 @@ export default function Footer() {
                   <Text style={styles.sectionTitle}>Administración</Text>
                   <View style={styles.menuSection}>
                     <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.EVENTS_VALIDATE.LIST })}>
-                      <MaterialCommunityIcons name="calendar-check" size={22} color={COLORS.textPrimary} />
-                      <Text style={styles.menuText}>Validar eventos</Text>
+                      <MaterialCommunityIcons name="check-circle-outline" size={22} color={COLORS.textPrimary} />
+                      <Text style={styles.menuText}>Validar Eventos</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.ARTISTS.NEW })}>
-                      <MaterialCommunityIcons name="account-plus" size={22} color={COLORS.textPrimary} />
-                      <Text style={styles.menuText}>Crear artista</Text>
+                      <MaterialCommunityIcons name="account-plus-outline" size={22} color={COLORS.textPrimary} />
+                      <Text style={styles.menuText}>Crear Artista</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.ARTISTS.MANAGE })}>
-                      <MaterialCommunityIcons name="account-music" size={22} color={COLORS.textPrimary} />
-                      <Text style={styles.menuText}>Editar artistas</Text>
+                      <MaterialCommunityIcons name="account-edit-outline" size={22} color={COLORS.textPrimary} />
+                      <Text style={styles.menuText}>Editar Artistas</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.NEWS.CREATE })}>
-                      <MaterialCommunityIcons name="newspaper-plus" size={22} color={COLORS.textPrimary} />
-                      <Text style={styles.menuText}>Crear noticia</Text>
+                      <MaterialCommunityIcons name="plus-circle-outline" size={22} color={COLORS.textPrimary} />
+                      <Text style={styles.menuText}>Crear Noticia</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.NEWS.MANAGE })}>
-                      <MaterialCommunityIcons name="newspaper-variant-multiple" size={22} color={COLORS.textPrimary} />
-                      <Text style={styles.menuText}>Editar noticias</Text>
+                      <MaterialCommunityIcons name="square-edit-outline" size={22} color={COLORS.textPrimary} />
+                      <Text style={styles.menuText}>Editar Noticias</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.TYC })}>
-                      <MaterialCommunityIcons name="file-document-edit" size={22} color={COLORS.textPrimary} />
+                      <MaterialCommunityIcons name="file-document-edit-outline" size={22} color={COLORS.textPrimary} />
                       <Text style={styles.menuText}>Actualizar TyC</Text>
                     </TouchableOpacity>
                   </View>
@@ -378,6 +380,17 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 60,
   },
+  tabItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  tabLabel: {
+    marginTop: 2,
+    color: COLORS.textSecondary,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: 12,
+  },
   avatarWrapper: {
     width: 32,
     height: 32,
@@ -406,6 +419,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#f3f3f3",
   },
+  sheetTitleRow: {
+    paddingHorizontal: 22,
+    paddingTop: 6,
+    paddingBottom: 8,
+  },
+  sheetTitleText: {
+    color: COLORS.textPrimary,
+    fontFamily: FONTS.titleBold,
+    fontSize: 18,
+  },
   handleBar: { paddingTop: 10, paddingBottom: 8, alignItems: "center", justifyContent: "center" },
   handle: { width: 54, height: 6, borderRadius: 3, backgroundColor: "#E2E8F0" },
   closeBtn: { position: "absolute", right: 16, top: 10, padding: 8 },
@@ -431,18 +454,16 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     backgroundColor: "#f3f3f3",
   },
-  nameText: { color: COLORS.textPrimary, fontWeight: "700", fontSize: 18 },
-  usernameText: { color: COLORS.textSecondary, fontSize: 13, marginTop: 2 },
+  nameText: { color: COLORS.textPrimary, fontFamily: FONTS.titleBold, fontSize: 18 },
+  usernameText: { color: COLORS.textSecondary, fontFamily: FONTS.subTitleMedium, fontSize: 13, marginTop: 2 },
 
   sectionTitle: {
     color: COLORS.textSecondary,
-    fontWeight: "700",
-    fontSize: 13,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: 14,
     paddingHorizontal: 22,
     paddingTop: 16,
     paddingBottom: 7,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
   },
   menuSection: { paddingVertical: 2 },
   menuItem: {
@@ -454,7 +475,7 @@ const styles = StyleSheet.create({
     marginVertical: 2,
     backgroundColor: "#f8f9fa",
   },
-  menuText: { marginLeft: 14, color: COLORS.textPrimary, fontSize: 16, fontWeight: "500" },
+  menuText: { marginLeft: 14, color: COLORS.textPrimary, fontSize: 16, fontFamily: FONTS.subTitleMedium },
   logoutBtn: {
     marginBottom: 18,
     backgroundColor: "#fff0f0",

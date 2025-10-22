@@ -1,14 +1,14 @@
 // src/screens/login/RegisterUserScreen.tsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { ScrollView, View, StyleSheet, Alert, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Text, TextInput, Button, useTheme, HelperText, Menu } from "react-native-paper";
 import { useRouter } from "expo-router";
+import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
-import Constants from "expo-constants";
-import { makeRedirectUri } from "expo-auth-session";
+// Google Cloud oauth removed; using Expo Auth Session with Firebase client IDs
 import { jwtDecode } from "jwt-decode";
 import * as nav from "@/utils/navigation";
 import { ROUTES } from "../../routes";
@@ -16,23 +16,38 @@ import { ROUTES } from "../../routes";
 import globalStyles from "@/styles/globalStyles";
 import { apiClient, login as apiLogin } from "@/utils/apiConfig";
 import { useAuth } from "@/context/AuthContext";
-import { GOOGLE_CONFIG, ensureGoogleClientId } from "@/utils/auth/googleConfig";
+import { getProfile, updateUsuario, createUsuario } from "@/utils/auth/userHelpers";
+// Google Cloud config removed; registration can be adapted to Firebase if needed.
 
 export default function RegisterUserScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { loginWithGoogle } = useAuth();
-  useEffect(() => { WebBrowser.maybeCompleteAuthSession(); }, []);
-  const clientId = ensureGoogleClientId();
-  const androidId = GOOGLE_CONFIG.androidClientId || undefined;
-  const iosId = GOOGLE_CONFIG.iosClientId || undefined;
-  const webId = GOOGLE_CONFIG.webClientId || undefined;
-  const expoId = GOOGLE_CONFIG.expoClientId || undefined;
+  const { loginWithGooglePopup, loginWithGoogle } = useAuth();
+  // Google Cloud removed; keep only email/password registration
   const isAndroid = Platform.OS === "android";
   const isIOS = Platform.OS === "ios";
   const isExpoGo = Constants.appOwnership === "expo";
-  const canUseExpoFlow = isExpoGo && !!(expoId || webId);
-  const canInitGoogle = isExpoGo ? !!(expoId || webId) : isAndroid ? !!androidId : isIOS ? !!iosId : !!webId;
+  const isWeb = Platform.OS === "web";
+  const EX = (Constants?.expoConfig as any)?.extra || (Constants as any)?.manifest2?.extra || {};
+
+  // Completar sesiones OAuth de navegador (requerido por expo-auth-session en móvil)
+  React.useEffect(() => { WebBrowser.maybeCompleteAuthSession(); }, []);
+
+  // Client IDs (provistos por Firebase/Google)
+  const expoClientId = EX.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID || EX.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || undefined;
+  const iosClientId = EX.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || undefined;
+  const androidClientId = EX.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || undefined;
+  const webClientId = EX.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || undefined;
+
+  const googleConfig: any = {
+    expoClientId,
+    iosClientId,
+    androidClientId,
+    webClientId,
+    scopes: ["openid", "profile", "email"],
+    responseType: "id_token",
+  };
+  const hasAnyClientId = !!(iosClientId || androidClientId || expoClientId);
 
   const [form, setForm] = useState({
     firstName: "",
@@ -138,6 +153,115 @@ export default function RegisterUserScreen() {
     return true;
   };
 
+  // Subcomponente para móvil: Google Auth con Expo Auth Session
+  function GoogleMobileRegisterButton() {
+    const [request, response, promptAsync] = Google.useAuthRequest(googleConfig);
+    return (
+      <Button
+        mode="outlined"
+        icon="google"
+        style={styles.googleButton}
+        contentStyle={styles.googleButtonContent}
+        onPress={async () => {
+          try {
+            if (!request) {
+              Alert.alert("Cargando", "Preparando Google Sign-In, intenta de nuevo en unos segundos.");
+              return;
+            }
+            const res = await (promptAsync as any)({ useProxy: isExpoGo });
+            if (res.type !== "success") return;
+            const idToken = res.authentication?.idToken || (res.params?.id_token as string | undefined);
+            const accessToken = res.authentication?.accessToken as string | undefined;
+            const tokenToUse = idToken || (accessToken ? `access:${accessToken}` : undefined);
+            if (!tokenToUse) {
+              Alert.alert("Error", "No se recibió id_token de Google");
+              return;
+            }
+            const u = await loginWithGoogle(tokenToUse);
+            if (!u) {
+              Alert.alert("Error", "No se pudo registrar/iniciar con Google (Firebase)");
+              return;
+            }
+            // Sincronizar con API (update o create)
+            try {
+              const rootToken = await apiLogin();
+              apiClient.defaults.headers.common.Authorization = `Bearer ${rootToken}`;
+              const correo = (u as any)?.username || "";
+              const displayName = `${(u as any)?.nombre ?? ""} ${(u as any)?.apellido ?? ""}`.trim();
+              const [nombreFB, ...restFB] = displayName.split(" ");
+              const apellidoFB = restFB.join(" ").trim();
+              try {
+                const perfil = await getProfile(correo);
+                const payload = {
+                  idUsuario: perfil.idUsuario,
+                  nombre: nombreFB || perfil.nombre,
+                  apellido: apellidoFB || perfil.apellido,
+                  correo: perfil.correo,
+                  dni: perfil.dni || "",
+                  telefono: perfil.telefono || "",
+                  cbu: perfil.cbu || "",
+                  nombreFantasia: perfil.nombreFantasia || "",
+                  bio: perfil.bio || "",
+                  dtNacimiento: perfil.dtNacimiento || new Date().toISOString(),
+                  domicilio: perfil.domicilio || {
+                    localidad: { nombre: "", codigo: "" },
+                    municipio: { nombre: "", codigo: "" },
+                    provincia: { nombre: "", codigo: "" },
+                    direccion: "",
+                    latitud: 0,
+                    longitud: 0,
+                  },
+                  cdRoles: perfil.cdRoles || [],
+                  socials: perfil.socials || {
+                    idSocial: "",
+                    mdInstagram: "",
+                    mdSpotify: "",
+                    mdSoundcloud: "",
+                  },
+                } as const;
+                await updateUsuario(payload as any);
+              } catch (err: any) {
+                const randomPassword = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+                const [nombre, ...rest] = (displayName || "").split(" ");
+                const apellido = rest.join(" ").trim();
+                const createPayload = {
+                  domicilio: {
+                    localidad: { nombre: "", codigo: "" },
+                    municipio: { nombre: "", codigo: "" },
+                    provincia: { nombre: "", codigo: "" },
+                    direccion: "",
+                    latitud: 0,
+                    longitud: 0,
+                  },
+                  nombre: nombre || "",
+                  apellido: apellido || "",
+                  correo,
+                  cbu: "",
+                  dni: "",
+                  telefono: "",
+                  nombreFantasia: "",
+                  bio: "",
+                  password: randomPassword,
+                  socials: { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
+                  dtNacimiento: new Date().toISOString(),
+                };
+                await createUsuario(createPayload as any);
+              }
+              nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
+            } catch (syncErr) {
+              console.error("Google register sync error:", syncErr);
+              Alert.alert("Atención", "Te registraste con Google pero no se pudo sincronizar con la base de datos.");
+            }
+          } catch (e) {
+            Alert.alert("Error", "No se pudo completar el registro con Google");
+          }
+        }}
+      >
+        Registrarse con Google
+      </Button>
+    );
+  }
+
   const handleRegister = async () => {
     if (!validateForm()) return;
     setLoading(true);
@@ -195,45 +319,112 @@ export default function RegisterUserScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
             <View style={styles.card}>
-              {canInitGoogle ? (
-                <GoogleButton
-                  isExpoGo={isExpoGo}
-                  androidId={androidId}
-                  iosId={iosId}
-                  webId={webId}
-                  expoId={expoId}
-                  onResult={async (idToken) => {
-                    try { jwtDecode(idToken); } catch {}
-                    const u = await loginWithGoogle(idToken);
-                    if (!u) {
-                      Alert.alert("Error", "No se pudo registrar/iniciar con Google");
-                      return;
+              {/* Registro mediante Google (Firebase) y/o email/contraseña */}
+
+              {isWeb ? (
+                <Button
+                  mode="outlined"
+                  icon="google"
+                  style={styles.googleButton}
+                  contentStyle={styles.googleButtonContent}
+                  onPress={async () => {
+                    try {
+                      const u = await loginWithGooglePopup?.();
+                      if (!u) {
+                        Alert.alert("Error", "No se pudo registrar/iniciar con Google (Firebase)");
+                        return;
+                      }
+                      // Sincronizar con API: update si existe, si no create
+                      try {
+                        const rootToken = await apiLogin();
+                        apiClient.defaults.headers.common.Authorization = `Bearer ${rootToken}`;
+                        const correo = (u as any)?.username || "";
+                        const displayName = `${(u as any)?.nombre ?? ""} ${(u as any)?.apellido ?? ""}`.trim();
+                        const [nombreFB, ...restFB] = displayName.split(" ");
+                        const apellidoFB = restFB.join(" ").trim();
+                        try {
+                          const perfil = await getProfile(correo);
+                          const payload = {
+                            idUsuario: perfil.idUsuario,
+                            nombre: nombreFB || perfil.nombre,
+                            apellido: apellidoFB || perfil.apellido,
+                            correo: perfil.correo,
+                            dni: perfil.dni || "",
+                            telefono: perfil.telefono || "",
+                            cbu: perfil.cbu || "",
+                            nombreFantasia: perfil.nombreFantasia || "",
+                            bio: perfil.bio || "",
+                            dtNacimiento: perfil.dtNacimiento || new Date().toISOString(),
+                            domicilio: perfil.domicilio || {
+                              localidad: { nombre: "", codigo: "" },
+                              municipio: { nombre: "", codigo: "" },
+                              provincia: { nombre: "", codigo: "" },
+                              direccion: "",
+                              latitud: 0,
+                              longitud: 0,
+                            },
+                            cdRoles: perfil.cdRoles || [],
+                            socials: perfil.socials || {
+                              idSocial: "",
+                              mdInstagram: "",
+                              mdSpotify: "",
+                              mdSoundcloud: "",
+                            },
+                          } as const;
+                          await updateUsuario(payload as any);
+                        } catch (err: any) {
+                          const randomPassword = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+                          const [nombre, ...rest] = (displayName || "").split(" ");
+                          const apellido = rest.join(" ").trim();
+                          const createPayload = {
+                            domicilio: {
+                              localidad: { nombre: "", codigo: "" },
+                              municipio: { nombre: "", codigo: "" },
+                              provincia: { nombre: "", codigo: "" },
+                              direccion: "",
+                              latitud: 0,
+                              longitud: 0,
+                            },
+                            nombre: nombre || "",
+                            apellido: apellido || "",
+                            correo,
+                            cbu: "",
+                            dni: "",
+                            telefono: "",
+                            nombreFantasia: "",
+                            bio: "",
+                            password: randomPassword,
+                            socials: { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
+                            dtNacimiento: new Date().toISOString(),
+                          };
+                          await createUsuario(createPayload as any);
+                        }
+                      } catch (syncErr) {
+                        console.error("Google register sync error:", syncErr);
+                        Alert.alert("Atención", "Te registraste con Google pero no se pudo sincronizar con la base de datos.");
+                      }
+                      nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
+                    } catch (e) {
+                      Alert.alert("Error", "No se pudo completar el registro con Google");
                     }
-                    nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
                   }}
-                  disabled={loading}
-                  label="Registrarse con Google"
-                />
+                >
+                  Registrarse con Google
+                </Button>
+              ) : hasAnyClientId ? (
+                <GoogleMobileRegisterButton />
               ) : (
                 <Button
                   mode="outlined"
-                  onPress={() => {
+                  icon="google"
+                  style={styles.googleButton}
+                  contentStyle={styles.googleButtonContent}
+                  onPress={() =>
                     Alert.alert(
                       "Configuración requerida",
-                      isExpoGo
-                        ? "Falta EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (o EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID) para Expo Go."
-                        : isAndroid
-                        ? "Falta EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID (Android OAuth Client)."
-                        : isIOS
-                        ? "Falta EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID (iOS OAuth Client)."
-                        : "Falta EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (Web OAuth Client)."
-                    );
-                  }}
-                  icon="google"
-                  contentStyle={styles.googleButtonContent}
-                  style={styles.googleButtonTop}
-                  labelStyle={{ color: globalStyles.COLORS.primary, fontWeight: "700" }}
-                  disabled={loading}
+                      "Faltan clientIds de Google en app.json (EXPO_PUBLIC_GOOGLE_*) para usar Google en móvil."
+                    )
+                  }
                 >
                   Registrarse con Google
                 </Button>
@@ -471,6 +662,14 @@ export default function RegisterUserScreen() {
 
               <Text style={styles.smallText}>Al registrarte aceptas los términos y condiciones.</Text>
             </View>
+            {/* Términos y privacidad (igual que login) */}
+            <View style={styles.termsRow}
+            >
+              <Text style={styles.termsText}>Al continuar, aceptas nuestros </Text>
+              <Text onPress={() => Alert.alert('Términos de Servicio', 'Próximamente.')} style={styles.termsLink}>Términos de Servicio</Text>
+              <Text style={styles.termsText}>  </Text>
+              <Text onPress={() => Alert.alert('Política de Privacidad', 'Próximamente.')} style={styles.termsLink}>Política de Privacidad</Text>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -478,65 +677,7 @@ export default function RegisterUserScreen() {
   );
 }
 
-function GoogleButton({ isExpoGo, androidId, iosId, webId, expoId, onResult, disabled, label }: {
-  isExpoGo: boolean;
-  androidId?: string;
-  iosId?: string;
-  webId?: string;
-  expoId?: string;
-  onResult: (idToken: string) => Promise<void> | void;
-  disabled?: boolean;
-  label?: string;
-}) {
-  const config: any = {
-    webClientId: webId || expoId,
-    scopes: ["openid", "profile", "email"],
-    responseType: "id_token",
-    redirectUri: (makeRedirectUri as any)({ useProxy: true }),
-  };
-  if (isExpoGo) {
-    config.expoClientId = expoId || webId;
-  } else {
-    if (Platform.OS === "android" && androidId) config.androidClientId = androidId;
-    if (Platform.OS === "ios" && iosId) config.iosClientId = iosId;
-  }
-  const [request, response, promptAsync] = Google.useAuthRequest(config);
-  const [busy, setBusy] = React.useState(false);
-
-  return (
-    <Button
-      mode="outlined"
-      onPress={async () => {
-        if (busy || disabled) return;
-        try {
-          setBusy(true);
-          if (!request) {
-            Alert.alert("Cargando", "Preparando Google Sign-In, intenta nuevamente en unos segundos.");
-            return;
-          }
-          const res = await promptAsync();
-          if (res.type !== "success") return;
-          const idToken = res.authentication?.idToken || (res.params?.id_token as string | undefined);
-          if (!idToken) {
-            Alert.alert("Error", "No se recibió id_token de Google");
-            return;
-          }
-          await onResult(idToken);
-        } finally {
-          setBusy(false);
-        }
-      }}
-      icon="google"
-      contentStyle={styles.googleButtonContent}
-      style={styles.googleButtonTop}
-      labelStyle={{ color: globalStyles.COLORS.primary, fontWeight: "700" }}
-      disabled={disabled || busy}
-      loading={busy}
-    >
-      {label || "Registrarse con Google"}
-    </Button>
-  );
-}
+// GoogleButton removed
 
 const COLORS = {
   primary: "#7c3aed", // morado vibrante
@@ -608,6 +749,9 @@ const styles = StyleSheet.create({
     color: "#6b7280",
     fontSize: 12,
   },
+  termsRow: { marginTop: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap' },
+  termsText: { color: '#6b7280' },
+  termsLink: { color: '#7c3aed', fontWeight: '600' },
 
   /* Copiado desde login.tsx: estilos de inputs mejorados */
   input: {

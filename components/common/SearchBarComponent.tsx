@@ -11,7 +11,7 @@ import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 const SearchBar: React.FC<SearchBarProps> = ({
   value,
   onChangeText,
-  placeholder = "Buscar...",
+  placeholder = "Buscar eventos...",
 }) => {
   return (
     <View style={styles.container}>
@@ -20,8 +20,9 @@ const SearchBar: React.FC<SearchBarProps> = ({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        left={<TextInput.Icon icon="magnify" color={COLORS.textPrimary} />}
+        left={<TextInput.Icon icon="magnify" color={COLORS.textSecondary} />}
         style={styles.input}
+        contentStyle={styles.content}
         outlineStyle={styles.outline}
         textColor={COLORS.textPrimary}
         placeholderTextColor={COLORS.textSecondary}
@@ -34,16 +35,21 @@ export default SearchBar;
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 8,
+    marginHorizontal: 12,
     marginTop: 8,
   },
   input: {
-    backgroundColor: COLORS.cardBg, // Blanco
-    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.backgroundLight,
+    borderRadius: 14,
+    height: 40,
     fontSize: FONT_SIZES.body,
   },
+  content: {
+    height: 40,
+    paddingVertical: 0,
+  },
   outline: {
-    borderRadius: RADIUS.card,
+    borderRadius: 14,
     borderColor: COLORS.borderInput,
     borderWidth: 1,
   },

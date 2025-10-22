@@ -1,7 +1,7 @@
 // src/screens/admin/EditArtistScreen.tsx
 
 import React, { useEffect, useState } from "react";
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Image, Alert } from "react-native";
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Image, Alert, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -16,6 +16,7 @@ import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import InputText from "@/components/common/inputText";
 import InputDesc from "@/components/common/inputDesc";
 import eventBus from "@/utils/eventBus";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 export default function EditArtistScreen() {
   const { id, activate, prefillName } = useLocalSearchParams<{ id: string; activate?: string; prefillName?: string }>();
@@ -164,12 +165,13 @@ export default function EditArtistScreen() {
           isEditing={true}
           onBeginEdit={() => {}}
           onChangeText={setName}
+          placeholder="Ingresa el nombre del artista..."
           containerStyle={{ width: "100%", alignItems: "stretch" }}
           labelStyle={{ width: "100%", textAlign: "left" }}
           inputStyle={{ width: "100%" }}
         />
 
-        <Text style={styles.label}>Foto del artista:</Text>
+        <Text style={styles.sectionLabel}>Foto del artista</Text>
         <View style={styles.imageContainer}>
           {imageUri ? (
             <>
@@ -178,25 +180,24 @@ export default function EditArtistScreen() {
                 style={styles.artistImage}
                 onError={() => setImageUri(null)}
               />
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={handleDeleteImage}
-              >
-                <Text style={styles.deleteButtonText}>
-                  Eliminar imagen actual
-                </Text>
-              </TouchableOpacity>
+              {idMedia ? (
+                <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteImage}>
+                  <Text style={styles.deleteButtonText}>Eliminar imagen actual</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.deleteButton} onPress={() => setImageUri(null)}>
+                  <Text style={styles.deleteButtonText}>Quitar vista previa</Text>
+                </TouchableOpacity>
+              )}
             </>
           ) : (
-            <View style={[styles.artistImage, styles.imageFallback]}>
-              <Text style={styles.imagePlaceholderText}>Sin imagen</Text>
+            <View style={styles.previewCircle}>
+              <MaterialCommunityIcons name="account" size={42} color={COLORS.textSecondary} />
+              <Text style={styles.previewText}>Vista previa</Text>
             </View>
           )}
 
-          <TouchableOpacity
-            style={styles.selectImageButton}
-            onPress={handleSelectImage}
-          >
+          <TouchableOpacity style={styles.selectImageButton} onPress={handleSelectImage}>
             <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
           </TouchableOpacity>
 
@@ -212,46 +213,63 @@ export default function EditArtistScreen() {
           onBeginEdit={() => {}}
           onChangeText={setDescription}
           autoFocus={false}
+          placeholder="Describe la información del artista, género musical, biografía..."
           containerStyle={{ width: "100%", alignItems: "stretch" }}
           labelStyle={{ width: "100%", textAlign: "left" }}
           inputStyle={{ width: "100%" }}
         />
 
-        <InputText
-          label="URL del Instagram del artista"
-          value={instagramURL}
-          isEditing={true}
-          onBeginEdit={() => {}}
-          onChangeText={setInstagramURL}
-          keyboardType="url"
-          containerStyle={{ width: "100%", alignItems: "stretch" }}
-          labelStyle={{ width: "100%", textAlign: "left" }}
-          inputStyle={{ width: "100%" }}
-        />
+        {/* Social URLs with left icons (visual parity with NewArtist) */}
+        <View style={styles.fieldBlock}>
+          <Text style={styles.sectionLabel}>URL de Instagram del artista</Text>
+          <View style={styles.iconInputRow}>
+            <MaterialCommunityIcons name="instagram" size={18} color={COLORS.textSecondary} style={{ marginHorizontal: 10 }} />
+            <TextInput
+              style={styles.textInputBare}
+              value={instagramURL}
+              onChangeText={setInstagramURL}
+              keyboardType="url"
+              placeholder="https://instagram.com/artista"
+              placeholderTextColor={COLORS.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+        </View>
 
-        <InputText
-          label="URL del SoundCloud del artista"
-          value={soundcloudURL}
-          isEditing={true}
-          onBeginEdit={() => {}}
-          onChangeText={setSoundcloudURL}
-          keyboardType="url"
-          containerStyle={{ width: "100%", alignItems: "stretch" }}
-          labelStyle={{ width: "100%", textAlign: "left" }}
-          inputStyle={{ width: "100%" }}
-        />
+        <View style={styles.fieldBlock}>
+          <Text style={styles.sectionLabel}>URL de SoundCloud del artista</Text>
+          <View style={styles.iconInputRow}>
+            <MaterialCommunityIcons name="soundcloud" size={18} color={COLORS.textSecondary} style={{ marginHorizontal: 10 }} />
+            <TextInput
+              style={styles.textInputBare}
+              value={soundcloudURL}
+              onChangeText={setSoundcloudURL}
+              keyboardType="url"
+              placeholder="https://soundcloud.com/artista"
+              placeholderTextColor={COLORS.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+        </View>
 
-        <InputText
-          label="URL del Spotify del artista"
-          value={spotifyURL}
-          isEditing={true}
-          onBeginEdit={() => {}}
-          onChangeText={setSpotifyURL}
-          keyboardType="url"
-          containerStyle={{ width: "100%", alignItems: "stretch" }}
-          labelStyle={{ width: "100%", textAlign: "left" }}
-          inputStyle={{ width: "100%" }}
-        />
+        <View style={styles.fieldBlock}>
+          <Text style={styles.sectionLabel}>URL de Spotify del artista</Text>
+          <View style={styles.iconInputRow}>
+            <MaterialCommunityIcons name="spotify" size={18} color={COLORS.textSecondary} style={{ marginHorizontal: 10 }} />
+            <TextInput
+              style={styles.textInputBare}
+              value={spotifyURL}
+              onChangeText={setSpotifyURL}
+              keyboardType="url"
+              placeholder="https://open.spotify.com/artist/..."
+              placeholderTextColor={COLORS.textSecondary}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+        </View>
 
         <TouchableOpacity style={styles.btn} onPress={handleUpdateArtist}>
           <Text style={styles.btnText}>Confirmar</Text>
@@ -274,16 +292,15 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.titleBold,
     fontSize: FONT_SIZES.titleMain,
     color: COLORS.textPrimary,
-    textAlign: "center",
-    marginBottom: 16,
-    textDecorationLine: "underline",
+    textAlign: "left",
+    marginBottom: 12,
   },
-  label: {
+  sectionLabel: {
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
     marginTop: 12,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   // input styles now provided by shared components
   imageContainer: {
@@ -296,15 +313,21 @@ const styles = StyleSheet.create({
     borderRadius: 70,
     marginBottom: 12,
   },
-  imageFallback: {
-    backgroundColor: COLORS.borderInput,
-    justifyContent: "center",
-    alignItems: "center",
+  previewCircle: {
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#c8cfd9',
+    backgroundColor: '#dbe2ea',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
-  imagePlaceholderText: {
-    fontFamily: FONTS.bodyRegular,
+  previewText: {
+    marginTop: 6,
     color: COLORS.textSecondary,
-    fontSize: 14,
   },
   deleteButton: {
     backgroundColor: COLORS.negative,
@@ -318,13 +341,15 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodyRegular,
   },
   selectImageButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.cardBg,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 14,
   },
   selectImageButtonText: {
-    color: COLORS.cardBg,
+    color: COLORS.textPrimary,
     fontFamily: FONTS.subTitleMedium,
   },
   imageNotice: {
@@ -335,15 +360,34 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   btn: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 14,
-    borderRadius: RADIUS.card,
+    backgroundColor: '#0F172A',
+    height: 52,
+    borderRadius: 14,
     marginTop: 24,
-    alignItems: "center",
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   btnText: {
     color: COLORS.cardBg,
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.button,
+  },
+  fieldBlock: { marginTop: 10 },
+  iconInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: 16,
+    backgroundColor: COLORS.cardBg,
+    height: 56,
+  },
+  textInputBare: {
+    flex: 1,
+    height: '100%',
+    paddingRight: 12,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
   },
 });

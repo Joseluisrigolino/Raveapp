@@ -24,7 +24,7 @@ export const COLORS = {
 
   // Iconos y otros
   alert: "#E53935",
-  info: "#FF9800",
+  info: "#6B7280",
   starFilled: "#FFC107",
   starEmpty: "#BDBDBD",
 

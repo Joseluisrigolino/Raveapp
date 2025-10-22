@@ -1,5 +1,6 @@
 import React from "react";
 import { TouchableOpacity, Image } from "react-native";
+import { getSafeImageSource } from "@/utils/image";
 import { styles } from "./styles";
 
 type Props = {
@@ -10,8 +11,8 @@ type Props = {
 export default function HeroImagen({ imageUrl, onPress }: Props) {
   if (!imageUrl || imageUrl.trim() === "") return null;
   return (
-    <TouchableOpacity style={styles.heroImageWrapper} activeOpacity={0.9} onPress={onPress}>
-      <Image source={{ uri: imageUrl }} style={styles.heroImage} />
+      <TouchableOpacity style={styles.heroImageWrapper} activeOpacity={0.9} onPress={onPress}>
+        <Image source={getSafeImageSource(imageUrl)} style={styles.heroImage} />
     </TouchableOpacity>
   );
 }

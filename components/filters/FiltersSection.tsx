@@ -161,20 +161,7 @@ export default function FiltersSection(props: FiltersSectionProps) {
           style={[styles.filterChip, isGenreActive && styles.filterChipActive]}
           onPress={onToggleGenreFilter}
         >
-          <IconButton
-            icon="music"
-            size={18}
-            iconColor={COLORS.textPrimary}
-            style={{ margin: 0 }}
-          />
-          <Text
-            style={[
-              styles.filterChipText,
-              isGenreActive && styles.filterChipTextActive,
-            ]}
-          >
-            Género
-          </Text>
+          <Text style={[styles.filterChipText, isGenreActive && styles.filterChipTextActive]}>Género</Text>
         </TouchableOpacity>
 
         {/* Fecha */}
@@ -182,20 +169,7 @@ export default function FiltersSection(props: FiltersSectionProps) {
           style={[styles.filterChip, isDateActive && styles.filterChipActive]}
           onPress={onToggleDateFilter}
         >
-          <IconButton
-            icon="calendar"
-            size={18}
-            iconColor={COLORS.textPrimary}
-            style={{ margin: 0 }}
-          />
-          <Text
-            style={[
-              styles.filterChipText,
-              isDateActive && styles.filterChipTextActive,
-            ]}
-          >
-            Fecha
-          </Text>
+          <Text style={[styles.filterChipText, isDateActive && styles.filterChipTextActive]}>Fecha</Text>
         </TouchableOpacity>
 
         {/* Ubicación */}
@@ -203,20 +177,7 @@ export default function FiltersSection(props: FiltersSectionProps) {
           style={[styles.filterChip, isLocationActive && styles.filterChipActive]}
           onPress={onToggleLocationFilter}
         >
-          <IconButton
-            icon="map-marker"
-            size={18}
-            iconColor={COLORS.textPrimary}
-            style={{ margin: 0 }}
-          />
-          <Text
-            style={[
-              styles.filterChipText,
-              isLocationActive && styles.filterChipTextActive,
-            ]}
-          >
-            Ubicación
-          </Text>
+          <Text style={[styles.filterChipText, isLocationActive && styles.filterChipTextActive]}>Ubicación</Text>
         </TouchableOpacity>
 
         {/* Esta semana */}
@@ -224,20 +185,7 @@ export default function FiltersSection(props: FiltersSectionProps) {
           style={[styles.filterChip, weekActive && styles.filterChipActive]}
           onPress={onToggleWeek}
         >
-          <IconButton
-            icon="newspaper-plus"
-            size={18}
-            iconColor={COLORS.textPrimary}
-            style={{ margin: 0 }}
-          />
-          <Text
-            style={[
-              styles.filterChipText,
-              weekActive && styles.filterChipTextActive,
-            ]}
-          >
-            Esta semana
-          </Text>
+          <Text style={[styles.filterChipText, weekActive && styles.filterChipTextActive]}>Esta semana</Text>
         </TouchableOpacity>
 
         {/* After */}
@@ -245,20 +193,7 @@ export default function FiltersSection(props: FiltersSectionProps) {
           style={[styles.filterChip, afterActive && styles.filterChipActive]}
           onPress={onToggleAfter}
         >
-          <IconButton
-            icon="moon-waning-crescent"
-            size={18}
-            iconColor={COLORS.textPrimary}
-            style={{ margin: 0 }}
-          />
-          <Text
-            style={[
-              styles.filterChipText,
-              afterActive && styles.filterChipTextActive,
-            ]}
-          >
-            After
-          </Text>
+          <Text style={[styles.filterChipText, afterActive && styles.filterChipTextActive]}>After</Text>
         </TouchableOpacity>
 
         {/* LGBT */}
@@ -266,20 +201,7 @@ export default function FiltersSection(props: FiltersSectionProps) {
           style={[styles.filterChip, lgbtActive && styles.filterChipActive]}
           onPress={onToggleLgbt}
         >
-          <IconButton
-            icon="gender-transgender"
-            size={18}
-            iconColor={COLORS.textPrimary}
-            style={{ margin: 0 }}
-          />
-          <Text
-            style={[
-              styles.filterChipText,
-              lgbtActive && styles.filterChipTextActive,
-            ]}
-          >
-            LGBT
-          </Text>
+          <Text style={[styles.filterChipText, lgbtActive && styles.filterChipTextActive]}>LGBT</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -288,7 +210,7 @@ export default function FiltersSection(props: FiltersSectionProps) {
         <SearchBarComponent
           value={searchText}
           onChangeText={onSearchTextChange}
-          placeholder="Buscar evento..."
+          placeholder="Buscar eventos..."
         />
       </View>
 
@@ -485,32 +407,35 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   horizontalScroll: {
-    marginHorizontal: 8,
-    marginTop: 8,
+    marginHorizontal: 12,
+    marginTop: 10,
   },
   filterChip: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.card,
-    marginRight: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: COLORS.backgroundLight,
+    borderRadius: RADIUS.chip,
+    marginRight: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
   },
   filterChipActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.cardBg,
+    borderColor: COLORS.textSecondary,
   },
   filterChipText: {
-    color: COLORS.textPrimary,
+    color: COLORS.textSecondary,
     fontSize: FONT_SIZES.body,
-    marginLeft: 2,
+    marginLeft: 0,
   },
   filterChipTextActive: {
-    color: COLORS.cardBg,
+    color: COLORS.textPrimary,
   },
   searchContainer: {
-    marginHorizontal: 8,
-    marginTop: 8,
+    marginHorizontal: 12,
+    marginTop: 10,
   },
   dateFilterContainer: {
     backgroundColor: COLORS.cardBg,

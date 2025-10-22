@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, FlatList, Alert, TextInput, TouchableOpacity, Image, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { IconButton } from "react-native-paper";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, usePathname } from "expo-router";
 import * as nav from "@/utils/navigation";
 import { ROUTES } from "../../../routes";
@@ -127,34 +128,45 @@ export default function ManageArtistsScreen() {
     },
   ];
 
+  const formatDateEs = (iso?: string) => {
+    if (!iso) return "";
+    try {
+      const d = new Date(iso);
+      const day = d.getDate().toString().padStart(2, "0");
+      const month = d.toLocaleString("es-ES", { month: "long" });
+      const capMonth = month.charAt(0).toUpperCase() + month.slice(1);
+      const year = d.getFullYear();
+      return `${day} ${capMonth} ${year}`;
+    } catch {
+      return iso;
+    }
+  };
+
   const renderItem = ({ item }: { item: Artist }) => (
     <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardText}>
-          <Text style={styles.label}>Creado:</Text>
-          <Text style={styles.dateText}>{item.creationDate}</Text>
-          <Text style={styles.label}>Nombre:</Text>
-          <Text style={styles.titleText}>{item.name}</Text>
+      <View style={styles.row}>
+        <Image source={{ uri: item.image }} style={styles.avatar} resizeMode="cover" />
+        <View style={styles.infoCol}>
+          <Text style={styles.nameText}>{item.name}</Text>
+          <View style={styles.metaRow}>
+            <MaterialCommunityIcons name="calendar-blank" size={16} color={COLORS.textSecondary} />
+            <Text style={styles.metaText}>Creado: {formatDateEs(item.creationDate)}</Text>
+          </View>
         </View>
-        <Image
-          source={{ uri: item.image }}
-          style={styles.avatar}
-          resizeMode="cover"
-        />
       </View>
 
       <View style={styles.buttonsRow}>
         <TouchableOpacity
-          style={[styles.fullButton, { backgroundColor: COLORS.primary }]}
+          style={[styles.fullButton, styles.editBtn]}
           onPress={() => handleEdit(item.idArtista)}
         >
-          <Text style={styles.fullButtonText}>Modificar</Text>
+          <Text style={[styles.editBtnText, { fontFamily: FONTS.bodyRegular, fontSize: FONT_SIZES.smallText }]}>Modificar</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.fullButton, { backgroundColor: COLORS.negative }]}
+          style={[styles.fullButton, styles.deleteBtn]}
           onPress={() => handleDelete(item.idArtista)}
         >
-          <Text style={styles.fullButtonText}>Eliminar</Text>
+          <Text style={styles.deleteBtnText}>Eliminar</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -167,17 +179,22 @@ export default function ManageArtistsScreen() {
 
       <View style={styles.content}>
         <TouchableOpacity style={styles.createBtn} onPress={handleCreateArtist}>
-          <Text style={styles.createText}>+ Crear artista</Text>
+          <MaterialCommunityIcons name="music-note-outline" size={16} color={COLORS.cardBg} style={{ marginRight: 6 }} />
+          <Text style={styles.createText}>Crear artista</Text>
         </TouchableOpacity>
 
         <Text style={styles.screenTitle}>Gestionar Artistas</Text>
 
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar..."
-          value={searchText}
-          onChangeText={handleSearch}
-        />
+        <View style={styles.searchRow}>
+          <MaterialCommunityIcons name="magnify" size={18} color={COLORS.textSecondary} style={{ marginHorizontal: 10 }} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar artista..."
+            value={searchText}
+            onChangeText={handleSearch}
+            placeholderTextColor={COLORS.textSecondary}
+          />
+        </View>
 
         {loading ? (
           <ActivityIndicator
@@ -210,11 +227,13 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   createBtn: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.textPrimary,
     borderRadius: RADIUS.card,
     paddingVertical: 12,
     alignItems: "center",
+    justifyContent: "center",
     marginBottom: 16,
+    flexDirection: "row",
   },
   createText: {
     fontFamily: FONTS.subTitleMedium,
@@ -227,15 +246,22 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 12,
   },
-  searchInput: {
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: COLORS.borderInput,
     borderRadius: RADIUS.card,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: COLORS.cardBg,
     marginBottom: 16,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingRight: 12,
     fontFamily: FONTS.bodyRegular,
     fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
   },
   list: {
     paddingBottom: 32,
@@ -251,30 +277,29 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  cardHeader: {
+  row: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
     marginBottom: 8,
   },
-  cardText: {
+  infoCol: {
     flex: 1,
   },
-  label: {
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textSecondary,
-  },
-  dateText: {
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.smallText,
-    color: COLORS.textSecondary,
-    marginBottom: 4,
-  },
-  titleText: {
+  nameText: {
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.body,
     color: COLORS.textPrimary,
-    marginBottom: 4,
+    marginBottom: 2,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  metaText: {
+    color: COLORS.textSecondary,
+    fontSize: FONT_SIZES.smallText,
   },
   avatar: {
     width: 72,
@@ -298,13 +323,23 @@ const styles = StyleSheet.create({
   fullButton: {
     flex: 1,
     borderRadius: 10,
-    paddingVertical: 6, // más bajo
+    paddingVertical: 10,
     alignItems: "center",
-    
   },
-  fullButtonText: {
+  editBtn: {
+    backgroundColor: COLORS.cardBg,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+  },
+  editBtnText: {
+    color: COLORS.textPrimary,
+  },
+  deleteBtn: {
+    backgroundColor: COLORS.textSecondary,
+  },
+  deleteBtnText: {
     color: COLORS.cardBg,
-    fontFamily: FONTS.bodyRegular, // menos pesado
-    fontSize: FONT_SIZES.smallText, // más chico
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
   },
 });

@@ -19,12 +19,12 @@ import * as nav from "@/utils/navigation";
 import ROUTES from "@/routes";
 import { EventItem } from "@/interfaces/EventItem";
 import HeroImagen from "@/components/events/evento/HeroImagen";
-import BadgesEvento from "@/components/events/evento/BadgesEvento";
 import ReproductorSoundCloud from "@/components/events/evento/ReproductorSoundCloud";
 import ReproductorYouTube from "@/components/events/evento/ReproductorYouTube";
 // Las reseñas no se muestran en el preview de validación
-import { COLORS } from "@/styles/globalStyles";
+import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 import Icon from "react-native-vector-icons/MaterialIcons";
+import MCIcon from "react-native-vector-icons/MaterialCommunityIcons";
 import { getProfile, getUsuarioById } from "@/utils/auth/userHelpers";
 import { updateArtistOnApi, fetchOneArtistFromApi } from "@/utils/artists/artistApi";
 import { mediaApi } from "@/utils/mediaApi";
@@ -56,6 +56,8 @@ export default function ValidateEventScreen() {
   const [idMedia, setIdMedia] = useState<string | null>(null);
   const [idSocial, setIdSocial] = useState<string | null>(null);
   const [newImageLocalUri, setNewImageLocalUri] = useState<string | null>(null);
+  // Avatar del propietario
+  const [ownerAvatarUrl, setOwnerAvatarUrl] = useState<string | null>(null);
   // track subscriptions
   useEffect(() => {
     // Listen for artist activation updates coming back from EditarArtistaPantalla
@@ -213,9 +215,30 @@ export default function ValidateEventScreen() {
           ownerEmail: profile.correo ?? prev.ownerEmail,
           ownerId: profile.idUsuario ?? prev.ownerId,
         }) : prev);
+        // Cargar avatar del propietario
+        try {
+          const finalOwnerId = String(profile.idUsuario || ownerId || "").trim();
+          if (finalOwnerId) {
+            const url = await mediaApi.getFirstImage(finalOwnerId);
+            if (url && url.trim()) setOwnerAvatarUrl(url);
+          }
+        } catch {}
       }
     })();
   }, [eventData]);
+
+  // Si ya contamos con ownerId pero aún no tenemos avatar, intentar cargarlo
+  useEffect(() => {
+    (async () => {
+      try {
+        const idCand = String((eventData as any)?.ownerId || (eventData as any)?.__raw?.propietario?.idUsuario || "").trim();
+        if (idCand && !ownerAvatarUrl) {
+          const url = await mediaApi.getFirstImage(idCand);
+          if (url && url.trim()) setOwnerAvatarUrl(url);
+        }
+      } catch {}
+    })();
+  }, [eventData?.ownerId]);
 
   const handleValidate = () => {
     if (!eventData?.id) return;
@@ -517,7 +540,7 @@ export default function ValidateEventScreen() {
     const d = new Date(String(iso));
     if (!isFinite(d.getTime())) return "";
     const pad = (n: number) => n.toString().padStart(2, "0");
-    return `${pad(d.getHours())}:${pad(d.getMinutes())} hs`;
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
   const getCreationDate = (ev: EventItemWithExtras): string => {
     const raw: any = (ev as any)?.__raw ?? {};
@@ -533,6 +556,21 @@ export default function ValidateEventScreen() {
     ].filter(Boolean);
     const first = cands[0];
     return formatDate(first);
+  };
+
+  // Formato "28 Marzo 2025" (sin "de" y con mes capitalizado)
+  const formatDatePretty = (iso?: string | null) => {
+    if (!iso) return "";
+    const d = new Date(String(iso));
+    if (!isFinite(d.getTime())) return "";
+    const months = [
+      "Enero","Febrero","Marzo","Abril","Mayo","Junio",
+      "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
+    ];
+    const dd = d.getDate().toString().padStart(2, '0');
+    const mm = months[d.getMonth()] || "";
+    const yyyy = d.getFullYear();
+    return `${dd} ${mm} ${yyyy}`;
   };
 
   // Helper: formato de moneda ARS sin decimales
@@ -570,134 +608,118 @@ export default function ValidateEventScreen() {
       <SafeAreaView style={styles.container}>
         <Header />
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Encabezado como en la web (sin card) */}
-          <Text style={styles.pageTitle}>Evento a validar:</Text>
+          {/* Encabezado replicando mock */}
+          <Text style={styles.pageTitle}>Verificar Evento</Text>
           <View style={[styles.infoCard, styles.summaryContainer]}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Nombre de evento:</Text>
-              <Text style={styles.summaryValue}>{eventData.title}</Text>
-            </View>
-            {getCreationDate(eventData) ? (
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Fecha de creación:</Text>
-                <Text style={styles.summaryValue}>{getCreationDate(eventData)}</Text>
-              </View>
-            ) : null}
-            <View style={[styles.summaryRow, { alignItems: "flex-start" }]}>
-              <Icon name="person" size={18} color={COLORS.textSecondary || "#666"} style={{ marginRight: 6, marginTop: 2 }} />
+            <Text style={styles.eventTitle}>{eventData.title}</Text>
+            <View style={styles.ownerRow}>
+              {ownerAvatarUrl ? (
+                <Image source={{ uri: ownerAvatarUrl }} style={styles.ownerAvatar} />
+              ) : (
+                <View style={styles.ownerAvatarPlaceholder}>
+                  <Icon name="person" size={22} color="#555" />
+                </View>
+              )}
               <View style={{ flex: 1 }}>
-                <Text style={styles.summaryLabelInline}><Text style={styles.summaryLabel}>Propietario:</Text> <Text style={styles.summaryValue}>{ownerName}</Text></Text>
-                {creatorEmail ? <Text style={styles.summaryEmail}>({creatorEmail})</Text> : null}
+                <Text style={styles.ownerName}>{ownerName}</Text>
+                {creatorEmail ? <Text style={styles.summaryEmail}>{creatorEmail}</Text> : null}
               </View>
             </View>
-            <View style={[styles.summaryRow, { alignItems: "flex-start" }]}>
-              <Icon name="music-note" size={18} color={COLORS.textSecondary || "#666"} style={{ marginRight: 6, marginTop: 2 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.summaryLabelInline}><Text style={styles.summaryLabel}>Género:</Text> <Text style={styles.summaryValue}>{getGenresText(eventData)}</Text></Text>
+            <View style={styles.chipsWrap}>
+              {(() => {
+                const genreText = getGenresText(eventData);
+                const flags = getEventFlags(eventData);
+                return (
+                  <>
+                    {genreText ? (
+                      <View style={[styles.chip, styles.chipGenre]}>
+                        <Icon name="music-note" size={14} color={COLORS.textPrimary} style={{ marginRight: 6 }} />
+                        <Text style={[styles.chipText, styles.chipTextGenre]}>{genreText}</Text>
+                      </View>
+                    ) : null}
+                    {flags.isLGBT ? (
+                      <View style={[styles.chip, styles.chipLGBT]}>
+                        <MCIcon name="rainbow" size={14} color="#fff" style={{ marginRight: 6 }} />
+                        <Text style={styles.chipTextDark}>LGTB+</Text>
+                      </View>
+                    ) : null}
+                    {flags.isAfter ? (
+                      <View style={[styles.chip, styles.chipAfter]}>
+                        <MCIcon name="weather-night" size={14} color="#fff" style={{ marginRight: 6 }} />
+                        <Text style={styles.chipTextDark}>AFTER</Text>
+                      </View>
+                    ) : null}
+                  </>
+                );
+              })()}
+            </View>
+            <View style={{ marginTop: 8 }}>
+              <HeroImagen imageUrl={(eventData as any).imageUrl} onPress={() => setImageModalVisible(true)} />
+              <Text style={styles.imageHint}>Tocar imagen para verla completa</Text>
+            </View>
+          </View>
+
+          {/* Fechas y Horarios */}
+          <Text style={styles.sectionTitle}>Fechas y Horarios</Text>
+          <View style={[styles.infoCard, styles.sectionContainer]}>
+            {/* fila fechas */}
+            <View style={styles.rowTwoCols}>
+              <View style={styles.colBox}>
+                <Text style={styles.smallLabel}>Fecha inicio</Text>
+                <Text style={styles.strongValue}>{formatDatePretty((eventData as any)?.fechas?.[0]?.inicio || (eventData as any)?.__raw?.inicio || (eventData as any)?.__raw?.inicioEvento || null)}</Text>
+              </View>
+              <View style={styles.colBox}>
+                <Text style={styles.smallLabel}>Fecha fin</Text>
+                <Text style={styles.strongValue}>{formatDatePretty((eventData as any)?.fechas?.[0]?.fin || (eventData as any)?.__raw?.fin || (eventData as any)?.__raw?.finEvento || null)}</Text>
+              </View>
+            </View>
+            {/* fila horas */}
+            <View style={[styles.rowTwoCols, { marginTop: 8 }]}>
+              <View style={styles.colBox}>
+                <Text style={styles.smallLabel}>Hora inicio</Text>
+                <Text style={styles.strongValue}>{formatHHmm((eventData as any)?.fechas?.[0]?.inicio || (eventData as any)?.__raw?.inicio || (eventData as any)?.__raw?.inicioEvento || "")}</Text>
+              </View>
+              <View style={styles.colBox}>
+                <Text style={styles.smallLabel}>Hora fin</Text>
+                <Text style={styles.strongValue}>{formatHHmm((eventData as any)?.fechas?.[0]?.fin || (eventData as any)?.__raw?.fin || (eventData as any)?.__raw?.finEvento || "")}</Text>
               </View>
             </View>
           </View>
-          {/* Badges de la vista previa del evento (sin título repetido) */}
-          <BadgesEvento isLGBT={getEventFlags(eventData).isLGBT} isAfter={getEventFlags(eventData).isAfter} />
-          <HeroImagen imageUrl={(eventData as any).imageUrl} onPress={() => setImageModalVisible(true)} />
-          <Text style={styles.imageHint}>Tocar imagen para verla completa</Text>
 
-          {/* Detalles del evento */}
-          <Text style={styles.sectionTitle}>Detalles del evento</Text>
+          {/* Dirección */}
+          <Text style={styles.sectionTitle}>Dirección</Text>
           <View style={[styles.infoCard, styles.sectionContainer]}>
-            {/* Fechas de inicio/fin (con ícono calendario) */}
-            <View style={[styles.summaryRow, { alignItems: "flex-start" }]}>
-              <Icon name="event" size={18} color={COLORS.textSecondary || "#666"} style={{ marginRight: 6, marginTop: 2 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.summaryLabelInline}>
-                  <Text style={styles.summaryLabel}>Fecha inicio:</Text>
-                  <Text style={styles.summaryValue}>
-                    {" "}
-                    {formatDate(
-                      (eventData as any)?.fechas?.[0]?.inicio ||
-                        (eventData as any)?.__raw?.inicio ||
-                        (eventData as any)?.__raw?.inicioEvento ||
-                        null
-                    )}
-                  </Text>
-                </Text>
-                <Text style={styles.summaryLabelInline}>
-                  <Text style={styles.summaryLabel}>Fecha fin:</Text>
-                  <Text style={styles.summaryValue}>
-                    {" "}
-                    {formatDate(
-                      (eventData as any)?.fechas?.[0]?.fin ||
-                        (eventData as any)?.__raw?.fin ||
-                        (eventData as any)?.__raw?.finEvento ||
-                        null
-                    )}
-                  </Text>
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.summaryRow, { alignItems: "flex-start" }]}>
-              <Icon name="schedule" size={18} color={COLORS.textSecondary || "#666"} style={{ marginRight: 6, marginTop: 2 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.summaryLabelInline}>
-                  <Text style={styles.summaryLabel}>Inicio:</Text>
-                  <Text style={styles.summaryValue}> {formatHHmm((eventData as any)?.fechas?.[0]?.inicio || (eventData as any)?.__raw?.inicio || (eventData as any)?.__raw?.inicioEvento || "")}</Text>
-                </Text>
-                <Text style={styles.summaryLabelInline}>
-                  <Text style={styles.summaryLabel}>Fin:</Text>
-                  <Text style={styles.summaryValue}> {formatHHmm((eventData as any)?.fechas?.[0]?.fin || (eventData as any)?.__raw?.fin || (eventData as any)?.__raw?.finEvento || "")}</Text>
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.summaryRow, { alignItems: "flex-start" }]}>
-              <Icon name="place" size={18} color={COLORS.textSecondary || "#666"} style={{ marginRight: 6, marginTop: 2 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.summaryLabelInline}>
-                  <Text style={styles.summaryLabel}>Dirección:</Text> <Text style={styles.summaryValue}>{(eventData as any).address || ""}</Text>
-                </Text>
-              </View>
-              {(eventData as any).address ? (
-                <TouchableOpacity style={styles.linkBtn} onPress={() => openMapsForAddress((eventData as any).address)}>
-                  <Text style={styles.linkBtnText}>Cómo llegar</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
+            <Text style={styles.summaryValue}>{(eventData as any).address || ""}</Text>
+          </View>
+
+          {/* Artistas */}
+          <Text style={styles.sectionTitle}>Artistas</Text>
+          <View style={[styles.infoCard, styles.sectionContainer]}>
             <View style={[styles.summaryRow, { alignItems: "flex-start" }]}>
               <Icon name="mic" size={18} color={COLORS.textSecondary || "#666"} style={{ marginRight: 6, marginTop: 2 }} />
               <View style={{ flex: 1 }}>
                 {(() => {
                   const parsed = parseArtists((eventData as any).artistas || []);
-                  const active = parsed.filter((a) => a.active).map((a) => a.name).filter(Boolean);
-                  const inactive = parsed.filter((a) => !a.active);
                   return (
                     <>
-                      <Text style={styles.summaryLabel}>Artistas activos:</Text>
-                      {active.length ? (
-                        <View style={styles.chipsWrap}>
-                          {active.map((n) => (
-                            <View key={n} style={styles.chip}>
-                              <Icon name="check-circle" size={14} color={COLORS.primary} style={{ marginRight: 4 }} />
-                              <Text style={styles.chipText}>{n}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      ) : (
-                        <Text style={styles.summaryValue}>—</Text>
-                      )}
-                      {inactive.length > 0 ? (
-                        <>
-                          <Text style={[styles.summaryLabel, { marginTop: 6 }]}>Artistas inactivos:</Text>
-                          {inactive.map((a) => (
-                            <View key={`${a.id ?? a.name}`} style={styles.inactiveRow}>
-                              <Text style={styles.summaryValue}>{a.name || "(sin nombre)"}</Text>
-                              {a.id ? (
+                      {parsed.length ? (
+                        parsed.map((a) => (
+                          <View key={`${a.id ?? a.name}`} style={styles.inactiveRow}>
+                            <Text style={styles.summaryValue}>{a.name || "(sin nombre)"}</Text>
+                            {a.active ? (
+                              <View style={styles.statusPill}><Text style={styles.statusPillText}>Activo</Text></View>
+                            ) : (
+                              a.id ? (
                                 <TouchableOpacity style={styles.activateBtn} onPress={() => openEditArtistPopup({ id: a.id!, name: a.name })}>
                                   <Text style={styles.activateBtnText}>Activar</Text>
                                 </TouchableOpacity>
-                              ) : null}
-                            </View>
-                          ))}
-                        </>
-                      ) : null}
+                              ) : null
+                            )}
+                          </View>
+                        ))
+                      ) : (
+                        <Text style={styles.summaryValue}>—</Text>
+                      )}
                     </>
                   );
                 })()}
@@ -705,8 +727,8 @@ export default function ValidateEventScreen() {
             </View>
           </View>
 
-          {/* Entradas del evento (por fecha) */}
-          <Text style={styles.sectionTitle}>Entradas</Text>
+          {/* Tipos de Entradas */}
+          <Text style={styles.sectionTitle}>Tipos de Entradas</Text>
           <View style={[styles.infoCard, styles.sectionContainer]}>
             {entradasLoading ? (
               <View style={{ paddingVertical: 8 }}>
@@ -721,20 +743,27 @@ export default function ValidateEventScreen() {
               }
               return (
                 <View>
-                  {fechas.map((f: any) => {
+                  {fechas.map((f: any, ix: number) => {
                     const idF = String(f?.idFecha || "");
                     const list = entradasByFecha[idF] || [];
                     const fechaLabel = formatDate(f?.inicio || f?.FechaInicio || f?.dtInicio || "");
                     return (
                       <View key={idF} style={{ marginBottom: 8 }}>
-                        <Text style={styles.ticketsDate}>Fecha: {fechaLabel || "—"}</Text>
+                        <Text style={styles.ticketsDate}>{(fechaLabel || "—") + ` - día ${ix + 1}`}</Text>
                         {list.length === 0 ? (
                           <Text style={styles.summaryValue}>—</Text>
                         ) : (
                           list.map((e, idx) => (
-                            <Text key={`${idF}-${idx}`} style={styles.ticketLine}>
-                              {getTipoNombreEntrada(e)}: Precio: {formatCurrency(e?.precio)} - Cantidad: {Number(e?.cantidad ?? 0)}
-                            </Text>
+                            <View key={`${idF}-${idx}`} style={styles.ticketItem}>
+                              <View>
+                                <Text style={styles.ticketName}>{getTipoNombreEntrada(e)}</Text>
+                                <Text style={styles.ticketPrice}>{formatCurrency(e?.precio)}</Text>
+                              </View>
+                              <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={styles.ticketDate}>Entradas</Text>
+                                <Text style={styles.ticketCount}>{Number(e?.cantidad ?? 0)} entradas</Text>
+                              </View>
+                            </View>
                           ))
                         )}
                       </View>
@@ -745,7 +774,7 @@ export default function ValidateEventScreen() {
             })()}
           </View>
 
-          <Text style={styles.sectionTitle}>Descripción</Text>
+          <Text style={styles.sectionTitle}>Descripción del Evento</Text>
           <View style={[styles.infoCard, styles.sectionContainer]}>
             <Text style={styles.descriptionText}>{(eventData as any).description || ""}</Text>
           </View>
@@ -768,15 +797,15 @@ export default function ValidateEventScreen() {
             );
           })()}
 
-          <Text style={[styles.rejectTitle, { marginTop: 12 }]}>Motivo de rechazo</Text>
+          <Text style={[styles.rejectTitle, { marginTop: 12 }]}>Motivo de Rechazo</Text>
           <Text style={styles.rejectSubtitle}>Es obligatorio escribir un motivo si vas a rechazar el evento. Este motivo se enviará al equipo y al creador del evento vía mail y quedará registrado.</Text>
           <InputDesc
-            label="Motivo de rechazo"
+            label=""
             value={rejectReason}
             isEditing={true}
             onBeginEdit={() => {}}
             onChangeText={setRejectReason}
-            placeholder="Escribí el motivo..."
+            placeholder="Escribir motivo de rechazo..."
             autoFocus={false}
             containerStyle={{ width: "100%", alignItems: "stretch" }}
             labelStyle={{ width: "100%", textAlign: "left" }}
@@ -1085,6 +1114,39 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#cfd3da",
     marginBottom: 8,
+    fontFamily: FONTS.titleBold,
+  },
+  eventTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.textPrimary || "#111",
+    marginBottom: 8,
+    fontFamily: FONTS.titleBold,
+  },
+  ownerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  ownerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 8,
+    backgroundColor: '#ddd',
+  },
+  ownerAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#e5e7eb',
+  },
+  ownerName: {
+    fontWeight: '700',
+    color: COLORS.textPrimary || '#222',
   },
   summaryContainer: {
     marginBottom: 10,
@@ -1098,18 +1160,22 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: COLORS.textPrimary || "#222",
     marginRight: 6,
+    fontFamily: FONTS.subTitleMedium,
   },
   summaryValue: {
     color: COLORS.textSecondary || "#444",
     flexShrink: 1,
+    fontFamily: FONTS.bodyRegular,
   },
   summaryLabelInline: {
     color: COLORS.textSecondary || "#444",
+    fontFamily: FONTS.bodyRegular,
   },
   summaryEmail: {
     color: COLORS.textSecondary || "#555",
     fontSize: 12,
     marginTop: 2,
+    fontFamily: FONTS.bodyRegular,
   },
   sectionContainer: {
     marginTop: 8,
@@ -1134,17 +1200,46 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: 12,
     fontWeight: "600",
+    fontFamily: FONTS.subTitleMedium,
   },
   ticketsDate: {
     fontWeight: "700",
     color: COLORS.textPrimary || "#222",
-    marginBottom: 4,
+    marginBottom: 6,
+    fontFamily: FONTS.subTitleMedium,
   },
   ticketLine: {
     color: COLORS.textSecondary || "#555",
     fontSize: 13,
     marginLeft: 6,
     marginBottom: 2,
+  },
+  ticketItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+  },
+  ticketName: {
+    color: COLORS.textPrimary || '#222',
+    fontWeight: '700',
+  },
+  ticketPrice: {
+    color: COLORS.textSecondary || '#666',
+    fontSize: 12,
+  },
+  ticketDate: {
+    color: COLORS.textSecondary || '#666',
+    fontSize: 12,
+  },
+  ticketCount: {
+    color: COLORS.textSecondary || '#444',
+    fontSize: 12,
   },
   // Polished cards and sections
   infoCard: {
@@ -1165,6 +1260,25 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary || "#222",
     marginTop: 12,
     marginBottom: 6,
+    fontFamily: FONTS.titleBold,
+  },
+  rowTwoCols: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  colBox: { flex: 1 },
+  smallLabel: {
+    color: COLORS.textSecondary || '#555',
+    fontSize: 13,
+    marginBottom: 2,
+    fontFamily: FONTS.bodyRegular,
+  },
+  strongValue: {
+    color: COLORS.textPrimary || '#222',
+    fontWeight: '700',
+    fontSize: 14,
+    fontFamily: FONTS.subTitleMedium,
   },
   chipsWrap: {
     flexDirection: "row",
@@ -1183,15 +1297,38 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
+  chipGenre: {
+    backgroundColor: '#eef2ff',
+    borderColor: '#e5e7eb',
+  },
+  chipLGBT: {
+    backgroundColor: COLORS.tagLGBT,
+    borderColor: COLORS.tagLGBT,
+  },
+  chipAfter: {
+    backgroundColor: COLORS.tagAfter,
+    borderColor: COLORS.tagAfter,
+  },
   chipText: {
     color: COLORS.textPrimary || "#222",
     fontSize: 12,
     fontWeight: "600",
+    fontFamily: FONTS.subTitleMedium,
+  },
+  chipTextGenre: {
+    color: COLORS.textPrimary || '#222',
+  },
+  chipTextDark: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: FONTS.subTitleMedium,
   },
   descriptionText: {
     color: COLORS.textSecondary || "#444",
     fontSize: 14,
     lineHeight: 20,
+    fontFamily: FONTS.bodyRegular,
   },
   // Fullscreen image modal
   imageModalOverlay: {
@@ -1234,5 +1371,19 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "700",
     fontSize: 12,
+  },
+  statusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#d1d5db',
+    backgroundColor: '#f3f4f6',
+  },
+  statusPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textPrimary || '#333',
+    fontFamily: FONTS.subTitleMedium,
   },
 });

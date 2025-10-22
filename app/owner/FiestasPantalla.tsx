@@ -23,6 +23,7 @@ import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import {
   getPartiesByUser,
@@ -37,6 +38,15 @@ type PartyItem = {
   idFiesta: string;
   nombre: string;
   isActivo: boolean;
+  // Optional fields if backend provides ratings summary
+  avgRating?: number;
+  ratingAvg?: number;
+  promedio?: number;
+  rating?: number;
+  reviewsCount?: number;
+  cantResenas?: number;
+  cantidad?: number;
+  count?: number;
 };
 
 export default function PartysScreen() {
@@ -168,6 +178,27 @@ export default function PartysScreen() {
 
   const hasList = useMemo(() => list && list.length > 0, [list]);
 
+  // Helpers for rating UI
+  const getPartyRating = (p: PartyItem): { avg: number; count: number } => {
+    const avgRaw = (p.avgRating ?? p.ratingAvg ?? p.promedio ?? p.rating ?? 0) as number;
+    const countRaw = (p.reviewsCount ?? p.cantResenas ?? p.cantidad ?? p.count ?? 0) as number;
+    const avg = Math.max(0, Math.min(5, Number(avgRaw) || 0));
+    const count = Math.max(0, Number(countRaw) || 0);
+    return { avg, count };
+  };
+  const renderStars = (avg: number) => {
+    const stars = [] as JSX.Element[];
+    for (let i = 1; i <= 5; i++) {
+      let name: any = "star-outline";
+      if (avg >= i) name = "star";
+      else if (avg >= i - 0.5) name = "star-half-full";
+      stars.push(
+        <MaterialCommunityIcons key={i} name={name} size={16} color={COLORS.textSecondary} />
+      );
+    }
+    return <View style={styles.starsRow}>{stars}</View>;
+  };
+
   // ====== Render ======
   if (loading) {
     return (
@@ -238,7 +269,7 @@ export default function PartysScreen() {
         <View style={styles.hr} />
 
         {/* Agregar nueva */}
-        <Text style={styles.subTitle}>Agregar fiesta recurrente:</Text>
+  <Text style={styles.subTitle}>Agregar nueva fiesta recurrente</Text>
         <View style={styles.addRow}>
           <View style={{ flex: 1 }}>
             <InputText
@@ -266,9 +297,7 @@ export default function PartysScreen() {
         </View>
 
         {/* Listado */}
-        <Text style={[styles.subTitle, { marginTop: 18 }]}>
-          Listado de mis fiestas recurrentes:
-        </Text>
+        <Text style={[styles.subTitle, { marginTop: 18 }]}>Mis fiestas recurrentes</Text>
 
         {!hasList ? (
           <Text style={styles.emptyText}>
@@ -278,57 +307,42 @@ export default function PartysScreen() {
           </Text>
         ) : (
           <View style={styles.tableCard}>
-            {/* Header de tabla */}
-            <View style={[styles.row, styles.tableHeader]}>
-              <Text style={[styles.th, { flex: 1.2 }]}>FIESTA</Text>
-              <Text style={[styles.th, { flex: 1 }]}>VER CALIFICACIONES</Text>
-              <Text style={[styles.th, { width: 90, textAlign: "right" }]}>
-                EDITAR
-              </Text>
-              <Text style={[styles.th, { width: 100, textAlign: "right" }]}>
-                ELIMINAR
-              </Text>
-            </View>
-
             {list.map((it) => {
               const nombre = (it.nombre || "").trim();
               return (
-                <View key={it.idFiesta} style={[styles.row, styles.tableRow]}>
-                  {/* Nombre */}
-                  <View style={{ flex: 1.2, paddingRight: 8 }}>
-                    <Text style={styles.tdText}>
+                <View key={it.idFiesta} style={[styles.cardRow]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.partyName} numberOfLines={1}>
                       {nombre.length ? nombre : "(sin nombre)"}
                     </Text>
-                  </View>
-
-                  {/* Ver calificaciones */}
-                  <View style={{ flex: 1 }}>
+                    {/* Rating row with stars and underlined link */}
                     <TouchableOpacity
                       onPress={() =>
                         nav.push(router, { pathname: ROUTES.OWNER.PARTY_RATINGS, params: { id: encodeURIComponent(it.idFiesta) } } as any)
                       }
+                      activeOpacity={0.8}
                     >
-                      <Text style={styles.link}>Ver calificaciones</Text>
+                      {(() => {
+                        const { avg, count } = getPartyRating(it);
+                        const text = count > 0
+                          ? `${avg.toFixed(1)} (${new Intl.NumberFormat('es-AR').format(count)} reseñas)`
+                          : 'Sin calificaciones aún';
+                        return (
+                          <View style={styles.ratingRow}>
+                            {renderStars(avg)}
+                            <Text style={styles.ratingTextLink}>{text}</Text>
+                          </View>
+                        );
+                      })()}
                     </TouchableOpacity>
                   </View>
-
-                  {/* Editar */}
-                  <View style={{ width: 90, alignItems: "flex-end" }}>
-                    <TouchableOpacity
-                      style={[styles.smallBtn, styles.smallBtnPink]}
-                      onPress={() => beginEdit(it)}
-                    >
-                      <Text style={styles.smallBtnText}>Editar</Text>
+                  {/* Actions */}
+                  <View style={styles.actionsCol}>
+                    <TouchableOpacity style={styles.iconAction} onPress={() => beginEdit(it)}>
+                      <MaterialCommunityIcons name="square-edit-outline" size={20} color={COLORS.textSecondary} />
                     </TouchableOpacity>
-                  </View>
-
-                  {/* Eliminar */}
-                  <View style={{ width: 100, alignItems: "flex-end" }}>
-                    <TouchableOpacity
-                      style={[styles.smallBtn, styles.smallBtnGray]}
-                      onPress={() => handleDelete(it.idFiesta, nombre)}
-                    >
-                      <Text style={styles.smallBtnText}>Eliminar</Text>
+                    <TouchableOpacity style={styles.iconAction} onPress={() => handleDelete(it.idFiesta, nombre)}>
+                      <MaterialCommunityIcons name="trash-can-outline" size={20} color={COLORS.textSecondary} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -430,6 +444,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 8,
   },
+  partyName: {
+    color: COLORS.textPrimary,
+    fontWeight: "700",
+    fontSize: 16,
+  },
   paragraphs: { marginTop: 8, gap: 12 },
   p: {
     color: COLORS.textPrimary,
@@ -491,6 +510,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
   },
+  cardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderInput,
+  },
 
   tableHeader: {
     backgroundColor: COLORS.backgroundLight,
@@ -509,10 +537,11 @@ const styles = StyleSheet.create({
   },
   tdText: { color: COLORS.textPrimary },
 
-  link: {
-    color: COLORS.info,
-    textDecorationLine: "underline",
-  },
+  ratingRow: { flexDirection: "row", alignItems: "center", marginTop: 6, gap: 8 },
+  starsRow: { flexDirection: "row", gap: 2 },
+  ratingTextLink: { color: COLORS.textSecondary, textDecorationLine: "underline" },
+  actionsCol: { flexDirection: "row", alignItems: "center", gap: 10 },
+  iconAction: { padding: 8, borderRadius: 8 },
 
   smallBtn: {
     paddingHorizontal: 10,

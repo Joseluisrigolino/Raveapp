@@ -14,6 +14,7 @@ import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
 import { getTicketMenuById } from "@/utils/tickets/ticketMenuHelpers";
 
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { getSafeImageSource } from "@/utils/image";
 
 /** Reseñas de ejemplo */
 const mockReviews: ReviewItem[] = [
@@ -76,7 +77,7 @@ function TicketFinalizedScreenContent() {
       <Header />
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Image source={{ uri: ticketData.imageUrl }} style={styles.eventImage} />
+  <Image source={getSafeImageSource(ticketData.imageUrl)} style={styles.eventImage} />
         <Text style={styles.eventTitle}>Entrada a: {ticketData.eventName}</Text>
 
         <Text style={styles.finalizedLabel}>Evento finalizado</Text>

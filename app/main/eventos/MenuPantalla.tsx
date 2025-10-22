@@ -337,7 +337,7 @@ export default function MenuPantalla() {
   if (loading) {
     return (
       <SafeAreaView style={styles.mainContainer}>
-        <Header />
+  <Header title="EventApp" />
         <View style={{ flex: 1, justifyContent: "center" }}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
@@ -349,7 +349,7 @@ export default function MenuPantalla() {
   if (error) {
     return (
       <SafeAreaView style={styles.mainContainer}>
-        <Header />
+  <Header title="EventApp" />
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
           <Text style={{ color: COLORS.negative }}>{error}</Text>
         </View>
@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
   containerCards: {
     marginTop: 10,
     paddingHorizontal: 12,
-    rowGap: 16,
+    rowGap: 8,
   },
   noEventsText: {
     marginTop: 20,

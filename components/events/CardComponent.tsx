@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { getSafeImageSource } from "@/utils/image";
 
 interface CardProps {
   title: string;
@@ -40,42 +41,34 @@ export default function CardComponent({
   };
 
   return (
-    <TouchableOpacity
-      style={styles.cardContainer}
-      onPress={onPress}
-      activeOpacity={0.9}
-    >
+    <TouchableOpacity style={styles.cardContainer} onPress={onPress} activeOpacity={0.9}>
       <View style={styles.imageWrapper}>
-        <Image source={{ uri: foto }} style={styles.image} />
+        <Image source={getSafeImageSource(foto)} style={styles.image} />
 
-        {/* Fecha */}
-        <View style={styles.dateBadge}>
-          <Text style={styles.dateBadgeText}>{date}</Text>
-        </View>
-
-        {/* Corazón sin fondo: outline rojo si no está marcado, sólido rojo si marcado */}
+        {/* Corazón dentro de chip circular blanco */}
         <TouchableOpacity
           onPress={handleHeartPress}
           disabled={disableFavorite || !onToggleFavorite}
-          style={styles.heartBtn}
+          style={styles.heartChip}
           hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
           <MaterialCommunityIcons
             name={isFavorite ? "heart" : "heart-outline"}
-            size={28}
-            color={COLORS.negative} // siempre rojo; cambia el ícono (relleno vs contorno)
+            size={20}
+            color={COLORS.negative}
           />
         </TouchableOpacity>
       </View>
 
       <View style={styles.infoContainer}>
-        <Text style={styles.eventTitle} numberOfLines={2}>
-          {title}
-        </Text>
-        <Text style={styles.eventSubtitle} numberOfLines={2}>
-          {text}
-        </Text>
+        <Text style={styles.eventTitle} numberOfLines={2}>{title}</Text>
+        <Text style={styles.eventSubtitle} numberOfLines={2}>{text}</Text>
+
+        <View style={styles.dateRow}>
+          <MaterialCommunityIcons name="calendar-blank-outline" size={16} color={COLORS.textSecondary} />
+          <Text style={styles.dateText}>{date}</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -83,60 +76,67 @@ export default function CardComponent({
 
 const styles = StyleSheet.create({
   cardContainer: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.backgroundLight,
+    borderRadius: 14,
     marginVertical: 10,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.06,
     shadowRadius: 3,
-    elevation: 3,
+    elevation: 1,
     overflow: "hidden",
   },
   imageWrapper: {
     position: "relative",
     width: "100%",
-    height: 200,
-    backgroundColor: COLORS.backgroundLight,
+    height: 170,
+    backgroundColor: COLORS.cardBg,
   },
   image: {
     width: "100%",
     height: "100%",
     resizeMode: "cover",
   },
-  dateBadge: {
+  heartChip: {
     position: "absolute",
-    bottom: 8,
-    left: 8,
-    backgroundColor: "#000",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  dateBadgeText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 14,
-  },
-  heartBtn: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    // sin fondo ni borde: el “borde” lo da el ícono outline rojo
-    // se deja sólo el ícono para el look “limpio”
+    top: 10,
+    right: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.backgroundLight,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
   },
   infoContainer: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   eventTitle: {
     color: COLORS.textPrimary,
-    fontFamily: FONTS.titleBold,
-    fontSize: FONT_SIZES.subTitle,
-    marginBottom: 4,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: 16,
+    marginBottom: 6,
   },
   eventSubtitle: {
     color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.body,
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  dateText: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
   },
 });

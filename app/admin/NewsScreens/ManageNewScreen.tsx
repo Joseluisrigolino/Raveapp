@@ -1,23 +1,25 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, FlatList, Image, TextInput, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from "react-native";
+import { View, Text, FlatList, Image, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { IconButton } from "react-native-paper";
 import { useRouter, usePathname } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { ROUTES } from "../../../routes";
 import * as nav from "@/utils/navigation";
 import { on as onEvent, off as offEvent } from "@/utils/eventBus";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
+import SearchBarComponent from "@/components/common/SearchBarComponent";
 
 import { getNews, deleteNews } from "@/utils/news/newsApi";
 import { mediaApi } from "@/utils/mediaApi";
 import { NewsItem } from "@/interfaces/NewsProps";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { getSafeImageSource } from "@/utils/image";
 
 const PLACEHOLDER_IMAGE = "https://via.placeholder.com/400x200?text=Sin+imagen";
 
@@ -132,28 +134,28 @@ export default function ManageNewsScreen() {
   const renderItem = ({ item }: { item: NewsItem }) => (
     <View style={styles.card}>
       <Image
-        source={{ uri: item.imagen || PLACEHOLDER_IMAGE }}
+        source={getSafeImageSource(item.imagen || PLACEHOLDER_IMAGE)}
         style={styles.image}
         resizeMode="cover"
       />
       <View style={styles.cardContent}>
-        <Text style={styles.title}>{item.titulo}</Text>
-        <Text style={styles.label}>
-          <Text style={styles.bold}>Fecha publicación: </Text>
-          {new Date(item.dtPublicado).toLocaleDateString()}
-        </Text>
+        <View style={styles.dateRow}>
+          <MaterialCommunityIcons name="calendar-blank-outline" size={16} color={COLORS.textSecondary} />
+          <Text style={styles.dateText}>{new Date(item.dtPublicado).toLocaleDateString()}</Text>
+        </View>
+        <Text style={styles.title} numberOfLines={2}>{item.titulo}</Text>
         <View style={styles.buttonsRow}>
           <TouchableOpacity
-            style={[styles.fullButton, { backgroundColor: COLORS.primary }]}
+            style={[styles.actionBtn, styles.modifyBtn]}
             onPress={() => handleEdit(item.idNoticia)}
           >
-            <Text style={styles.fullButtonText}>Modificar</Text>
+            <Text style={styles.modifyBtnText}>Modificar</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.fullButton, { backgroundColor: COLORS.negative }]}
+            style={[styles.actionBtn, styles.deleteBtn]}
             onPress={() => handleDelete(item.idNoticia)}
           >
-            <Text style={styles.fullButtonText}>Eliminar</Text>
+            <Text style={styles.deleteBtnText}>Eliminar</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -163,23 +165,22 @@ export default function ManageNewsScreen() {
   return (
     <ProtectedRoute allowedRoles={["admin"]}>
       <SafeAreaView style={styles.container}>
-        <Header />
+        <Header title="EventApp" />
         <TabMenuComponent tabs={tabs} />
         <View style={styles.content}>
           <TouchableOpacity
             style={styles.createButton}
             onPress={() => nav.push(router, { pathname: ROUTES.ADMIN.NEWS.CREATE })}
+            activeOpacity={0.85}
           >
-            <Text style={styles.createButtonText}>+ Crear noticia</Text>
+            <MaterialCommunityIcons name="plus" size={20} color={COLORS.backgroundLight} />
+            <Text style={styles.createButtonText}>Crear noticia</Text>
           </TouchableOpacity>
 
-          <Text style={styles.screenTitle}>Gestionar Noticias</Text>
-
-          <TextInput
-            placeholder="Buscar por título"
-            style={styles.search}
+          <SearchBarComponent
             value={searchText}
             onChangeText={setSearchText}
+            placeholder="Buscar noticias..."
           />
 
           {loading ? (
@@ -205,46 +206,33 @@ export default function ManageNewsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.backgroundLight },
-  content: { flex: 1, padding: 16 },
+  content: { flex: 1, paddingHorizontal: 12, paddingTop: 12 },
   createButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.card,
-    paddingVertical: 10,
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#0F172A",
+    borderRadius: 14,
+    height: 44,
+    marginBottom: 12,
   },
   createButtonText: {
-    color: COLORS.cardBg,
+    color: COLORS.backgroundLight,
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.button,
   },
-  screenTitle: {
-    fontFamily: FONTS.titleBold,
-    fontSize: FONT_SIZES.titleMain,
-    color: COLORS.textPrimary,
-    marginBottom: 12,
-  },
-  search: {
-    backgroundColor: COLORS.cardBg,
-    borderColor: COLORS.borderInput,
-    borderWidth: 1,
-    borderRadius: RADIUS.card,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
-  },
   card: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.card,
-    marginBottom: 16,
+    backgroundColor: COLORS.backgroundLight,
+    borderRadius: 14,
+    marginVertical: 10,
     overflow: "hidden",
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
   },
   image: {
     width: "100%",
-    height: 160,
+    height: 180,
     backgroundColor: COLORS.borderInput,
   },
   cardContent: {
@@ -252,28 +240,24 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.subTitle,
+    fontSize: 16,
     color: COLORS.textPrimary,
+    marginTop: 6,
     marginBottom: 6,
   },
-  label: {
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textSecondary,
-    marginBottom: 2,
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
-  bold: {
-    fontFamily: FONTS.subTitleMedium,
-    color: COLORS.textPrimary,
+  dateText: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
   },
   actionsRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
     marginTop: 10,
-  },
-  actionIcon: {
-    marginLeft: 8,
-    borderRadius: RADIUS.card,
   },
   buttonsRow: {
     flexDirection: "row",
@@ -281,15 +265,26 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 8,
   },
-  fullButton: {
+  actionBtn: {
     flex: 1,
-    borderRadius: 10,
-    paddingVertical: 6,
+    height: 40,
+    borderRadius: 12,
     alignItems: "center",
-    
+    justifyContent: "center",
   },
-  fullButtonText: {
-    color: COLORS.cardBg,
+  modifyBtn: {
+    backgroundColor: "#F1F5F9",
+  },
+  modifyBtnText: {
+    color: COLORS.textPrimary,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
+  },
+  deleteBtn: {
+    backgroundColor: "#374151",
+  },
+  deleteBtnText: {
+    color: COLORS.backgroundLight,
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.button,
   },

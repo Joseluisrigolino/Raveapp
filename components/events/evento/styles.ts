@@ -284,11 +284,11 @@ export const styles = StyleSheet.create({
     lineHeight: 12,
   },
   afterTag: {
-    backgroundColor: "#FFF4EE",
-    borderColor: "#FFE6D5",
+    backgroundColor: COLORS.backgroundLight,
+    borderColor: "#e6e9ef",
   },
   afterTagText: {
-    color: COLORS.primary,
+    color: COLORS.textPrimary,
     fontWeight: "700",
   },
 
@@ -378,6 +378,16 @@ export const styles = StyleSheet.create({
     borderRadius: RADIUS.card,
     paddingVertical: 10,
     paddingHorizontal: 20,
+  },
+  buyButtonFull: {
+    backgroundColor: "#0f172a",
+    borderRadius: RADIUS.card,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginTop: 8,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
   },
   buyButtonDisabled: {
     opacity: 0.5,

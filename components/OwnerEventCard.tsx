@@ -1,6 +1,7 @@
 // components/OwnerEventCard.tsx
 import React from "react";
 import { View, Text, Image, StyleSheet, TouchableOpacity } from "react-native";
+import { getSafeImageSource } from "@/utils/image";
 import { OwnerEventItem } from "@/interfaces/OwnerEventItem";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
@@ -129,7 +130,7 @@ export default function OwnerEventCard({
         </Text>
 
         {hasImage ? (
-          <Image source={{ uri: item.imageUrl }} style={imageStyle} />
+          <Image source={getSafeImageSource(item.imageUrl)} style={imageStyle} />
         ) : (
           <View
             style={[

@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text } from "react-native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { styles } from "./styles";
+import { COLORS } from "@/styles/globalStyles";
 
 type Props = {
   isLGBT?: boolean;
@@ -22,7 +23,7 @@ export default function BadgesEvento({ isLGBT, isAfter }: Props) {
       ) : null}
       {isAfter ? (
         <View style={[styles.tagItemImproved, styles.afterTag]}>
-          <MaterialCommunityIcons name="party-popper" size={16} color="#FF6D3A" style={{ marginRight: 6 }} />
+          <MaterialCommunityIcons name="party-popper" size={16} color={COLORS.info} style={{ marginRight: 6 }} />
           <Text style={[styles.tagTextImproved, styles.afterTagText]}>AFTER</Text>
         </View>
       ) : null}

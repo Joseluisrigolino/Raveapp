@@ -188,52 +188,33 @@ export default function UserProfileEditScreen() {
         const birthDateStr = u.dtNacimiento?.split?.("T")?.[0] ?? "";
         if (birthDateStr && /^\d{4}-\d{2}-\d{2}$/.test(birthDateStr)) {
           const [year, month, day] = birthDateStr.split('-');
-          setDateSelectors({
-            day: day,
-            month: month,
-            year: year,
-          });
+          setDateSelectors({ day, month, year });
         }
 
-        // 2) Foto + idMedia
-        const mediaData: any = await mediaApi.getByEntidad(u.idUsuario);
-        const m = mediaData.media?.[0];
-        let img = m?.url ?? m?.imagen ?? "";
-        if (img && m?.imagen && !/^https?:\/\//.test(img)) {
-          img = `${apiClient.defaults.baseURL}${
-            img.startsWith("/") ? "" : "/"
-          }${img}`;
-        }
-        setProfileImage(img || randomProfileImage);
-        setProfileMediaId(m?.idMedia ?? null);
+        // Set IDs if available from API
+        setProvinceId(u.domicilio?.provincia?.codigo || "");
+        setMunicipalityId(u.domicilio?.municipio?.codigo || "");
+        setLocalityId(u.domicilio?.localidad?.codigo || "");
 
-        // 3) Georef
-        const provs = await fetchProvinces();
-        setProvinces(provs);
-        const foundProv = provs.find(
-          (p) => p.nombre === u.domicilio?.provincia?.nombre
-        );
-        if (foundProv) {
-          setProvinceId(foundProv.id);
-          const muns = await fetchMunicipalities(foundProv.id);
-          setMunicipalities(muns);
-          const foundMun = muns.find(
-            (m) => m.nombre === u.domicilio?.municipio?.nombre
-          );
-          if (foundMun) {
-            setMunicipalityId(foundMun.id);
-            const locs = await fetchLocalities(foundProv.id, foundMun.id);
-            setLocalities(locs);
-            const foundLoc = locs.find(
-              (l) => l.nombre === u.domicilio?.localidad?.nombre
-            );
-            if (foundLoc) setLocalityId(foundLoc.id);
+        // Cargar provincias para selects
+        try {
+          const provs = await fetchProvinces();
+          setProvinces(provs);
+        } catch {}
+
+        // Intentar cargar media de perfil si existe
+        try {
+          const media = await mediaApi.getByEntidad(u.idUsuario);
+          const m = media?.media?.[0];
+          let finalUrl = m?.url ?? m?.imagen ?? "";
+          if (finalUrl && m?.imagen && !/^https?:\/\//.test(finalUrl)) {
+            finalUrl = `${apiClient.defaults.baseURL}${finalUrl.startsWith("/") ? "" : "/"}${finalUrl}`;
           }
+          setProfileImage(finalUrl || randomProfileImage);
+          setProfileMediaId(m?.idMedia ?? null);
+        } catch {
+          setProfileImage(randomProfileImage);
         }
-      } catch (err) {
-        console.warn("[UserProfileEdit] error:", err);
-        setProfileImage(randomProfileImage);
-        Alert.alert("Error", "No se pudo cargar tu perfil.");
       } finally {
         setLoading(false);
       }
@@ -686,9 +667,21 @@ export default function UserProfileEditScreen() {
           </View>
         )}
 
+        {/* Nombre completo debajo del avatar */}
+        <Text style={styles.profileName}>
+          {`${userData.firstName || ''} ${userData.lastName || ''}`.trim() || ' '}
+        </Text>
+
         <Text style={styles.smallNote}>
           Formatos permitidos: JPG, JPEG o PNG. Máx. 2MB.
         </Text>
+
+        {/* Card: Tus datos */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionTitleRow}>
+            <MaterialIcons name="person" size={18} color={COLORS.textPrimary} />
+            <Text style={styles.sectionCardTitle}>Tus datos</Text>
+          </View>
 
         {/* Mi perfil */}
         <InputText
@@ -853,15 +846,19 @@ export default function UserProfileEditScreen() {
           </View>
         )}
 
-        {/* Cambiar contraseña */}
-        <TouchableOpacity style={styles.resetContainer} onPress={openPwdModal}>
-          <MaterialIcons name="lock-reset" size={20} color={COLORS.cardBg} />
-          <Text style={styles.resetText}>Cambiar contraseña</Text>
-        </TouchableOpacity>
+          {/* Cambiar contraseña (gris dentro de la card) */}
+          <TouchableOpacity style={styles.resetContainerCard} onPress={openPwdModal}>
+            <MaterialIcons name="lock-reset" size={20} color={COLORS.textPrimary} />
+            <Text style={styles.resetTextCard}>Cambiar contraseña</Text>
+          </TouchableOpacity>
+        </View>
 
-        {/* Domicilio */}
-        <View style={styles.divider} />
-        <Text style={styles.sectionTitle}>Tu domicilio</Text>
+        {/* Card: Tu domicilio */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionTitleRow}>
+            <MaterialIcons name="home" size={18} color={COLORS.textPrimary} />
+            <Text style={styles.sectionCardTitle}>Tu domicilio</Text>
+          </View>
 
         {/* Provincia */}
         <Text style={styles.addressSubtitle}>Provincia</Text>
@@ -908,8 +905,8 @@ export default function UserProfileEditScreen() {
                 color={COLORS.textSecondary}
               />
             </TouchableOpacity>
-          </View>
-        )}
+    </View>
+  )}
 
         {/* Municipio: ocultar por completo si la provincia seleccionada es CABA (02) */}
         {provinceId !== '02' && (
@@ -1047,27 +1044,36 @@ export default function UserProfileEditScreen() {
           </View>
         )}
 
-        {/* Acciones */}
-        <View style={styles.buttonContainer}>
+  </View>
+
+  {/* Acciones (vertical) */}
+        <View style={styles.actionsColumn}>
           <TouchableOpacity
-            style={[styles.button, styles.confirm]}
+            style={[styles.fullButton, styles.fullButtonPrimary]}
             onPress={handleConfirm}
           >
-            <Text style={styles.buttonText}>Confirmar cambios</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <MaterialIcons name="check" size={18} color={COLORS.cardBg} />
+              <Text style={styles.fullButtonPrimaryText}>Confirmar cambios</Text>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.button, styles.logout]}
+            style={[styles.fullButton, styles.fullButtonSecondary]}
             onPress={async () => {
               await logout();
               nav.replace(router, ROUTES.LOGIN.LOGIN);
             }}
           >
-            <Text style={styles.buttonText}>Cerrar sesión</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <MaterialIcons name="logout" size={18} color={COLORS.primary} />
+              <Text style={styles.fullButtonSecondaryText}>Cerrar sesión</Text>
+            </View>
           </TouchableOpacity>
         </View>
 
         {/* Eliminar cuenta (link) */}
-        <TouchableOpacity onPress={openDeleteModal}>
+        <TouchableOpacity onPress={openDeleteModal} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <MaterialIcons name="delete-outline" size={18} color={COLORS.textSecondary} />
           <Text style={styles.deleteLink}>Eliminar cuenta</Text>
         </TouchableOpacity>
         {/* Hacer administrador (assign role 1) */}
@@ -1291,6 +1297,13 @@ const styles = StyleSheet.create({
   photoActionText: { color: "#fff", fontFamily: FONTS.subTitleMedium },
 
   smallNote: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 16 },
+  profileName: {
+    fontSize: FONT_SIZES.subTitle,
+    fontFamily: FONTS.subTitleMedium,
+    color: COLORS.textPrimary,
+    marginTop: 8,
+    marginBottom: 4,
+  },
 
   rowNoLabel: {
     flexDirection: "row",
@@ -1335,27 +1348,35 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
 
-  resetContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: RADIUS.card,
-    marginVertical: 16,
-  },
-  resetText: {
-    color: COLORS.cardBg,
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.body,
-    marginLeft: 6,
-  },
+  // resetContainer/resetText defined later not needed here
 
   divider: {
     width: "90%",
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderInput,
     marginVertical: 16,
+  },
+  sectionCard: {
+    width: "90%",
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    padding: 12,
+    marginBottom: 16,
+  },
+  sectionCardTitle: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.subTitle,
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+    textAlign: 'left',
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
   },
   sectionTitle: {
     width: "90%",
@@ -1433,22 +1454,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dateSelector: {
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     borderRadius: 12,
-    borderColor: "#d1d5db",
+    borderColor: '#d1d5db',
     borderWidth: 1,
     minHeight: 48,
-    padding: 12,
+    paddingHorizontal: 12,
     justifyContent: 'center',
-    alignItems: 'center',
     // Shadow para iOS
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
     // Elevation para Android
     elevation: 1,
   },
+  resetContainerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eef2f7',
+    paddingVertical: 12,
+    borderRadius: RADIUS.card,
+    marginTop: 12,
+  },
+  resetTextCard: {
+    color: COLORS.textPrimary,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.body,
+    marginLeft: 6,
+  },
+  
   dateSelectorText: {
     color: "#374151",
     fontSize: 14,
@@ -1493,6 +1529,34 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.button,
     color: COLORS.cardBg,
     textAlign: "center",
+  },
+  actionsColumn: {
+    width: '90%',
+    marginTop: 8,
+  },
+  fullButton: {
+    width: '100%',
+    borderRadius: RADIUS.card,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  fullButtonPrimary: {
+    backgroundColor: COLORS.primary,
+  },
+  fullButtonSecondary: {
+    backgroundColor: '#E9E5FF',
+  },
+  fullButtonPrimaryText: {
+    color: COLORS.cardBg,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
+  },
+  fullButtonSecondaryText: {
+    color: COLORS.primary,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
   },
 
   deleteLink: {

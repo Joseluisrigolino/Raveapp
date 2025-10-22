@@ -1,16 +1,20 @@
 // src/screens/admin/EventsValidateScreens/EventsToValidateScreen.tsx
 
 import React, { useEffect, useState } from "react";
-import { View, Text, FlatList, Image, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
+import { View, Text, FlatList, Image, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
 import { ROUTES } from "../../../routes";
 import * as nav from "@/utils/navigation";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import ProtectedRoute from "@/utils/auth/ProtectedRoute";
+import SearchBarComponent from "@/components/common/SearchBarComponent";
+import { mediaApi } from "@/utils/mediaApi";
+import { getSafeImageSource } from "@/utils/image";
 
 import { fetchEvents, fetchGenres, ApiGenero } from "@/utils/events/eventApi";
 import { getProfile, getUsuarioById } from "@/utils/auth/userHelpers";
@@ -118,7 +122,37 @@ export default function EventsToValidateScreen() {
           })
         );
 
-        setEvents(enriched);
+        // Prefetch owner avatars and enrich events
+        try {
+          const uniqueOwnerIds = Array.from(
+            new Set(
+              enriched
+                .map((e: any) => e.ownerId)
+                .filter((id: any) => typeof id === "string" || typeof id === "number")
+                .map((id: any) => String(id))
+            )
+          );
+          const avatarMap = new Map<string, string>();
+          await Promise.all(
+            uniqueOwnerIds.map(async (id) => {
+              try {
+                const url = await mediaApi.getFirstImage(id);
+                if (typeof url === "string" && url.trim().length > 0) {
+                  avatarMap.set(id, url);
+                }
+              } catch {}
+            })
+          );
+
+          const enrichedWithAvatars = enriched.map((e: any) => {
+            const id = e.ownerId ? String(e.ownerId) : "";
+            const ownerAvatarUrl = id ? avatarMap.get(id) || "" : "";
+            return { ...e, ownerAvatarUrl } as EventItem & { ownerAvatarUrl?: string };
+          });
+          setEvents(enrichedWithAvatars);
+        } catch {
+          setEvents(enriched);
+        }
       } catch (e) {
         console.error("Error al cargar eventos:", e);
       } finally {
@@ -161,44 +195,52 @@ export default function EventsToValidateScreen() {
   const renderItem = ({ item }: { item: EventItem }) => (
     <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => handleVerify(item.id)}>
       <Image
-        source={{ uri: item.imageUrl || PLACEHOLDER_IMAGE }}
+        source={getSafeImageSource(item.imageUrl || PLACEHOLDER_IMAGE)}
         style={styles.image}
         resizeMode="cover"
       />
       <View style={styles.cardContent}>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.label}>
-          <Text style={styles.bold}>Fecha(s): </Text>
-          {item.date}
-        </Text>
-        <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
-          <Text style={styles.bold}>Género(s): </Text>
-          {getGenresText(item)}
-        </Text>
-        {}
+        <View style={styles.metaRow}>
+          <View style={styles.dateRow}>
+            <MaterialCommunityIcons name="calendar-blank-outline" size={16} color={COLORS.textSecondary} />
+            <Text style={styles.dateText}>{item.date}</Text>
+          </View>
+          <View style={styles.genreChip}>
+            <MaterialCommunityIcons name="music" size={14} color={COLORS.textSecondary} />
+            <Text style={styles.genreChipText} numberOfLines={1}>{getGenresText(item)}</Text>
+          </View>
+        </View>
+
+        <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+
         {(() => {
-          // Resolver nombre y email desde distintos shapes posibles del backend
           const raw: any = item as any;
           const ownerName = raw.ownerName ?? raw.owner?.name ?? raw.propietario?.nombre ?? raw.ownerDisplayName ?? "N/D";
           const ownerEmail = raw.ownerEmail ?? raw.owner?.email ?? raw.propietario?.correo ?? raw.email ?? null;
           return (
-            <>
-              <Text style={styles.label}>
-                <Text style={styles.bold}>Propietario: </Text>
-                {ownerName}
-              </Text>
-              {ownerEmail ? (
-                <Text style={styles.labelEmail}>{ownerEmail}</Text>
-              ) : null}
-            </>
+            <View style={styles.ownerRow}>
+              {(item as any).ownerAvatarUrl ? (
+                <Image
+                  source={getSafeImageSource((item as any).ownerAvatarUrl)}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <View style={styles.avatarCircle}>
+                  <MaterialCommunityIcons name="account-outline" size={18} color={COLORS.textPrimary} />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.ownerName} numberOfLines={1}>{ownerName}</Text>
+                {ownerEmail ? (
+                  <Text style={styles.ownerEmail} numberOfLines={1}>{ownerEmail}</Text>
+                ) : null}
+              </View>
+            </View>
           );
         })()}
 
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => handleVerify(item.id)}
-        >
-          <Text style={styles.buttonText}>VERIFICAR</Text>
+        <TouchableOpacity style={styles.verifyBtn} onPress={() => handleVerify(item.id)} activeOpacity={0.85}>
+          <Text style={styles.verifyBtnText}>Verificar</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -207,7 +249,7 @@ export default function EventsToValidateScreen() {
   return (
     <ProtectedRoute allowedRoles={["admin"]}>
       <SafeAreaView style={styles.container}>
-        <Header />
+        <Header title="EventApp" />
 
   <TabMenuComponent tabs={tabs} />
 
@@ -216,16 +258,14 @@ export default function EventsToValidateScreen() {
             style={styles.createButton}
             onPress={() => nav.push(router, { pathname: ROUTES.MAIN.EVENTS.CREATE })}
           >
-            <Text style={styles.createButtonText}>+ Crear evento</Text>
+            <MaterialCommunityIcons name="plus" size={20} color={COLORS.backgroundLight} />
+            <Text style={styles.createButtonText}>Crear evento</Text>
           </TouchableOpacity>
 
-          <Text style={styles.titleScreen}>Eventos a validar:</Text>
-
-          <TextInput
-            placeholder="Buscar por nombre del evento o propietario"
-            style={styles.search}
+          <SearchBarComponent
             value={searchText}
             onChangeText={setSearchText}
+            placeholder="Buscar eventos..."
           />
 
           {loading ? (
@@ -259,7 +299,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 12,
+    paddingTop: 12,
   },
   titleScreen: {
     fontFamily: FONTS.titleBold,
@@ -268,34 +309,28 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   createButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.card,
-    paddingVertical: 10,
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#0F172A", // dark pill like mock
+    borderRadius: 14,
+    height: 44,
+    marginHorizontal: 0,
+    marginBottom: 12,
   },
   createButtonText: {
-    color: COLORS.cardBg,
+    color: COLORS.backgroundLight,
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.button,
   },
-  search: {
-    backgroundColor: COLORS.cardBg,
-    borderColor: COLORS.borderInput,
-    borderWidth: 1,
-    borderRadius: RADIUS.card,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
-  },
   card: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.card,
-    marginBottom: 16,
+    backgroundColor: COLORS.backgroundLight,
+    borderRadius: 14,
+    marginVertical: 10,
     overflow: "hidden",
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
   },
   image: {
     width: "100%",
@@ -307,9 +342,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.subTitle,
+    fontSize: 16,
     color: COLORS.textPrimary,
     marginBottom: 6,
+    marginTop: 6,
   },
   label: {
     fontFamily: FONTS.bodyRegular,
@@ -328,16 +364,78 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.subTitleMedium,
     color: COLORS.textPrimary,
   },
-  button: {
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  dateText: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+  },
+  genreChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  genreChipText: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    maxWidth: 140,
+  },
+  ownerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  avatarCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.backgroundLight,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarImage: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.borderInput,
+  },
+  ownerName: {
+    color: COLORS.textPrimary,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: 14,
+  },
+  ownerEmail: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+  },
+  verifyBtn: {
     marginTop: 10,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.card,
-    paddingVertical: 10,
+    borderRadius: 12,
+    height: 40,
     alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 0,
   },
-  buttonText: {
-    color: COLORS.cardBg,
-    fontWeight: "bold",
+  verifyBtnText: {
+    color: COLORS.backgroundLight,
+    fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.body,
   },
 });

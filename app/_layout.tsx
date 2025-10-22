@@ -3,7 +3,6 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "@/context/AuthContext";
 import { Provider as PaperProvider } from 'react-native-paper';
 import { View, Text, StyleSheet } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import globalStyles, { COLORS } from "@/styles/globalStyles";
 
 const formatRouteName = (name?: string) => {
@@ -22,20 +21,14 @@ export default function RootLayout() {
         <Stack
         initialRouteName="login/login"
         screenOptions={({ route }) => ({
-          headerTintColor: "#fff",
+          headerTintColor: "#0f172a",
+          headerStyle: { backgroundColor: "#fff", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#e5e7eb" },
           headerTitle: () => (
             <View style={styles.titleWrapper}>
               <Text style={styles.titleText}>{formatRouteName(route?.name)}</Text>
             </View>
           ),
-          headerBackground: () => (
-            <LinearGradient
-              colors={[COLORS.primary, COLORS.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{ flex: 1 }}
-            />
-          ),
+          headerBackground: undefined,
         })}
       >
         {/* Rutas raíz dentro de la carpeta login */}
@@ -58,5 +51,5 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   titleWrapper: { paddingVertical: 6 },
-  titleText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  titleText: { color: "#0f172a", fontWeight: "700", fontSize: 16 },
 });

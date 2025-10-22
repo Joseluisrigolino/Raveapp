@@ -1,6 +1,5 @@
 // src/utils/auth/authHelpers.ts
 import { apiClient, login as apiLogin } from "../apiConfig";
-import { jwtDecode } from "jwt-decode";
 
 interface ApiRole { cdRol: number; dsRol: string }
 interface ApiUser {
@@ -92,66 +91,4 @@ interface GoogleIdTokenPayload {
  * - Busca al usuario por correo en la API; si no existe, lo crea.
  * - Devuelve el AuthUser mapeado (mismo contrato que loginUser)
  */
-export async function loginOrRegisterWithGoogleIdToken(idToken: string): Promise<AuthUser> {
-  if (!idToken) throw new Error("Falta id_token de Google");
-
-  const decoded = jwtDecode<GoogleIdTokenPayload>(idToken);
-  const email = (decoded.email || "").trim();
-  const given_name = decoded.given_name || "";
-  const family_name = decoded.family_name || "";
-  if (!email) throw new Error("El id_token de Google no contiene email");
-
-  const token = await apiLogin();
-  apiClient.defaults.headers.common.Authorization = `Bearer ${token}`;
-
-  // 1) Intentar obtener el usuario por correo
-  let usuario: ApiUser | null = null;
-  try {
-    const res = await apiClient.get<{ usuarios: ApiUser[] }>("/v1/Usuario/GetUsuario", { params: { Mail: email } });
-    if (Array.isArray(res.data?.usuarios) && res.data.usuarios.length > 0) {
-      usuario = res.data.usuarios[0];
-    }
-  } catch (err: any) {
-    // Si 404, lo creamos. Otros errores se re-lanzan
-    if (err?.response?.status !== 404) throw err;
-  }
-
-  // 2) Si no existe, crearlo y volver a buscar
-  if (!usuario) {
-    const payload = {
-      domicilio: {
-        localidad: { nombre: "", codigo: "" },
-        municipio: { nombre: "", codigo: "" },
-        provincia: { nombre: "", codigo: "" },
-        direccion: "",
-        latitud: 0,
-        longitud: 0,
-      },
-      nombre: given_name,
-      apellido: family_name,
-      correo: email,
-      cbu: "",
-      dni: "",
-      telefono: "",
-      nombreFantasia: "",
-      bio: "",
-      password: generateRandomPassword(),
-      socials: { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
-      // La API puede aceptar null o ISO string; si falla con null, probar con nueva fecha o quitar el campo
-      dtNacimiento: null as any,
-    };
-
-    try {
-      await apiClient.post("/v1/Usuario/CreateUsuario", payload, { headers: { "Content-Type": "application/json" } });
-      const buscarRes = await apiClient.get<{ usuarios: ApiUser[] }>("/v1/Usuario/GetUsuario", { params: { Mail: email } });
-      const encontrados = buscarRes.data?.usuarios || [];
-      if (!encontrados.length) throw new Error("Usuario creado pero no encontrado");
-      usuario = encontrados[0];
-    } catch (createErr) {
-      console.error("Error al crear usuario con Google:", createErr);
-      throw createErr;
-    }
-  }
-
-  return mapApiUserToAuthUser(usuario);
-}
+// Google Cloud login removed; Firebase handles Google sign-in when enabled.

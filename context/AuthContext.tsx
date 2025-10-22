@@ -1,6 +1,8 @@
 // src/context/AuthContext.tsx
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { loginUser, AuthUser, loginOrRegisterWithGoogleIdToken } from "@/utils/auth/authHelpers";
+import Constants from "expo-constants";
+import { loginUser, AuthUser as ApiAuthUser } from "@/utils/auth/authHelpers";
+import { fbLoginWithGoogleIdToken, fbLogout, AuthUser as FbAuthUser, fbLoginWithGooglePopup } from "@/utils/auth/firebaseAuthHelpers";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
@@ -17,29 +19,37 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * Esto permite no repetir checks como `user?.roles?.some(...)` en cada componente.
  */
 
+type AuthUser = ApiAuthUser | FbAuthUser;
+
 interface AuthContextValue {
   user: AuthUser | null;
   login: (u: string, p: string) => Promise<AuthUser | null>;
   loginWithGoogle: (idToken: string) => Promise<AuthUser | null>;
+  loginWithGooglePopup?: () => Promise<AuthUser | null>;
   logout: () => void;
   isAuthenticated: boolean;
   hasRole: (role: string) => boolean;
   hasAnyRole: (roles: string[]) => boolean;
   updateUsuario: (payload: any) => Promise<void>;
+  stashLoginExtras?: (extras: { nickname?: string; birthdate?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   login: async () => null,
   loginWithGoogle: async () => null,
+  loginWithGooglePopup: async () => null,
   logout: () => {},
   isAuthenticated: false,
   hasRole: () => false,
   hasAnyRole: () => false,
   updateUsuario: async () => {},
+  stashLoginExtras: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const EX = (Constants?.expoConfig as any)?.extra || (Constants as any)?.manifest2?.extra || {};
+  const USE_FIREBASE = !!EX.EXPO_PUBLIC_USE_FIREBASE_AUTH;
   // Import updateUsuario from userHelpers
   const { updateUsuario } = require("@/utils/auth/userHelpers");
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -60,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // login delega al helper que maneja token + fetch del perfil
   async function login(username: string, password: string) {
+    // Siempre usar el login de la API para el botón "Ingresar"
     const u = await loginUser(username, password).catch(() => null);
     setUser(u);
     if (u) {
@@ -69,13 +80,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function logout() {
-    setUser(null);
-    await AsyncStorage.removeItem('raveapp_user');
+    try {
+      if (USE_FIREBASE) await fbLogout();
+    } finally {
+      setUser(null);
+      await AsyncStorage.removeItem('raveapp_user');
+      await AsyncStorage.removeItem('raveapp_login_extras');
+    }
   }
 
   async function loginWithGoogle(idToken: string) {
     try {
-      const u = await loginOrRegisterWithGoogleIdToken(idToken);
+      const u = await fbLoginWithGoogleIdToken(idToken);
+      setUser(u);
+      await AsyncStorage.setItem('raveapp_user', JSON.stringify(u));
+      return u;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function loginWithGooglePopup() {
+    try {
+      const u = await fbLoginWithGooglePopup();
       setUser(u);
       await AsyncStorage.setItem('raveapp_user', JSON.stringify(u));
       return u;
@@ -107,9 +134,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return null;
   }
 
+  async function stashLoginExtras(extras: { nickname?: string; birthdate?: string }) {
+    try {
+      await AsyncStorage.setItem('raveapp_login_extras', JSON.stringify(extras));
+    } catch {}
+  }
+
   return (
     <AuthContext.Provider
-      value={{ user, login, loginWithGoogle, logout, isAuthenticated, hasRole, hasAnyRole, updateUsuario }}
+      value={{ user, login, loginWithGoogle, loginWithGooglePopup, logout, isAuthenticated, hasRole, hasAnyRole, updateUsuario, stashLoginExtras }}
     >
       {children}
     </AuthContext.Provider>

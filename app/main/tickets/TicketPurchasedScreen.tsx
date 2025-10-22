@@ -15,6 +15,7 @@ import { getEntradasUsuario } from "@/utils/auth/userHelpers";
 import { getTipoMap } from "@/utils/events/entradaApi";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
+import { getSafeImageSource } from "@/utils/image";
 
 const screenWidth = Dimensions.get("window").width;
 const QR_SIZE = 140;
@@ -200,7 +201,7 @@ function TicketPurchasedScreenContent() {
       <Header />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Image source={{ uri: eventData.imageUrl }} style={styles.eventImage} />
+  <Image source={getSafeImageSource(eventData.imageUrl)} style={styles.eventImage} />
 
         <Text style={styles.title}>Entrada a: {eventData.title}</Text>
         {typeof ticketsCount === 'number' && ticketsCount > 1 ? (
