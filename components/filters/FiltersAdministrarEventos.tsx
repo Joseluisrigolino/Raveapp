@@ -1,39 +1,30 @@
-// components/events/manage/Filters.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-} from "react-native";
+import { View, StyleSheet, ScrollView, TouchableOpacity, Text, ActivityIndicator } from "react-native";
+import SearchBarComponent from "@/components/common/SearchBarComponent";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { fetchEventStates, ApiEstadoEvento } from "@/utils/events/eventApi";
+import type { FilterValue } from "@/components/events/manage/Filters";
 
-export type FilterValue = number | "all";
-
-type Option = { code: number | "all"; label: string };
-
-interface Props {
-  /** valor seleccionado: número de estado o "all" */
+type Props = {
   value: FilterValue;
-  /** callback cuando cambia el filtro */
   onChange: (v: FilterValue) => void;
-  /**
-   * opcional: te devuelvo los estados cargados desde la API
-   * para que el padre los use si necesita (p.ej. para pedir por lote).
-   */
   onStatesLoaded?: (states: { code: number; label: string }[]) => void;
-}
+  searchText?: string;
+  onSearchTextChange?: (val: string) => void;
+  placeholder?: string;
+};
 
-export default function ManageEventFilters({
+export default function FiltersAdministrarEventos({
   value,
   onChange,
   onStatesLoaded,
+  searchText = "",
+  onSearchTextChange,
+  placeholder = "Buscar por nombre...",
 }: Props) {
+  // Estados traídos desde la API (la original ManageEventFilters hace esto)
   const [loading, setLoading] = useState(true);
-  const [options, setOptions] = useState<Option[]>([
+  const [options, setOptions] = useState<{ code: number | "all"; label: string }[]>([
     { code: "all", label: "Todos" },
   ]);
 
@@ -42,14 +33,13 @@ export default function ManageEventFilters({
     (async () => {
       setLoading(true);
       try {
-        const list = await fetchEventStates(); // [{cdEstado, dsEstado}, ...]
+        const list = await fetchEventStates();
         const apiOptions = (Array.isArray(list) ? list : [])
           .filter((s: ApiEstadoEvento) => Number.isFinite(Number(s?.cdEstado)))
           .sort((a, b) => Number(a.cdEstado) - Number(b.cdEstado))
           .map((s) => ({ code: Number(s.cdEstado), label: String(s.dsEstado || "") }));
 
         if (!apiOptions.length) {
-          // Fallback defensivo si la API no responde
           const fallback = [
             { code: 0, label: "Por Aprobar" },
             { code: 1, label: "Aprobado" },
@@ -57,21 +47,19 @@ export default function ManageEventFilters({
             { code: 3, label: "Fin Venta" },
             { code: 4, label: "Finalizado" },
             { code: 5, label: "Cancelado" },
-            // si tu API maneja "Rechazado" (6), lo podés sumar acá en fallback
           ];
           if (mounted) {
             setOptions([{ code: "all", label: "Todos" }, ...fallback]);
-            onStatesLoaded?.(fallback);
+            onStatesLoaded?.(fallback as any);
           }
           return;
         }
 
         if (mounted) {
           setOptions([{ code: "all", label: "Todos" }, ...apiOptions]);
-          onStatesLoaded?.(apiOptions);
+          onStatesLoaded?.(apiOptions as any);
         }
       } catch {
-        // mismo fallback si hay error
         const fallback = [
           { code: 0, label: "Por Aprobar" },
           { code: 1, label: "Aprobado" },
@@ -82,93 +70,82 @@ export default function ManageEventFilters({
         ];
         if (mounted) {
           setOptions([{ code: "all", label: "Todos" }, ...fallback]);
-          onStatesLoaded?.(fallback);
+          onStatesLoaded?.(fallback as any);
         }
       } finally {
         if (mounted) setLoading(false);
       }
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [onStatesLoaded]);
 
-  const current = useMemo(
-    () => options.find((o) => o.code === value),
-    [options, value]
-  );
+  const current = useMemo(() => options.find((o) => o.code === value), [options, value]);
+
+  const handleChange = onSearchTextChange ?? (() => {});
 
   return (
     <View style={styles.container}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
         {options.map((opt) => {
           const isActive = opt.code === value;
           return (
             <TouchableOpacity
               key={String(opt.code)}
-              style={[styles.chip, isActive && styles.chipActive]}
-              onPress={() => onChange(opt.code)}
+              style={[styles.filterChip, isActive && styles.filterChipActive]}
+              onPress={() => onChange(opt.code as any)}
             >
-              <Text style={[styles.chipText, isActive && styles.chipTextActive]}>
-                {opt.label}
-              </Text>
+              <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>{opt.label}</Text>
             </TouchableOpacity>
           );
         })}
         {loading && (
-          <View style={[styles.chip, { paddingHorizontal: 10 }]}>
+          <View style={[styles.filterChip, { paddingHorizontal: 10 }]}>
             <ActivityIndicator />
           </View>
         )}
       </ScrollView>
 
-      {!!current && current.code !== "all" && (
-        <Text style={styles.helper}>
-          Filtrando por: <Text style={{ fontWeight: "700" }}>{current.label}</Text>
-        </Text>
-      )}
+      <View style={styles.searchContainer}>
+        <SearchBarComponent value={searchText} onChangeText={handleChange} placeholder={placeholder} />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { paddingHorizontal: 8, paddingTop: 8 },
-  scroll: { marginBottom: 8 },
-  chip: {
+  container: {
+    backgroundColor: COLORS.backgroundLight,
+    paddingBottom: 8,
+  },
+  horizontalScroll: {
+    marginHorizontal: 12,
+    marginTop: 10,
+  },
+  filterChip: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 999,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    backgroundColor: COLORS.backgroundLight,
+    borderRadius: RADIUS.chip,
     marginRight: 10,
-    borderWidth: 1.5,
-    borderColor: COLORS.textPrimary,
-    minHeight: 36,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
   },
-  chipActive: {
-    backgroundColor: COLORS.textPrimary,
-    borderColor: COLORS.textPrimary,
-    shadowColor: COLORS.textPrimary,
-    shadowOpacity: 0.10,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+  filterChipActive: {
+    backgroundColor: COLORS.cardBg,
+    borderColor: COLORS.textSecondary,
   },
-  chipText: {
-    color: COLORS.textPrimary,
-    fontWeight: "bold",
-    fontSize: FONT_SIZES.body,
-  },
-  chipTextActive: {
-    color: COLORS.cardBg,
-    fontWeight: "bold",
-    fontSize: FONT_SIZES.body,
-  },
-  helper: {
-    marginLeft: 8,
-    marginBottom: 4,
+  filterChipText: {
     color: COLORS.textSecondary,
-    fontSize: FONT_SIZES.caption ?? 12,
+    fontSize: FONT_SIZES.body,
+    marginLeft: 0,
+  },
+  filterChipTextActive: {
+    color: COLORS.textPrimary,
+  },
+  searchContainer: {
+    marginHorizontal: 12,
+    marginTop: 10,
   },
 });

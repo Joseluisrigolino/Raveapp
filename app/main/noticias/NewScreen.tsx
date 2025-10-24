@@ -1,6 +1,6 @@
 // screens/NewsScreens/NewScreen.tsx
 import React, { useState, useEffect, useMemo } from "react";
-import { ScrollView, View, Text, Image, StyleSheet, Linking, TouchableOpacity, ActivityIndicator, Share } from "react-native";
+import { ScrollView, View, Text, Image, StyleSheet, Linking, TouchableOpacity, Share } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as nav from "@/utils/navigation";
@@ -11,12 +11,11 @@ import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import { NewsItem } from "@/interfaces/NewsProps";
 import { getNewsById, extractEventIdFromUrl } from "@/utils/news/newsApi";
-import globalStyles, { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import globalStyles, { COLORS, FONT_SIZES } from "@/styles/globalStyles";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { getSafeImageSource } from "@/utils/image";
 import { fetchEventById } from "@/utils/events/eventApi";
-import { mediaApi } from "@/utils/mediaApi";
-import { getProfile, getUsuarioById } from "@/utils/auth/userHelpers";
+// Autor oculto: se eliminan imports de autor
 import CirculoCarga from "@/components/general/CirculoCarga";
 
 export default function NewScreen() {
@@ -25,10 +24,7 @@ export default function NewScreen() {
   const [linkedEventId, setLinkedEventId] = useState<string | null>(null);
   const [relatedEventTitle, setRelatedEventTitle] = useState<string | null>(null);
   const [relatedEventImage, setRelatedEventImage] = useState<string | null>(null);
-  const [relatedOwnerId, setRelatedOwnerId] = useState<string | null>(null);
-  const [authorAvatarUrl, setAuthorAvatarUrl] = useState<string | null>(null);
-  const [authorIdResolved, setAuthorIdResolved] = useState<string | null>(null);
-  const [authorNameResolved, setAuthorNameResolved] = useState<string | null>(null);
+  // Autor oculto: ya no se utiliza ownerId para autor
   const [loading, setLoading] = useState(true);
   const [loadingRelatedEvent, setLoadingRelatedEvent] = useState(false);
   const [loadingImages, setLoadingImages] = useState(false);
@@ -87,7 +83,6 @@ export default function NewScreen() {
         if (active && ev) {
           setRelatedEventTitle(ev.title || null);
           setRelatedEventImage(ev.imageUrl || null);
-          setRelatedOwnerId((ev as any)?.ownerId ? String((ev as any).ownerId) : null);
         }
       } catch (e) {
         if (active) {
@@ -103,132 +98,14 @@ export default function NewScreen() {
     };
   }, [linkedEventId]);
 
-  // Heuristic author name from the news object (fallback)
-  const authorName = useMemo(() => {
-    const n: any = newsItem;
-    if (!n) return undefined;
-    return (
-      n?.autorNombre ||
-      n?.autor ||
-      n?.createdByName ||
-      n?.creadoPorNombre ||
-      n?.usuario?.nombre ||
-      n?.usuario?.nombreFantasia ||
-      (n?.usuario?.nombre && n?.usuario?.apellido
-        ? `${n.usuario.nombre} ${n.usuario.apellido}`
-        : undefined)
-    );
-  }, [newsItem]);
+  // Autor oculto: se elimina toda la lógica de autor
 
-  const authorRole = useMemo(() => {
-    const n: any = newsItem;
-    return n?.autorRol || n?.usuario?.rol || undefined;
-  }, [newsItem]);
-
-  const displayAuthorName = useMemo(() => {
-    return authorNameResolved || authorName;
-  }, [authorNameResolved, authorName]);
-
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      const n: any = newsItem;
-      if (!n) {
-        if (active) setAuthorAvatarUrl(null);
-        if (active) setAuthorIdResolved(null);
-        if (active) setAuthorNameResolved(null);
-        return;
-      }
-      // Discover an author user id from several likely fields and fallbacks
-      const normalizeId = (val: any): string | undefined => {
-        if (!val && val !== 0) return undefined;
-        if (typeof val === "number") return String(val);
-        if (typeof val === "string") return val;
-        if (typeof val === "object") {
-          return (
-            normalizeId(val.idUsuario) ||
-            normalizeId(val.IdUsuario) ||
-            normalizeId(val.id) ||
-            normalizeId(val.Id) ||
-            undefined
-          );
-        }
-        return undefined;
-      };
-
-      let candidateId: string | undefined =
-        normalizeId(n?.autorId) ||
-        normalizeId(n?.idAutor) ||
-        normalizeId(n?.createdById) ||
-        normalizeId(n?.creadoPorId) ||
-        normalizeId(n?.idUsuarioAutor) ||
-        normalizeId(n?.idUsuarioCreador) ||
-        normalizeId(n?.idUsuario) ||
-        normalizeId(n?.IdUsuario) ||
-        normalizeId(n?.usuario?.idUsuario) ||
-        normalizeId(n?.usuario?.IdUsuario) ||
-        normalizeId(n?.createdBy) ||
-        normalizeId(n?.creadoPor) ||
-        normalizeId(n?.usuarioCreador);
-
-      // If not found, try resolve by author email
-      if (!candidateId) {
-        const candidateEmail: string | undefined =
-          n?.autorEmail ||
-          n?.email ||
-          n?.usuario?.correo ||
-          n?.usuario?.email ||
-          n?.creadoPorEmail ||
-          n?.createdByEmail ||
-          undefined;
-        if (candidateEmail) {
-          try {
-            const profile = await getProfile(String(candidateEmail));
-            if (profile?.idUsuario) candidateId = String(profile.idUsuario);
-          } catch {
-            // ignore
-          }
-        }
-      }
-
-      // As a final fallback, try event owner
-      if (!candidateId && relatedOwnerId) {
-        candidateId = relatedOwnerId;
-      }
-
-      if (!candidateId) {
-        if (active) setAuthorAvatarUrl(null);
-        if (active) setAuthorIdResolved(null);
-        return;
-      }
-      if (active) setAuthorIdResolved(String(candidateId));
-
-      // Try to resolve author name from user profile by id
-      try {
-        const prof = await getUsuarioById(String(candidateId));
-        if (active && prof) {
-          const fullName = prof?.nombre && prof?.apellido ? `${prof.nombre} ${prof.apellido}` : (prof?.nombreFantasia || prof?.nombre);
-          if (fullName) setAuthorNameResolved(fullName);
-        }
-      } catch {
-        // ignore
-      }
-      try {
-        const url = await mediaApi.getFirstImage(String(candidateId));
-        if (active) setAuthorAvatarUrl(url || null);
-      } catch {
-        if (active) setAuthorAvatarUrl(null);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [newsItem, relatedOwnerId]);
+  // Eliminado: resolución de autor (id/nombre/avatar)
 
   // Prefetch de imágenes (noticia, evento relacionado, avatar autor) para que renderice todo junto
   useEffect(() => {
     let mounted = true;
-    const urls = [newsItem?.imagen, relatedEventImage, authorAvatarUrl]
+    const urls = [newsItem?.imagen, relatedEventImage]
       .filter(Boolean)
       .map(String)
       // evitar duplicados exactos
@@ -256,7 +133,7 @@ export default function NewScreen() {
     });
 
     return () => { mounted = false; };
-  }, [newsItem?.imagen, relatedEventImage, authorAvatarUrl]);
+  }, [newsItem?.imagen, relatedEventImage]);
 
   const linkifyText = (text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -298,11 +175,7 @@ export default function NewScreen() {
     }
   };
 
-  const readingMinutes = useMemo(() => {
-    const words = (newsItem?.contenido || "").trim().split(/\s+/).filter(Boolean).length;
-    const min = Math.max(1, Math.round(words / 200));
-    return min;
-  }, [newsItem?.contenido]);
+  // Eliminado: cálculo de minutos de lectura
 
   const formattedDate = useMemo(() => {
     if (!newsItem?.dtPublicado) return "";
@@ -371,27 +244,12 @@ export default function NewScreen() {
             <View style={styles.metaRow}>
               <MaterialCommunityIcons name="clock-outline" size={16} color={COLORS.textSecondary} />
               <Text style={styles.metaText}>{formattedDate}</Text>
-              <Text style={styles.metaSeparator}>•</Text>
-              <Text style={styles.metaText}>{readingMinutes} min de lectura</Text>
             </View>
 
             {/* Title */}
             <Text style={styles.title}>{newsItem.titulo}</Text>
 
-            {/* Author row (from API + media) */}
-            {(displayAuthorName || authorAvatarUrl) && (
-              <View style={styles.authorRow}>
-                {authorAvatarUrl ? (
-                  <Image source={getSafeImageSource(authorAvatarUrl)} style={styles.authorAvatarImg} />
-                ) : (
-                  <View style={styles.authorAvatar} />
-                )}
-                <View>
-                  {displayAuthorName ? <Text style={styles.authorName}>{displayAuthorName}</Text> : null}
-                  {authorRole ? <Text style={styles.authorRole}>{authorRole}</Text> : null}
-                </View>
-              </View>
-            )}
+            {/* Autor oculto: no se muestra sección de autor */}
 
             {/* Content */}
             {newsItem.contenido ? (

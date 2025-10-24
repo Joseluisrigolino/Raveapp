@@ -33,7 +33,7 @@ type UiUserEntry = {
 };
 
 function TicketPurchasedScreenContent() {
-  const { id, eventId, count } = useLocalSearchParams<{ id?: string; eventId?: string; count?: string }>();
+  const { id, eventId, count, idCompra } = useLocalSearchParams<{ id?: string; eventId?: string; count?: string; idCompra?: string }>();
   const { user } = useAuth();
   const [eventData, setEventData] = useState<EventItemWithExtras | null>(null);
   const [loading, setLoading] = useState(true);
@@ -132,7 +132,7 @@ function TicketPurchasedScreenContent() {
           setEventData(null);
         }
 
-        // Cargar entradas del usuario y filtrar por el evento actual
+        // Cargar entradas del usuario y filtrar por el evento actual y/o idCompra
         const userId: string | null = (user as any)?.id ?? (user as any)?.idUsuario ?? null;
         if (userId) {
           const raw = await getEntradasUsuario(String(userId));
@@ -144,10 +144,22 @@ function TicketPurchasedScreenContent() {
             const s = String(id ?? "").trim();
             return s ? s : null;
           };
+          const getCompraId = (r: any): string | null => {
+            const idc = r?.idCompra ?? r?.IdCompra ?? r?.compraId ?? r?.purchaseId ?? r?.id_compra ?? r?.compra?.idCompra ?? r?.pago?.idCompra;
+            const s = String(idc ?? "").trim();
+            return s ? s : null;
+          };
 
-          const filtered = (Array.isArray(raw) ? raw : []).filter((r) => {
+          const all = Array.isArray(raw) ? raw : [];
+          const filteredByEvent = all.filter((r) => {
+            if (!eventId) return true;
             const eid = getEventId(r);
-            return eid && eventId ? String(eid) === String(eventId) : false;
+            return eid ? String(eid) === String(eventId) : false;
+          });
+          const filtered = filteredByEvent.filter((r) => {
+            if (!idCompra) return true;
+            const cid = getCompraId(r);
+            return cid ? String(cid) === String(idCompra) : false;
           });
 
           const mapped: UiUserEntry[] = filtered.map((r: any) => {
@@ -190,9 +202,7 @@ function TicketPurchasedScreenContent() {
 
   const handleDownloadEntryPDF = async (entry: UiUserEntry) => {
     if (!eventData) return;
-    const qrText = entry.mdQR || `Entrada:${entry.idEntrada}|Evento:${eventData.id}|Fecha:${entry.idFecha ?? ""}`;
-
-    // Capturar el QR renderizado como base64 para embebido en el PDF
+    const qrText = entry.mdQR || `Entrada:${entry.idEntrada}|Evento:${eventData.id}|Fecha:${entry.idFecha ?? ''}`;
     const qrDataUrl: string | undefined = await new Promise((resolve) => {
       try {
         const ref = qrRefs.current[entry.idEntrada];
@@ -206,56 +216,12 @@ function TicketPurchasedScreenContent() {
       }
     });
 
-    const html = `
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <style>
-            @page { size: A4; margin: 20mm; }
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f7f8fa; margin: 0; padding: 0; }
-            .card { max-width: 720px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 18mm; box-shadow: 0 6px 24px rgba(0,0,0,0.08); }
-            .title { font-size: 22px; font-weight: 700; text-align: center; margin: 0 0 12px; color: #111827; }
-            .subtitle { font-size: 14px; text-align: center; color: #6b7280; margin: 0 0 16px; }
-            .hero { text-align: center; margin: 4mm 0 6mm; }
-            .hero img { max-width: 100%; border-radius: 10px; }
-            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
-            .item { background: #f9fafb; border-radius: 8px; padding: 10px 12px; }
-            .item b { color: #374151; }
-            .qrWrap { text-align: center; padding: 8mm 0; }
-            .qrWrap img { width: 70mm; height: 70mm; image-rendering: pixelated; }
-            .footer { text-align: center; color: #9ca3af; font-size: 12px; margin-top: 12px; }
-            .note { background: #eef2ff; color: #3730a3; border-radius: 8px; padding: 10px 12px; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h1 class="title">Entrada a: ${eventData.title}</h1>
-            <p class="subtitle">Mostrá este QR en puerta para validar tu acceso</p>
-            <div class="hero">
-              <img src="${eventData.imageUrl}" alt="Evento" />
-            </div>
-            <div class="grid">
-              <div class="item"><b>Evento ID:</b><br />${eventData.id}</div>
-              <div class="item"><b>Entrada ID:</b><br />${entry.idEntrada}</div>
-              <div class="item"><b>Fecha:</b><br />${eventData.date}</div>
-              <div class="item"><b>Horario:</b><br />${eventData.timeRange || "-"}</div>
-              <div class="item"><b>Tipo:</b><br />${entry.tipoDs ?? (entry.tipoCd ?? "-")}</div>
-              <div class="item"><b>Precio:</b><br />${typeof entry.precio === 'number' ? `$${entry.precio}` : '-'}</div>
-            </div>
-            <div class="qrWrap">
-              ${qrDataUrl
-                ? `<img src="${qrDataUrl}" alt="QR" />`
-                : `<div class="note">No se pudo generar la imagen del QR automáticamente. Presentá este texto: <br/><br/><code>${qrText}</code></div>`}
-            </div>
-            <div class="footer">Raveapp · Ticket digital</div>
-          </div>
-        </body>
-      </html>`;
+    const html = buildPurchasePdfHtml(eventData, [{ entry, dataUrl: qrDataUrl, text: qrText }], String(idCompra || ''));
     try {
       const { uri } = await Print.printToFileAsync({ html });
-      await Sharing.shareAsync(uri, { mimeType: "application/pdf" });
+      await Sharing.shareAsync(uri, { mimeType: 'application/pdf' });
     } catch (err) {
-      console.error("Error generando PDF:", err);
+      console.error('Error generando PDF:', err);
     }
   };
 
@@ -278,54 +244,7 @@ function TicketPurchasedScreenContent() {
       qrImages.push({ entry: e, dataUrl, text: qrText });
     }
 
-    const htmlSections = qrImages.map(({ entry, dataUrl, text }, idx) => {
-      const tipo = entry.tipoDs ?? (entry.tipoCd ?? 'Entrada');
-      const ticketNumber = Number.isFinite(entry.nroEntrada as number) ? (entry.nroEntrada as number) : (idx + 1);
-      const code = formatTicketCode(ticketNumber);
-      const price = typeof entry.precio === 'number' ? `$${entry.precio}` : '';
-      const valido = formatDateEs(eventData.date);
-      return `
-        <div class="entry">
-          <div class="row">
-            <div class="left">${tipo}</div>
-            <div class="right">${code}</div>
-          </div>
-          <div class="sub">${price}</div>
-          <div class="qr">${dataUrl ? `<img src="${dataUrl}" alt="QR" />` : `<div class="note">${text}</div>`}</div>
-          <div class="valid">Entrada válida para el ${valido}</div>
-        </div>`;
-    }).join('\n');
-
-    const html = `
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <style>
-            @page { size: A4; margin: 20mm; }
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f7f8fa; margin: 0; padding: 0; }
-            .card { max-width: 760px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 18mm; box-shadow: 0 6px 24px rgba(0,0,0,0.08); }
-            .title { font-size: 22px; font-weight: 700; text-align: center; margin: 0 0 12px; color: #111827; }
-            .hero { text-align: center; margin: 4mm 0 6mm; }
-            .hero img { max-width: 100%; border-radius: 10px; }
-            .entry { border-top: 1px solid #eee; padding-top: 5mm; margin-top: 5mm; page-break-inside: avoid; }
-            .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-            .left { font-weight: 600; color: #111827; }
-            .right { color: #6b7280; font-weight: 600; }
-            .sub { color: #374151; font-size: 14px; margin: 2mm 0 4mm; text-align: center; }
-            .qr { text-align: center; margin: 4mm 0 3mm; }
-            .qr img { width: 70mm; height: 70mm; image-rendering: pixelated; }
-            .note { background: #eef2ff; color: #3730a3; border-radius: 8px; padding: 8px 10px; font-size: 12px; text-align: center; }
-            .valid { color: #6b7280; font-size: 12px; text-align: center; margin-bottom: 2mm; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h1 class="title">${eventData.title}</h1>
-            <div class="hero"><img src="${eventData.imageUrl}" alt="Evento" /></div>
-            ${htmlSections}
-          </div>
-        </body>
-      </html>`;
+    const html = buildPurchasePdfHtml(eventData, qrImages, String(idCompra || ''));
     try {
       const { uri } = await Print.printToFileAsync({ html });
       await Sharing.shareAsync(uri, { mimeType: 'application/pdf' });
@@ -333,6 +252,109 @@ function TicketPurchasedScreenContent() {
       console.error('Error generando PDF combinado:', err);
     }
   }
+
+  // Construye un PDF similar a la plantilla provista, con datos reales
+  const buildPurchasePdfHtml = (
+    ev: EventItemWithExtras,
+    images: { entry: UiUserEntry; dataUrl?: string; text: string }[],
+    compraId?: string
+  ) => {
+    const fmtMoney = (n?: number) => (typeof n === 'number' && !isNaN(n) ? `$${n.toLocaleString('es-AR')}` : '-');
+    const dateHuman = formatDateEs(ev.date);
+    const headerTitle = `Entradas · ${ev.title}`;
+    const headerSub = compraId ? `Compra ${compraId}` : '';
+
+    const sections = images.map(({ entry, dataUrl, text }, idx) => {
+      const tipo = entry.tipoDs ?? (entry.tipoCd ?? 'Entrada');
+      const numero = Number.isFinite(entry.nroEntrada as number) ? (entry.nroEntrada as number) : (idx + 1);
+      const code = formatTicketCode(numero);
+      const precio = fmtMoney(entry.precio);
+      return `
+        <div class="ticket">
+          <div class="ticket-head">
+            <div class="ticket-name">${tipo}</div>
+            <div class="ticket-code">${code}</div>
+          </div>
+          <div class="ticket-grid">
+            <div class="ticket-info">
+              <div class="info-row"><span class="info-label">Evento:</span><span class="info-val">${ev.title}</span></div>
+              <div class="info-row"><span class="info-label">Fecha:</span><span class="info-val">${dateHuman}</span></div>
+              ${ev.timeRange ? `<div class="info-row"><span class="info-label">Horario:</span><span class="info-val">${ev.timeRange}</span></div>` : ''}
+              <div class="info-row"><span class="info-label">Entrada ID:</span><span class="info-val">${entry.idEntrada}</span></div>
+              <div class="info-row"><span class="info-label">Precio:</span><span class="info-val">${precio}</span></div>
+            </div>
+            <div class="ticket-qr">
+              ${dataUrl ? `<img src="${dataUrl}" alt="QR" />` : `<div class="qr-fallback">${text}</div>`}
+              <div class="qr-note">Presentar en puerta</div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            @page { size: A4; margin: 12mm; }
+            body { margin:0; padding:0; font-family: Arial, Helvetica, 'Segoe UI', Roboto, sans-serif; background:#ffffff; color:#111827; }
+            .wrap { max-width: 770px; margin: 0 auto; }
+            .header {
+              display:flex; align-items:center; justify-content:space-between;
+              padding: 10px 0 12px; border-bottom: 2px solid #0F172A;
+            }
+            .brand { font-weight: 800; font-size: 18px; color:#0F172A; }
+            .sub { font-size: 12px; color:#6b7280; }
+            .event {
+              margin: 10px 0 14px; display:flex; gap: 12px; align-items:center;
+            }
+            .event img { width: 120px; height: 80px; object-fit: cover; border-radius: 8px; }
+            .event .meta { display:flex; flex-direction:column; gap:4px; }
+            .event .meta .title { font-weight:700; font-size:16px; }
+            .event .meta .date { font-size:12px; color:#374151; }
+
+            .ticket { page-break-inside: avoid; border:1px solid #e5e7eb; border-radius: 10px; padding: 12px; margin: 10px 0; }
+            .ticket-head { display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px; }
+            .ticket-name { font-weight:700; }
+            .ticket-code { color:#6b7280; font-weight:600; }
+            .ticket-grid { display:grid; grid-template-columns: 1fr 220px; gap: 12px; align-items:center; }
+            .ticket-info { display:flex; flex-direction:column; gap: 6px; }
+            .info-row { display:flex; gap:8px; font-size: 13px; }
+            .info-label { min-width: 80px; color:#374151; font-weight:600; }
+            .info-val { color:#111827; }
+            .ticket-qr { text-align:center; }
+            .ticket-qr img { width: 180px; height: 180px; image-rendering: pixelated; border: 6px solid #f3f4f6; border-radius: 8px; }
+            .qr-fallback { font-size:11px; color:#111827; background:#eef2ff; border-radius:8px; padding:8px; word-break:break-all; }
+            .qr-note { margin-top:6px; font-size: 11px; color:#6b7280; }
+
+            .footer { text-align:center; padding-top: 10px; margin-top: 6px; border-top:1px dashed #e5e7eb; color:#9ca3af; font-size: 11px; }
+          </style>
+        </head>
+        <body>
+          <div class="wrap">
+            <div class="header">
+              <div>
+                <div class="brand">Raveapp</div>
+                ${headerSub ? `<div class="sub">${headerSub}</div>` : ''}
+              </div>
+              <div class="sub">${new Date().toLocaleDateString('es-AR')}</div>
+            </div>
+
+            <div class="event">
+              ${ev.imageUrl ? `<img src="${ev.imageUrl}" alt="Evento"/>` : ''}
+              <div class="meta">
+                <div class="title">${headerTitle}</div>
+                <div class="date">${dateHuman}${ev.timeRange ? ` · ${ev.timeRange}` : ''}</div>
+              </div>
+            </div>
+
+            ${sections}
+
+            <div class="footer">Descargado desde la app · Mostrá el QR en puerta</div>
+          </div>
+        </body>
+      </html>`;
+  };
 
   if (loading) {
     return (

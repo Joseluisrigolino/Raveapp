@@ -9,10 +9,8 @@ import { useFocusEffect } from "@react-navigation/native";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import SearchBarComponent from "@/components/common/SearchBarComponent";
-import ManageEventFilters, {
-  FilterValue,
-} from "@/components/events/manage/Filters";
+import { FilterValue } from "@/components/events/manage/Filters";
+import FiltersAdministrarEventos from "@/components/filters/FiltersAdministrarEventos";
 import CardsManageEvent, {
   ManageEventCardItem,
 } from "@/components/events/manage/CardsManageEvent";
@@ -226,21 +224,15 @@ export default function ManageEventsScreen() {
     <SafeAreaView style={styles.container}>
       <Header />
 
-      {/* Filtros por estado desde API + "Todos" */}
-      <ManageEventFilters
+      {/* Filtros visuales y buscador (componente combinado para administrar eventos) */}
+      <FiltersAdministrarEventos
         value={selectedFilter}
         onChange={setSelectedFilter}
         onStatesLoaded={setEventStates}
+        searchText={searchText}
+        onSearchTextChange={setSearchText}
+        placeholder="Buscar por nombre..."
       />
-
-      {/* Buscador */}
-      <View style={styles.searchContainer}>
-        <SearchBarComponent
-          value={searchText}
-          onChangeText={setSearchText}
-          placeholder="Buscar por nombre..."
-        />
-      </View>
 
       {/* Lista */}
       <ScrollView

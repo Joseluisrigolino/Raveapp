@@ -55,155 +55,148 @@ const CardsManageEvent: React.FC<Props> = ({
 
   return (
     <View style={[styles.card, containerStyle]}>
-      {/* Cabecera con estado + imagen a la derecha */}
+      {/* Cabecera con estado como chip y miniatura a la derecha */}
       <View style={styles.headerRow}>
-        <Text style={[styles.statusText, { color: statusColor }]}>
-          {item.statusLabel}
-        </Text>
-
-        {item.imageUrl ? (
-          <Image source={{ uri: item.imageUrl }} style={styles.cover} resizeMode="cover" />
-        ) : (
-          <View style={[styles.cover, styles.coverPlaceholder]} />
-        )}
-      </View>
-
-      {/* Meta info (fecha · horario) */}
-      <Text style={styles.metaText}>
-        <Text style={{ color: COLORS.textSecondary }}>Fecha del evento: </Text>
-        <Text style={styles.metaStrong}>{item.date || "—"}</Text>
-        {!!item.timeRange && (
-          <Text style={{ color: COLORS.textSecondary }}>
-            {"  •  "}{item.timeRange}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title} numberOfLines={2}>{item.eventName}</Text>
+          <Text style={styles.metaText}>
+            <Text style={{ color: COLORS.textSecondary }}>Fecha del evento: </Text>
+            <Text style={styles.metaStrong}>{item.date || "—"}</Text>
+            {!!item.timeRange && (
+              <Text style={{ color: COLORS.textSecondary }}>{"  •  "}{item.timeRange}</Text>
+            )}
           </Text>
-        )}
-      </Text>
-
-      {/* Título */}
-      <Text style={styles.title} numberOfLines={2}>
-        {item.eventName}
-      </Text>
+        </View>
+        <View style={{ alignItems: "flex-end" }}>
+          <View style={[styles.statusChip, { backgroundColor: statusColor + '22', borderColor: statusColor }]}> 
+            <Text style={[styles.statusChipText, { color: statusColor }]}>{item.statusLabel}</Text>
+          </View>
+          {item.imageUrl ? (
+            <Image source={{ uri: item.imageUrl }} style={styles.cover} resizeMode="cover" />
+          ) : (
+            <View style={[styles.cover, styles.coverPlaceholder]} />
+          )}
+        </View>
+      </View>
 
       {/* Acciones */}
       <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.soldBtn]}
-          onPress={() => onTicketsSold?.(item.id)}
-        >
-          <Text style={styles.actionText}>Entradas vendidas</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.modifyBtn]}
-          onPress={() => onModify?.(item.id)}
-        >
-          <Text style={styles.actionText}>Modificar</Text>
-        </TouchableOpacity>
+        {onTicketsSold && (
+          <TouchableOpacity style={[styles.actionBtn]} onPress={() => onTicketsSold(item.id)}>
+            <Text style={styles.actionText}>Entradas vendidas</Text>
+          </TouchableOpacity>
+        )}
+        {onModify && (
+          <TouchableOpacity style={[styles.actionBtn]} onPress={() => onModify(item.id)}>
+            <Text style={styles.actionText}>Modificar</Text>
+          </TouchableOpacity>
+        )}
+        {!isCanceled && onCancel && (
+          <TouchableOpacity style={[styles.actionBtn, styles.cancelBtn]} onPress={() => onCancel(item.id)}>
+            <Text style={styles.cancelText}>Cancelar</Text>
+          </TouchableOpacity>
+        )}
       </View>
-
-      {/* Botón cancelar: oculto si ya está cancelado */}
-      {!isCanceled && (
-        <TouchableOpacity style={styles.cancelBtn} onPress={() => onCancel?.(item.id)}>
-          <Text style={styles.cancelText}>Cancelar evento</Text>
-        </TouchableOpacity>
-      )}
     </View>
   );
 };
 
-export default CardsManageEvent;
-
-/* ===================== estilos ===================== */
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.card,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: COLORS.borderInput,
     padding: 16,
-    marginHorizontal: 8,
-    marginBottom: 12,
+    marginHorizontal: 0,
+    marginBottom: 16,
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 1,
   },
-
   headerRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: 6,
+    marginBottom: 8,
   },
-
-  statusText: {
-    fontSize: FONT_SIZES.subTitle,
-    fontWeight: "800",
-    maxWidth: "58%",
+  statusChip: {
+    alignSelf: "flex-end",
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginBottom: 8,
+    minWidth: 80,
+    alignItems: "center",
   },
-
+  statusChipText: {
+    fontSize: FONT_SIZES.caption ?? 12,
+    fontWeight: "700",
+    textAlign: "center",
+  },
   cover: {
-    width: 120,
-    height: 88,
+    width: 90,
+    height: 68,
     borderRadius: 12,
-    marginLeft: 12,
+    marginTop: 4,
+    backgroundColor: "#E9E9E9",
   },
   coverPlaceholder: {
     backgroundColor: "#E9E9E9",
   },
-
   metaText: {
     color: COLORS.textSecondary,
-    marginTop: 4,
+    marginTop: 2,
+    fontSize: FONT_SIZES.caption ?? 12,
   },
   metaStrong: {
     color: COLORS.textSecondary,
     fontWeight: "600",
   },
-
   title: {
-    marginTop: 6,
     color: COLORS.textPrimary,
     fontWeight: "800",
     fontSize: FONT_SIZES.body,
+    marginBottom: 2,
   },
-
   actionsRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
+    marginTop: 12,
+    gap: 8,
   },
-
   actionBtn: {
     paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 18,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: COLORS.backgroundLight,
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    minWidth: 80,
+    alignItems: "center",
   },
   actionText: {
-    color: "#fff",
+    color: COLORS.textPrimary,
     fontWeight: "600",
-    fontSize: 13,
+    fontSize: FONT_SIZES.caption ?? 12,
+    textAlign: "center",
   },
-  soldBtn: {
-    backgroundColor: "#f59e0b",
-  },
-  modifyBtn: {
-    backgroundColor: "#d946ef",
-  },
-
   cancelBtn: {
-    marginTop: 8,
-    backgroundColor: COLORS.negative ?? "#ef4444",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    backgroundColor: COLORS.backgroundLight,
+    borderColor: COLORS.negative,
+    borderWidth: 1,
+    minWidth: 80,
   },
   cancelText: {
-    color: "#fff",
+    color: COLORS.negative,
     fontWeight: "700",
     textAlign: "center",
-    fontSize: 13,
+    fontSize: FONT_SIZES.caption ?? 12,
   },
 });
+
+export default CardsManageEvent;

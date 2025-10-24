@@ -23,7 +23,7 @@ import { mailsApi } from "@/utils/mails/mailsApi";
 export default function RegisterUserScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { loginWithGooglePopup, loginWithGoogle } = useAuth();
+  const { loginWithGooglePopup, loginWithGoogle, login } = useAuth();
   // Google Cloud removed; keep only email/password registration
   const isAndroid = Platform.OS === "android";
   const isIOS = Platform.OS === "ios";
@@ -244,7 +244,7 @@ export default function RegisterUserScreen() {
                   dni: "",
                   telefono: "",
                   nombreFantasia: "",
-                  bio: "",
+                  bio: "0",
                   password: randomPassword,
                   socials: { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
                   dtNacimiento: new Date().toISOString(),
@@ -290,7 +290,7 @@ export default function RegisterUserScreen() {
         dni: form.dni.trim(),
         telefono: form.phone.trim(),
         nombreFantasia: "",
-        bio: "",
+        bio: "0",
         password: form.password,
         socials: { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
         dtNacimiento: parseBirthDateToISO(form.birthDate),
@@ -312,6 +312,11 @@ export default function RegisterUserScreen() {
       } catch (mailErr) {
         console.warn("sendConfirmEmail fallo (no bloquea registro):", mailErr);
       }
+
+      // Auto-login tras crear usuario (no navegamos aún; mostramos popup y al aceptar vamos al home)
+      try {
+        await login(form.email.trim(), form.password);
+      } catch {}
 
       const email = form.email.trim();
       const msg = mailOk
@@ -362,7 +367,8 @@ export default function RegisterUserScreen() {
                   contentStyle={{ height: 48 }}
                   onPress={() => {
                     setSuccessVisible(false);
-                    nav.replace(router, ROUTES.LOGIN.LOGIN);
+                    // Ahora redirigimos a la app ya logueado
+                    nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
                   }}
                 >
                   Aceptar
@@ -443,7 +449,7 @@ export default function RegisterUserScreen() {
                             dni: "",
                             telefono: "",
                             nombreFantasia: "",
-                            bio: "",
+                                bio: "0",
                             password: randomPassword,
                             socials: { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
                             dtNacimiento: new Date().toISOString(),

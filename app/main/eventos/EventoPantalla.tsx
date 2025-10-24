@@ -311,6 +311,16 @@ export default function EventScreen() {
     return addr || suffix || "-";
   }, [eventData?.address, (eventData as any)?.domicilio?.localidad, (eventData as any)?.domicilio?.municipio, (eventData as any)?.domicilio?.provincia]);
 
+  // Abreviar "Ciudad Autónoma/Autonoma de Buenos Aires" -> "CABA"
+  const shortAddressDisplay = useMemo(() => {
+    if (!addressDisplay) return addressDisplay;
+    try {
+      return addressDisplay.replace(/Ciudad Autónoma de Buenos Aires/gi, "CABA");
+    } catch {
+      return addressDisplay;
+    }
+  }, [addressDisplay]);
+
   const openMapsDirections = () => {
     const getText = (val: any): string => {
       if (typeof val === "string") return val;
@@ -552,19 +562,20 @@ export default function EventScreen() {
             <Text style={styles.cardTitle}>Dirección</Text>
             <TouchableOpacity
               onPress={openMapsDirections}
-              disabled={!addressDisplay || addressDisplay === "-"}
+              disabled={!shortAddressDisplay || shortAddressDisplay === "-"}
               activeOpacity={0.75}
             >
-              <View style={[styles.listRow, { flexWrap: 'wrap' }]}>
-                <MaterialCommunityIcons name="map-marker-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} />
-                <Text style={[styles.listText, { color: COLORS.info, textDecorationLine: 'underline', fontWeight: 'bold' }]}>
-                  {addressDisplay}
-                </Text>
-                <MaterialCommunityIcons name="open-in-new" size={16} color={COLORS.info} style={{ marginLeft: 6 }} />
+              <View style={styles.addressRow}>
+                <MaterialCommunityIcons name="map-marker-outline" size={18} color={COLORS.info} style={styles.addressIcon} />
+                <View style={styles.addressTextCol}>
+                  <Text style={styles.addressLinkText}>
+                    {shortAddressDisplay}
+                  </Text>
+                  <Text style={styles.addressHintText}>
+                    Tocar para ver cómo llegar en Google Maps
+                  </Text>
+                </View>
               </View>
-              <Text style={[styles.listText, { color: COLORS.textSecondary, marginLeft: 26 }]}>
-                Tocar para ver cómo llegar en Google Maps
-              </Text>
             </TouchableOpacity>
           </View>
 
@@ -741,6 +752,32 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.subTitle,
     color: COLORS.textPrimary,
     marginBottom: 10,
+  },
+  // Dirección (layout robusto)
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  addressIcon: {
+    marginRight: 8,
+    marginTop: 2,
+  },
+  addressTextCol: {
+    flex: 1,
+    flexShrink: 1,
+  },
+  addressLinkText: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.info,
+    textDecorationLine: 'underline',
+    fontWeight: 'bold',
+  },
+  addressHintText: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textSecondary,
+    marginTop: 2,
   },
   listRow: {
     flexDirection: 'row',

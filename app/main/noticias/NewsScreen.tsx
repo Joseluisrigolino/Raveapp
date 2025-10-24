@@ -10,15 +10,12 @@ import ProtectedRoute from "@/utils/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
-import { getNews, extractEventIdFromUrl } from "@/utils/news/newsApi";
+import { getNews } from "@/utils/news/newsApi";
 import { NewsItem } from "@/interfaces/NewsProps";
-import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
+import { COLORS, FONT_SIZES, FONTS } from "@/styles/globalStyles";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import SearchBarComponent from "@/components/common/SearchBarComponent";
 import { getSafeImageSource } from "@/utils/image";
-import { mediaApi } from "@/utils/mediaApi";
-import { getUsuarioById, getProfile } from "@/utils/auth/userHelpers";
-import { fetchEventById } from "@/utils/events/eventApi";
 
 const PLACEHOLDER_IMAGE = "https://via.placeholder.com/400x200?text=Sin+imagen";
 
@@ -34,8 +31,7 @@ export default function NewsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [authorById, setAuthorById] = useState<Record<string, { name?: string; avatarUrl?: string }>>({});
-  const [emailToId, setEmailToId] = useState<Record<string, string>>({});
+  // Autor oculto en UI (se elimina resolución de autor)
 
   const loadNews = useCallback(async (opts: { refresh?: boolean } = {}) => {
     if (opts.refresh) setRefreshing(true);
@@ -58,157 +54,10 @@ export default function NewsScreen() {
   }, [loadNews]);
 
   // Helpers to derive author info from a news item
-  const normalizeId = useCallback((val: any): string | undefined => {
-    if (!val && val !== 0) return undefined;
-    if (typeof val === "number") return String(val);
-    if (typeof val === "string") return val;
-    if (typeof val === "object") {
-      return (
-        normalizeId(val.idUsuario) ||
-        normalizeId(val.IdUsuario) ||
-        normalizeId(val.id) ||
-        normalizeId(val.Id) ||
-        undefined
-      );
-    }
-    return undefined;
-  }, []);
-
-  const extractAuthorId = useCallback((n: any): string | undefined => {
-    return (
-      normalizeId(n?.autorId) ||
-      normalizeId(n?.idAutor) ||
-      normalizeId(n?.createdById) ||
-      normalizeId(n?.creadoPorId) ||
-      normalizeId(n?.idUsuarioAutor) ||
-      normalizeId(n?.idUsuarioCreador) ||
-      normalizeId(n?.idUsuario) ||
-      normalizeId(n?.IdUsuario) ||
-      normalizeId(n?.usuario?.idUsuario) ||
-      normalizeId(n?.usuario?.IdUsuario) ||
-      normalizeId(n?.createdBy) ||
-      normalizeId(n?.creadoPor) ||
-      normalizeId(n?.usuarioCreador)
-    );
-  }, [normalizeId]);
-
-  const extractAuthorEmail = useCallback((n: any): string | undefined => {
-    return (
-      n?.autorEmail ||
-      n?.email ||
-      n?.usuario?.correo ||
-      n?.usuario?.email ||
-      n?.creadoPorEmail ||
-      n?.createdByEmail ||
-      undefined
-    );
-  }, []);
-
-  const heuristicAuthorName = useCallback((n: any): string | undefined => {
-    return (
-      n?.autorNombre ||
-      n?.autor ||
-      n?.createdByName ||
-      n?.creadoPorNombre ||
-      n?.usuario?.nombre ||
-      n?.usuario?.nombreFantasia ||
-      (n?.usuario?.nombre && n?.usuario?.apellido
-        ? `${n.usuario.nombre} ${n.usuario.apellido}`
-        : undefined)
-    );
-  }, []);
+  // Eliminados helpers de autor (no se muestra el creador en la UI)
 
   // Resolve authors for the current news list and cache results (replicates NewScreen fallbacks)
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!Array.isArray(newsList) || newsList.length === 0) return;
-
-      const idsToFetch = new Set<string>();
-      const emailsToResolve = new Set<string>();
-      const eventsToResolve = new Set<string>();
-
-      for (const item of newsList) {
-        const id = extractAuthorId(item as any);
-        if (id) {
-          if (!authorById[id]) idsToFetch.add(id);
-          continue;
-        }
-        const email = extractAuthorEmail(item as any);
-        if (email && !emailToId[email]) emailsToResolve.add(email);
-        // If no id/email, try to resolve from related event owner as a final fallback (like NewScreen)
-        if (!id && !email) {
-          const evId = (item as any)?.urlEventoId || extractEventIdFromUrl((item as any)?.urlEvento);
-          if (evId) eventsToResolve.add(String(evId));
-        }
-      }
-
-      // Resolve emails to IDs
-      const newEmailToId: Record<string, string> = {};
-      if (emailsToResolve.size > 0) {
-        await Promise.all(
-          Array.from(emailsToResolve).map(async (mail) => {
-            try {
-              const prof = await getProfile(mail);
-              if (prof?.idUsuario) newEmailToId[mail] = String(prof.idUsuario);
-            } catch {}
-          })
-        );
-      }
-
-      if (Object.keys(newEmailToId).length) {
-        if (!cancelled) setEmailToId((prev) => ({ ...prev, ...newEmailToId }));
-      }
-
-      // Any newly resolved IDs to fetch profiles/media for
-      for (const [mail, id] of Object.entries(newEmailToId)) {
-        if (!authorById[id]) idsToFetch.add(id);
-      }
-
-      // Resolve events to ownerIds (fallback)
-      if (eventsToResolve.size > 0) {
-        const ownerIds = await Promise.all(
-          Array.from(eventsToResolve).map(async (evId) => {
-            try {
-              const ev = await fetchEventById(evId);
-              const owner = (ev as any)?.ownerId;
-              return owner ? String(owner) : undefined;
-            } catch { return undefined; }
-          })
-        );
-        for (const oid of ownerIds) {
-          if (oid && !authorById[oid]) idsToFetch.add(oid);
-        }
-      }
-
-      if (idsToFetch.size === 0) return;
-
-      const newAuthorById: Record<string, { name?: string; avatarUrl?: string }> = {};
-      await Promise.all(
-        Array.from(idsToFetch).map(async (id) => {
-          try {
-            const [profile, avatar] = await Promise.all([
-              getUsuarioById(id),
-              mediaApi.getFirstImage(id).catch(() => ""),
-            ]);
-            const name = profile?.nombre && profile?.apellido
-              ? `${profile.nombre} ${profile.apellido}`
-              : (profile?.nombreFantasia || profile?.nombre);
-            newAuthorById[id] = { name: name || undefined, avatarUrl: avatar || undefined };
-          } catch {
-            // ignore individual failures
-          }
-        })
-      );
-
-      if (!cancelled && Object.keys(newAuthorById).length) {
-        setAuthorById((prev) => ({ ...prev, ...newAuthorById }));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [newsList, extractAuthorEmail, extractAuthorId]);
+  // Eliminada la resolución de autor en lista (no se muestra)
 
   const currentScreen = path?.split("/").pop() || "";
 
@@ -263,10 +112,7 @@ export default function NewsScreen() {
     );
   }, [newsList, searchText]);
 
-  const readingMinutes = (content?: string) => {
-    const words = String(content || "").trim().split(/\s+/).filter(Boolean).length;
-    return Math.max(1, Math.round(words / 200));
-  };
+  // Eliminado: cálculo de minutos de lectura
 
   const getCategory = (title: string, content?: string) => {
     const t = (title + " " + (content || "")).toLowerCase();
@@ -333,7 +179,7 @@ export default function NewsScreen() {
                     <View style={styles.metaRow}>
                       <MaterialCommunityIcons name="clock-time-three-outline" size={16} color={COLORS.textSecondary} />
                       <Text style={styles.metaText}>
-                        {new Date(item.dtPublicado).toLocaleDateString()} • {readingMinutes(item.contenido)} min de lectura
+                        {new Date(item.dtPublicado).toLocaleDateString()}
                       </Text>
                     </View>
 
@@ -341,28 +187,6 @@ export default function NewsScreen() {
                     <Text style={styles.newsExcerpt} numberOfLines={2}>{String(item.contenido || "").replace(/\n+/g, " ").trim()}</Text>
 
                     <View style={styles.footerRow}>
-                      <View style={styles.authorRow}>
-                        {(() => {
-                          const aId = extractAuthorId(item as any);
-                          const email = extractAuthorEmail(item as any);
-                          const resolvedId = aId || (email ? emailToId[email] : undefined);
-                          const info = resolvedId ? authorById[resolvedId] : undefined;
-                          const heuristic = heuristicAuthorName(item as any);
-                          const displayName = info?.name || heuristic || "";
-                          return (
-                            <>
-                              {info?.avatarUrl ? (
-                                <Image source={getSafeImageSource(info.avatarUrl)} style={styles.avatarImage} />
-                              ) : (
-                                <View style={styles.avatarCircle}>
-                                  <MaterialCommunityIcons name="account-outline" size={16} color={COLORS.textPrimary} />
-                                </View>
-                              )}
-                                  <Text style={styles.authorText}>Por {displayName || "Equipo EventApp"}</Text>
-                            </>
-                          );
-                        })()}
-                      </View>
                       <View style={styles.actionsRow}>
                         <TouchableOpacity
                           style={styles.iconBtn}
@@ -467,33 +291,8 @@ const styles = StyleSheet.create({
   footerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     marginTop: 10,
-  },
-  authorRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  avatarCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.backgroundLight,
-  },
-  avatarImage: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: COLORS.borderInput,
-  },
-  authorText: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
   },
   actionsRow: {
     flexDirection: "row",

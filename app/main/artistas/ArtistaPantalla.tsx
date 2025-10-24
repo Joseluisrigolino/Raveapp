@@ -1,7 +1,7 @@
 // src/screens/ArtistsScreens/ArtistScreen.tsx
 
-import React, { useState, useEffect } from "react";
-import { ScrollView, View, Text, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Dimensions, Alert } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { ScrollView, View, Text, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Dimensions, Alert, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Avatar } from "react-native-paper";
 import { useLocalSearchParams } from "expo-router";
@@ -23,6 +23,7 @@ export default function ArtistaPantalla() {
   const [artist, setArtist] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
+  const likeRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!id || !user) {
@@ -51,21 +52,52 @@ export default function ArtistaPantalla() {
 
   const toggleLike = async () => {
     if (!user || !artist) return;
+
+    // Cambiamos solo el estado del corazón para feedback inmediato
+    setIsLiked((prev) => !prev);
+
+    // Ejecutamos el toggle en el backend (sin depender del resultado inmediato)
     try {
-      const updated = await toggleArtistFavoriteOnApi(user.id, artist.idArtista);
-      if (updated) {
-        setArtist(updated);
-        setIsLiked(!!updated.isLiked);
-      } else {
-        // Fallback: re-fetch
-        const refreshed = await fetchOneArtistFromApi(id, user.id);
-        setArtist(refreshed);
-        setIsLiked(!!refreshed.isLiked);
-      }
+      await toggleArtistFavoriteOnApi(user.id, artist.idArtista);
     } catch (e) {
       console.error("Error al marcar favorito:", e);
+      // Si falla, revertimos el corazón visual y avisamos
+      setIsLiked((prev) => !prev);
       Alert.alert("Error", "No se pudo actualizar el favorito. Probá de nuevo.");
+      return;
     }
+
+    // Limpiar timeout previo si existe y agendar un refetch en 1 segundo
+    if (likeRefreshTimer.current) clearTimeout(likeRefreshTimer.current);
+    likeRefreshTimer.current = setTimeout(async () => {
+      try {
+        const refreshed = await fetchOneArtistFromApi(id, user.id);
+        if (refreshed) {
+          setArtist(refreshed);
+          // Sincronizamos icono con el backend por si hubo cambios intermedios
+          setIsLiked(!!refreshed.isLiked);
+        }
+      } catch (err) {
+        console.warn('No se pudo refrescar likes del artista:', err);
+      }
+    }, 1000);
+  };
+
+  // Limpiar timer al desmontar
+  useEffect(() => {
+    return () => {
+      if (likeRefreshTimer.current) clearTimeout(likeRefreshTimer.current);
+    };
+  }, []);
+
+  const openExternal = (raw?: string) => {
+    if (!raw || typeof raw !== 'string' || raw.trim().length === 0) {
+      Alert.alert('Enlace no disponible');
+      return;
+    }
+    let url = raw.trim();
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    Linking.openURL(url).catch(() => Alert.alert('No se pudo abrir el enlace'));
   };
 
   if (loading) {
@@ -105,9 +137,14 @@ export default function ArtistaPantalla() {
                     const has = typeof it.url === 'string' && it.url.trim().length > 0;
                     const iconColor = has ? it.color : COLORS.textSecondary;
                     return (
-                      <View key={it.key} style={styles.socialBubble}>
+                      <TouchableOpacity
+                        key={it.key}
+                        style={styles.socialBubble}
+                        activeOpacity={has ? 0.7 : 1}
+                        onPress={() => has ? openExternal(it.url!) : Alert.alert('Enlace no disponible')}
+                      >
                         <MaterialCommunityIcons name={it.icon as any} size={22} color={iconColor} />
-                      </View>
+                      </TouchableOpacity>
                     );
                   })}
                 </View>
@@ -128,13 +165,18 @@ export default function ArtistaPantalla() {
                     key={`${idx}-${uri}`}
                     size={20}
                     source={getSafeImageSource(uri)}
-                    style={[styles.avatar, idx === 0 ? { marginLeft: 2 } : { marginLeft: -8 }]}
+                    style={[styles.avatar, idx === 0 ? { marginLeft: -2 } : { marginLeft: -10 }]}
                   />
                 ));
               })()}
             </View>
             <Text style={styles.likeText} numberOfLines={1}>
-              {`A ${new Intl.NumberFormat('es-AR').format(Array.isArray(artist.likedByIds) ? artist.likedByIds.length : (artist.likesCount ?? 0))} personas les gusta esto`}
+              {(() => {
+                const count = Array.isArray(artist.likedByIds) && artist.likedByIds.length > 0
+                  ? artist.likedByIds.length
+                  : (typeof artist.likes === 'number' ? artist.likes : 0);
+                return `A ${new Intl.NumberFormat('es-AR').format(count)} personas les gusta esto`;
+              })()}
             </Text>
           </View>
 
@@ -198,10 +240,10 @@ const styles = StyleSheet.create({
     textDecorationLine: "none",
   },
   likesRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 4 },
-  heartWrap: { padding: 2 },
+  heartWrap: { padding: 2, marginRight: 2 },
   avatars: { flexDirection: 'row' },
   avatar: { borderWidth: 2, borderColor: COLORS.cardBg },
-  likeText: { fontFamily: FONTS.bodyRegular, fontSize: FONT_SIZES.body, color: COLORS.textPrimary, marginLeft: 6, flexShrink: 1 },
+  likeText: { fontFamily: FONTS.bodyRegular, fontSize: FONT_SIZES.body, color: COLORS.textPrimary, marginLeft: 4, flexShrink: 1 },
   bigImage: {
     width: '100%',
     height: screenWidth > 600 ? 300 : 220,

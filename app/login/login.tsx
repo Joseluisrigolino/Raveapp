@@ -151,7 +151,7 @@ export default function LoginScreen() {
           dni: "",
           telefono: "",
           nombreFantasia: "",
-          bio: "",
+          bio: "0",
           password: randomPassword,
           socials: { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
           dtNacimiento: new Date().toISOString(),

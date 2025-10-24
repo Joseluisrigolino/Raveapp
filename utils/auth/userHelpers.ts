@@ -145,7 +145,11 @@ export interface CreateUsuarioPayload {
 export async function createUsuario(
   payload: CreateUsuarioPayload
 ): Promise<void> {
-  await apiClient.post("/v1/Usuario/CreateUsuario", payload);
+  const finalPayload: CreateUsuarioPayload = {
+    ...payload,
+    bio: (payload.bio ?? "0") as string,
+  };
+  await apiClient.post("/v1/Usuario/CreateUsuario", finalPayload);
 }
 
 /**

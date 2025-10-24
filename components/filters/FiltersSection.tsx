@@ -1,4 +1,3 @@
-// components/FiltersSection/FiltersSection.tsx
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -16,7 +15,7 @@ import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { fetchGenres, ApiGenero } from "@/utils/events/eventApi";
 
 interface FiltersSectionProps {
-  // --- Estados y callbacks para los chips horizontales ---
+  // Chips horizontales
   isDateActive: boolean;
   isLocationActive: boolean;
   isGenreActive: boolean;
@@ -27,11 +26,11 @@ interface FiltersSectionProps {
   onToggleAfter: () => void;
   onToggleLgbt: () => void;
 
-  // --- Search bar ---
+  // Search bar
   searchText: string;
   onSearchTextChange: (val: string) => void;
 
-  // --- Date filter ---
+  // Date filter
   dateFilterOpen: boolean;
   onToggleDateFilter: () => void;
   startDate: Date | null;
@@ -44,7 +43,7 @@ interface FiltersSectionProps {
   onEndDateChange: (event: any, selectedDate?: Date) => void;
   onClearDates: () => void;
 
-  // --- Ubicación filter con 3 inputs ---
+  // Ubicación (3 inputs)
   locationFilterOpen: boolean;
   onToggleLocationFilter: () => void;
   // Provincia
@@ -65,14 +64,14 @@ interface FiltersSectionProps {
   // Botón para limpiar los 3 inputs
   onClearLocation: () => void;
 
-  // --- Género filter ---
+  // Género
   genreFilterOpen: boolean;
   onToggleGenreFilter: () => void;
   selectedGenres: string[];
   onToggleGenre: (genre: string) => void;
   onClearGenres: () => void;
 
-  // --- Control de scroll anidado (opcional) ---
+  // Control de scroll anidado (opcional)
   nestedScrollEnabled?: boolean;
 }
 
@@ -150,7 +149,7 @@ export default function FiltersSection(props: FiltersSectionProps) {
 
   return (
     <View style={styles.container}>
-      {/* CHIPS horizontales */}
+      {/* Chips horizontales */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -188,20 +187,44 @@ export default function FiltersSection(props: FiltersSectionProps) {
           <Text style={[styles.filterChipText, weekActive && styles.filterChipTextActive]}>Esta semana</Text>
         </TouchableOpacity>
 
-        {/* After */}
+        {/* AFTER con color propio */}
         <TouchableOpacity
-          style={[styles.filterChip, afterActive && styles.filterChipActive]}
+          style={[
+            styles.filterChip,
+            styles.afterChip,
+            afterActive && styles.afterChipActive,
+          ]}
           onPress={onToggleAfter}
         >
-          <Text style={[styles.filterChipText, afterActive && styles.filterChipTextActive]}>After</Text>
+          <Text
+            style={[
+              styles.filterChipText,
+              styles.afterChipText,
+              afterActive && styles.afterChipTextActive,
+            ]}
+          >
+            AFTER
+          </Text>
         </TouchableOpacity>
 
-        {/* LGBT */}
+        {/* LGTB con color propio */}
         <TouchableOpacity
-          style={[styles.filterChip, lgbtActive && styles.filterChipActive]}
+          style={[
+            styles.filterChip,
+            styles.lgtbChip,
+            lgbtActive && styles.lgtbChipActive,
+          ]}
           onPress={onToggleLgbt}
         >
-          <Text style={[styles.filterChipText, lgbtActive && styles.filterChipTextActive]}>LGBT</Text>
+          <Text
+            style={[
+              styles.filterChipText,
+              styles.lgtbChipText,
+              lgbtActive && styles.lgtbChipTextActive,
+            ]}
+          >
+            LGTB
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -259,7 +282,7 @@ export default function FiltersSection(props: FiltersSectionProps) {
         </View>
       )}
 
-      {/* Panel de ubicación con 3 inputs */}
+      {/* Panel de ubicación (3 inputs) */}
       {locationFilterOpen && (
         <View style={styles.locationFilterContainer}>
           <Text style={styles.dateFilterLabel}>Filtrar por ubicación:</Text>
@@ -275,7 +298,6 @@ export default function FiltersSection(props: FiltersSectionProps) {
           {provinceSuggestions.length > 0 && (
             <View style={styles.suggestionsContainer}>
               <ScrollView
-                style={styles.suggestionsScroll}
                 nestedScrollEnabled={nestedScrollEnabled}
                 keyboardShouldPersistTaps="handled"
               >
@@ -303,7 +325,6 @@ export default function FiltersSection(props: FiltersSectionProps) {
           {municipalitySuggestions.length > 0 && (
             <View style={styles.suggestionsContainer}>
               <ScrollView
-                style={styles.suggestionsScroll}
                 nestedScrollEnabled={nestedScrollEnabled}
                 keyboardShouldPersistTaps="handled"
               >
@@ -331,7 +352,6 @@ export default function FiltersSection(props: FiltersSectionProps) {
           {localitySuggestions.length > 0 && (
             <View style={styles.suggestionsContainer}>
               <ScrollView
-                style={styles.suggestionsScroll}
                 nestedScrollEnabled={nestedScrollEnabled}
                 keyboardShouldPersistTaps="handled"
               >
@@ -360,7 +380,6 @@ export default function FiltersSection(props: FiltersSectionProps) {
           <Text style={styles.dateFilterLabel}>Seleccionar géneros:</Text>
 
           <ScrollView
-            style={styles.genreScroll}
             nestedScrollEnabled={nestedScrollEnabled}
             keyboardShouldPersistTaps="handled"
           >
@@ -433,6 +452,36 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: COLORS.textPrimary,
   },
+  // AFTER chip con color propio
+  afterChip: {
+    backgroundColor: COLORS.tagAfter,
+    borderColor: "#C23679",
+  },
+  afterChipActive: {
+    backgroundColor: "#B8326E",
+    borderColor: "#9F2B60",
+  },
+  afterChipText: {
+    color: "#FFFFFF",
+  },
+  afterChipTextActive: {
+    color: "#FFFFFF",
+  },
+  // LGTB chip con color propio
+  lgtbChip: {
+    backgroundColor: COLORS.tagLGBT,
+    borderColor: "#38AAA6",
+  },
+  lgtbChipActive: {
+    backgroundColor: "#2EA19C",
+    borderColor: "#278A86",
+  },
+  lgtbChipText: {
+    color: "#FFFFFF",
+  },
+  lgtbChipTextActive: {
+    color: "#FFFFFF",
+  },
   searchContainer: {
     marginHorizontal: 12,
     marginTop: 10,
@@ -496,7 +545,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 4,
   },
-  suggestionsScroll: {},
   suggestionItem: {
     padding: 8,
     borderBottomWidth: 1,
@@ -514,7 +562,6 @@ const styles = StyleSheet.create({
     maxHeight: 250,
     overflow: "hidden",
   },
-  genreScroll: {},
   genreItem: {
     flexDirection: "row",
     alignItems: "center",

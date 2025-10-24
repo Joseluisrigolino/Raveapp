@@ -41,14 +41,20 @@ function TicketsPurchasedMenuContent() {
         const raw = await getEntradasUsuario(String(userId));
         const list = Array.isArray(raw) ? raw : [];
 
-        // 1) Extraer ids de evento de cada entrada
+        // 1) Helpers para IDs
         const getEventId = (r: any): string | null => {
           const ev = r?.evento ?? r?.event ?? null;
           const id = ev?.idEvento ?? ev?.id ?? r?.idEvento ?? r?.eventId ?? r?.id_evento;
           const s = String(id ?? "").trim();
           return s ? s : null;
         };
-        const uniqueIds = Array.from(
+        const getCompraId = (r: any): string | null => {
+          const id = r?.idCompra ?? r?.IdCompra ?? r?.compraId ?? r?.purchaseId ?? r?.id_compra ?? r?.compra?.idCompra ?? r?.pago?.idCompra;
+          const s = String(id ?? "").trim();
+          return s ? s : null;
+        };
+        // 2) Reunir todos los eventIds necesarios (aunque agrupemos por compra)
+        const uniqueEventIds = Array.from(
           new Set(
             list
               .map(getEventId)
@@ -56,10 +62,10 @@ function TicketsPurchasedMenuContent() {
           )
         );
 
-        // 2) Buscar detalles de eventos por cada id
+        // 3) Buscar detalles de eventos por cada id
         const eventMap = new Map<string, EventItemWithExtras>();
         await Promise.all(
-          uniqueIds.map(async (eid) => {
+          uniqueEventIds.map(async (eid) => {
             try {
               const evt = await fetchEventById(eid);
               if (evt?.id) eventMap.set(String(evt.id), evt);
@@ -69,36 +75,46 @@ function TicketsPurchasedMenuContent() {
           })
         );
 
-        // 3) Agrupar entradas por evento y mapear a una sola card por evento
+        // 4) Agrupar entradas por idCompra
         type Group = {
           count: number;
+          compraId: string;
+          eventId: string | null;
           evt: EventItemWithExtras | null;
-          fallback: any;
-          anyRaw: any; // por si necesitamos otros campos
+          fallbackEvent: any;
+          anyRaw: any;
         };
         const groups = new Map<string, Group>();
         list.forEach((r: any) => {
-          const fallbackEvent = r?.evento ?? r?.event ?? {};
+          const compraId = getCompraId(r);
           const eid = getEventId(r);
-          if (!eid) return; // si no hay id de evento, lo salteamos
-          const key = String(eid);
+          const fallbackEvent = r?.evento ?? r?.event ?? {};
+          if (!compraId && !eid) return; // si no hay compraId ni eventId, salteamos
+          const key = compraId ? String(compraId) : String(eid);
           const prev = groups.get(key);
           if (prev) {
             prev.count += 1;
+            // si no teníamos eventId, tomar la primera aparición
+            if (!prev.eventId && eid) {
+              prev.eventId = eid;
+              prev.evt = (eid && eventMap.get(eid)) || prev.evt;
+            }
           } else {
             groups.set(key, {
               count: 1,
-              evt: eventMap.get(key) || null,
-              fallback: fallbackEvent,
+              compraId: compraId || key,
+              eventId: eid || null,
+              evt: (eid && eventMap.get(eid)) || null,
+              fallbackEvent,
               anyRaw: r,
             });
           }
         });
 
-        // Construir las cards usando datos del evento real; agregar indicador "xN entradas"
-        const mapped: TicketPurchasedMenuItem[] = Array.from(groups.entries()).map(([eid, g], idx) => {
+        // 5) Construir las cards usando datos del evento real; agregar indicador "xN entradas"
+        const mapped: TicketPurchasedMenuItem[] = Array.from(groups.values()).map((g, idx) => {
           const ev = g.evt;
-          const fb = g.fallback || {};
+          const fb = g.fallbackEvent || {};
           const name = ev?.title ?? fb?.title ?? fb?.nombre ?? fb?.eventoNombre ?? "Evento";
           const date = ev?.date ?? fb?.date ?? fb?.fecha ?? "";
           const baseDesc = ev?.description ?? fb?.description ?? "";
@@ -108,17 +124,16 @@ function TicketsPurchasedMenuContent() {
           const estadoNum = Number(estado);
           const isFinished = estadoNum === ESTADO_CODES.FINALIZADO || estadoNum === ESTADO_CODES.CANCELADO;
 
-          // adjuntamos eventId y ticketsCount como campos extra (no tipados) para navegación
           return ({
-            // mantenemos un id numérico para la key/render; en un futuro podemos pasar eid como param de ruta
             id: idx + 1,
             imageUrl: String(imageUrl || ""),
             eventName: String(name || "Evento"),
             date: String(date || ""),
             description: String(desc || ""),
             isFinished,
-            // extras
-            eventId: eid,
+            // extras para navegación
+            eventId: g.eventId ?? undefined,
+            idCompra: g.compraId,
             ticketsCount: g.count,
           } as any) as TicketPurchasedMenuItem;
         });
@@ -146,9 +161,10 @@ function TicketsPurchasedMenuContent() {
     const anyItem: any = item as any;
     const eventId = anyItem?.eventId ? String(anyItem.eventId) : undefined;
     const ticketsCount = typeof anyItem?.ticketsCount === 'number' ? anyItem.ticketsCount : undefined;
+    const idCompra = anyItem?.idCompra ? String(anyItem.idCompra) : undefined;
     const route = item.isFinished
-      ? { pathname: ROUTES.MAIN.TICKETS.FINALIZED, params: { id: item.id, eventId, count: ticketsCount } }
-      : { pathname: ROUTES.MAIN.TICKETS.PURCHASED, params: { id: item.id, eventId, count: ticketsCount } };
+      ? { pathname: ROUTES.MAIN.TICKETS.FINALIZED, params: { id: item.id, eventId, count: ticketsCount, idCompra } }
+      : { pathname: ROUTES.MAIN.TICKETS.PURCHASED, params: { id: item.id, eventId, count: ticketsCount, idCompra } };
     nav.push(router, route);
   };
 

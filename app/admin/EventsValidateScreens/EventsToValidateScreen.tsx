@@ -254,14 +254,6 @@ export default function EventsToValidateScreen() {
   <TabMenuComponent tabs={tabs} />
 
   <View style={styles.content}>
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={() => nav.push(router, { pathname: ROUTES.MAIN.EVENTS.CREATE })}
-          >
-            <MaterialCommunityIcons name="plus" size={20} color={COLORS.backgroundLight} />
-            <Text style={styles.createButtonText}>Crear evento</Text>
-          </TouchableOpacity>
-
           <SearchBarComponent
             value={searchText}
             onChangeText={setSearchText}
@@ -307,22 +299,6 @@ const styles = StyleSheet.create({
   fontSize: FONT_SIZES.titleMain,
     color: COLORS.textPrimary,
     marginBottom: 12,
-  },
-  createButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#0F172A", // dark pill like mock
-    borderRadius: 14,
-    height: 44,
-    marginHorizontal: 0,
-    marginBottom: 12,
-  },
-  createButtonText: {
-    color: COLORS.backgroundLight,
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.button,
   },
   card: {
     backgroundColor: COLORS.backgroundLight,
