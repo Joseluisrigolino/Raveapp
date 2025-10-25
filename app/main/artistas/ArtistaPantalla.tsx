@@ -30,6 +30,7 @@ export default function ArtistaPantalla() {
       setLoading(false);
       return;
     }
+    console.log('ArtistaPantalla - id:', id);
     (async () => {
       setLoading(true);
       try {
@@ -171,12 +172,9 @@ export default function ArtistaPantalla() {
               })()}
             </View>
             <Text style={styles.likeText} numberOfLines={1}>
-              {(() => {
-                const count = Array.isArray(artist.likedByIds) && artist.likedByIds.length > 0
-                  ? artist.likedByIds.length
-                  : (typeof artist.likes === 'number' ? artist.likes : 0);
-                return `A ${new Intl.NumberFormat('es-AR').format(count)} personas les gusta esto`;
-              })()}
+              {`A ${new Intl.NumberFormat('es-AR').format(
+                typeof artist.likes === 'number' ? artist.likes : 0
+              )} personas les gusta esto`}
             </Text>
           </View>
 

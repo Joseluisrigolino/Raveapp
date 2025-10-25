@@ -15,8 +15,9 @@ import { fetchEventById, EventItemWithExtras } from "@/utils/events/eventApi";
 import { fetchEntradasFechaRaw, ApiEntradaFechaRaw, getTipoMap, fetchTiposEntrada, reservarEntradas, cancelarReserva, fetchReservaActiva, createPago } from "@/utils/events/entradaApi";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { useAuth } from "@/context/AuthContext";
-import { getUsuarioById } from "@/utils/auth/userHelpers";
+import { getUsuarioById, updateUsuario } from "@/utils/auth/userHelpers";
 import InputText from "@/components/common/inputText";
+import { fetchProvinces, fetchMunicipalities, fetchLocalitiesByName, fetchLocalities, fetchLocalitiesByProvince } from '@/utils/georef/georefHelpers';
 
 // Datos del comprador
 interface BuyerInfo {
@@ -78,6 +79,17 @@ function BuyTicketScreenContent() {
     municipio: "",
     provincia: "",
   });
+
+  // Georef lists & selection ids for chained selectors
+  const [provinces, setProvinces] = useState<Array<{ id: string; nombre: string }>>([]);
+  const [municipalities, setMunicipalities] = useState<Array<{ id: string; nombre: string }>>([]);
+  const [localities, setLocalities] = useState<Array<{ id: string; nombre: string }>>([]);
+  const [showProvinces, setShowProvinces] = useState(false);
+  const [showMunicipalities, setShowMunicipalities] = useState(false);
+  const [showLocalities, setShowLocalities] = useState(false);
+  const [provinceId, setProvinceId] = useState("");
+  const [municipalityId, setMunicipalityId] = useState("");
+  const [localityId, setLocalityId] = useState("");
 
   // Index de entradas por idEntrada para poder calcular subtotales y labels desde la API real
   const [entradasIndex, setEntradasIndex] = useState<Record<string, { idEntrada: string; idFecha: string; cdTipo: number; precio: number; nombreTipo: string }>>({});
@@ -225,7 +237,7 @@ function BuyTicketScreenContent() {
           phone: perfil.telefono || "",
           birthDate: birth,
         }));
-        // Prefill domicilio de facturación
+        // Prefill domicilio de facturación (nombres) and ids if available
         const dom = perfil.domicilio as any;
         setBillingAddress({
           direccion: dom?.direccion || "",
@@ -233,11 +245,77 @@ function BuyTicketScreenContent() {
           municipio: dom?.municipio?.nombre || "",
           provincia: dom?.provincia?.nombre || "",
         });
+        setProvinceId(dom?.provincia?.codigo || dom?.provincia?.codigoProvincia || dom?.provincia?.codigo || dom?.provincia?.id || "");
+        setMunicipalityId(dom?.municipio?.codigo || dom?.municipio?.codigoMunicipio || dom?.municipio?.id || "");
+        setLocalityId(dom?.localidad?.codigo || dom?.localidad?.codigoLocalidad || dom?.localidad?.id || "");
       } catch (e) {
         console.log("[BuyTicketScreen] No se pudo precargar datos de usuario:", e);
       }
     })();
   }, [user]);
+
+  // Cargar provincias al montar
+  useEffect(() => {
+    (async () => {
+      try {
+        const provs = await fetchProvinces().catch(() => [] as any[]);
+        setProvinces(provs || []);
+      } catch (e) {
+        console.log('[BuyTicketScreen] fetchProvinces error:', e);
+      }
+    })();
+  }, []);
+
+  // Handlers para selects encadenados (Provincia arriba; Municipio izquierda, Localidad derecha abajo)
+  const handleSelectProvince = async (id: string, nombre: string) => {
+    setProvinceId(id);
+    handleBillingChange('provincia', nombre);
+    setShowProvinces(false);
+    setMunicipalityId("");
+    setLocalityId("");
+    setMunicipalities([]);
+    setLocalities([]);
+    handleBillingChange('municipio', '');
+    handleBillingChange('localidad', '');
+
+    if (id === '02') {
+      // CABA: municipio = CABA
+      setMunicipalityId('02');
+      handleBillingChange('municipio', 'Ciudad Autónoma de Buenos Aires');
+      try {
+        const locs = await fetchLocalitiesByProvince(id).catch(() => [] as any[]);
+        setLocalities(locs || []);
+      } catch {}
+    } else {
+      try {
+        const munis = await fetchMunicipalities(String(id)).catch(() => [] as any[]);
+        setMunicipalities(munis || []);
+      } catch (e) {
+        console.log('[BuyTicketScreen] fetchMunicipalities error:', e);
+      }
+    }
+  };
+
+  const handleSelectMunicipality = async (id: string, nombre: string) => {
+    setMunicipalityId(id);
+    handleBillingChange('municipio', nombre);
+    setShowMunicipalities(false);
+    setLocalityId("");
+    setLocalities([]);
+    handleBillingChange('localidad', '');
+    try {
+      const locs = await fetchLocalities(String(provinceId), String(id)).catch(() => [] as any[]);
+      setLocalities(locs || []);
+    } catch (e) {
+      console.log('[BuyTicketScreen] fetchLocalities error:', e);
+    }
+  };
+
+  const handleSelectLocality = (id: string, nombre: string) => {
+    setLocalityId(id);
+    handleBillingChange('localidad', nombre);
+    setShowLocalities(false);
+  };
 
   // Al volver desde Mercado Pago (backUrl), cerrar la sesión del navegador y navegar a la pantalla de vuelta
   useEffect(() => {
@@ -362,6 +440,101 @@ function BuyTicketScreenContent() {
     setBuyerInfo((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Billing address change handlers
+  const handleBillingChange = (field: keyof BillingAddress, value: string) => {
+    setBillingAddress((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Persistir domicilio usando georef para resolver códigos. Devuelve true si se guardó OK.
+  const persistBillingBeforeConfirm = async (): Promise<boolean> => {
+    try {
+      if (!isBillingComplete) {
+        Alert.alert('Domicilio incompleto', 'Completá todos los campos de domicilio antes de continuar.');
+        return false;
+      }
+      const uid: string | null = (user as any)?.id ?? (user as any)?.idUsuario ?? (user as any)?.userId ?? null;
+      if (!uid) {
+        Alert.alert('Usuario no detectado', 'Iniciá sesión nuevamente para continuar.');
+        return false;
+      }
+
+      // Intentar resolver códigos geográficos con la API de georef
+      let provinciaCodigo = "";
+      let municipioCodigo = "";
+      let localidadCodigo = "";
+
+      try {
+        const provs = await fetchProvinces().catch(() => [] as any[]);
+        const matchProv = provs.find((p: any) => String(p.nombre || '').toLowerCase().trim() === String(billingAddress.provincia || '').toLowerCase().trim());
+        if (matchProv) provinciaCodigo = String(matchProv.id || matchProv.codigo || '');
+        // Si encontramos provincia, intentar obtener municipios y localidades
+        if (provinciaCodigo) {
+          try {
+            const munis = await fetchMunicipalities(String(provinciaCodigo)).catch(() => [] as any[]);
+            const matchMuni = munis.find((m: any) => String(m.nombre || '').toLowerCase().trim() === String(billingAddress.municipio || '').toLowerCase().trim());
+            if (matchMuni) municipioCodigo = String(matchMuni.id || matchMuni.codigo || '');
+            // Para localidad intentamos buscar por nombre (puede devolver varias, tomamos la primera que coincida)
+            const locMatches = await fetchLocalitiesByName(String(billingAddress.localidad || '')).catch(() => [] as any[]);
+            if (Array.isArray(locMatches) && locMatches.length) {
+              const mLoc = locMatches.find((l: any) => String(l.nombre || '').toLowerCase().trim() === String(billingAddress.localidad || '').toLowerCase().trim());
+              if (mLoc) localidadCodigo = String(mLoc.id || mLoc.codigo || '');
+            }
+          } catch (gErr) {
+            console.log('[BuyTicketScreen] georef municipio/localidad lookup error:', gErr);
+          }
+        }
+      } catch (gErr) {
+        console.log('[BuyTicketScreen] georef province lookup error:', gErr);
+      }
+
+      // Obtener perfil y componer payload completo para updateUsuario
+      const perfil = await getUsuarioById(String(uid)).catch(() => null);
+      if (!perfil) {
+        Alert.alert('Error', 'No se pudo obtener perfil de usuario para actualizar domicilio.');
+        return false;
+      }
+
+      const domicilioPayload = {
+        direccion: billingAddress.direccion || perfil.domicilio?.direccion || "",
+        localidad: { nombre: billingAddress.localidad || perfil.domicilio?.localidad?.nombre || "", codigo: localidadCodigo || perfil.domicilio?.localidad?.codigo || "" },
+        municipio: { nombre: billingAddress.municipio || perfil.domicilio?.municipio?.nombre || "", codigo: municipioCodigo || perfil.domicilio?.municipio?.codigo || "" },
+        provincia: { nombre: billingAddress.provincia || perfil.domicilio?.provincia?.nombre || "", codigo: provinciaCodigo || perfil.domicilio?.provincia?.codigo || "" },
+        latitud: perfil.domicilio?.latitud ?? 0,
+        longitud: perfil.domicilio?.longitud ?? 0,
+      };
+
+      const payload = {
+        idUsuario: perfil.idUsuario,
+        nombre: perfil.nombre || "",
+        apellido: perfil.apellido || "",
+        correo: perfil.correo || "",
+        dni: perfil.dni || "",
+        telefono: perfil.telefono || "",
+        cbu: perfil.cbu || "",
+        nombreFantasia: perfil.nombreFantasia || "",
+        bio: perfil.bio || "0",
+        dtNacimiento: perfil.dtNacimiento || new Date().toISOString(),
+        domicilio: domicilioPayload,
+        cdRoles: perfil.cdRoles || [],
+        socials: perfil.socials || { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
+      } as any;
+
+      try {
+        await updateUsuario(payload);
+        console.log('[BuyTicketScreen] Domicilio actualizado en el servidor (confirm)');
+        return true;
+      } catch (err) {
+        console.error('[BuyTicketScreen] Error al actualizar domicilio (confirm):', err);
+        Alert.alert('Error', 'No se pudo actualizar el domicilio. Intentá nuevamente.');
+        return false;
+      }
+    } catch (e) {
+      console.error('[BuyTicketScreen] persistBillingBeforeConfirm error:', e);
+      Alert.alert('Error', 'Ocurrió un error al validar el domicilio.');
+      return false;
+    }
+  };
+
   // Group selección por idFecha usando el índice de entradas
   const groupedSelection = useMemo(() => {
     const byFecha: Record<string, Array<{ idEntrada: string; label: string; qty: number; price: number }>> = {};
@@ -431,6 +604,14 @@ function BuyTicketScreenContent() {
   const mm = String(Math.floor(remainingSec / 60)).padStart(2, "0");
   const ss = String(remainingSec % 60).padStart(2, "0");
 
+  // Validación de domicilio: todos los campos deben estar completos antes de confirmar
+  const isBillingComplete = Boolean(
+    String(billingAddress.direccion || "").trim() &&
+      String(billingAddress.localidad || "").trim() &&
+      String(billingAddress.municipio || "").trim() &&
+      String(billingAddress.provincia || "").trim()
+  );
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -458,6 +639,11 @@ function BuyTicketScreenContent() {
   const handleConfirmPurchase = async () => {
     if (isExpired) return;
     if (!acceptedTyc) return;
+
+    // Persistir domicilio antes de continuar
+    const persisted = await persistBillingBeforeConfirm();
+    if (!persisted) return;
+
     try {
       setIsSubmitting(true);
       try { console.log("========================== selectedTickets:", JSON.stringify(selectedTickets)); } catch {}
@@ -747,7 +933,7 @@ function BuyTicketScreenContent() {
         </View>
 
         <Text style={styles.sectionTitle}>Tus datos</Text>
-        <View style={styles.buyerForm}>
+  <View style={styles.buyerForm}>
           {/* Nombre / Apellido */}
           <View style={styles.formRow}>
             <View style={styles.halfInputContainer}>
@@ -867,60 +1053,94 @@ function BuyTicketScreenContent() {
                 label="Dirección"
                 value={billingAddress.direccion}
                 isEditing={true}
-                editable={false}
+                editable={true}
                 onBeginEdit={() => {}}
-                onChangeText={() => {}}
+                onChangeText={(t) => handleBillingChange('direccion', t)}
                 containerStyle={styles.inputContainer}
-                inputStyle={styles.inputPaper}
+                inputStyle={styles.editableInputPaper}
                 labelStyle={styles.inputLabel}
               />
             </View>
           </View>
-          {/* Localidad / Municipio */}
-          <View style={styles.formRow}>
-            <View style={styles.halfInputContainer}>
-              <InputText
-                label="Localidad"
-                value={billingAddress.localidad}
-                isEditing={true}
-                editable={false}
-                onBeginEdit={() => {}}
-                onChangeText={() => {}}
-                containerStyle={styles.inputContainer}
-                inputStyle={styles.inputPaper}
-                labelStyle={styles.inputLabel}
-              />
-            </View>
-            <View style={styles.halfInputContainer}>
-              <InputText
-                label="Municipio"
-                value={billingAddress.municipio}
-                isEditing={true}
-                editable={false}
-                onBeginEdit={() => {}}
-                onChangeText={() => {}}
-                containerStyle={styles.inputContainer}
-                inputStyle={styles.inputPaper}
-                labelStyle={styles.inputLabel}
-              />
-            </View>
-          </View>
-          {/* Provincia */}
+          {/* Provincia (full-width) */}
           <View style={styles.formRow}>
             <View style={styles.fullInputContainer}>
-              <InputText
-                label="Provincia"
-                value={billingAddress.provincia}
-                isEditing={true}
-                editable={false}
-                onBeginEdit={() => {}}
-                onChangeText={() => {}}
-                containerStyle={styles.inputContainer}
-                inputStyle={styles.inputPaper}
-                labelStyle={styles.inputLabel}
-              />
+              <TouchableOpacity
+                style={styles.dropdownButton}
+                onPress={() => {
+                  setShowProvinces((s) => !s);
+                  setShowMunicipalities(false);
+                  setShowLocalities(false);
+                }}
+              >
+                <Text style={styles.dropdownText}>{billingAddress.provincia || 'Seleccione provincia'}</Text>
+              </TouchableOpacity>
+              {showProvinces && (
+                <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" style={[styles.dropdownContainer, { maxHeight: 180 }]}> 
+                  {provinces.map((p) => (
+                    <TouchableOpacity key={p.id} style={styles.dropdownItem} onPress={() => handleSelectProvince(p.id, p.nombre)}>
+                      <Text style={styles.dropdownItemText}>{p.nombre}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
             </View>
           </View>
+
+          {/* Municipio (left) / Localidad (right) */}
+          <View style={styles.formRow}>
+            <View style={styles.halfInputContainer}>
+              <TouchableOpacity
+                style={[styles.dropdownButton, !provinceId && { opacity: 0.5 }]}
+                disabled={!provinceId}
+                onPress={() => {
+                  setShowMunicipalities((s) => !s);
+                  setShowProvinces(false);
+                  setShowLocalities(false);
+                }}
+              >
+                <Text style={[styles.dropdownText, !provinceId && { opacity: 0.5 }]}> {billingAddress.municipio || 'Seleccione municipio'}</Text>
+              </TouchableOpacity>
+              {showMunicipalities && (
+                <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" style={[styles.dropdownContainer, { maxHeight: 180 }]}> 
+                  {municipalities.map((m) => (
+                    <TouchableOpacity key={m.id} style={styles.dropdownItem} onPress={() => handleSelectMunicipality(m.id, m.nombre)}>
+                      <Text style={styles.dropdownItemText}>{m.nombre}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+            <View style={styles.halfInputContainer}>
+              <TouchableOpacity
+                style={[styles.dropdownButton, (!municipalityId && provinceId !== '02') && { opacity: 0.5 }]}
+                disabled={!municipalityId && provinceId !== '02'}
+                onPress={() => {
+                  setShowLocalities((s) => !s);
+                  setShowProvinces(false);
+                  setShowMunicipalities(false);
+                }}
+              >
+                <Text style={[styles.dropdownText, (!municipalityId && provinceId !== '02') && { opacity: 0.5 }]}>{billingAddress.localidad || 'Seleccione localidad'}</Text>
+              </TouchableOpacity>
+              {showLocalities && (
+                <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" style={[styles.dropdownContainer, { maxHeight: 180 }]}> 
+                  {localities.map((l) => (
+                    <TouchableOpacity key={l.id} style={styles.dropdownItem} onPress={() => handleSelectLocality(l.id, l.nombre)}>
+                      <Text style={styles.dropdownItemText}>{l.nombre}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          </View>
+
+        {/* Mensaje de validación si falta completar domicilio */}
+        {!isBillingComplete && (
+          <View style={{ paddingHorizontal: 16, marginTop: -6 }}>
+            <Text style={styles.validationText}>Completá todos los campos de domicilio para poder continuar.</Text>
+          </View>
+        )}
         </View>
 
         {/* Aceptación de TyC */}
@@ -939,9 +1159,9 @@ function BuyTicketScreenContent() {
         </View>
 
         <TouchableOpacity
-          style={[styles.confirmButton, (isExpired || !acceptedTyc || isSubmitting) && styles.confirmButtonDisabled]}
+          style={[styles.confirmButton, (isExpired || !acceptedTyc || isSubmitting || !isBillingComplete) && styles.confirmButtonDisabled]}
           onPress={handleConfirmPurchase}
-          disabled={isExpired || !acceptedTyc || isSubmitting}
+          disabled={isExpired || !acceptedTyc || isSubmitting || !isBillingComplete}
         >
           <Text style={styles.confirmButtonText}>{isSubmitting ? "PROCESANDO…" : "CONFIRMAR COMPRA"}</Text>
         </TouchableOpacity>
@@ -1171,6 +1391,64 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     opacity: 0.7,
+  },
+  dropdownButton: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderColor: "#d1d5db",
+    borderWidth: 1,
+    minHeight: 48,
+    padding: 12,
+    marginBottom: 4,
+    justifyContent: 'center',
+    // Shadow para iOS
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    // Elevation para Android
+    elevation: 1,
+  },
+  dropdownText: {
+    color: "#374151",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  dropdownContainer: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    maxHeight: 200,
+    marginBottom: 8,
+    // Shadow para iOS
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    // Elevation para Android
+    elevation: 4,
+  },
+  dropdownItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: "#374151",
+  },
+  // Estilo específico para inputs editables (domicilio) - más blanco para indicar editable
+  editableInputPaper: {
+    width: "100%",
+    opacity: 1,
+    backgroundColor: "#ffffff",
+  },
+  validationText: {
+    color: "#dc2626", // rojo suave
+    fontSize: FONT_SIZES.smallText,
+    textAlign: "left",
+    marginTop: 6,
   },
   priceSummary: {
     marginVertical: 12,

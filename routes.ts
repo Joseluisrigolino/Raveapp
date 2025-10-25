@@ -51,7 +51,7 @@ export const ROUTES = {
     MANAGE_EVENTS: "/owner/AdministrarEventosPantalla",
     TICKET_SOLD: "/owner/TicketSoldScreen",
     MODIFY_EVENT: "/owner/ModifyEventScreen",
-    CANCEL_EVENT: "/owner/CancelEventScreen",
+  CANCEL_EVENT: "/owner/CancelarEventoPantalla",
   },
   LOGIN: {
     LOGIN: "/login/login",

@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS, RADIUS } from "@/styles/globalStyles";
 import InputText from "@/components/common/inputText";
 
@@ -69,7 +70,7 @@ export default function MediaSection({
       </Text>
 
       <View style={{ marginTop: 10 }}>
-        <Text style={styles.label}>Previsualización:</Text>
+        <Text style={styles.label}>Imagen del evento</Text>
         {photoTooLarge ? (
           <View style={[styles.previewImage, styles.previewTooLarge]}>
             <Text style={styles.tooLargeText}>
@@ -78,18 +79,34 @@ export default function MediaSection({
             </Text>
             <Text style={styles.tooLargeSub}>Seleccioná otra imagen más liviana.</Text>
           </View>
-        ) : photoFile ? (
-          <>
-            <Image source={{ uri: photoFile }} style={styles.previewImage} />
-            {onDeletePhoto ? (
-              <TouchableOpacity style={styles.deleteButton} onPress={onDeletePhoto}>
-                <Text style={styles.deleteButtonText}>Eliminar imagen</Text>
-              </TouchableOpacity>
-            ) : null}
-          </>
         ) : (
-          <View style={[styles.previewImage, styles.previewEmpty]} />
+          <TouchableOpacity style={[styles.previewImage, photoFile ? {} : styles.previewEmpty]} onPress={onSelectPhoto} activeOpacity={0.8}>
+            {!photoFile ? (
+              <>
+                <MaterialCommunityIcons name="cloud-upload-outline" size={28} color={COLORS.textSecondary} />
+                <Text style={styles.previewEmptyText}>Toca para subir imagen</Text>
+              </>
+            ) : (
+              <Image source={{ uri: photoFile }} style={styles.previewImage} />
+            )}
+          </TouchableOpacity>
         )}
+
+        {/* Vista previa adicional (bloque gris como en maqueta) */}
+        <View style={styles.previewBox}>
+          {photoFile ? (
+            <Image source={{ uri: photoFile }} style={styles.previewBoxImage} />
+          ) : (
+            <View style={styles.previewBoxEmpty}>
+              <Text style={styles.previewBoxEmptyText}>Vista previa</Text>
+            </View>
+          )}
+        </View>
+        {photoFile && onDeletePhoto ? (
+          <TouchableOpacity style={styles.deleteButton} onPress={onDeletePhoto}>
+            <Text style={styles.deleteButtonText}>Eliminar imagen</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <InputText
@@ -161,7 +178,24 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.backgroundLight,
     borderWidth: 1,
     borderColor: COLORS.borderInput,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 12,
   },
+  previewEmptyText: { color: COLORS.textSecondary, marginTop: 8 },
+  previewBox: {
+    marginTop: 12,
+    backgroundColor: '#e9ecef',
+    height: 140,
+    borderRadius: RADIUS.card,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewBoxImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  previewBoxEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%' },
+  previewBoxEmptyText: { color: COLORS.textSecondary },
   previewTooLarge: {
     backgroundColor: '#f3f4f6',
     borderWidth: 1,

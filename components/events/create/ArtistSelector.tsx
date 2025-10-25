@@ -86,35 +86,24 @@ export default function ArtistSelector({
       {selectedArtists.length > 0 && (
         <>
           <View style={styles.line} />
-          <View style={{ gap: 8 }}>
+          <View style={styles.tagsRow}>
             {selectedArtists.map((a) => (
-              <View key={a.name} style={styles.artistPickedWrapper}>
-                <View style={styles.artistPickedRow}>
-                  <MaterialCommunityIcons
-                    name={a.__isNew ? "clock-outline" : "check"}
-                    size={18}
-                    color={a.__isNew ? "#f5a623" : "#17a34a"}
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text style={styles.artistPickedName}>{a.name}</Text>
-                  <TouchableOpacity
-                    style={styles.removeBubble}
-                    onPress={() => onRemoveArtist(a.name)}
-                  >
-                    <MaterialCommunityIcons name="close" size={14} color="#fff" />
-                  </TouchableOpacity>
-                </View>
+              <View key={a.name} style={styles.tagPill}>
+                <Text style={styles.tagText}>{a.name}</Text>
+                <TouchableOpacity onPress={() => onRemoveArtist(a.name)} style={styles.tagRemove}>
+                  <MaterialCommunityIcons name="close" size={12} color="#fff" />
+                </TouchableOpacity>
               </View>
             ))}
-            {selectedArtists.some((x) => (x as any).__isNew) && (
-              <View style={styles.notePill}>
-                <MaterialCommunityIcons name="clock-outline" size={14} color="#f5a623" style={{ marginRight: 8 }} />
-                <Text style={styles.notePillText}>
-                  Los artistas añadidos manualmente quedan en estado pendiente y deberán ser autorizados por un administrador antes de su publicación.
-                </Text>
-              </View>
-            )}
           </View>
+          {selectedArtists.some((x) => (x as any).__isNew) && (
+            <View style={styles.notePill}>
+              <MaterialCommunityIcons name="clock-outline" size={14} color="#f5a623" style={{ marginRight: 8 }} />
+              <Text style={styles.notePillText}>
+                Los artistas añadidos manualmente quedan en estado pendiente y deberán ser autorizados por un administrador antes de su publicación.
+              </Text>
+            </View>
+          )}
         </>
       )}
     </View>
@@ -178,29 +167,29 @@ const styles = StyleSheet.create({
     borderBottomColor: "#eee",
   },
   hint: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
-  artistPickedRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.backgroundLight,
-    borderRadius: RADIUS.card,
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
-    paddingVertical: 8,
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  tagPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.textPrimary,
+    paddingVertical: 6,
     paddingHorizontal: 10,
+    borderRadius: 999,
+    marginRight: 8,
   },
-  artistPickedName: {
-    color: COLORS.textPrimary,
-    fontWeight: "600",
-    flex: 1,
-  },
-  removeBubble: {
+  tagText: { color: '#fff', fontWeight: '600', marginRight: 8 },
+  tagRemove: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: COLORS.negative,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)'
   },
   line: {
     height: 1,

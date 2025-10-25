@@ -104,13 +104,46 @@ export async function getUsuarioById(idUsuario: string): Promise<ApiUserFull> {
 
 // 2) Actualizar perfil
 export async function updateUsuario(payload: UpdateUsuarioPayload): Promise<void> {
-  console.log("updateUsuario - Payload recibido:", JSON.stringify(payload, null, 2));
-  
+  // Normalizar payload para evitar nulls que la API valida como campos faltantes
+  const safeSocials = {
+    idSocial: String((payload as any)?.socials?.idSocial ?? "") || "",
+    mdInstagram: String((payload as any)?.socials?.mdInstagram ?? "") || "",
+    mdSpotify: String((payload as any)?.socials?.mdSpotify ?? "") || "",
+    mdSoundcloud: String((payload as any)?.socials?.mdSoundcloud ?? "") || "",
+  };
+
+  const safeDomicilio = {
+    direccion: payload.domicilio?.direccion ?? "",
+    localidad: {
+      nombre: payload.domicilio?.localidad?.nombre ?? "",
+      codigo: payload.domicilio?.localidad?.codigo ?? "",
+    },
+    municipio: {
+      nombre: payload.domicilio?.municipio?.nombre ?? "",
+      codigo: payload.domicilio?.municipio?.codigo ?? "",
+    },
+    provincia: {
+      nombre: payload.domicilio?.provincia?.nombre ?? "",
+      codigo: payload.domicilio?.provincia?.codigo ?? "",
+    },
+    latitud: typeof payload.domicilio?.latitud === 'number' ? payload.domicilio.latitud : 0,
+    longitud: typeof payload.domicilio?.longitud === 'number' ? payload.domicilio.longitud : 0,
+  };
+
+  const finalPayload: UpdateUsuarioPayload = {
+    ...payload,
+    domicilio: safeDomicilio as any,
+    cdRoles: Array.isArray(payload.cdRoles) ? payload.cdRoles : [],
+    socials: safeSocials as any,
+  };
+
+  console.log("updateUsuario - Payload recibido:", JSON.stringify(finalPayload, null, 2));
+
   try {
-    const response = await apiClient.put("/v1/Usuario/UpdateUsuario", payload, {
+    const response = await apiClient.put("/v1/Usuario/UpdateUsuario", finalPayload, {
       headers: {
-        'Content-Type': 'application/json'
-      }
+        "Content-Type": "application/json",
+      },
     });
     console.log("updateUsuario - Respuesta exitosa:", response.status);
   } catch (error: any) {

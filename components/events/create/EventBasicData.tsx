@@ -64,100 +64,124 @@ export default function EventBasicData(props: Props) {
         inputStyle={{ width: "100%" }}
       />
 
-      <View style={[styles.flagsRow, { marginTop: 10 }]}>
-        <TouchableOpacity
-          style={styles.checkRow}
-          onPress={() => props.setIsRecurring(!isRecurring)}
-        >
-          <View style={[styles.checkBox, isRecurring && styles.checkBoxOn]} />
-          <Text style={styles.checkText}>Este evento es recurrente</Text>
-        </TouchableOpacity>
-      </View>
-
-      {isRecurring && (
-        <View style={styles.recurringBox}>
-          <SelectField
-            label="Seleccioná una fiesta"
-            value={
-              partyLoading
-                ? "Cargando…"
-                : selectedPartyId
-                ? myParties.find((p) => p.idFiesta === selectedPartyId)?.nombre || "Sin nombre"
-                : ""
-            }
-            placeholder={partyLoading ? "Cargando…" : "Seleccioná una opción"}
-            onPress={() => setShowPartyDropdown(!showPartyDropdown)}
-            isOpen={showPartyDropdown}
-            containerStyle={{ width: "100%" }}
-            labelStyle={{ width: "100%", marginLeft: 2 }}
-            fieldStyle={{ width: "100%" }}
-          />
-
-          {showPartyDropdown && (
-            <View style={styles.dropdownContainer}>
-              {partyLoading && (
-                <View style={styles.dropdownItem}>
-                  <Text style={styles.hint}>Cargando…</Text>
-                </View>
-              )}
-              {!partyLoading && myParties.length === 0 && (
-                <View style={styles.dropdownItem}>
-                  <Text style={styles.hint}>No tenés fiestas aún.</Text>
-                </View>
-              )}
-              {!partyLoading &&
-                myParties.map((p) => (
-                  <TouchableOpacity
-                    key={p.idFiesta}
-                    style={styles.dropdownItem}
-                    onPress={() => props.onPickParty(p)}
-                  >
-                    <Text>{p.nombre || "(sin nombre)"}</Text>
-                  </TouchableOpacity>
-                ))}
-            </View>
-          )}
-
-          <View style={{ flexDirection: "row", alignItems: "center", columnGap: 8, marginTop: 12 }}>
-            <View style={{ flex: 1 }}>
-              <InputText
-                label="O crear una nueva"
-                value={newPartyName}
-                isEditing={true}
-                onBeginEdit={() => {}}
-                onChangeText={setNewPartyName}
-                placeholder="Nombre de la nueva fiesta"
-                labelStyle={{ width: "100%", alignSelf: "flex-start", marginLeft: 2 }}
-                inputStyle={{ width: "100%" }}
-                editable={!newPartyLocked}
-              />
-            </View>
-            <TouchableOpacity
-              style={[styles.addIconBtn, { opacity: newPartyLocked || !newPartyName.trim() ? 0.5 : 1 }]}
-              onPress={props.onPressAddNewParty}
-              disabled={newPartyLocked || !newPartyName.trim()}
-            >
-              <Text style={styles.addIconText}>+</Text>
-            </TouchableOpacity>
-          </View>
-
-          {newPartyLocked && (
-            <Text style={[styles.hint, { marginTop: 6 }]}>
-              Se creará con ese nombre al enviar el evento.
-            </Text>
-          )}
+      {/* Recurring toggle styled as two buttons */}
+      <View style={{ marginTop: 10 }}>
+        <Text style={[styles.label, { marginBottom: 8 }]}>¿Es un evento recurrente?</Text>
+        <View style={styles.recurringSegment}>
+          <TouchableOpacity
+            style={[styles.recurringItem, !isRecurring && styles.recurringItemOn]}
+            onPress={() => setIsRecurring(false)}
+          >
+            <Text style={[styles.recurringText, !isRecurring && styles.recurringTextOn]}>No</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.recurringItem, isRecurring && styles.recurringItemOn]}
+            onPress={() => setIsRecurring(true)}
+          >
+            <Text style={[styles.recurringText, isRecurring && styles.recurringTextOn]}>Sí</Text>
+          </TouchableOpacity>
         </View>
-      )}
+
+        {isRecurring && (
+          <View style={styles.recurringBox}>
+            <InputText
+              label="Escribir evento recurrente"
+              value={newPartyName}
+              isEditing={true}
+              onBeginEdit={() => {}}
+              onChangeText={setNewPartyName}
+              placeholder="Escribir evento recurrente"
+              labelStyle={{ width: "100%", alignSelf: "flex-start", marginLeft: 2 }}
+              inputStyle={{ width: "100%" }}
+              editable={!newPartyLocked}
+            />
+
+            <SelectField
+              label="Seleccioná una fiesta"
+              value={
+                partyLoading
+                  ? "Cargando…"
+                  : selectedPartyId
+                  ? myParties.find((p) => p.idFiesta === selectedPartyId)?.nombre || "Sin nombre"
+                  : ""
+              }
+              placeholder={partyLoading ? "Cargando…" : "Seleccioná una opción"}
+              onPress={() => setShowPartyDropdown(!showPartyDropdown)}
+              isOpen={showPartyDropdown}
+              containerStyle={{ width: "100%" }}
+              labelStyle={{ width: "100%", marginLeft: 2 }}
+              fieldStyle={{ width: "100%" }}
+            />
+
+            {showPartyDropdown && (
+              <View style={styles.dropdownContainer}>
+                {partyLoading && (
+                  <View style={styles.dropdownItem}>
+                    <Text style={styles.hint}>Cargando…</Text>
+                  </View>
+                )}
+                {!partyLoading && myParties.length === 0 && (
+                  <View style={styles.dropdownItem}>
+                    <Text style={styles.hint}>No tenés fiestas aún.</Text>
+                  </View>
+                )}
+                {!partyLoading &&
+                  myParties.map((p) => (
+                    <TouchableOpacity
+                      key={p.idFiesta}
+                      style={styles.dropdownItem}
+                      onPress={() => props.onPickParty(p)}
+                    >
+                      <Text>{p.nombre || "(sin nombre)"}</Text>
+                    </TouchableOpacity>
+                  ))}
+              </View>
+            )}
+
+            <View style={{ flexDirection: "row", alignItems: "center", columnGap: 8, marginTop: 12 }}>
+              <View style={{ flex: 1 }}>
+                <InputText
+                  label="O crear una nueva"
+                  value={newPartyName}
+                  isEditing={true}
+                  onBeginEdit={() => {}}
+                  onChangeText={setNewPartyName}
+                  placeholder="Nombre de la nueva fiesta"
+                  labelStyle={{ width: "100%", alignSelf: "flex-start", marginLeft: 2 }}
+                  inputStyle={{ width: "100%" }}
+                  editable={!newPartyLocked}
+                />
+              </View>
+              <TouchableOpacity
+                style={[styles.addIconBtn, { opacity: newPartyLocked || !newPartyName.trim() ? 0.5 : 1 }]}
+                onPress={props.onPressAddNewParty}
+                disabled={newPartyLocked || !newPartyName.trim()}
+              >
+                <Text style={styles.addIconText}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            {newPartyLocked && (
+              <Text style={[styles.hint, { marginTop: 6 }]}>Se creará con ese nombre al enviar el evento.</Text>
+            )}
+          </View>
+        )}
+      </View>
 
       <View style={styles.line} />
       <Text style={[styles.label, { marginBottom: 10 }]}>Tipo de evento</Text>
       <View style={styles.segment}>
-        {(["1d", "2d", "3d"] as EventType[]).map((v) => {
+        {(["1d", "2d", "3d"] as EventType[]).map((v, idx) => {
           const active = eventType === v;
+          const isLast = idx === 2;
           return (
             <TouchableOpacity
               key={v}
-              style={[styles.segmentItem, active && styles.segmentItemOn]}
+              style={[
+                styles.segmentItem,
+                active && styles.segmentItemOn,
+                !isLast && styles.segmentItemMargin,
+              ]}
               onPress={() => setEventType(v)}
             >
               <Text style={[styles.segmentText, active && styles.segmentTextOn]}>
@@ -256,20 +280,21 @@ const styles = StyleSheet.create({
     borderBottomColor: "#eee",
   },
   segment: {
-    backgroundColor: COLORS.backgroundLight,
-    borderRadius: RADIUS.card,
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
     flexDirection: "row",
-    overflow: "hidden",
-  },
-  segmentItem: {
-    flex: 1,
-    paddingVertical: 10,
     alignItems: "center",
   },
+  segmentItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+  },
   segmentItemOn: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.textPrimary,
+    borderColor: COLORS.textPrimary,
   },
   segmentText: { color: COLORS.textPrimary, fontWeight: "600" },
   segmentTextOn: { color: COLORS.cardBg },
@@ -293,4 +318,26 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginTop: -2,
   },
+  recurringSegment: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  recurringItem: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.backgroundLight,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    marginRight: 10,
+  },
+  recurringItemOn: {
+    backgroundColor: COLORS.textPrimary,
+    borderColor: COLORS.textPrimary,
+  },
+  recurringText: { color: COLORS.textPrimary, fontWeight: "600" },
+  recurringTextOn: { color: COLORS.cardBg },
+  segmentItemMargin: { marginRight: 12 },
 });

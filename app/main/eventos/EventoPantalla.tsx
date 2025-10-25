@@ -598,6 +598,7 @@ export default function EventScreen() {
             subtotal={subtotal}
             noEntradasAvailable={noEntradasAvailable}
             onBuy={handleBuyPress}
+            isAdmin={hasRole("admin")}
           />
 
           {/* Reproductores multimedia debajo de la sección de entradas */}

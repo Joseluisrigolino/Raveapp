@@ -60,9 +60,9 @@ export default function SelectField({
 }
 
 const styles = StyleSheet.create({
-  wrapper: { width: "100%", alignItems: "center" },
+  wrapper: { width: "100%", alignItems: "flex-start" },
   label: {
-    width: "90%",
+    width: "100%",
     fontSize: FONT_SIZES.body + 2,
     fontFamily: FONTS.subTitleMedium,
     color: COLORS.textPrimary,
@@ -70,26 +70,26 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   field: {
-    width: "90%",
+    width: "100%",
     backgroundColor: "#fff",
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e6e9ef",
+    borderColor: COLORS.borderInput,
     height: 56,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.03,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 1,
   },
   valueText: {
     flex: 1,
     marginRight: 8,
-    color: "#111827",
+    color: COLORS.textPrimary,
     fontFamily: FONTS.bodyRegular,
   },
 });

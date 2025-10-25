@@ -99,7 +99,16 @@ export default function MenuPantalla() {
           .map((e) => ({ ...e, _ts: parseDateToTs(e.date) }))
           .sort((a, b) => (a._ts || 0) - (b._ts || 0));
 
-        setAllEvents(enriched);
+        // Filtrar sólo eventos desde el inicio del día actual en adelante
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const upcoming = enriched.filter((e) => {
+          const ts = Number(e._ts || 0);
+          // excluir aquellos sin fecha válida (ts NaN o 0)
+          return ts >= todayStart.getTime();
+        });
+
+        setAllEvents(upcoming);
         setFavSet(new Set(favIds.map(String)));
       } catch (err) {
         console.error("[MenuPantalla] Error cargando eventos/favoritos:", err);

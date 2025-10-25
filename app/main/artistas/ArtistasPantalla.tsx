@@ -157,10 +157,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBg,
   },
   searchWrapper: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     paddingTop: 12,
     paddingBottom: 8,
     backgroundColor: COLORS.cardBg,
+    width: '100%',
+    alignSelf: 'stretch',
   },
   searchRow: {
     flexDirection: "row",

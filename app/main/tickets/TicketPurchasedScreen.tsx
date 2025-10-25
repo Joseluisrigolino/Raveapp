@@ -246,10 +246,14 @@ function TicketPurchasedScreenContent() {
 
     const html = buildPurchasePdfHtml(eventData, qrImages, String(idCompra || ''));
     try {
+      // Generar el PDF y guardar localmente
       const { uri } = await Print.printToFileAsync({ html });
-      await Sharing.shareAsync(uri, { mimeType: 'application/pdf' });
+      // Mostrar vista previa del PDF (el usuario puede imprimir, guardar o compartir desde aquí)
+      await Print.printAsync({ uri });
+      // Si quieres compartir después de la vista previa, puedes dejar un botón aparte para compartir
+      // await Sharing.shareAsync(uri, { mimeType: 'application/pdf' });
     } catch (err) {
-      console.error('Error generando PDF combinado:', err);
+      console.error('Error generando o mostrando PDF:', err);
     }
   }
 
@@ -259,36 +263,26 @@ function TicketPurchasedScreenContent() {
     images: { entry: UiUserEntry; dataUrl?: string; text: string }[],
     compraId?: string
   ) => {
+    // Pega aquí el string base64 de tu logo (ejemplo: data:image/png;base64,xxxx)
+    const LOGO_BASE64 = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAC0ALQDASIAAhEBAxEB/8QAHgABAAICAwEBAQAAAAAAAAAAAAcKCAkBBQYEAgP/xABOEAABAwIEAQMPCAgBDQAAAAABAAIDBAUGBwgREgkhMRMWIjhBUVJhcXaRlbG00hQZVldzdIHTFTI0NTdiobIjFxg2Q1NUWGNydYOztf/EABQBAQAAAAAAAAAAAAAAAAAAAAD/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwDVUiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIueB55ww+hOB/gO9CDhFzwP8B3oTgf4DvQg4Rc8D/Ad6ELXDpaR5Qg4REQEREBERARchrndDSfIE4H+A70IOEXPA/wAB3oTgf4DvQg4Rclrh0tI8oXCAiIgIiICmDR9g+w4+1QZZYRxRQx1tpuOI6RlXTSDdk8bXcZjcD0tdw7Ed4lQ+p60GduLlL5yQexyCwdT5fYCpIGU1LgiwQxRgNZGy2wta0d4AN5l/TrGwT9D7J6vh+Fd4iDo+sbBP0Psnq+H4U6xsE/Q+yer4fhXeIg6PrGwT9D7J6vh+FfFccqssLxEYbtlzhisjd0tntFPID+BYvUogxRzv5M3SrnJR1E1FgaHBV8ewiK54daKZrX9wvpx/gvG/T2Id/MFpe1NabMe6W8zarLjHMccwLPlVtuMDT1C4UpJDZWb9B5iHN6WuBHPzE2T1hDyuWUFFj/S3U49ho2Pu+X9dDcYZQ3d/yWaRkNQwHp4eyjefskGjVERAUj6dMoK7PnO3CGVFE98bb/co4aqZg3MFK3s55B42xteR4wFHC2gcirklDcL7jHP67UZeLUwYdtD3N7ETSBstS9v8wZ1Fu/ekcO6g2W4IyKyey5w9R4Xwflth230FDCyBjWW6IveGgDie8t4nuO25c4kk85Xf9Y2CfofZPV8PwrvEQdH1jYJ+h9k9Xw/CnWNgn6H2T1fD8K7xEHjsTZOZT4ytFRYcUZbYaudBVRujlgqLZC4FpGx2PDuD4xsR3FXr1d5FzadNQeLcr2wyNttHVfKrQ95LuqW+YdUgPEf1iGu4CfCY7vKyKtYPLT5Gm4YcwjqBtMI6paZTh677N5zDKS+nkJ7zXiRp+1ag1KoiICIiAp60GduLlL5yQexygVT1oM7cXKXzkg9jkFi5ERB+JZBFE+UgkMaXEDxBa7anlr8jqaolpnZR46LonuYSHUexIO3+1Ww+t/Y5/snewqrPdv3pWfeJP7igsC6VNf2S+rO8V+FcHUV7smIbfTGsdbrvDG100AcGufE+N7muALm7g7Hn322WTK0VckQJjrJthiDuAWG59U26OHqQ23/HZb1UBQdrgijn0iZtRytDm9a1a7Y98M3H9QFOKxs5RnGNDgvRnmVV1krWyXO3R2imYTsZJamZkWw7+zXOd5GlBXqREQfuGGWomZT08TpJZXBjGMG7nOJ2AA7pJVkHSBkwMgdOeCstKijjp7nRW9tTdg0Dc185Ms+5H6xa95Zv3mDuLS9ybmR787tVGGYKynEllwm7rkuhcN2llO4GFnj4pjENvB4j3FYFQERRbqhzROS+nzHmZcU7Yqqy2aZ1G53R8rkAig8v+K9iDzVFrk0r3DMxuUVJm7bH4nkuRtDKYwzCJ1ZxcHUhMWdSLi/sR2WxdzDnU7qrBTXOupbnFeIqmQVkM7als3EePqodxB2/Tvvz7qzFkNmXQZxZM4MzNt07ZWYhs1NWS8J34KgsAmjPjZKHtPjaUHvVHOojKS156ZKYwysusTXtvtslipnn/U1TRx08g8bZWsd+CkZEFWG7Wuusd1rbLdKd8FZb6iSlqInjZ0csbi1zSO4QQQvlWZXKsZJOyo1SXHE1utxp7Jj+nF9pnsbtGasngq2D+bqgEhH/ADm99YaoCIiAp60GduLlL5yQexygVT1oM7cXKXzkg9jkFi5ERB+JYxLE+JxID2lpI8a17VPIqafKmolqX5o5hh0r3PIE1DsCTv8A7uthiIMbtLOgnJLSbc6/EmB5L1eL/cYDSPul4njkligJDjHG2NjGNBLWknYk7Dn25lkiiIC1TcrE7VrmBSxW0ZOXG3ZTYZndXOrqKeKtfVzAFoqakQucYY2tLuFrgAOJxcd9g3ayvzJGyVjopWNex4LXNcNwQekEIKrKLYVysmkLDmTmKLXnflxaWW7D2L6t9JdKCniDaejuPCXh8YHMxsrWvPDtsHMdt+tsNeqDcnyMGT9PhvJrEuclZEf0hjC5/o+mJH6tFSDbcf8AVLJJv9m1bFVBGhXCVNgvSHlXaKdgaZ8OU1yl2HTLVA1D/wCspH4Kd0Ba3OWqzWksmVuDcoLfXGOXE1zfdK+Jjud9LSt2Y1w8EyytcPHF4lsjXgcwMgsk817rBfMzMqsL4ouFLTilgqbrbIqmSOEOLgxrngkN4nOO3fJQVlVuf5GXNmDFGQ1+yoqanevwVd3Twxk9FFWbvaR/5WT7+Ud9ZR/5mWkz/hyy89QU3wr1mXuRWTOU1dVXPLLK/DOFquuiEFTNabbFTPmjB3DXFgG4B59ig90iIgwS5YPKN+OtM9PmFQU4krcv7rFWSEDd3yKpIgmA8j3QOPiYT3FpEVlrU/hyDFunPMvD1SwPZV4VuXMRv2Tad72n0tBVaVAREQFPWgztxcpfOSD2OUCqetBnbi5S+ckHscgsXIiIOCQBuTsAvMHNLLJpLXZi4YBHMQbvT/GvRVv7HP8AZO9hVWe7fvSs+8Sf3FBZ2/yp5Y/WNhj1vT/Gu/t9xt92pI6+1V9PWU0o3ZNTytkjd5HNJBVWBbUeRBxVfpajM/Bc1ynks9PFb7jBSOeTHDUOdKx72N6GlzWsDtungbv0INq6IiDEnlULJR3jRTjWaphY+S2VFtradzhzskFZEzcd48Mjx5HFaDVYE5TjtJMx/sqD36BV+0FlbSv2s2VPmZZvc4lKSi3Sv2s2VPmZZvc4lKSAiLHfM3X7pYyfxxc8uswMxZLbf7O9jKymFqqpRGXMa9vZsjLT2LmnmPdQZEIsT/nSdE31szepK38pewym136Yc78c0OXGW2YMl0xBcmTSU1KbZVQh7Yo3SPPHJGGjZrHHnPcQZAIiIPHZy/wgxz5tXP3WRViFZ3zl/hBjnzaufusirEICIiAp60GduLlL5yQexygVTvoSnhp9YWUsk8rY2nE1KwFx2HE7drR+JIH4oLGKIiD+Nb+xz/ZO9hVWe7fvSs+8Sf3FWlrg9kVBUySODWMhe5zidgAGncqrPcnsluNVJG4Oa+d7mkdBBcUHzrZ1yH3+mWan/bLb/wC2VaxVs45D+WMY2zShLx1R1qtzg3fnIE0oJ/qPSg24IiIMW+U47STMf7Kg9+gVftWAeU8mih0SZidVkazjZb2N3O27jXQbAKv8gsraV+1myp8zLN7nEpSUU6UJ4ajTFlRNBI2RhwZZwHNO4O1JGD/VSsgKvnylfbr5lfeqT3OFWDFXw5SeWKbWtmYYpGvDaylYSDvs4UcII/AoMZllzyU/bvYI+6Xf/wCfOsRllryVk8MGt7A3VpWs6pTXaNnEduJxt8+wHjQb80REHjs5f4QY582rn7rIqxCs6Z1zRU+TePJ55GsjZhm6Oc5x2AHyWRVi0BERAX02u53GyXKlvForp6OuoZmVFNUwPLJIZWEOa9rhzgggEEd5fMiDJOl5R/WzR08dLDn5dnMjaGtMtBQyPI8bnQlxPjJJX9fnKNb319XH1Xb/AMhYzogyCxVr/wBYeNbDWYZxFnpeprdcInQVMUFNS0xkjcNnNL4Ymv2IJBAKx9REBevyvzfzMyVxGcW5V4zuOG7s6IwPqKN4HVIiQSx7XAte3cA7OBG4C8giDJj5yjW79fVx9V2/8hPnKNb319XH1Xb/AMhYzoglrNzVlqKz3s8OHs181btf7XBKJ2UT2QwQGQb7OcyFjGuI3OxcDsolREE25a61tUuUGGKfBeXecd3tVko9xTUToaepjgBJJDOrRvLBuSdhsOder+co1vfX1cfVdv8AyFjOiDJWflItbdTC+CTPu6hsjS0lluoWO28TmwAg+MFY8X2+3rFF5rcRYiulVcrpcp31NXWVUpklnled3Pe485JJ6V8KIC7HDuI79hG+0OJsL3eqtd2tszaijrKWUxywSN6HNcOcFdciDJWDlItbdPEyGPPu6lrBsC+3UL3fi50BJ8pK/fzlGt76+rj6rt/5CxnRBO+PddOrPM3DNZg7Gudl5rrNcYzDV0scFPTNnjPSx5hjY5zT3QTsVBCIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiICIiAiIgIiIP//Z';
     const fmtMoney = (n?: number) => (typeof n === 'number' && !isNaN(n) ? `$${n.toLocaleString('es-AR')}` : '-');
     const dateHuman = formatDateEs(ev.date);
-    const headerTitle = `Entradas · ${ev.title}`;
+    const headerTitle = `${(user && user.nombre) ? user.nombre : 'Usuario'}, aquí tienes tus entradas QR`;
+  const eventLink = (ev as any)?.url || null;
     const headerSub = compraId ? `Compra ${compraId}` : '';
+    const artistas = Array.isArray((ev as any)?.artistas) ? (ev as any).artistas.map((a: any) => a?.name || a?.nombre || a?.dsNombre).filter(Boolean).join(', ') : '';
+    const address = [getText(ev.address), getText((ev as any)?.localidad), getText((ev as any)?.municipio), getText((ev as any)?.provincia)].filter(Boolean).join(', ');
+    const fechaHora = `${dateHuman}${ev.timeRange ? `, ${ev.timeRange}` : ''}`;
 
     const sections = images.map(({ entry, dataUrl, text }, idx) => {
       const tipo = entry.tipoDs ?? (entry.tipoCd ?? 'Entrada');
-      const numero = Number.isFinite(entry.nroEntrada as number) ? (entry.nroEntrada as number) : (idx + 1);
-      const code = formatTicketCode(numero);
       const precio = fmtMoney(entry.precio);
       return `
-        <div class="ticket">
-          <div class="ticket-head">
-            <div class="ticket-name">${tipo}</div>
-            <div class="ticket-code">${code}</div>
-          </div>
-          <div class="ticket-grid">
-            <div class="ticket-info">
-              <div class="info-row"><span class="info-label">Evento:</span><span class="info-val">${ev.title}</span></div>
-              <div class="info-row"><span class="info-label">Fecha:</span><span class="info-val">${dateHuman}</span></div>
-              ${ev.timeRange ? `<div class="info-row"><span class="info-label">Horario:</span><span class="info-val">${ev.timeRange}</span></div>` : ''}
-              <div class="info-row"><span class="info-label">Entrada ID:</span><span class="info-val">${entry.idEntrada}</span></div>
-              <div class="info-row"><span class="info-label">Precio:</span><span class="info-val">${precio}</span></div>
-            </div>
-            <div class="ticket-qr">
-              ${dataUrl ? `<img src="${dataUrl}" alt="QR" />` : `<div class="qr-fallback">${text}</div>`}
-              <div class="qr-note">Presentar en puerta</div>
-            </div>
-          </div>
-        </div>`;
+        <div class="qr-section">
+          <div class="qr-img">${dataUrl ? `<img src="${dataUrl}" alt="QR" />` : `<div class="qr-fallback">${text}</div>`}</div>
+          <div class="qr-info"><b>Tipo:</b> ${tipo}<br/><b>Precio:</b> ${precio}</div>
+        </div>
+      `;
     }).join('');
 
     return `
@@ -296,61 +290,77 @@ function TicketPurchasedScreenContent() {
         <head>
           <meta charset="utf-8" />
           <style>
-            @page { size: A4; margin: 12mm; }
-            body { margin:0; padding:0; font-family: Arial, Helvetica, 'Segoe UI', Roboto, sans-serif; background:#ffffff; color:#111827; }
-            .wrap { max-width: 770px; margin: 0 auto; }
+            @page { size: A4; margin: 18mm; }
+            body {
+              margin:0; padding:0; font-family: Arial, Helvetica, 'Segoe UI', Roboto, sans-serif; background:#fff; color:#111827;
+            }
+            .watermark-overlay {
+              position: fixed;
+              top: 0; left: 0; width: 100vw; height: 100vh;
+              z-index: 0;
+              pointer-events: none;
+              user-select: none;
+            }
+            .watermark-text {
+              position: absolute;
+              font-size: 48px;
+              color: #ebebeb; /* color pedido */
+              font-weight: 700;
+              opacity: 0.6; /* aumentar visibilidad manteniendo sutileza */
+              transform: rotate(-18deg);
+              white-space: nowrap;
+              pointer-events: none;
+              user-select: none;
+            }
+            .wrap { max-width: 600px; margin: 0 auto; position: relative; z-index: 1; }
             .header {
               display:flex; align-items:center; justify-content:space-between;
               padding: 10px 0 12px; border-bottom: 2px solid #0F172A;
             }
-            .brand { font-weight: 800; font-size: 18px; color:#0F172A; }
-            .sub { font-size: 12px; color:#6b7280; }
-            .event {
-              margin: 10px 0 14px; display:flex; gap: 12px; align-items:center;
-            }
-            .event img { width: 120px; height: 80px; object-fit: cover; border-radius: 8px; }
-            .event .meta { display:flex; flex-direction:column; gap:4px; }
-            .event .meta .title { font-weight:700; font-size:16px; }
-            .event .meta .date { font-size:12px; color:#374151; }
-
-            .ticket { page-break-inside: avoid; border:1px solid #e5e7eb; border-radius: 10px; padding: 12px; margin: 10px 0; }
-            .ticket-head { display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px; }
-            .ticket-name { font-weight:700; }
-            .ticket-code { color:#6b7280; font-weight:600; }
-            .ticket-grid { display:grid; grid-template-columns: 1fr 220px; gap: 12px; align-items:center; }
-            .ticket-info { display:flex; flex-direction:column; gap: 6px; }
-            .info-row { display:flex; gap:8px; font-size: 13px; }
-            .info-label { min-width: 80px; color:#374151; font-weight:600; }
-            .info-val { color:#111827; }
-            .ticket-qr { text-align:center; }
-            .ticket-qr img { width: 180px; height: 180px; image-rendering: pixelated; border: 6px solid #f3f4f6; border-radius: 8px; }
-            .qr-fallback { font-size:11px; color:#111827; background:#eef2ff; border-radius:8px; padding:8px; word-break:break-all; }
-            .qr-note { margin-top:6px; font-size: 11px; color:#6b7280; }
-
-            .footer { text-align:center; padding-top: 10px; margin-top: 6px; border-top:1px dashed #e5e7eb; color:#9ca3af; font-size: 11px; }
+            .header-title { font-weight: 700; font-size: 20px; color:#111; }
+            .logo-ra { width: 54px; height: 54px; object-fit: contain; border-radius: 8px; }
+            .event-link, .event-title-violet { color: #6C2BD7 !important; text-decoration: none; font-weight: bold; }
+            .event-data { margin: 18px 0 10px; font-size: 15px; }
+            .event-data .icon { margin-right: 6px; }
+            .event-data-row { margin-bottom: 4px; display: flex; align-items: center; }
+            .event-data-label { font-weight: bold; margin-right: 4px; }
+            .qr-section { margin: 32px 0 0 0; text-align: center; }
+            .qr-img img { width: 220px; height: 220px; max-width: 90vw; max-height: 220px; }
+            .qr-info { margin-top: 10px; font-size: 16px; }
+            hr { border: none; border-top: 1px solid #bbb; margin: 24px 0 0 0; }
           </style>
         </head>
         <body>
+          <div class="watermark-overlay">
+            <!-- Filas diagonales estructuradas: 12 marcas distribuidas ordenadamente -->
+            <span class="watermark-text" style="top:6%; left:6%;">RaveApp</span>
+            <span class="watermark-text" style="top:22%; left:28%;">RaveApp</span>
+            <span class="watermark-text" style="top:38%; left:50%;">RaveApp</span>
+            <span class="watermark-text" style="top:54%; left:72%;">RaveApp</span>
+
+            <span class="watermark-text" style="top:12%; left:38%;">RaveApp</span>
+            <span class="watermark-text" style="top:28%; left:60%;">RaveApp</span>
+            <span class="watermark-text" style="top:44%; left:82%;">RaveApp</span>
+
+            <span class="watermark-text" style="top:68%; left:10%;">RaveApp</span>
+            <span class="watermark-text" style="top:80%; left:34%;">RaveApp</span>
+            <span class="watermark-text" style="top:86%; left:58%;">RaveApp</span>
+            <span class="watermark-text" style="top:72%; left:76%;">RaveApp</span>
+            <span class="watermark-text" style="top:48%; left:18%;">RaveApp</span>
+          </div>
           <div class="wrap">
             <div class="header">
-              <div>
-                <div class="brand">Raveapp</div>
-                ${headerSub ? `<div class="sub">${headerSub}</div>` : ''}
-              </div>
-              <div class="sub">${new Date().toLocaleDateString('es-AR')}</div>
+              <div class="header-title">${headerTitle}</div>
+              <img class="logo-ra" src="${LOGO_BASE64}" alt="RA" />
             </div>
-
-            <div class="event">
-              ${ev.imageUrl ? `<img src="${ev.imageUrl}" alt="Evento"/>` : ''}
-              <div class="meta">
-                <div class="title">${headerTitle}</div>
-                <div class="date">${dateHuman}${ev.timeRange ? ` · ${ev.timeRange}` : ''}</div>
-              </div>
+            <div class="event-data">
+              <div class="event-data-row"><span class="event-data-label">Evento:</span> ${eventLink ? `<a class="event-link event-title-violet" href="${eventLink}">${ev.title}</a>` : `<span class="event-title-violet">${ev.title}</span>`}</div>
+              <div class="event-data-row"><span class="event-data-label">Fecha y hora:</span> ${fechaHora}</div>
+              <div class="event-data-row"><span class="event-data-label">Dirección:</span> ${address}</div>
+              ${artistas ? `<div class="event-data-row"><span class="event-data-label">Artistas:</span> ${artistas}</div>` : ''}
             </div>
-
+            <hr/>
             ${sections}
-
-            <div class="footer">Descargado desde la app · Mostrá el QR en puerta</div>
           </div>
         </body>
       </html>`;

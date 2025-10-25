@@ -272,9 +272,12 @@ export default function CreateEventScreen() {
   const { user, updateUsuario } = useAuth();
   const userId: string | null =
     (user as any)?.idUsuario ?? (user as any)?.id ?? null;
-  // Detectar si el usuario tiene rol "Usuario" (frontend: 'user')
+  // Detectar roles en frontend: 'user' y 'owner'
   const isUsuario = Array.isArray((user as any)?.roles)
     ? (user as any).roles.includes("user")
+    : false;
+  const isOrganizador = Array.isArray((user as any)?.roles)
+    ? (user as any).roles.includes("owner") || (user as any).roles.includes("organizer")
     : false;
   const mustShowLogin = !user;
 
@@ -291,13 +294,14 @@ export default function CreateEventScreen() {
   const [showUpgradePopup, setShowUpgradePopup] = useState(false);
 
   useEffect(() => {
-    // Mostrar popup solo si el usuario tiene rol "Usuario" (cdRol: 0)
-    if (isUsuario) {
+    // Mostrar popup solo si el usuario tiene rol "Usuario" (frontend 'user')
+    // y NO tiene ya el rol organizador/owner.
+    if (isUsuario && !isOrganizador) {
       setShowUpgradePopup(true);
     } else {
       setShowUpgradePopup(false);
     }
-  }, [isUsuario]);
+  }, [isUsuario, isOrganizador]);
 
   /* --- Datos base --- */
   const [eventName, setEventName] = useState("");
@@ -2950,10 +2954,10 @@ const styles = StyleSheet.create({
   checkText: { color: COLORS.textPrimary },
 
   submitButton: {
-    backgroundColor: COLORS.primary,
-    marginTop: 12,
-    paddingVertical: 14,
-    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.textPrimary,
+    marginTop: 18,
+    paddingVertical: 16,
+    borderRadius: 16,
     alignItems: "center",
     width: "100%",
   },

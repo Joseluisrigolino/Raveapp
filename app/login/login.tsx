@@ -22,7 +22,7 @@ import { ROUTES } from "../../routes";
 import globalStyles from "@/styles/globalStyles";
 import { useAuth } from "@/context/AuthContext";
 import { apiClient, login as apiLogin } from "@/utils/apiConfig";
-import { getProfile, updateUsuario, createUsuario } from "@/utils/auth/userHelpers";
+import { getProfile, updateUsuario, createUsuario, getEntradasUsuario } from "@/utils/auth/userHelpers";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // Google Cloud config removed; we rely on Firebase when Google is enabled.
 
@@ -193,6 +193,25 @@ export default function LoginScreen() {
               Alert.alert("Error", "No se pudo iniciar sesión con Google (Firebase)");
               return;
             }
+            // Loggear id de usuario para debugging (Google móvil)
+            try {
+              const uid = (u as any)?.id ?? (u as any)?.idUsuario ?? (u as any)?.userId ?? 'unknown';
+              console.log('Usuario logueado (Google) - id:', uid);
+            } catch (e) {
+              console.log('Usuario logueado (Google) - id: (no disponible)');
+            }
+            // Obtener entradas del usuario y loguearlas para depuración
+            try {
+              const idForEntries = (u as any)?.id ?? (u as any)?.idUsuario ?? (u as any)?.userId ?? (u as any)?.uid ?? null;
+              if (idForEntries) {
+                const entradas = await getEntradasUsuario(String(idForEntries));
+                console.log('[login] entradas para usuario', String(idForEntries), entradas);
+              } else {
+                console.log('[login] id de usuario no disponible para getEntradasUsuario');
+              }
+            } catch (err) {
+              console.error('[login] error obteniendo entradas del usuario:', err);
+            }
             const ok = await syncWithApiAfterGoogle(u);
             if (ok) nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
           } catch (e) {
@@ -227,6 +246,25 @@ export default function LoginScreen() {
         Alert.alert("Error", "Usuario o contraseña incorrectos.");
         return;
       }
+      // Loggear id de usuario para debugging
+      try {
+        const uid = (u as any)?.id ?? (u as any)?.idUsuario ?? (u as any)?.userId ?? 'unknown';
+        console.log('Usuario logueado - id:', uid);
+      } catch (e) {
+        console.log('Usuario logueado - id: (no disponible)');
+      }
+      // Obtener entradas del usuario y loguearlas para depuración
+      try {
+        const idForEntries = (u as any)?.id ?? (u as any)?.idUsuario ?? (u as any)?.userId ?? (u as any)?.uid ?? null;
+        if (idForEntries) {
+          const entradas = await getEntradasUsuario(String(idForEntries));
+          console.log('[login] entradas para usuario', String(idForEntries), entradas);
+        } else {
+          console.log('[login] id de usuario no disponible para getEntradasUsuario');
+        }
+      } catch (err) {
+        console.error('[login] error obteniendo entradas del usuario:', err);
+      }
       // Persistir preferencia de recordarme y email
       try {
         await AsyncStorage.setItem('raveapp_remember', remember ? 'true' : 'false');
@@ -260,9 +298,13 @@ export default function LoginScreen() {
       >
           {/* Header con logo y tagline */}
           <View style={styles.headerBox}>
-            <View style={styles.logoCircle}>
-              <Icon name="music-note" size={28} color="#ffffff" />
-            </View>
+              <View style={styles.logoCircle}>
+                <Image
+                  source={require('../../assets/images/raveapplogo/logo1.jpeg')}
+                  style={styles.logoImage}
+                  resizeMode="cover"
+                />
+              </View>
             <Text style={styles.brandTitle}>RaveApp</Text>
             <Text style={styles.brandSubtitle}>Tu puerta al mejor entretenimiento</Text>
           </View>
@@ -363,6 +405,25 @@ export default function LoginScreen() {
                     if (!u) {
                       Alert.alert("Error", "No se pudo iniciar sesión con Google (Firebase)");
                       return;
+                    }
+                    // Loggear id de usuario para debugging (Google web/popup)
+                    try {
+                      const uid = (u as any)?.id ?? (u as any)?.idUsuario ?? (u as any)?.userId ?? 'unknown';
+                      console.log('Usuario logueado (Google web) - id:', uid);
+                    } catch (e) {
+                      console.log('Usuario logueado (Google web) - id: (no disponible)');
+                    }
+                    // Obtener entradas del usuario y loguearlas para depuración
+                    try {
+                      const idForEntries = (u as any)?.id ?? (u as any)?.idUsuario ?? (u as any)?.userId ?? (u as any)?.uid ?? null;
+                      if (idForEntries) {
+                        const entradas = await getEntradasUsuario(String(idForEntries));
+                        console.log('[login] entradas para usuario', String(idForEntries), entradas);
+                      } else {
+                        console.log('[login] id de usuario no disponible para getEntradasUsuario');
+                      }
+                    } catch (err) {
+                      console.error('[login] error obteniendo entradas del usuario:', err);
                     }
                     const ok = await syncWithApiAfterGoogle(u);
                     if (ok) nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
@@ -466,6 +527,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+  },
+  logoImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
   },
   brandTitle: {
     fontSize: 28,

@@ -149,7 +149,13 @@ export default function NewsScreen() {
           </View>
         ) : newsList.length === 0 ? (
           <View style={styles.centered}>
-            <Text style={styles.errorText}>No hay noticias disponibles.</Text>
+            <View style={styles.placeholderCard}>
+              <View style={styles.placeholderIconBox}>
+                <MaterialCommunityIcons name="newspaper-variant-outline" size={34} color={COLORS.textSecondary} />
+              </View>
+              <Text style={styles.placeholderTitle}>No hay noticias por ahora</Text>
+              <Text style={styles.placeholderSubtitle}>Por el momento, no hay noticias para mostrar. Próximamente estaremos subiendo las últimas novedades.</Text>
+            </View>
           </View>
         ) : (
           <ScrollView
@@ -319,5 +325,36 @@ const styles = StyleSheet.create({
   retryText: {
     color: "#fff",
     fontWeight: "700",
+  },
+  /* Placeholder styles for empty news list */
+  placeholderCard: {
+    width: 320,
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 14,
+    paddingVertical: 24,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+  },
+  placeholderIconBox: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: COLORS.backgroundLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  placeholderTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  placeholderSubtitle: {
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

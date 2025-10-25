@@ -61,9 +61,9 @@ export default function InputDesc({
 }
 
 const styles = StyleSheet.create({
-  wrapper: { width: "100%", alignItems: "center" },
+  wrapper: { width: "100%", alignItems: "flex-start" },
   label: {
-    width: "90%",
+    width: "100%",
     fontSize: FONT_SIZES.body + 2,
     fontFamily: FONTS.subTitleMedium,
     color: COLORS.textPrimary,
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   rowNoLabel: {
     flexDirection: "row",
     alignItems: "center",
-    width: "90%",
+    width: "100%",
     marginBottom: 12,
   },
   valueText: {
@@ -85,23 +85,21 @@ const styles = StyleSheet.create({
   },
   icon: { padding: 4 },
   input: {
-    width: "90%",
+    width: "100%",
     marginBottom: 14,
     backgroundColor: "#fff",
-    borderRadius: 16,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderRadius: 12,
     overflow: "hidden",
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingRight: 12,
     borderWidth: 1,
-    borderColor: "#e6e9ef",
-    color: "#111827",
+    borderColor: COLORS.borderInput,
+    color: COLORS.textPrimary,
     shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.03,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 1,
   },
   textarea: {
     minHeight: 140,

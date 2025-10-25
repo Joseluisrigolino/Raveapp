@@ -17,14 +17,23 @@ import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
 import { useAuth } from "@/context/AuthContext";
 import { getEntradasUsuario } from "@/utils/auth/userHelpers";
 import { fetchEventById, EventItemWithExtras, ESTADO_CODES } from "@/utils/events/eventApi";
+import { getEstadoMap } from '@/utils/events/entradaApi';
+import FiltroMisTickets from '@/components/filters/FiltroMisTickets';
 
 function TicketsPurchasedMenuContent() {
   const router = useRouter();
   const { user } = useAuth();
 
-  const userId: string | null = (user as any)?.id ?? (user as any)?.idUsuario ?? null;
+  // Normalizar extracción de id de usuario desde el contexto (varios formatos observados)
+  const userId: string | null =
+    (user as any)?.id ??
+    (user as any)?.idUsuario ??
+    (user as any)?.userId ??
+    (user as any)?.uid ??
+    null;
 
   const [items, setItems] = useState<TicketPurchasedMenuItem[]>([]);
+  const [selectedEstadoIds, setSelectedEstadoIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,8 +47,23 @@ function TicketsPurchasedMenuContent() {
           setItems([]);
           return;
         }
-        const raw = await getEntradasUsuario(String(userId));
+  console.log('[TicketPurchasedMenu] fetching entradas for userId:', userId);
+  const raw = await getEntradasUsuario(String(userId));
         const list = Array.isArray(raw) ? raw : [];
+
+        // Preparar mapa inverso nombreEstado -> cdEstado para resolver labels que vienen como texto
+        const estadoMap = await getEstadoMap().catch(() => new Map<number, string>());
+        const estadoNameToCd = new Map<string, number>();
+        const normalize = (s: string) =>
+          (s || "")
+            .normalize("NFD")
+            // @ts-ignore
+            .replace(/\p{Diacritic}/gu, "")
+            .toLowerCase()
+            .trim();
+        for (const [k, v] of Array.from(estadoMap.entries())) {
+          if (typeof v === 'string') estadoNameToCd.set(normalize(v), Number(k));
+        }
 
         // 1) Helpers para IDs
         const getEventId = (r: any): string | null => {
@@ -120,9 +144,36 @@ function TicketsPurchasedMenuContent() {
           const baseDesc = ev?.description ?? fb?.description ?? "";
           const desc = g.count > 1 ? `${baseDesc ? baseDesc + ' · ' : ''}x${g.count} entradas` : baseDesc;
           const imageUrl = ev?.imageUrl ?? fb?.imageUrl ?? fb?.imagen ?? "";
-          const estado = ev?.estado ?? ev?.cdEstado ?? fb?.estado ?? fb?.cdEstado ?? g.anyRaw?.estado;
-          const estadoNum = Number(estado);
-          const isFinished = estadoNum === ESTADO_CODES.FINALIZADO || estadoNum === ESTADO_CODES.CANCELADO;
+          // Obtener estado de entrada (cdEstado + dsEstado) preferentemente desde la respuesta raw
+          const rawEstado = g.anyRaw?.estado ?? ev?.estado ?? fb?.estado ?? null;
+          let estadoLabel: string | undefined = undefined;
+          let estadoCd = undefined as number | undefined;
+          if (rawEstado && typeof rawEstado === 'object') {
+            // si trae el objeto con cdEstado lo usamos
+            estadoCd = typeof rawEstado?.cdEstado !== 'undefined' ? Number(rawEstado.cdEstado) : undefined;
+            estadoLabel = rawEstado?.dsEstado ?? (typeof estadoCd !== 'undefined' ? `Estado ${estadoCd}` : undefined);
+            // si no tenemos cd pero sí label, intentamos resolver por nombre
+            if (typeof estadoCd === 'undefined' && typeof rawEstado?.dsEstado === 'string') {
+              const found = estadoNameToCd.get(normalize(String(rawEstado.dsEstado)));
+              if (typeof found !== 'undefined') estadoCd = found;
+            }
+          } else if (typeof rawEstado === 'number') {
+            estadoCd = Number(rawEstado);
+            estadoLabel = `Estado ${estadoCd}`;
+          } else if (typeof rawEstado === 'string') {
+            // a veces la API devuelve solo el nombre del estado
+            const found = estadoNameToCd.get(normalize(String(rawEstado)));
+            if (typeof found !== 'undefined') {
+              estadoCd = found;
+              estadoLabel = String(rawEstado);
+            } else {
+              estadoLabel = String(rawEstado);
+            }
+          } else if (typeof ev?.cdEstado !== 'undefined') {
+            estadoCd = Number(ev.cdEstado);
+            estadoLabel = (ev as any)?.estado?.dsEstado ?? `Estado ${estadoCd}`;
+          }
+          const isFinished = estadoCd === ESTADO_CODES.FINALIZADO || estadoCd === ESTADO_CODES.CANCELADO;
 
           return ({
             id: idx + 1,
@@ -131,6 +182,9 @@ function TicketsPurchasedMenuContent() {
             date: String(date || ""),
             description: String(desc || ""),
             isFinished,
+            // Exponer el estado (cdEstado + dsEstado) para permitir filtrado por código
+            estadoCd,
+            estadoLabel,
             // extras para navegación
             eventId: g.eventId ?? undefined,
             idCompra: g.compraId,
@@ -151,11 +205,19 @@ function TicketsPurchasedMenuContent() {
     };
   }, [userId]);
 
+  const filteredItems = useMemo(() => {
+    if (!selectedEstadoIds || selectedEstadoIds.length === 0) return items;
+    return items.filter((it: any) => {
+      const estadoCd = typeof (it as any).estadoCd !== 'undefined' ? Number((it as any).estadoCd) : undefined;
+      return typeof estadoCd === 'number' && selectedEstadoIds.includes(estadoCd);
+    });
+  }, [items, selectedEstadoIds]);
+
   const sortedTickets = useMemo(() => (
-    [...items].sort((a, b) =>
-    a.isFinished === b.isFinished ? 0 : a.isFinished ? 1 : -1
-  )
-  ), [items]);
+    [...filteredItems].sort((a, b) =>
+      a.isFinished === b.isFinished ? 0 : a.isFinished ? 1 : -1
+    )
+  ), [filteredItems]);
 
   const handlePress = (item: TicketPurchasedMenuItem) => {
     const anyItem: any = item as any;
@@ -185,6 +247,13 @@ function TicketsPurchasedMenuContent() {
             isActive: false,
           },
         ]}
+      />
+
+      {/* Filtro por estado de entradas */}
+      <FiltroMisTickets
+        selectedEstadoIds={selectedEstadoIds}
+        onToggleEstado={(id: number) => setSelectedEstadoIds((s: number[]) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
+        onClear={() => setSelectedEstadoIds([])}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>

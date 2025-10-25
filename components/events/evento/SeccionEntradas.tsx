@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, Alert } from "react-native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import TicketSelector from "@/components/tickets/TicketSelector";
 import { styles } from "./styles";
@@ -17,9 +17,10 @@ type Props = {
   subtotal: number;
   noEntradasAvailable: boolean;
   onBuy: () => void;
+  isAdmin?: boolean;
 };
 
-export default function SeccionEntradas({ fechas, entradasPorFecha, loadingEntradas, selectedTickets, setTicketQty, subtotal, noEntradasAvailable, onBuy }: Props) {
+export default function SeccionEntradas({ fechas, entradasPorFecha, loadingEntradas, selectedTickets, setTicketQty, subtotal, noEntradasAvailable, onBuy, isAdmin }: Props) {
   const formatDay = (f: { inicio?: string; fin?: string }): { date: string; time?: string } => {
     const res = { date: "", time: undefined as string | undefined };
     try {
@@ -114,9 +115,17 @@ export default function SeccionEntradas({ fechas, entradasPorFecha, loadingEntra
         <TouchableOpacity
           style={[
             styles.buyButtonFull,
-            (noEntradasAvailable || subtotal <= 0) && styles.buyButtonDisabled,
+            (noEntradasAvailable || subtotal <= 0 || isAdmin) && styles.buyButtonDisabled,
           ]}
-          onPress={onBuy}
+          onPress={() => {
+            if (isAdmin) {
+              Alert.alert("Acceso restringido", "Sos administrador y no podés comprar entradas.");
+            } else {
+              onBuy();
+            }
+          }}
+          // NOTE: no deshabilitamos el touch en admins porque `disabled` evita ejecutar onPress,
+          // queremos que al tocar muestre la alerta. Mantener solo las condiciones funcionales.
           disabled={noEntradasAvailable || subtotal <= 0}
         >
           <Text style={styles.buyButtonText}>Comprar Entradas</Text>
