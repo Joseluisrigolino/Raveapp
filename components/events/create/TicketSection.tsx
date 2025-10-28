@@ -52,9 +52,10 @@ export default function TicketsSection({
 
             {/* Generales */}
             <Text style={styles.fieldTitle}>{L.general} *</Text>
-            <View style={styles.row}>
+            <View style={styles.rowTwo}
+            >
               <TextInput
-                style={[styles.input, styles.inputSm]}
+                style={[styles.input, styles.inputHalf]}
                 keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
                 value={d.genQty}
                 onChangeText={(v) => setTicket(i, "genQty", v.replace(/[^0-9]/g, ''))}
@@ -62,7 +63,7 @@ export default function TicketsSection({
                 placeholderTextColor={COLORS.textSecondary}
               />
               <TextInput
-                style={[styles.input, styles.inputSm]}
+                style={[styles.input, styles.inputHalf]}
                 keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
                 value={d.genPrice}
                 onChangeText={(v) => setTicket(i, "genPrice", v.replace(/[^0-9]/g, ''))}
@@ -70,19 +71,15 @@ export default function TicketsSection({
                 placeholderTextColor={COLORS.textSecondary}
               />
             </View>
-            <Text style={styles.hint}>
-              La cantidad ingresada es el total de {L.general}.{"\n"}
-              Si agregás {L.earlyGeneral}, esas ya forman parte del total de{" "}
-              {L.general}, no se suman.
-            </Text>
+            <View style={styles.divider} />
 
             {/* Early Bird General */}
             <Text style={styles.fieldTitle}>{L.earlyGeneral} (opcional)</Text>
-            <View style={styles.row}>
+            <View style={styles.rowTwo}>
               <TextInput
                 style={[
                   styles.input,
-                  styles.inputSm,
+                  styles.inputHalf,
                   !enableEBGen && styles.inputDisabled,
                 ]}
                 keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
@@ -95,7 +92,7 @@ export default function TicketsSection({
               <TextInput
                 style={[
                   styles.input,
-                  styles.inputSm,
+                  styles.inputHalf,
                   !enableEBGen && styles.inputDisabled,
                 ]}
                 keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
@@ -106,12 +103,13 @@ export default function TicketsSection({
                 editable={enableEBGen}
               />
             </View>
+            <View style={styles.divider} />
 
             {/* VIP */}
             <Text style={styles.fieldTitle}>{L.vip} (opcional)</Text>
-            <View style={styles.row}>
+            <View style={styles.rowTwo}>
               <TextInput
-                style={[styles.input, styles.inputSm]}
+                style={[styles.input, styles.inputHalf]}
                 keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
                 value={d.vipQty}
                 onChangeText={(v) => setTicket(i, "vipQty", v.replace(/[^0-9]/g, ''))}
@@ -119,7 +117,7 @@ export default function TicketsSection({
                 placeholderTextColor={COLORS.textSecondary}
               />
               <TextInput
-                style={[styles.input, styles.inputSm]}
+                style={[styles.input, styles.inputHalf]}
                 keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
                 value={d.vipPrice}
                 onChangeText={(v) => setTicket(i, "vipPrice", v.replace(/[^0-9]/g, ''))}
@@ -127,19 +125,15 @@ export default function TicketsSection({
                 placeholderTextColor={COLORS.textSecondary}
               />
             </View>
-            <Text style={styles.hint}>
-              La cantidad ingresada es el total de {L.vip}.{"\n"}
-              Si agregás {L.earlyVip}, no se suman al total (son parte de {L.vip}
-              ).
-            </Text>
+            <View style={styles.divider} />
 
             {/* Early Bird VIP */}
             <Text style={styles.fieldTitle}>{L.earlyVip} (opcional)</Text>
-            <View style={styles.row}>
+            <View style={styles.rowTwo}>
               <TextInput
                 style={[
                   styles.input,
-                  styles.inputSm,
+                  styles.inputHalf,
                   !enableEBVip && styles.inputDisabled,
                 ]}
                 keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
@@ -152,7 +146,7 @@ export default function TicketsSection({
               <TextInput
                 style={[
                   styles.input,
-                  styles.inputSm,
+                  styles.inputHalf,
                   !enableEBVip && styles.inputDisabled,
                 ]}
                 keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
@@ -166,7 +160,7 @@ export default function TicketsSection({
 
             {/* Total del día */}
             <Text style={styles.totalLine}>
-              Total de entradas del día:{" "}
+              Total entradas:{" "}
               <Text style={{ color: "#17a34a", fontWeight: "700" }}>
                 {totalPerDay(d)}
               </Text>
@@ -190,6 +184,7 @@ const styles = StyleSheet.create({
   },
 
   row: { flexDirection: "row", alignItems: "center" },
+  rowTwo: { flexDirection: "row", alignItems: "center", gap: 10 },
 
   // textos
   fieldTitle: {
@@ -221,10 +216,16 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   inputSm: { width: 140, marginRight: 10 },
+  inputHalf: { flex: 1 },
   inputDisabled: {
     backgroundColor: COLORS.borderInput,
     color: COLORS.textSecondary,
   },
 
   hint: { color: COLORS.textSecondary, fontSize: 12, marginTop: 6 },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.borderInput,
+    marginTop: 10,
+  },
 });

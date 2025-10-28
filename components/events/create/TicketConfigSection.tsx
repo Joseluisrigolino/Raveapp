@@ -39,55 +39,55 @@ interface Props {
 
 const GREEN = "#17a34a";
 
-/** ================== Campo Fecha+Hora con modal (reutilizable) ================== */
-function DirectDateTimeField({
+// Dos campos separados (Fecha | Hora)
+function TwoFieldDateTime({
   value,
   onChange,
-  placeholder = "Seleccionar fecha y hora",
 }: {
   value: Date;
   onChange: (d: Date) => void;
-  placeholder?: string;
 }) {
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
   const [tmpDate, setTmpDate] = useState<Date>(value || new Date());
 
-  const open = () => {
+  const openDate = () => {
     setTmpDate(value || new Date());
     setShowDate(true);
   };
+  const openTime = () => {
+    setTmpDate(value || new Date());
+    setShowTime(true);
+  };
 
-  const fmt = (d?: Date) =>
-    d
-      ? d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
-      : placeholder;
+  const fmtDate = (d?: Date) =>
+    d ? d.toLocaleDateString(undefined, { dateStyle: "medium" }) : "Seleccionar fecha";
+  const fmtTime = (d?: Date) =>
+    d ? d.toLocaleTimeString(undefined, { timeStyle: "short" }) : "Seleccionar hora";
 
   const pickerCommonPropsDate: any =
     Platform.OS === "ios" ? { textColor: "#111111" } : { themeVariant: "light" };
-
   const pickerCommonPropsTime: any =
-    Platform.OS === "ios"
-      ? { textColor: "#111111" }
-      : { themeVariant: "light", is24Hour: true };
+    Platform.OS === "ios" ? { textColor: "#111111" } : { themeVariant: "light", is24Hour: true };
 
   return (
     <>
-      <TouchableOpacity style={styles.dtButton} onPress={open}>
-        <MaterialCommunityIcons
-          name="calendar-clock"
-          size={18}
-          color={COLORS.textPrimary}
-          style={{ marginRight: 6 }}
-        />
-        <Text style={styles.dtButtonText}>{fmt(value)}</Text>
-      </TouchableOpacity>
+      <View style={styles.rowTwo}>
+        <TouchableOpacity style={[styles.dtButton, styles.dtButtonSmall]} onPress={openDate}>
+          <MaterialCommunityIcons name="calendar" size={18} color={COLORS.textPrimary} style={{ marginRight: 6 }} />
+          <Text style={styles.dtButtonText}>{fmtDate(value)}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.dtButton, styles.dtButtonSmall]} onPress={openTime}>
+          <MaterialCommunityIcons name="clock-outline" size={18} color={COLORS.textPrimary} style={{ marginRight: 6 }} />
+          <Text style={styles.dtButtonText}>{fmtTime(value)}</Text>
+        </TouchableOpacity>
+      </View>
 
       {Platform.OS === "ios" ? (
         <>
           <Modal visible={showDate} transparent animationType="fade">
             <View style={styles.modalBackdrop}>
-              <View style={[styles.modalCard, styles.modalInner, { backgroundColor: COLORS.cardBg }]}> 
+              <View style={[styles.modalCard, styles.modalInner, { backgroundColor: COLORS.cardBg }]}>
                 <Text style={styles.modalTitle}>Seleccionar fecha</Text>
                 <DateTimePicker
                   value={tmpDate}
@@ -99,20 +99,17 @@ function DirectDateTimeField({
                   }}
                 />
                 <View style={styles.modalActions}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: "#E5E7EB" }]}
-                    onPress={() => setShowDate(false)}
-                  >
+                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: "#E5E7EB" }]} onPress={() => setShowDate(false)}>
                     <Text style={[styles.actionText, { color: COLORS.textPrimary }]}>Cancelar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionBtn, { backgroundColor: GREEN }]}
                     onPress={() => {
                       setShowDate(false);
-                      setShowTime(true);
+                      onChange(tmpDate);
                     }}
                   >
-                    <Text style={styles.actionText}>Continuar</Text>
+                    <Text style={styles.actionText}>Aceptar</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -121,7 +118,7 @@ function DirectDateTimeField({
 
           <Modal visible={showTime} transparent animationType="fade">
             <View style={styles.modalBackdrop}>
-              <View style={[styles.modalCard, styles.modalInner, { backgroundColor: COLORS.cardBg }]}> 
+              <View style={[styles.modalCard, styles.modalInner, { backgroundColor: COLORS.cardBg }]}>
                 <Text style={styles.modalTitle}>Seleccionar hora</Text>
                 <DateTimePicker
                   value={tmpDate}
@@ -137,10 +134,7 @@ function DirectDateTimeField({
                   }}
                 />
                 <View style={styles.modalActions}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: "#E5E7EB" }]}
-                    onPress={() => setShowTime(false)}
-                  >
+                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: "#E5E7EB" }]} onPress={() => setShowTime(false)}>
                     <Text style={[styles.actionText, { color: COLORS.textPrimary }]}>Cancelar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -172,7 +166,7 @@ function DirectDateTimeField({
                 }
                 setTmpDate(d);
                 setShowDate(false);
-                setTimeout(() => setShowTime(true), 50);
+                onChange(d);
               }}
             />
           )}
@@ -216,18 +210,12 @@ export default function TicketConfigSection({
           <Text style={styles.dayTitle}>Día {i + 1}</Text>
 
           <Text style={styles.label}>Inicio de venta</Text>
-          <DirectDateTimeField
-            value={cfg.saleStart}
-            onChange={(val) => setSaleCfg(i, "saleStart", val)}
-          />
+          <TwoFieldDateTime value={cfg.saleStart} onChange={(val) => setSaleCfg(i, "saleStart", val)} />
 
           <Text style={[styles.label, { marginTop: 8 }]}>
             Vender Generales/VIP hasta
           </Text>
-          <DirectDateTimeField
-            value={cfg.sellUntil}
-            onChange={(val) => setSaleCfg(i, "sellUntil", val)}
-          />
+          <TwoFieldDateTime value={cfg.sellUntil} onChange={(val) => setSaleCfg(i, "sellUntil", val)} />
         </View>
       ))}
     </>
@@ -269,10 +257,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  dtButtonSmall: { flex: 1 },
   dtButtonText: {
     color: COLORS.textPrimary,
     fontWeight: "600",
   },
+  rowTwo: { flexDirection: "row", alignItems: "center", gap: 10 },
 
   // modal base reutilizable
   modalBackdrop: {

@@ -547,3 +547,132 @@ export async function resolveTipoCodes(): Promise<TipoCodes> {
   console.log("[resolveTipoCodes] mapeo final:", codes, " (desde: ", tipos, ")");
   return codes;
 }
+
+/** =========================================================================
+ *                     REPORTE: VENTAS POR EVENTO (OWNER)
+ *  Endpoint: GET /v1/Reporte/ReporteVentasEvento
+ *  Query: IdEvento, IdUsuarioOrg (ambos string UUID)
+ *  ======================================================================= */
+
+// Estructura flexible porque el contrato exacto del back puede variar.
+// Intentamos cubrir los campos más probables y dejamos `any` para extras.
+export type ReporteVentasItem = {
+  tipo: string; // p.ej. "General", "VIP", "General Early Bird"
+  cantidadInicial?: number;
+  cantidadVendida?: number;
+  precioUnitario?: number;
+  cargoServicioUnitario?: number;
+  subtotal?: number; // precioUnitario * cantidadVendida
+  cargoServicio?: number; // cargoServicioUnitario * cantidadVendida
+  total?: number; // subtotal + cargoServicio
+  stock?: number; // cantidadInicial - cantidadVendida
+  [k: string]: any;
+};
+
+export type ReporteVentasDia = {
+  fecha: string; // etiqueta para UI (puede ser dd/mm/yyyy o idFecha)
+  idFecha?: string; // para machear con fechas del evento
+  numFecha?: number | string; // índice de fecha si viene
+  items: ReporteVentasItem[];
+  totalEntradasVendidas?: number;
+  totalRecaudado?: number; // solo entradas
+  totalCargoServicio?: number;
+  [k: string]: any;
+};
+
+export type ReporteVentasEvento = {
+  evento?: {
+    idEvento?: string;
+    nombre?: string;
+    creadoPor?: string;
+  } | null;
+  generado?: string | null; // timestamp de generación
+  dias: ReporteVentasDia[];
+  totales?: {
+    totalEntradasVendidas?: number;
+    totalRecaudado?: number;
+    totalCargoServicio?: number;
+  } | null;
+  [k: string]: any;
+};
+
+/** Llama al endpoint y retorna el body crudo. */
+export async function fetchReporteVentasEventoRaw(
+  idEvento: string,
+  idUsuarioOrg: string
+): Promise<any> {
+  const token = await login();
+  const { data } = await apiClient.get<any>("/v1/Reporte/ReporteVentasEvento", {
+    params: { IdEvento: idEvento, IdUsuarioOrg: idUsuarioOrg },
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data ?? {};
+}
+
+/**
+ * Normaliza el response en una estructura usable por la UI.
+ * Soporta dos formatos comunes: agrupado por día con `items`,
+ * o lista plana con propiedades { fecha, tipo, ... }.
+ */
+export function normalizeReporteVentasEvento(data: any): ReporteVentasEvento {
+  if (!data) return { dias: [] };
+
+  // Caso 1: ya viene con dias: []
+  if (Array.isArray(data.dias)) {
+    return {
+      evento: data.evento ?? null,
+      generado: data.generado ?? null,
+      dias: data.dias as ReporteVentasDia[],
+      totales: data.totales ?? null,
+      ...data,
+    } as ReporteVentasEvento;
+  }
+
+  // Caso 2: viene plano como array de registros
+  const list: any[] = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+  const byDate = new Map<string, ReporteVentasDia>();
+
+  for (const r of list) {
+    // Key de agrupación: preferimos idFecha, luego numFecha, luego fecha plana
+    const idFecha = r.idFecha ? String(r.idFecha) : undefined;
+    const numFecha = r.numFecha ?? r.nroFecha ?? r.numeroFecha;
+    const fechaRaw = String(r.fecha || r.dia || r.date || idFecha || numFecha || "");
+    const tipo = String(r.tipo || r.entrada || r.nombreTipo || r.dsTipo || "");
+    const item: ReporteVentasItem = {
+      tipo,
+      cantidadInicial: num(r.cantidadInicial ?? r.stockInicial ?? r.cantidad ?? 0),
+      cantidadVendida: num(r.cantidadVendida ?? r.vendida ?? r.vendidas ?? 0),
+      precioUnitario: num(r.precioUnitario ?? r.precio ?? r.precioEntrada ?? 0),
+      cargoServicioUnitario: num(r.cargoServicioUnitario ?? r.cargoServicioU ?? undefined),
+      subtotal: num(r.subtotal ?? r.montoSubTotal),
+      cargoServicio: num(r.cargoServicio ?? r.montoCostoServicio),
+      total: num(r.total ?? r.montoVenta),
+      stock: num(r.stock ?? r.restante ?? r.stockActual ?? undefined),
+      ...r,
+    };
+    const key = fechaRaw || "";
+    if (!byDate.has(key)) byDate.set(key, { fecha: key, idFecha, numFecha, items: [] });
+    const d = byDate.get(key)!;
+    // actualizamos meta si no estaba
+    if (!d.idFecha && idFecha) d.idFecha = idFecha;
+    if (typeof d.numFecha === "undefined" && typeof numFecha !== "undefined") d.numFecha = numFecha;
+    d.items.push(item);
+  }
+
+  const dias = Array.from(byDate.values());
+  return { dias } as ReporteVentasEvento;
+}
+
+function num(v: any): number | undefined {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** Helper de alto nivel para la UI */
+export async function fetchReporteVentasEvento(
+  idEvento: string,
+  idUsuarioOrg: string
+): Promise<ReporteVentasEvento> {
+  const raw = await fetchReporteVentasEventoRaw(idEvento, idUsuarioOrg);
+  return normalizeReporteVentasEvento(raw);
+}

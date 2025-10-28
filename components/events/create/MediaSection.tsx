@@ -1,8 +1,7 @@
 import React from "react";
-import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator, TextInput } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS, RADIUS } from "@/styles/globalStyles";
-import InputText from "@/components/common/inputText";
 
 interface Props {
   photoFile: string | null;
@@ -29,7 +28,6 @@ export default function MediaSection({
   isChecking = false,
   photoTooLarge = false,
   photoFileSize = null,
-  onDeletePhoto,
   maxImageBytes = 1 * 1024 * 1024,
 }: Props) {
   const fmtBytes = (bytes: number) => {
@@ -45,92 +43,68 @@ export default function MediaSection({
   };
   return (
     <View style={styles.card}>
-      <Text style={styles.label}>
-        Foto <Text style={{ color: COLORS.negative }}>(obligatoria)</Text>
-      </Text>
-      <View style={[styles.row, { justifyContent: "space-between" }]}>
+      <Text style={styles.label}>Imagen del evento</Text>
+
+      {photoTooLarge ? (
+        <View style={[styles.uploadArea, styles.previewTooLarge]}>
+          <Text style={styles.tooLargeText}>
+            La imagen seleccionada supera {fmtBytes(maxImageBytes)}
+            {photoFileSize ? ` (${Math.round(photoFileSize/1024)} KB).` : "."}
+          </Text>
+          <Text style={styles.tooLargeSub}>Seleccioná otra imagen más liviana.</Text>
+        </View>
+      ) : (
         <TouchableOpacity
           testID="select-button"
-          style={[styles.fileBtn, isChecking && styles.fileBtnDisabled]}
+          style={[styles.uploadArea, isChecking && styles.fileBtnDisabled]}
           onPress={onSelectPhoto}
           disabled={isChecking}
+          activeOpacity={0.8}
         >
           {isChecking ? (
-            <ActivityIndicator testID="select-loading" color="#fff" />
+            <ActivityIndicator testID="select-loading" color={COLORS.textSecondary} />
           ) : (
-            <Text style={styles.fileBtnText}>Seleccionar imagen</Text>
+            <>
+              <MaterialCommunityIcons name="cloud-upload-outline" size={28} color={COLORS.textSecondary} />
+              <Text style={styles.previewEmptyText}>Toca para subir imagen</Text>
+            </>
           )}
         </TouchableOpacity>
-        <Text style={styles.fileName}>
-          {photoFile ? "Archivo seleccionado" : "Ninguno…"}
-        </Text>
-      </View>
-      <Text style={styles.hint}>
-        La imagen debe pesar menos de {fmtBytes(maxImageBytes)} y ser JPG, JPEG o PNG
-      </Text>
+      )}
 
-      <View style={{ marginTop: 10 }}>
-        <Text style={styles.label}>Imagen del evento</Text>
-        {photoTooLarge ? (
-          <View style={[styles.previewImage, styles.previewTooLarge]}>
-            <Text style={styles.tooLargeText}>
-              La imagen seleccionada supera {fmtBytes(maxImageBytes)}
-              {photoFileSize ? ` (${Math.round(photoFileSize/1024)} KB).` : "."}
-            </Text>
-            <Text style={styles.tooLargeSub}>Seleccioná otra imagen más liviana.</Text>
-          </View>
+      {/* Vista previa (si hay imagen se muestra aquí) */}
+      <View style={styles.previewBox}>
+        {photoFile ? (
+          <Image source={{ uri: photoFile }} style={styles.previewBoxImage} />
         ) : (
-          <TouchableOpacity style={[styles.previewImage, photoFile ? {} : styles.previewEmpty]} onPress={onSelectPhoto} activeOpacity={0.8}>
-            {!photoFile ? (
-              <>
-                <MaterialCommunityIcons name="cloud-upload-outline" size={28} color={COLORS.textSecondary} />
-                <Text style={styles.previewEmptyText}>Toca para subir imagen</Text>
-              </>
-            ) : (
-              <Image source={{ uri: photoFile }} style={styles.previewImage} />
-            )}
-          </TouchableOpacity>
+          <View style={styles.previewBoxEmpty}>
+            <Text style={styles.previewBoxEmptyText}>Vista previa</Text>
+          </View>
         )}
-
-        {/* Vista previa adicional (bloque gris como en maqueta) */}
-        <View style={styles.previewBox}>
-          {photoFile ? (
-            <Image source={{ uri: photoFile }} style={styles.previewBoxImage} />
-          ) : (
-            <View style={styles.previewBoxEmpty}>
-              <Text style={styles.previewBoxEmptyText}>Vista previa</Text>
-            </View>
-          )}
-        </View>
-        {photoFile && onDeletePhoto ? (
-          <TouchableOpacity style={styles.deleteButton} onPress={onDeletePhoto}>
-            <Text style={styles.deleteButtonText}>Eliminar imagen</Text>
-          </TouchableOpacity>
-        ) : null}
       </View>
 
-      <InputText
-        label="Video (opcional)"
+      <Text style={[styles.label, { marginTop: 12 }]}>Enlaces multimedia</Text>
+
+      <TextInput
+        style={styles.textInput}
         value={videoLink}
-        isEditing={true}
-        onBeginEdit={() => {}}
         onChangeText={onChangeVideo}
-        placeholder="Pega el link de YouTube aquí"
         keyboardType="url"
-        labelStyle={{ width: "100%" }}
-        inputStyle={{ width: "100%" }}
+        placeholder="Enlace de YouTube"
+        placeholderTextColor={COLORS.textSecondary}
+        autoCapitalize="none"
+        autoCorrect={false}
       />
 
-      <InputText
-        label="Música (SoundCloud – opcional)"
+      <TextInput
+        style={styles.textInput}
         value={musicLink}
-        isEditing={true}
-        onBeginEdit={() => {}}
         onChangeText={onChangeMusic}
-        placeholder="Pega el link de SoundCloud aquí"
         keyboardType="url"
-        labelStyle={{ width: "100%", marginTop: 12 }}
-        inputStyle={{ width: "100%" }}
+        placeholder="Enlace de SoundCloud"
+        placeholderTextColor={COLORS.textSecondary}
+        autoCapitalize="none"
+        autoCorrect={false}
       />
     </View>
   );
@@ -147,38 +121,15 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   row: { flexDirection: "row", alignItems: "center" },
-  fileBtn: {
-    backgroundColor: COLORS.textPrimary,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: RADIUS.card,
-  },
-  fileBtnText: { color: "#fff", fontWeight: "700" },
-  fileName: { color: COLORS.textSecondary },
   fileBtnDisabled: { opacity: 0.7 },
-  previewImage: {
+  uploadArea: {
     width: "100%",
     height: 160,
-    borderRadius: RADIUS.card,
-    resizeMode: "cover",
-  },
-  deleteButton: {
-    backgroundColor: COLORS.negative,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: RADIUS.card,
-    marginTop: 10,
-    alignSelf: 'flex-start',
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  previewEmpty: {
     backgroundColor: COLORS.backgroundLight,
     borderWidth: 1,
     borderColor: COLORS.borderInput,
     borderStyle: 'dashed',
+    borderRadius: RADIUS.card,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 12,
@@ -220,5 +171,21 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 6,
   },
-  hint: { color: COLORS.textSecondary, fontSize: 12, marginTop: 6 },
+  textInput: {
+    width: "100%",
+    marginTop: 8,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    height: 56,
+    paddingHorizontal: 14,
+    paddingRight: 12,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    color: COLORS.textPrimary,
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 1,
+  },
 });

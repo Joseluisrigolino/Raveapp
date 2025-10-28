@@ -17,7 +17,6 @@ import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
 import { useAuth } from "@/context/AuthContext";
 import { getEntradasUsuario } from "@/utils/auth/userHelpers";
 import { fetchEventById, EventItemWithExtras, ESTADO_CODES } from "@/utils/events/eventApi";
-import { getEstadoMap } from '@/utils/events/entradaApi';
 import FiltroMisTickets from '@/components/filters/FiltroMisTickets';
 
 function TicketsPurchasedMenuContent() {
@@ -51,19 +50,6 @@ function TicketsPurchasedMenuContent() {
   const raw = await getEntradasUsuario(String(userId));
         const list = Array.isArray(raw) ? raw : [];
 
-        // Preparar mapa inverso nombreEstado -> cdEstado para resolver labels que vienen como texto
-        const estadoMap = await getEstadoMap().catch(() => new Map<number, string>());
-        const estadoNameToCd = new Map<string, number>();
-        const normalize = (s: string) =>
-          (s || "")
-            .normalize("NFD")
-            // @ts-ignore
-            .replace(/\p{Diacritic}/gu, "")
-            .toLowerCase()
-            .trim();
-        for (const [k, v] of Array.from(estadoMap.entries())) {
-          if (typeof v === 'string') estadoNameToCd.set(normalize(v), Number(k));
-        }
 
         // 1) Helpers para IDs
         const getEventId = (r: any): string | null => {
@@ -86,7 +72,7 @@ function TicketsPurchasedMenuContent() {
           )
         );
 
-        // 3) Buscar detalles de eventos por cada id
+        // 3) Buscar detalles de eventos por cada id (solo para datos visuales; no se usa para estado de la entrada)
         const eventMap = new Map<string, EventItemWithExtras>();
         await Promise.all(
           uniqueEventIds.map(async (eid) => {
@@ -144,36 +130,24 @@ function TicketsPurchasedMenuContent() {
           const baseDesc = ev?.description ?? fb?.description ?? "";
           const desc = g.count > 1 ? `${baseDesc ? baseDesc + ' · ' : ''}x${g.count} entradas` : baseDesc;
           const imageUrl = ev?.imageUrl ?? fb?.imageUrl ?? fb?.imagen ?? "";
-          // Obtener estado de entrada (cdEstado + dsEstado) preferentemente desde la respuesta raw
-          const rawEstado = g.anyRaw?.estado ?? ev?.estado ?? fb?.estado ?? null;
-          let estadoLabel: string | undefined = undefined;
-          let estadoCd = undefined as number | undefined;
-          if (rawEstado && typeof rawEstado === 'object') {
-            // si trae el objeto con cdEstado lo usamos
-            estadoCd = typeof rawEstado?.cdEstado !== 'undefined' ? Number(rawEstado.cdEstado) : undefined;
-            estadoLabel = rawEstado?.dsEstado ?? (typeof estadoCd !== 'undefined' ? `Estado ${estadoCd}` : undefined);
-            // si no tenemos cd pero sí label, intentamos resolver por nombre
-            if (typeof estadoCd === 'undefined' && typeof rawEstado?.dsEstado === 'string') {
-              const found = estadoNameToCd.get(normalize(String(rawEstado.dsEstado)));
-              if (typeof found !== 'undefined') estadoCd = found;
-            }
-          } else if (typeof rawEstado === 'number') {
-            estadoCd = Number(rawEstado);
-            estadoLabel = `Estado ${estadoCd}`;
-          } else if (typeof rawEstado === 'string') {
-            // a veces la API devuelve solo el nombre del estado
-            const found = estadoNameToCd.get(normalize(String(rawEstado)));
-            if (typeof found !== 'undefined') {
-              estadoCd = found;
-              estadoLabel = String(rawEstado);
-            } else {
-              estadoLabel = String(rawEstado);
-            }
-          } else if (typeof ev?.cdEstado !== 'undefined') {
-            estadoCd = Number(ev.cdEstado);
-            estadoLabel = (ev as any)?.estado?.dsEstado ?? `Estado ${estadoCd}`;
+          // Estado de la ENTRADA: tomar SIEMPRE lo que viene del endpoint GetEntradas (sin machear con evento)
+          let ticketEstadoCd: number | undefined = undefined;
+          let ticketEstadoLabel: string | undefined = undefined;
+          const anyRaw = g.anyRaw ?? {};
+          if (typeof anyRaw?.cdEstado !== 'undefined') {
+            ticketEstadoCd = Number(anyRaw.cdEstado);
+            ticketEstadoLabel = anyRaw?.dsEstado ?? `Estado ${ticketEstadoCd}`;
+          } else if (anyRaw?.estado && typeof anyRaw.estado === 'object') {
+            const st = anyRaw.estado;
+            if (typeof st?.cdEstado !== 'undefined') ticketEstadoCd = Number(st.cdEstado);
+            ticketEstadoLabel = st?.dsEstado ?? (typeof ticketEstadoCd !== 'undefined' ? `Estado ${ticketEstadoCd}` : undefined);
           }
-          const isFinished = estadoCd === ESTADO_CODES.FINALIZADO || estadoCd === ESTADO_CODES.CANCELADO;
+
+          // Estado del EVENTO (solo para ordenar/navegar): si hay evento, usamos su cdEstado
+          const eventEstadoCd = typeof ev?.cdEstado !== 'undefined' ? Number(ev.cdEstado) : undefined;
+          const isFinished = typeof eventEstadoCd === 'number'
+            ? (eventEstadoCd === ESTADO_CODES.FINALIZADO || eventEstadoCd === ESTADO_CODES.CANCELADO)
+            : false;
 
           return ({
             id: idx + 1,
@@ -183,8 +157,8 @@ function TicketsPurchasedMenuContent() {
             description: String(desc || ""),
             isFinished,
             // Exponer el estado (cdEstado + dsEstado) para permitir filtrado por código
-            estadoCd,
-            estadoLabel,
+            estadoCd: ticketEstadoCd,
+            estadoLabel: ticketEstadoLabel,
             // extras para navegación
             eventId: g.eventId ?? undefined,
             idCompra: g.compraId,

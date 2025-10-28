@@ -354,6 +354,10 @@ export default function Footer() {
                   <>
                     <Text style={styles.sectionTitle}>Administración</Text>
                     <View style={styles.menuSection}>
+                      <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.REPORT_SALES.MENU })}>
+                        <MaterialCommunityIcons name="chart-bar" size={22} color={COLORS.textPrimary} />
+                        <Text style={styles.menuText}>Ver reporte de ventas</Text>
+                      </TouchableOpacity>
                       <TouchableOpacity style={styles.menuItem} onPress={() => go({ pathname: ROUTES.ADMIN.EVENTS_VALIDATE.LIST })}>
                         <MaterialCommunityIcons name="check-circle-outline" size={22} color={COLORS.textPrimary} />
                         <Text style={styles.menuText}>Validar Eventos</Text>

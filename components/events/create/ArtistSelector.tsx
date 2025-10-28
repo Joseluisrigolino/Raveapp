@@ -87,14 +87,25 @@ export default function ArtistSelector({
         <>
           <View style={styles.line} />
           <View style={styles.tagsRow}>
-            {selectedArtists.map((a) => (
-              <View key={a.name} style={styles.tagPill}>
-                <Text style={styles.tagText}>{a.name}</Text>
-                <TouchableOpacity onPress={() => onRemoveArtist(a.name)} style={styles.tagRemove}>
-                  <MaterialCommunityIcons name="close" size={12} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            ))}
+            {selectedArtists.map((a) => {
+              const isNew = Boolean((a as any).__isNew);
+              return (
+                <View key={a.name} style={[styles.tagPill, isNew && styles.tagPillNew]}>
+                  {isNew && (
+                    <MaterialCommunityIcons
+                      name="clock-outline"
+                      size={14}
+                      color="#7A5E00"
+                      style={{ marginRight: 6 }}
+                    />
+                  )}
+                  <Text style={[styles.tagText, isNew && styles.tagTextNew]}>{a.name}</Text>
+                  <TouchableOpacity onPress={() => onRemoveArtist(a.name)} style={[styles.tagRemove, isNew && styles.tagRemoveNew]}>
+                    <MaterialCommunityIcons name="close" size={12} color={isNew ? "#7A5E00" : "#fff"} />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
           </View>
           {selectedArtists.some((x) => (x as any).__isNew) && (
             <View style={styles.notePill}>
@@ -190,6 +201,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.12)'
+  },
+  // estilos para artistas agregados manualmente (pendientes)
+  tagPillNew: {
+    backgroundColor: '#FFF4CC',
+    borderWidth: 1,
+    borderColor: '#F6C343',
+  },
+  tagTextNew: {
+    color: '#5C4A00',
+  },
+  tagRemoveNew: {
+    backgroundColor: 'rgba(0,0,0,0.06)'
   },
   line: {
     height: 1,

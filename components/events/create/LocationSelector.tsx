@@ -1,6 +1,7 @@
 // components/events/create/LocationSelector.tsx
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS, RADIUS } from "@/styles/globalStyles";
 import SelectField from "@/components/common/selectField";
 import InputText from "@/components/common/inputText";
@@ -198,21 +199,40 @@ export default function LocationSelector(props: Props) {
         inputStyle={{ width: "100%" }}
       />
 
-      {/* Flags */}
-      <View style={styles.flagsRow}>
+      {/* Flags (After / LGBT) como botones tipo segmento */}
+      <Text style={[styles.label, { marginTop: 10, marginBottom: 8 }]}>Tipo de evento</Text>
+      <View style={styles.flagSegment}>
         <TouchableOpacity
-          style={styles.checkRow}
+          style={[styles.flagItem, isAfter && styles.flagItemOn]}
           onPress={() => setIsAfter(!isAfter)}
         >
-          <View style={[styles.checkBox, isAfter && styles.checkBoxOn]} />
-          <Text style={styles.checkText}>¿Es after?</Text>
+          <View style={styles.flagItemContent}>
+            <MaterialCommunityIcons
+              name="weather-night"
+              size={16}
+              color={isAfter ? '#fff' : COLORS.textPrimary}
+              style={{ marginRight: 8 }}
+            />
+            <Text style={[styles.flagText, isAfter && styles.flagTextOn]}>After</Text>
+          </View>
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={styles.checkRow}
+          style={[styles.flagItem, isLGBT && styles.flagItemOn]}
           onPress={() => setIsLGBT(!isLGBT)}
         >
-          <View style={[styles.checkBox, isLGBT && styles.checkBoxOn]} />
-          <Text style={styles.checkText}>¿Es LGBT?</Text>
+          <View style={styles.flagItemContent}>
+            {/* Banderita LGBT */}
+            <View style={styles.lgbtFlag}>
+              <View style={[styles.lgbtStripe, { backgroundColor: '#E40303' }]} />
+              <View style={[styles.lgbtStripe, { backgroundColor: '#FF8C00' }]} />
+              <View style={[styles.lgbtStripe, { backgroundColor: '#FFED00' }]} />
+              <View style={[styles.lgbtStripe, { backgroundColor: '#008026' }]} />
+              <View style={[styles.lgbtStripe, { backgroundColor: '#004DFF' }]} />
+              <View style={[styles.lgbtStripe, { backgroundColor: '#750787' }]} />
+            </View>
+            <Text style={[styles.flagText, isLGBT && styles.flagTextOn]}>LGTB</Text>
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -260,17 +280,42 @@ const styles = StyleSheet.create({
     borderBottomColor: "#f3f4f6",
   },
 
-  // flags
-  flagsRow: { flexDirection: "row", alignItems: "center", marginTop: 12 },
-  checkRow: { flexDirection: "row", alignItems: "center", marginRight: 16 },
-  checkBox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    marginRight: 8,
+  // flags como segment buttons
+  flagSegment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  checkBoxOn: { backgroundColor: COLORS.primary },
-  checkText: { color: COLORS.textPrimary },
+  flagItem: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    backgroundColor: '#fff',
+    marginRight: 10,
+  },
+  flagItemOn: {
+    backgroundColor: COLORS.textPrimary,
+    borderColor: COLORS.textPrimary,
+  },
+  flagItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flagText: { color: COLORS.textPrimary, fontWeight: '700' },
+  flagTextOn: { color: '#fff' },
+  lgbtFlag: {
+    width: 18,
+    height: 12,
+    marginRight: 8,
+    borderRadius: 2,
+    overflow: 'hidden',
+    backgroundColor: '#ccc',
+  },
+  lgbtStripe: {
+    flex: 1,
+    width: '100%',
+  },
 });

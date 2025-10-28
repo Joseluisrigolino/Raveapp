@@ -43,13 +43,16 @@ export const ROUTES = {
       LIST: "/admin/EventsValidateScreens/EventsToValidateScreen",
       VALIDATE: "/admin/EventsValidateScreens/ValidateEventScreen",
     },
+    REPORT_SALES: {
+      MENU: "/admin/ReporteVentaEntradaMenu",
+    },
     TYC: "/admin/Tyc",
   },
   OWNER: {
     PARTY_RATINGS: "/owner/PartyRatingsScreen",
   PARTYS: "/owner/FiestasPantalla",
     MANAGE_EVENTS: "/owner/AdministrarEventosPantalla",
-    TICKET_SOLD: "/owner/TicketSoldScreen",
+    TICKET_SOLD: "/owner/ReporteVentaEntradaEvento",
     MODIFY_EVENT: "/owner/ModifyEventScreen",
   CANCEL_EVENT: "/owner/CancelarEventoPantalla",
   },

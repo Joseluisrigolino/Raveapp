@@ -15,6 +15,7 @@ import Footer from "@/components/layout/FooterComponent";
 import { fetchEventById, EventItemWithExtras } from "@/utils/events/eventApi";
 import { getEntradasUsuario } from "@/utils/auth/userHelpers";
 import { getTipoMap } from "@/utils/events/entradaApi";
+import { mediaApi } from "@/utils/mediaApi";
 import { useAuth } from "@/context/AuthContext";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 import { getSafeImageSource } from "@/utils/image";
@@ -30,6 +31,8 @@ type UiUserEntry = {
   tipoDs?: string;
   precio?: number;
   nroEntrada?: number;
+  qrImageUrl?: string;
+  mediaId?: string; // idMedia asociado a la entrada (si existe)
 };
 
 function TicketPurchasedScreenContent() {
@@ -187,7 +190,35 @@ function TicketPurchasedScreenContent() {
               nroEntrada: Number.isFinite(nroEntradaRaw) ? (nroEntradaRaw as number) : undefined,
             };
           });
-          setEntries(mapped);
+          // Obtener QR desde mediaApi por cada idEntrada y anexar su URL
+          const withQrImages: UiUserEntry[] = await Promise.all(
+            mapped.map(async (e) => {
+              try {
+                // Traemos la lista de media para capturar también el idMedia
+                const data = await mediaApi.getByEntidad(e.idEntrada);
+                const list: any[] = Array.isArray((data as any)?.media) ? (data as any).media : [];
+                // Seleccionar la primera imagen (sin mdVideo), igual criterio que getFirstImage
+                const img = list.find(
+                  (m) =>
+                    m &&
+                    typeof m.url === "string" &&
+                    m.url.trim().length > 0 &&
+                    !m?.mdVideo &&
+                    !/youtube\.com|youtu\.be/i.test(m.url)
+                );
+                const mediaId = img?.idMedia || img?.id || img?.IdMedia || undefined;
+                const url = img?.url || "";
+                return { ...e, qrImageUrl: url || undefined, mediaId };
+              } catch {
+                return e;
+              }
+            })
+          );
+          setEntries(withQrImages);
+          try {
+            // Loguear ids para diagnóstico rápido
+            console.log('[TicketPurchasedScreen] Entradas e idMedia:', withQrImages.map((x) => ({ idEntrada: x.idEntrada, idMedia: x.mediaId })));
+          } catch {}
         } else {
           setEntries([]);
         }
@@ -203,20 +234,25 @@ function TicketPurchasedScreenContent() {
   const handleDownloadEntryPDF = async (entry: UiUserEntry) => {
     if (!eventData) return;
     const qrText = entry.mdQR || `Entrada:${entry.idEntrada}|Evento:${eventData.id}|Fecha:${entry.idFecha ?? ''}`;
-    const qrDataUrl: string | undefined = await new Promise((resolve) => {
-      try {
-        const ref = qrRefs.current[entry.idEntrada];
-        if (ref && typeof ref.toDataURL === 'function') {
-          ref.toDataURL((data: string) => resolve(`data:image/png;base64,${data}`));
-        } else {
+    // Preferir la imagen del QR desde mediaApi; si no, intentar extraer dataURL del componente QR
+    let dataUrl: string | undefined;
+    let url: string | undefined = entry.qrImageUrl;
+    if (!url) {
+      dataUrl = await new Promise((resolve) => {
+        try {
+          const ref = qrRefs.current[entry.idEntrada];
+          if (ref && typeof ref.toDataURL === 'function') {
+            ref.toDataURL((d: string) => resolve(`data:image/png;base64,${d}`));
+          } else {
+            resolve(undefined);
+          }
+        } catch {
           resolve(undefined);
         }
-      } catch {
-        resolve(undefined);
-      }
-    });
+      });
+    }
 
-    const html = buildPurchasePdfHtml(eventData, [{ entry, dataUrl: qrDataUrl, text: qrText }], String(idCompra || ''));
+    const html = buildPurchasePdfHtml(eventData, [{ entry, dataUrl, url, text: qrText }], String(idCompra || ''));
     try {
       const { uri } = await Print.printToFileAsync({ html });
       await Sharing.shareAsync(uri, { mimeType: 'application/pdf' });
@@ -230,18 +266,21 @@ function TicketPurchasedScreenContent() {
     if (!eventData || !entries.length) return;
 
     // Obtener dataURL para cada QR ya renderizado
-    const qrImages: { entry: UiUserEntry; dataUrl?: string; text: string }[] = [];
+    const qrImages: { entry: UiUserEntry; dataUrl?: string; url?: string; text: string }[] = [];
     for (const e of entries) {
       const qrText = e.mdQR || `Entrada:${e.idEntrada}|Evento:${eventData.id}|Fecha:${e.idFecha ?? ''}`;
       let dataUrl: string | undefined;
+      const url = e.qrImageUrl;
       try {
-        const ref = qrRefs.current[e.idEntrada];
-        if (ref && typeof ref.toDataURL === 'function') {
-          // eslint-disable-next-line no-await-in-loop
-          dataUrl = await new Promise<string>((resolve) => ref.toDataURL((data: string) => resolve(`data:image/png;base64,${data}`)));
+        if (!url) {
+          const ref = qrRefs.current[e.idEntrada];
+          if (ref && typeof ref.toDataURL === 'function') {
+            // eslint-disable-next-line no-await-in-loop
+            dataUrl = await new Promise<string>((resolve) => ref.toDataURL((data: string) => resolve(`data:image/png;base64,${data}`)));
+          }
         }
       } catch {}
-      qrImages.push({ entry: e, dataUrl, text: qrText });
+      qrImages.push({ entry: e, dataUrl, url, text: qrText });
     }
 
     const html = buildPurchasePdfHtml(eventData, qrImages, String(idCompra || ''));
@@ -260,7 +299,7 @@ function TicketPurchasedScreenContent() {
   // Construye un PDF similar a la plantilla provista, con datos reales
   const buildPurchasePdfHtml = (
     ev: EventItemWithExtras,
-    images: { entry: UiUserEntry; dataUrl?: string; text: string }[],
+    images: { entry: UiUserEntry; dataUrl?: string; url?: string; text: string }[],
     compraId?: string
   ) => {
     // Pega aquí el string base64 de tu logo (ejemplo: data:image/png;base64,xxxx)
@@ -274,12 +313,12 @@ function TicketPurchasedScreenContent() {
     const address = [getText(ev.address), getText((ev as any)?.localidad), getText((ev as any)?.municipio), getText((ev as any)?.provincia)].filter(Boolean).join(', ');
     const fechaHora = `${dateHuman}${ev.timeRange ? `, ${ev.timeRange}` : ''}`;
 
-    const sections = images.map(({ entry, dataUrl, text }, idx) => {
+    const sections = images.map(({ entry, dataUrl, url, text }, idx) => {
       const tipo = entry.tipoDs ?? (entry.tipoCd ?? 'Entrada');
       const precio = fmtMoney(entry.precio);
       return `
         <div class="qr-section">
-          <div class="qr-img">${dataUrl ? `<img src="${dataUrl}" alt="QR" />` : `<div class="qr-fallback">${text}</div>`}</div>
+          <div class="qr-img">${(dataUrl || url) ? `<img src="${dataUrl || url}" alt="QR" />` : `<div class="qr-fallback">${text}</div>`}</div>
           <div class="qr-info"><b>Tipo:</b> ${tipo}<br/><b>Precio:</b> ${precio}</div>
         </div>
       `;
@@ -467,14 +506,25 @@ function TicketPurchasedScreenContent() {
                     </View>
                     <Text style={styles.entryPriceLine}>{price}</Text>
                     <View style={{ alignItems: 'center', marginTop: 6 }}>
-                      <QRCode
-                        value={qrText}
-                        size={QR_SIZE}
-                        color={COLORS.textPrimary}
-                        backgroundColor={COLORS.cardBg}
-                        getRef={(c: any) => { if (c) { qrRefs.current[en.idEntrada] = c; } }}
-                      />
+                      {en.qrImageUrl ? (
+                        <Image
+                          source={{ uri: en.qrImageUrl }}
+                          style={{ width: QR_SIZE, height: QR_SIZE, resizeMode: 'contain' }}
+                          accessible
+                          accessibilityLabel={`QR ${code}`}
+                        />
+                      ) : (
+                        <QRCode
+                          value={qrText}
+                          size={QR_SIZE}
+                          color={COLORS.textPrimary}
+                          backgroundColor={COLORS.cardBg}
+                          getRef={(c: any) => { if (c) { qrRefs.current[en.idEntrada] = c; } }}
+                        />
+                      )}
                     </View>
+                    {/* Mostrar IDs solicitados */}
+                    <Text style={styles.entryIdsLine}>idEntrada: {en.idEntrada}  •  idMedia: {en.mediaId ? String(en.mediaId) : '-'}</Text>
                     <Text style={styles.entryValidText}>Entrada válida para el {valido}</Text>
                   </View>
                 );
@@ -684,6 +734,13 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   entryValidText: {
+    marginTop: 6,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  entryIdsLine: {
     marginTop: 6,
     fontFamily: FONTS.bodyRegular,
     fontSize: FONT_SIZES.smallText,

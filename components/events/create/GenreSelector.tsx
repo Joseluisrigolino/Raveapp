@@ -54,23 +54,26 @@ const styles = StyleSheet.create({
   genreGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    justifyContent: "space-between",
     marginTop: 2,
   },
   chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    width: "31%", // 3 columnas aprox.
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: COLORS.borderInput,
     backgroundColor: COLORS.cardBg,
-    marginRight: 8,
-    marginBottom: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
   },
   chipOn: {
     backgroundColor: COLORS.textPrimary,
     borderColor: COLORS.textPrimary,
   },
-  chipText: { color: COLORS.textPrimary, fontWeight: '600' },
+  chipText: { color: COLORS.textPrimary, fontWeight: '600', textAlign: 'center' },
   chipTextOn: { color: COLORS.cardBg, fontWeight: '700' },
   hint: { color: COLORS.textSecondary, fontSize: 12, marginTop: 6 },
 });

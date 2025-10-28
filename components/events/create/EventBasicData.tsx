@@ -52,35 +52,35 @@ export default function EventBasicData(props: Props) {
   } = props;
 
   return (
-    <View style={styles.card}>
-      <InputText
-        label="Nombre del evento"
-        value={eventName}
-        isEditing={true}
-        onBeginEdit={() => {}}
-        onChangeText={onChangeEventName}
-        placeholder="Nombre del evento"
-        labelStyle={{ width: "100%", alignSelf: "flex-start", marginLeft: 2 }}
-        inputStyle={{ width: "100%" }}
-      />
+      <View style={styles.card}>
+        <InputText
+          label="Nombre del evento"
+          value={eventName}
+          isEditing={true}
+          onBeginEdit={() => {}}
+          onChangeText={onChangeEventName}
+          placeholder="Nombre del evento"
+          labelStyle={{ width: "100%", alignSelf: "flex-start", marginLeft: 2 }}
+          inputStyle={{ width: "100%" }}
+        />
 
-      {/* Recurring toggle styled as two buttons */}
-      <View style={{ marginTop: 10 }}>
-        <Text style={[styles.label, { marginBottom: 8 }]}>¿Es un evento recurrente?</Text>
-        <View style={styles.recurringSegment}>
-          <TouchableOpacity
-            style={[styles.recurringItem, !isRecurring && styles.recurringItemOn]}
-            onPress={() => setIsRecurring(false)}
-          >
-            <Text style={[styles.recurringText, !isRecurring && styles.recurringTextOn]}>No</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.recurringItem, isRecurring && styles.recurringItemOn]}
-            onPress={() => setIsRecurring(true)}
-          >
-            <Text style={[styles.recurringText, isRecurring && styles.recurringTextOn]}>Sí</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Recurring toggle styled as two buttons */}
+        <View style={{ marginTop: 10 }}>
+          <Text style={[styles.label, { marginBottom: 8 }]}>¿Es un evento recurrente?</Text>
+          <View style={styles.recurringSegment}>
+            <TouchableOpacity
+              style={[styles.recurringItem, !isRecurring && styles.recurringItemOn]}
+              onPress={() => setIsRecurring(false)}
+            >
+              <Text style={[styles.recurringText, !isRecurring && styles.recurringTextOn]}>No</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.recurringItem, isRecurring && styles.recurringItemOn]}
+              onPress={() => setIsRecurring(true)}
+            >
+              <Text style={[styles.recurringText, isRecurring && styles.recurringTextOn]}>Sí</Text>
+            </TouchableOpacity>
+          </View>
 
         {isRecurring && (
           <View style={styles.recurringBox}>
@@ -171,17 +171,12 @@ export default function EventBasicData(props: Props) {
       <View style={styles.line} />
       <Text style={[styles.label, { marginBottom: 10 }]}>Tipo de evento</Text>
       <View style={styles.segment}>
-        {(["1d", "2d", "3d"] as EventType[]).map((v, idx) => {
+        {(["1d", "2d", "3d"] as EventType[]).map((v) => {
           const active = eventType === v;
-          const isLast = idx === 2;
           return (
             <TouchableOpacity
               key={v}
-              style={[
-                styles.segmentItem,
-                active && styles.segmentItemOn,
-                !isLast && styles.segmentItemMargin,
-              ]}
+              style={[styles.segmentItem, active && styles.segmentItemOn]}
               onPress={() => setEventType(v)}
             >
               <Text style={[styles.segmentText, active && styles.segmentTextOn]}>
@@ -282,6 +277,7 @@ const styles = StyleSheet.create({
   segment: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
   },
   segmentItem: {
     paddingVertical: 12,
@@ -291,6 +287,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: COLORS.borderInput,
+    minWidth: 96,
+    marginHorizontal: 6,
   },
   segmentItemOn: {
     backgroundColor: COLORS.textPrimary,
