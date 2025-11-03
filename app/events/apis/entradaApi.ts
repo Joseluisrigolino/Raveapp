@@ -578,48 +578,21 @@ export async function createPago(body: CrearPagoBody): Promise<CrearPagoResponse
 }
 
 /** =========================================================================
- *                       ACTUALIZAR ESTADO DE ENTRADAS
- *  =======================================================================
+ *                         CONFIRMAR PAGO (MERCADO PAGO)
+ *  Endpoint: POST /v1/Pago/PagoMP?IdPagoMP=<id>
+ *  - El backend actualizará el estado de entradas automáticamente
+ *  ==========================================================================
  */
-
-export async function updateEstadoPorCompra(idCompra: string, cdEstado: number): Promise<void> {
+export async function confirmarPagoMP(idPagoMP: string): Promise<void> {
   const token = await login();
-  const body = { idCompra, cdEstado } as any;
-  try {
-    await apiClient.put("/v1/Entrada/UpdateEstadoEntrada", body, {
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    });
-    return;
-  } catch (e: any) {
-    // Fallback PascalCase
-    const pascal = { IdCompra: idCompra, CdEstado: cdEstado } as any;
-    await apiClient.put("/v1/Entrada/UpdateEstadoEntrada", pascal, {
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    });
-  }
+  await apiClient.post("/v1/Pago/PagoMP", null, {
+    params: { idPagoMP },
+    headers: { Authorization: `Bearer ${token}` },
+  });
 }
 
-/**
- * Actualiza el estado de UNA entrada por su id (idEntrada).
- * Body esperado por el backend: { idEntrada: string, cdEstado: number }
- * También intenta fallback en PascalCase: { IdEntrada, CdEstado }
- */
-export async function updateEstadoPorEntrada(idEntrada: string, cdEstado: number): Promise<void> {
-  const token = await login();
-  const body = { idEntrada, cdEstado } as any;
-  try {
-    await apiClient.put("/v1/Entrada/UpdateEstadoEntrada", body, {
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    });
-    return;
-  } catch (e: any) {
-    // Fallback PascalCase
-    const pascal = { IdEntrada: idEntrada, CdEstado: cdEstado } as any;
-    await apiClient.put("/v1/Entrada/UpdateEstadoEntrada", pascal, {
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    });
-  }
-}
+// Los métodos manuales de actualización de estado por compra/entrada se eliminaron;
+// ahora el backend realiza el cambio de estado al confirmar el pago mediante PagoMP.
 
 /** =========================================================================
  *                 RESOLUCIÓN DE CÓDIGOS DE TIPOS

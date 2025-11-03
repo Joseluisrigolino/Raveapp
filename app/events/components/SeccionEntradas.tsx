@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { View, Text, TouchableOpacity, Alert } from "react-native";
-import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import TicketSelector from "@/app/tickets/components/TicketSelector";
 import { styles } from "@/app/events/components/evento/styles";
 import { COLORS } from "@/styles/globalStyles";

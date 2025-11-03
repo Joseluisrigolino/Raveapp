@@ -11,7 +11,7 @@ import { getTycPdfUrl } from "@/app/tyc/api/tycApi";
 import { COLORS } from "@/styles/globalStyles";
 import * as FileSystem from "expo-file-system/legacy";
 import { mediaApi } from "@/app/apis/mediaApi";
-import Icon from "react-native-vector-icons/MaterialIcons";
+import { MaterialIcons as Icon } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
@@ -66,7 +66,8 @@ export default function Tyc() {
 
   const handleChangePdf = async () => {
     try {
-      const DocumentPicker: any = await import("expo-document-picker");
+  // @ts-ignore - módulo opcional en este proyecto; si no está instalado, se mostrará un error controlado
+  const DocumentPicker: any = await import("expo-document-picker");
       const res: any = await DocumentPicker.getDocumentAsync({ type: "application/pdf", multiple: false, copyToCacheDirectory: true });
       // Soportar shape antiguo y nuevo de expo-document-picker
       let file: { uri: string; name: string; mimeType?: string } | null = null;

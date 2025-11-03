@@ -4,7 +4,7 @@ import { ScrollView, View, Text, Image, StyleSheet, Linking, TouchableOpacity, S
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as nav from "@/utils/navigation";
-import { ROUTES } from "../../../routes";
+import ROUTES from "@/routes";
 
 import ProtectedRoute from "@/app/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";

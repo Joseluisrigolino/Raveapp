@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { View, ScrollView, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, usePathname } from "expo-router";
-import { ROUTES } from "../../../routes";
+import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
 
 import ProtectedRoute from "@/app/auth/ProtectedRoute";
@@ -13,7 +13,7 @@ import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import ArtistCard from "@/app/artists/components/ArtistCardComponent";
 
-import { Artist } from "@/interfaces/Artist";
+import { Artist } from "@/app/artists/types/Artist";
 import { fetchArtistsFromApi } from "@/app/artists/apis/artistApi";
 import { useAuth } from "@/app/auth/AuthContext";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";

@@ -18,7 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { IconButton } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, usePathname } from "expo-router";
-import { ROUTES } from "../../routes";
+import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
 import { useAuth } from "@/app/auth/AuthContext";
 import { mediaApi } from "@/app/apis/mediaApi";
@@ -214,6 +214,7 @@ export default function Footer() {
     { icon: "account-outline", label: "Mi perfil", route: { pathname: ROUTES.MAIN.USER.PROFILE_EDIT } },
   ];
   const ownerItems = [
+  { icon: "shield-account", label: "Crear usuario controlador", route: { pathname: ROUTES.CONTROLLER.CREATE_USER } },
   { icon: "calendar-plus", label: "Mis eventos creados", route: { pathname: ROUTES.OWNER.MANAGE_EVENTS } },
   { icon: "repeat", label: "Mis fiestas recurrentes", route: { pathname: ROUTES.OWNER.PARTYS } },
   // Pasar el id del owner como param para que la pantalla de reporte traiga

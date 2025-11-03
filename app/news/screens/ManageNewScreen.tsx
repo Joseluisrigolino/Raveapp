@@ -3,7 +3,7 @@ import { View, Text, FlatList, Image, TouchableOpacity, ActivityIndicator, Alert
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, usePathname } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
-import { ROUTES } from "../../../routes";
+import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
 import { on as onEvent, off as offEvent } from "@/utils/eventBus";
 import { MaterialCommunityIcons } from "@expo/vector-icons";

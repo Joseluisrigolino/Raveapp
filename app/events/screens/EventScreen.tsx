@@ -2,11 +2,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ScrollView, View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { IconButton } from "react-native-paper";
 import { WebView } from "react-native-webview";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ROUTES } from "../../../routes";
+import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
 import { Linking } from "react-native";
 

@@ -19,7 +19,7 @@ import {
   deleteArtistFromApi,
 } from "@/app/artists/apis/artistApi";
 import { mediaApi } from "@/app/apis/mediaApi";
-import { Artist } from "@/interfaces/Artist";
+import { Artist } from "@/app/artists/types/Artist";
 import { useAuth } from "@/app/auth/AuthContext";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 

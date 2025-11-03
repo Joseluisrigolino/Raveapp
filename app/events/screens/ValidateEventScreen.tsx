@@ -23,8 +23,8 @@ import ReproductorSoundCloud from "@/app/events/components/evento/ReproductorSou
 import ReproductorYouTube from "@/app/events/components/evento/ReproductorYouTube";
 // Las reseñas no se muestran en el preview de validación
 import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
-import Icon from "react-native-vector-icons/MaterialIcons";
-import MCIcon from "react-native-vector-icons/MaterialCommunityIcons";
+import { MaterialIcons as Icon } from "@expo/vector-icons";
+import { MaterialCommunityIcons as MCIcon } from "@expo/vector-icons";
 import { getProfile, getUsuarioById } from "@/app/auth/userHelpers";
 import { updateArtistOnApi, fetchOneArtistFromApi } from "@/app/artists/apis/artistApi";
 import { mediaApi } from "@/app/apis/mediaApi";

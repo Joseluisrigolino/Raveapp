@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, Image, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
-import { ROUTES } from "../../../routes";
+import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 

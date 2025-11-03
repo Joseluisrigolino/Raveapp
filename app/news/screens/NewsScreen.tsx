@@ -3,7 +3,7 @@ import { ScrollView, View, Text, Image, StyleSheet, TouchableOpacity, ActivityIn
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, usePathname } from "expo-router";
 import { useAuth } from "@/app/auth/AuthContext";
-import { ROUTES } from "../../../routes";
+import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
 import ProtectedRoute from "@/app/auth/ProtectedRoute";
 

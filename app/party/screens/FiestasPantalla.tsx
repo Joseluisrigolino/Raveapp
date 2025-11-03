@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { ROUTES } from "../../../routes";
+import ROUTES from "@/routes";
 
 import * as nav from "@/utils/navigation";
 
@@ -32,6 +32,7 @@ import {
   deleteParty,
 } from "@/app/party/apis/partysApi";
 import InputText from "@/components/common/inputText";
+import { getAvgResenias } from "@/utils/reviewsApi";
 
 /** Tipo mínimo local (coincide con utils/partysApi) */
 type PartyItem = {
@@ -84,7 +85,60 @@ export default function PartysScreen() {
       }
 
       const data = await getPartiesByUser(String(userId));
-      setList(Array.isArray(data) ? data : []);
+      const baseList: PartyItem[] = Array.isArray(data) ? data : [];
+
+      // 1) Intento en batch (sin IdFiesta) por performance
+      let avgsMap: Record<string, { avg?: number; count?: number; raw?: any }> = {};
+      try {
+        const batch = await getAvgResenias();
+        if (Array.isArray(batch) && batch.length) {
+          batch.forEach((a: any) => {
+            const k = String(a?.idFiesta ?? a?.IdFiesta ?? "");
+            if (!k) return;
+            const avgNum = Number((a?.avg ?? a?.avgEstrellas ?? "").toString().replace?.(",", "."));
+            const cnt = a?.count ?? a?.cantResenias ?? a?.cantResenas ?? a?.cantidad;
+            avgsMap[k] = { avg: avgNum, count: cnt, raw: a };
+          });
+        }
+      } catch {}
+
+      // 2) Fallback por-id para los que no estén resueltos
+      const missing = baseList.filter((p) => !avgsMap[String(p.idFiesta)]);
+      if (missing.length) {
+        try {
+          const results = await Promise.all(
+            missing.map(async (p) => {
+              try {
+                const arr = await getAvgResenias({ idFiesta: p.idFiesta });
+                const first = Array.isArray(arr) && arr.length ? arr[0] : null;
+                return { idFiesta: p.idFiesta, avg: first?.avg, count: first?.count, raw: first };
+              } catch {
+                return { idFiesta: p.idFiesta };
+              }
+            })
+          );
+          results.forEach((r) => {
+            avgsMap[String(r.idFiesta)] = { avg: r.avg, count: r.count, raw: r.raw };
+          });
+        } catch {}
+      }
+
+      // Fusionar promedios en la lista base
+      const merged: PartyItem[] = baseList.map((p) => {
+        const a = avgsMap[String(p.idFiesta)];
+        if (!a || (a.avg === undefined && a.count === undefined)) return p;
+        const avgNum = Number((a.avg as any)?.toString?.().replace?.(",", ".") ?? a.avg);
+        const countNum = a.count !== undefined ? Number(a.count) : undefined;
+        return {
+          ...p,
+          ratingAvg: Number.isFinite(avgNum) ? avgNum : p.ratingAvg,
+          promedio: Number.isFinite(avgNum) ? avgNum : (p as any)?.promedio,
+          reviewsCount: Number.isFinite(countNum || NaN) ? (countNum as number) : p.reviewsCount,
+          cantidad: Number.isFinite(countNum || NaN) ? (countNum as number) : (p as any)?.cantidad,
+        } as PartyItem;
+      });
+
+      setList(merged);
     } catch (e) {
       console.error("[PartysScreen] load error", e);
       setError("No pudimos cargar tus fiestas recurrentes.");
@@ -326,6 +380,8 @@ export default function PartysScreen() {
                         const { avg, count } = getPartyRating(it);
                         const text = count > 0
                           ? `${avg.toFixed(1)} (${new Intl.NumberFormat('es-AR').format(count)} reseñas)`
+                          : avg > 0
+                          ? `${avg.toFixed(1)}`
                           : 'Sin calificaciones aún';
                         return (
                           <View style={styles.ratingRow}>

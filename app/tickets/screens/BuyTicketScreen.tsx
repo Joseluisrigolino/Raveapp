@@ -399,9 +399,14 @@ function BuyTicketScreenContent() {
             const parsed = Linking.parse(url) as any;
             // Log parsed object and extracted id param for debugging
             try { console.log('[BuyTicketScreen] parsed deep link:', parsed); } catch {}
-            const idParam = parsed?.queryParams?.id;
-            try { console.log('[BuyTicketScreen] extracted idParam:', idParam); } catch {}
-            router.replace({ pathname: ROUTES.MAIN.TICKETS.RETURN, params: idParam ? { id: String(idParam) } : undefined });
+            const qp = parsed?.queryParams || {};
+            const idParam = qp?.id;
+            const idPagoMP = qp?.idPagoMP || qp?.payment_id || qp?.collection_id || qp?.paymentId || qp?.paymentid;
+            try { console.log('[BuyTicketScreen] extracted params:', { idParam, idPagoMP }); } catch {}
+            const params: any = {};
+            if (idParam) params.id = String(idParam);
+            if (idPagoMP) params.idPagoMP = String(idPagoMP);
+            router.replace({ pathname: ROUTES.MAIN.TICKETS.RETURN as any, params: Object.keys(params).length ? params : undefined });
           } catch (e) {
             console.warn('[BuyTicketScreen] error parsing deep link or navigating:', e);
           }
@@ -531,8 +536,29 @@ function BuyTicketScreenContent() {
         Alert.alert('Usuario no detectado', 'Iniciá sesión nuevamente para continuar.');
         return false;
       }
+      // Obtener perfil primero y detectar si hubo cambios; si no, evitar update
+      const perfil = await getUsuarioById(String(uid)).catch(() => null);
+      if (!perfil) {
+        Alert.alert('Error', 'No se pudo obtener perfil de usuario para actualizar domicilio.');
+        return false;
+      }
 
-      // Intentar resolver códigos geográficos con la API de georef
+      // Normalizar strings para comparar
+      const norm = (s: any) => String(s ?? '').trim().toLowerCase();
+      const prevDom = perfil.domicilio || {};
+      const noChanges = (
+        norm(billingAddress.direccion) === norm(prevDom.direccion) &&
+        norm(billingAddress.provincia) === norm(prevDom?.provincia?.nombre) &&
+        norm(billingAddress.municipio) === norm(prevDom?.municipio?.nombre) &&
+        norm(billingAddress.localidad) === norm(prevDom?.localidad?.nombre)
+      );
+
+      if (noChanges) {
+        try { console.log('[BuyTicketScreen] Domicilio sin cambios: se omite updateUsuario'); } catch {}
+        return true; // no actualizamos porque no hubo cambios
+      }
+
+      // Intentar resolver códigos geográficos con la API de georef SOLO si hubo cambios
       let provinciaCodigo = "";
       let municipioCodigo = "";
       let localidadCodigo = "";
@@ -559,13 +585,6 @@ function BuyTicketScreenContent() {
         }
       } catch (gErr) {
         console.log('[BuyTicketScreen] georef province lookup error:', gErr);
-      }
-
-      // Obtener perfil y componer payload completo para updateUsuario
-      const perfil = await getUsuarioById(String(uid)).catch(() => null);
-      if (!perfil) {
-        Alert.alert('Error', 'No se pudo obtener perfil de usuario para actualizar domicilio.');
-        return false;
       }
 
       const domicilioPayload = {

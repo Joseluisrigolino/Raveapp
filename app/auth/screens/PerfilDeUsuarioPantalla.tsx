@@ -3,12 +3,12 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { ScrollView, View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert, Image, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Menu } from "react-native-paper";
-import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+import { MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import * as nav from "@/utils/navigation";
-import { ROUTES } from "../../../routes";
+import ROUTES from "@/routes";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";

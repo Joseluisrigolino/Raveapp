@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ScrollView, View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { ROUTES } from "../../../routes";
+import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
 
 import ProtectedRoute from "@/app/auth/ProtectedRoute";

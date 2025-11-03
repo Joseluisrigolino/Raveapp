@@ -30,7 +30,18 @@ import {
 import { useAuth } from "@/app/auth/AuthContext";
 
 type EventType = "1d" | "2d" | "3d";
-type ArtistSel = Artist & { __isNew?: boolean };
+type ArtistSel = {
+  idArtista: string;
+  name: string;
+  image: string;
+  description: string;
+  creationDate: string;
+  isActivo: boolean;
+  instagramURL: string;
+  spotifyURL: string;
+  soundcloudURL: string;
+  __isNew?: boolean;
+};
 
 const GREEN = "#17a34a";
 const createEmptyDayTickets = (): any => ({ genQty: "0", genPrice: "", ebGenQty: "0", ebGenPrice: "", vipQty: "0", vipPrice: "", ebVipQty: "0", ebVipPrice: "" });
@@ -133,7 +144,7 @@ export default function ModifyEventScreen() {
   const [isAfter, setIsAfter] = useState(false);
   const [isLGBT, setIsLGBT] = useState(false);
 
-  const [daySchedules, setDaySchedules] = useState<[]>([createEmptySchedule() as any]);
+  const [daySchedules, setDaySchedules] = useState<any[]>([createEmptySchedule() as any]);
   const [daysTickets, setDaysTickets] = useState<any[]>([createEmptyDayTickets()]);
   const [daySaleConfigs, setDaySaleConfigs] = useState<any[]>([createEmptySaleConfig()]);
 
@@ -207,10 +218,22 @@ export default function ModifyEventScreen() {
 
         setSelectedGenres(Array.isArray(ev.genero) ? ev.genero : []);
 
-        const artistasFromApi: ArtistSel[] = Array.isArray(ev.artistas) ? ev.artistas.map((a: any) => ({ idArtista: a?.idArtista, name: a?.nombre ?? a?.name ?? "", image: a?.imagen ?? a?.image ?? "", description: a?.bio ?? a?.description ?? "", creationDate: a?.dtAlta ?? a?.creationDate ?? "", isActivo: a?.isActivo === undefined ? true : Boolean(a.isActivo), instagramURL: a?.socials?.mdInstagram ?? a?.instagramURL ?? "", spotifyURL: a?.socials?.mdSpotify ?? a?.spotifyURL ?? "", soundcloudURL: a?.socials?.mdSoundcloud ?? a?.soundcloudURL ?? "" })) : [];
-        setSelectedArtists(artistasFromApi as any);
+        const artistasFromApi: ArtistSel[] = Array.isArray(ev.artistas)
+          ? ev.artistas.map((a: any) => ({
+              idArtista: a?.idArtista,
+              name: a?.nombre ?? a?.name ?? "",
+              image: a?.imagen ?? a?.image ?? "",
+              description: a?.bio ?? a?.description ?? "",
+              creationDate: a?.dtAlta ?? a?.creationDate ?? "",
+              isActivo: a?.isActivo === undefined ? true : Boolean(a.isActivo),
+              instagramURL: a?.socials?.mdInstagram ?? a?.instagramURL ?? "",
+              spotifyURL: a?.socials?.mdSpotify ?? a?.spotifyURL ?? "",
+              soundcloudURL: a?.socials?.mdSoundcloud ?? a?.soundcloudURL ?? "",
+            }))
+          : [];
+        setSelectedArtists(artistasFromApi);
 
-      } catch (e) { console.error("Error cargando evento para modificar", e); setInitialError(String(e?.message || e)); }
+  } catch (e: any) { console.error("Error cargando evento para modificar", e); setInitialError(String((e && e.message) || e)); }
       finally { setInitialLoading(false); }
     })();
     return () => { mounted = false; };
@@ -221,7 +244,7 @@ export default function ModifyEventScreen() {
       <Header />
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={{ padding: 12 }}>
-          <TitlePers title={eventName || "Modificar evento"} />
+          <TitlePers text={eventName || "Modificar evento"} />
           {initialLoading ? <ActivityIndicator /> : null}
         </View>
       </ScrollView>

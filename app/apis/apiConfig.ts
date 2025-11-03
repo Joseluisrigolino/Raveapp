@@ -30,3 +30,9 @@ export async function login(): Promise<string> {
   // Ajustá esto si tu Swagger lo llama distinto
   return response.data.token;
 }
+
+// --- Expo Router: este módulo NO es una pantalla/ruta ---
+// Agregamos un export default inofensivo para evitar el warning de expo-router.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function ExpoRouterNoRoute() { return null; }
+export default ExpoRouterNoRoute;

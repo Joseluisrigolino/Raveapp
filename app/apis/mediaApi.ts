@@ -281,3 +281,9 @@ export const mediaApi = {
     return data;
   },
 };
+
+// --- Expo Router: este módulo NO es una pantalla/ruta ---
+// Export default inofensivo para evitar el warning de expo-router en tiempo de desarrollo.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function ExpoRouterNoRoute() { return null; }
+export default ExpoRouterNoRoute;

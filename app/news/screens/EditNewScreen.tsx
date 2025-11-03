@@ -18,7 +18,7 @@ import { emit } from "@/utils/eventBus";
 import InputText from "@/components/common/inputText";
 import InputDesc from "@/components/common/inputDesc";
 import SelectField from "@/components/common/selectField";
-import { ROUTES } from "../../../routes";
+import ROUTES from "@/routes";
 import ProtectedRoute from "@/app/auth/ProtectedRoute";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 

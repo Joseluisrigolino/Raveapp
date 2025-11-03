@@ -8,6 +8,9 @@ import Footer from "@/components/layout/FooterComponent";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { getPartyById } from "@/app/party/apis/partysApi";
+import { getResenias } from "@/utils/reviewsApi";
+import { getUsuarioById } from "@/app/auth/userHelpers";
+import { mediaApi } from "@/app/apis/mediaApi";
 import SearchBarComponent from "@/components/common/SearchBarComponent";
 
 type Review = {
@@ -39,64 +42,55 @@ export default function PartyRatingsScreen() {
           setLoading(false);
           return;
         }
-        // Obtener nombre de la fiesta; API aún no expone reseñas, así que usamos placeholder
+        // Nombre de la fiesta
         try {
           const p = await getPartyById(idFiesta);
           setPartyName(p?.nombre || "Fiesta");
         } catch {}
-        // Placeholder de reseñas simuladas (hasta que haya endpoint real)
-        const today = new Date();
-        const sample: Review[] = [
-          {
-            id: "1",
-            userName: "María González",
-            comment:
-              "Increíble fiesta! La música estuvo espectacular y el ambiente fue perfecto. Los DJs realmente sabían cómo mantener a la pista llena toda la noche. Definitivamente volveré.",
-            rating: 5,
-            dateISO: new Date(today.getFullYear(), 0, 15).toISOString(),
-          },
-          {
-            id: "2",
-            userName: "Carlos Ruiz",
-            comment:
-              "Muy buena fiesta en general. El sonido estuvo excelente y la organización fue impecable. Solo le faltó un poco más de variedad en los géneros musicales.",
-            rating: 4,
-            dateISO: new Date(today.getFullYear(), 0, 12).toISOString(),
-          },
-          {
-            id: "3",
-            userName: "Ana Martínez",
-            comment:
-              "¡Fantástica experiencia! Los efectos visuales y la producción fueron de primer nivel. El line-up estuvo increíble, especialmente el set principal. Muy recomendable.",
-            rating: 5,
-            dateISO: new Date(today.getFullYear(), 0, 8).toISOString(),
-          },
-          {
-            id: "4",
-            userName: "Diego López",
-            comment:
-              "Estuvo bien pero esperaba más. El lugar se llenó demasiado y era difícil moverse. La música estuvo buena pero nada extraordinario. Precio un poco alto para lo que ofrecieron.",
-            rating: 3,
-            dateISO: new Date(today.getFullYear(), 0, 5).toISOString(),
-          },
-          {
-            id: "5",
-            userName: "Sofía Herrera",
-            comment:
-              "Me encantó la fiesta! El ambiente estuvo genial y conocí mucha gente nueva. Los tragos estuvieron buenos y el personal muy amable. Solo mejoraría la ventilación del lugar.",
-            rating: 4,
-            dateISO: new Date(today.getFullYear(), 0, 2).toISOString(),
-          },
-          {
-            id: "6",
-            userName: "Roberto Silva",
-            comment:
-              "No cumplió mis expectativas. La música estuvo muy repetitiva y el servicio en la barra fue muy lento. Además, el lugar estaba demasiado caluroso. No creo que vuelva.",
-            rating: 2,
-            dateISO: new Date(today.getFullYear() - 1, 11, 28).toISOString(),
-          },
-        ];
-        setReviews(sample);
+
+        // 1) Traer reseñas reales de la fiesta
+        const raw = await getResenias({ idFiesta });
+
+        // 2) Enriquecer con usuario (nombre + avatar)
+        const uniqueUserIds = Array.from(
+          new Set(
+            (raw || [])
+              .map((r) => String(r?.idUsuario || "").trim())
+              .filter((v) => v.length > 0)
+          )
+        );
+
+        const usersMap: Record<string, { name: string; avatar?: string }> = {};
+        await Promise.all(
+          uniqueUserIds.map(async (uid) => {
+            try {
+              const u = await getUsuarioById(uid);
+              const name = `${u?.nombre ?? ""} ${u?.apellido ?? ""}`.trim() || (u as any)?.correo || "Usuario";
+              // Asumimos que la imagen de perfil se guarda en Media con idEntidadMedia = idUsuario
+              // Si tu backend usa otra entidad para el avatar, ajustá acá
+              let avatar = "";
+              try { avatar = await mediaApi.getFirstImage(uid); } catch {}
+              usersMap[uid] = { name, avatar };
+            } catch {
+              usersMap[uid] = { name: "Usuario", avatar: "" };
+            }
+          })
+        );
+
+        const list: Review[] = (raw || []).map((r) => {
+          const uid = String(r?.idUsuario || "").trim();
+          const u = usersMap[uid] || { name: "Usuario", avatar: "" };
+          return {
+            id: String(r?.id ?? r?.idResenia ?? Math.random()),
+            userName: u.name,
+            userAvatar: u.avatar,
+            comment: String(r?.comentario ?? "").trim(),
+            rating: Number(r?.estrellas ?? 0) || 0,
+            dateISO: String(r?.fecha || new Date().toISOString()),
+          } as Review;
+        });
+
+        setReviews(list);
       } catch (e) {
         setError("No se pudieron cargar las reseñas");
       } finally {
@@ -134,8 +128,9 @@ export default function PartyRatingsScreen() {
     const stars = [] as JSX.Element[];
     for (let i = 1; i <= 5; i++) {
       const name = rating >= i ? "star" : rating >= i - 0.5 ? "star-half-full" : "star-outline";
+      const color = name === "star" || name === "star-half-full" ? "#f59e0b" : COLORS.textSecondary; // amarillo para llenas/medias
       stars.push(
-        <MaterialCommunityIcons key={i} name={name as any} size={16} color={COLORS.textSecondary} />
+        <MaterialCommunityIcons key={i} name={name as any} size={16} color={color} />
       );
     }
     return <View style={{ flexDirection: "row", gap: 2 }}>{stars}</View>;

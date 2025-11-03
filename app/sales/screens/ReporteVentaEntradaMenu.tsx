@@ -5,7 +5,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import SearchBar from "@/components/common/SearchBarComponent";
-import { ROUTES } from "../../../routes";
+import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { fetchEventsByEstados, ESTADO_CODES, EventItemWithExtras } from "@/app/events/apis/eventApi";

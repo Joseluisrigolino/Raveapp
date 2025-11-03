@@ -4,9 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useLocalSearchParams } from "expo-router";
 
-import { updateEstadoPorCompra, updateEstadoPorEntrada, getEstadoMap } from "@/app/events/apis/entradaApi";
-import { useAuth } from '@/app/auth/AuthContext';
-import { getEntradasUsuario } from '@/app/auth/userHelpers';
+import { confirmarPagoMP } from "@/app/events/apis/entradaApi";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
@@ -15,91 +13,27 @@ import ROUTES from "@/routes";
 
 export default function VueltaCompraPantalla() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
-  const { user } = useAuth();
+  const { id, idPagoMP } = useLocalSearchParams<{ id?: string; idPagoMP?: string }>();
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const compraId = id ? String(id) : undefined;
-        if (!compraId) return;
+        const pagoId = idPagoMP ? String(idPagoMP) : undefined;
+        if (!pagoId) return;
         setProcessing(true);
-        // Intentar resolver el código de estado para "pagado" consultando los estados conocidos
-        let estadoCode: number | undefined;
+        // Confirmar pago en backend (actualiza estados automáticamente)
         try {
-          const map = await getEstadoMap();
-          for (const [code, name] of map.entries()) {
-            const n = String(name || "").toLowerCase();
-            if (n.includes("pag") || n.includes("pago") || n.includes("pagado") || n.includes("pagada") || n.includes("pagadas")) {
-              estadoCode = Number(code);
-              break;
-            }
-          }
-        } catch (e) {
-          // ignore
-        }
-  // fallback a 4 (estado 'PAGA') si no encontramos mapeo
-  if (typeof estadoCode === "undefined") estadoCode = 4;
-
-        // Primero intentamos localizar las entradas creadas asociadas a esta compra
-        try {
-          const uid: string | null = (user as any)?.id ?? (user as any)?.idUsuario ?? null;
-          let entradas: any[] = [];
-
-          if (uid) {
-            try {
-              entradas = await getEntradasUsuario(String(uid)).catch(() => []);
-            } catch (e) {
-              console.warn('[VueltaCompraPantalla] getEntradasUsuario error:', e);
-              entradas = [];
-            }
-          }
-
-          // Filtrar entradas que pertenezcan a la compra (acomodar varios nombres de campo)
-          const matched = (entradas || []).filter((it: any) => {
-            const idc = it?.idCompra ?? it?.IdCompra ?? it?.compraId ?? it?.purchaseId ?? it?.id_compra ?? it?.compra?.idCompra ?? it?.pago?.idCompra;
-            return idc && String(idc) === String(compraId);
-          });
-
-          if (matched.length > 0) {
-            // Actualizar cada entrada por su id
-            for (const m of matched) {
-              const idEntrada = m?.idEntrada ?? m?.IdEntrada ?? m?.id ?? m?.entradaId ?? m?.id_entrada ?? m?.entrada?.idEntrada;
-              if (idEntrada) {
-                try {
-                  await updateEstadoPorEntrada(String(idEntrada), estadoCode);
-                  console.log('[VueltaCompraPantalla] Entrada marcada como pagada:', idEntrada);
-                } catch (err) {
-                  console.warn('[VueltaCompraPantalla] Error actualizando entrada', idEntrada, err);
-                }
-              }
-            }
-            console.log("[VueltaCompraPantalla] Estado actualizado para compra:", compraId, "->", estadoCode);
-          } else {
-            // Si no encontramos entradas por usuario+compra, intentamos el endpoint por compra (si existe)
-            try {
-              await updateEstadoPorCompra(compraId, estadoCode);
-              console.log('[VueltaCompraPantalla] updateEstadoPorCompra ok for compraId', compraId);
-            } catch (err) {
-              console.warn('[VueltaCompraPantalla] updateEstadoPorCompra failed:', err);
-              Alert.alert('Pago recibido', "Hemos recibido la confirmación del pago. Si no ves tu entrada en 'Mis entradas', contactá con soporte.");
-            }
-          }
-        } catch (e) {
-          console.warn('[VueltaCompraPantalla] Error procesando actualización de estado:', e);
-          try {
-            await updateEstadoPorCompra(compraId, estadoCode);
-          } catch (err) {
-            console.warn('[VueltaCompraPantalla] updateEstadoPorCompra fallback failed:', err);
-            Alert.alert('Pago recibido', "Hemos recibido la confirmación del pago. Si no ves tu entrada en 'Mis entradas', contactá con soporte.");
-          }
+          await confirmarPagoMP(pagoId);
+        } catch (err) {
+          console.warn('[VueltaCompraPantalla] confirmarPagoMP fallo:', err);
+          Alert.alert('Pago recibido', "Tu pago fue recibido. Si no ves tu entrada en 'Mis entradas', contactá con soporte.");
         }
       } finally {
         setProcessing(false);
       }
     })();
-  }, [id]);
+  }, [idPagoMP]);
 
   const handleGoToTickets = () => {
     router.replace(ROUTES.MAIN.TICKETS.MENU);

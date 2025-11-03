@@ -5,7 +5,7 @@ import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIn
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { ROUTES } from "../../../routes";
+import ROUTES from "@/routes";
 // Animated/Easing not required here
 import { BlurView } from "expo-blur";
 import { Portal } from "react-native-paper";
@@ -2158,7 +2158,7 @@ export default function CreateEventScreen() {
       }
 
       Alert.alert("Éxito", "Evento creado correctamente.");
-      router.push("/owner/AdministrarEventosPantalla");
+  router.push(ROUTES.OWNER.MANAGE_EVENTS as any);
     } catch (err: any) {
       const msg = err?.message || extractBackendMessage(err);
       Alert.alert("Error", String(msg));

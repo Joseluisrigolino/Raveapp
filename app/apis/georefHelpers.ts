@@ -185,3 +185,9 @@ export async function fetchLocalitiesByName(
   // Devuelve { localidades: [{ id, nombre }, ...], ... }
   return data.localidades || [];
 }
+
+// --- Expo Router: este módulo NO es una pantalla/ruta ---
+// Export default inofensivo para evitar el warning de expo-router.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function ExpoRouterNoRoute() { return null; }
+export default ExpoRouterNoRoute;

@@ -10,10 +10,10 @@ import {
   Pressable,
 } from "react-native";
 import { Text, TextInput, Button } from "react-native-paper";
-import Icon from "react-native-vector-icons/MaterialIcons";
+import { MaterialIcons as Icon } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
 import globalStyles from "@/styles/globalStyles";
-import { ROUTES } from "../../../routes";
+import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
 import { sendPasswordRecoveryEmail } from "@/app/apis/mailsApi";
 import { getProfile } from "@/app/auth/userHelpers";
@@ -142,7 +142,7 @@ export default function RecuperarContrasenaScreen() {
           {/* Link de recordaste contraseña */}
           <View style={styles.rememberRow}>
             <Text style={styles.rememberText}>¿Recordaste tu contraseña? </Text>
-            <Link href={ROUTES.LOGIN.LOGIN} style={styles.loginLink}>
+            <Link href={ROUTES.LOGIN.LOGIN as any} style={styles.loginLink}>
               Iniciar Sesión
             </Link>
           </View>

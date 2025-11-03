@@ -11,7 +11,7 @@ import * as Google from "expo-auth-session/providers/google";
 // Google Cloud oauth removed; using Expo Auth Session with Firebase client IDs
 import { jwtDecode } from "jwt-decode";
 import * as nav from "@/utils/navigation";
-import { ROUTES } from "../../../routes";
+import ROUTES from "@/routes";
 
 import globalStyles from "@/styles/globalStyles";
 import { apiClient, login as apiLogin } from "@/app/apis/apiConfig";
