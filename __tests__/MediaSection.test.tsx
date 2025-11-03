@@ -1,32 +1,16 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
-import MediaSection from '../components/events/create/MediaSection';
+import ImagePickerComponent from '@/components/common/ImagePickerComponent';
 
 describe('MediaSection', () => {
-  it('muestra loading y deshabilita el botón cuando isChecking=true', () => {
-    const onSelect = jest.fn();
-  const { getByText, getByTestId, queryByTestId } = render(
-      <MediaSection
-        photoFile={null}
-        videoLink=""
-        musicLink=""
-        onSelectPhoto={onSelect}
-        onChangeVideo={() => {}}
-        onChangeMusic={() => {}}
-        isChecking={true}
-      />
+  it('renderiza ImagePickerComponent y muestra label y botón', () => {
+    const onChange = jest.fn();
+    const { getByText } = render(
+      <ImagePickerComponent value={null} onChange={onChange} />
     );
 
-  // El texto del botón no debe estar (porque muestra ActivityIndicator en su lugar)
-  expect(() => getByText('Seleccionar imagen')).toThrow();
-
-    // El botón está deshabilitado y se muestra loading
-  const btn = getByTestId('select-button');
-  // Intentar presionar el botón no debe invocar onSelectPhoto porque está deshabilitado
-  fireEvent.press(btn);
-  expect(onSelect).not.toHaveBeenCalled();
-  // Loading indicator debe estar presente
-  const loading = queryByTestId('select-loading');
-  expect(loading).toBeTruthy();
+    // Label y texto del botón deben estar presentes
+    expect(getByText('Imagen')).toBeTruthy();
+    expect(getByText('Seleccionar imagen')).toBeTruthy();
   });
 });

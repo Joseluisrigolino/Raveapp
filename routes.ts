@@ -52,7 +52,8 @@ export const ROUTES = {
     PARTY_RATINGS: "/owner/PartyRatingsScreen",
   PARTYS: "/owner/FiestasPantalla",
     MANAGE_EVENTS: "/owner/AdministrarEventosPantalla",
-    TICKET_SOLD: "/owner/ReporteVentaEntradaEvento",
+  // Apunta al menú de reporte de ventas (pantalla administrativa/menu)
+  TICKET_SOLD: "/admin/ReporteVentaEntradaMenu",
     MODIFY_EVENT: "/owner/ModifyEventScreen",
   CANCEL_EVENT: "/owner/CancelarEventoPantalla",
   },

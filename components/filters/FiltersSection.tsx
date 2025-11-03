@@ -12,7 +12,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 
 import SearchBarComponent from "@/components/common/SearchBarComponent";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
-import { fetchGenres, ApiGenero } from "@/utils/events/eventApi";
+import { fetchGenres, ApiGenero } from "@/app/events/apis/eventApi";
 
 interface FiltersSectionProps {
   // Chips horizontales

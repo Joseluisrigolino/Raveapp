@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider } from "@/app/auth/AuthContext";
 import { Provider as PaperProvider } from 'react-native-paper';
 import { View, Text, StyleSheet } from "react-native";
 import globalStyles, { COLORS } from "@/styles/globalStyles";
@@ -19,7 +19,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
       <AuthProvider>
         <Stack
-        initialRouteName="login/login"
+        initialRouteName="auth/screens/login"
         screenOptions={({ route }) => ({
           headerTintColor: "#0f172a",
           headerStyle: { backgroundColor: "#fff", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#e5e7eb" },
@@ -31,17 +31,10 @@ export default function RootLayout() {
           headerBackground: undefined,
         })}
       >
-        {/* Rutas raíz dentro de la carpeta login */}
-        <Stack.Screen name="login/index" options={{ headerShown: false }} />
-        <Stack.Screen name="login/login" options={{ title: "Ingresar" }} />
-
-        {/* Presentar edición de artista como modal (popup) */}
-        <Stack.Screen
-          name="admin/artistas-admin/EditarArtistaPantalla"
-          options={{ presentation: "modal", headerShown: false }}
-        />
-
-  {/* No declarar segmentos padres sin ruta directa para evitar warnings */}
+        {/* Dejá que expo-router registre las rutas automáticamente.
+            Si necesitás overrides, agregalos apuntando a rutas existentes, por ejemplo:
+            <Stack.Screen name="auth/screens/login" options={{ title: "Ingresar" }} />
+        */}
         </Stack>
       </AuthProvider>
       </SafeAreaProvider>

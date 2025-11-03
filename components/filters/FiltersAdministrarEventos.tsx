@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { View, StyleSheet, ScrollView, TouchableOpacity, Text, ActivityIndicator } from "react-native";
 import SearchBarComponent from "@/components/common/SearchBarComponent";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
-import { fetchEventStates, ApiEstadoEvento } from "@/utils/events/eventApi";
-import type { FilterValue } from "@/components/events/manage/Filters";
+import { fetchEventStates, ApiEstadoEvento } from "@/app/events/apis/eventApi";
+import type { FilterValue } from "@/app/events/components/manage/Filters";
 
 type Props = {
   value: FilterValue;

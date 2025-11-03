@@ -20,10 +20,10 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter, usePathname } from "expo-router";
 import { ROUTES } from "../../routes";
 import * as nav from "@/utils/navigation";
-import { useAuth } from "@/context/AuthContext";
-import { mediaApi } from "@/utils/mediaApi";
-import { getProfile } from "@/utils/auth/userHelpers";
-import { apiClient } from "@/utils/apiConfig";
+import { useAuth } from "@/app/auth/AuthContext";
+import { mediaApi } from "@/app/apis/mediaApi";
+import { getProfile } from "@/app/auth/userHelpers";
+import { apiClient } from "@/app/apis/apiConfig";
 import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 import { getSafeImageSource } from "@/utils/image";
 
@@ -67,6 +67,8 @@ export default function Footer() {
   const [profileImageUrl, setProfileImageUrl] = useState<string>(
     randomProfileImage
   );
+  // id del usuario propietario (si corresponde)
+  const [ownerId, setOwnerId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.username) return;
@@ -80,6 +82,12 @@ export default function Footer() {
           img = `${apiClient.defaults.baseURL}${img.startsWith("/") ? "" : "/"}${img}`;
         }
         setProfileImageUrl(img || randomProfileImage);
+        // almacenar el id del propietario para usar en rutas de owner
+        try {
+          if (u?.idUsuario) setOwnerId(String(u.idUsuario));
+        } catch {
+          // noop
+        }
       } catch {
         setProfileImageUrl(randomProfileImage);
       }
@@ -208,7 +216,9 @@ export default function Footer() {
   const ownerItems = [
   { icon: "calendar-plus", label: "Mis eventos creados", route: { pathname: ROUTES.OWNER.MANAGE_EVENTS } },
   { icon: "repeat", label: "Mis fiestas recurrentes", route: { pathname: ROUTES.OWNER.PARTYS } },
-  { icon: "chart-bar", label: "Entradas vendidas", route: { pathname: ROUTES.OWNER.TICKET_SOLD } },
+  // Pasar el id del owner como param para que la pantalla de reporte traiga
+  // solo los eventos de este organizador.
+  { icon: "chart-bar", label: "Entradas vendidas", route: { pathname: ROUTES.OWNER.TICKET_SOLD, params: { id: ownerId ?? (user?.idUsuario ?? (user?.id ?? "")) } } },
   ];
 
   return (

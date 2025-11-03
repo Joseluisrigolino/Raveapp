@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, ScrollView, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { COLORS, RADIUS, FONT_SIZES } from "@/styles/globalStyles";
-import { fetchEstadosEntrada, ApiEstadoEntrada } from "@/utils/events/entradaApi";
+import { fetchEstadosEntrada, ApiEstadoEntrada } from "@/app/events/apis/entradaApi";
 
 interface FiltroMisTicketsProps {
   // ids de estado seleccionados (cdEstado)
