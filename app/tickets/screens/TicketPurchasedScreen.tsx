@@ -1,6 +1,6 @@
 // app/main/TicketsScreens/TicketPurchasedScreen.tsx
-import React, { useState, useEffect, useRef } from "react";
-import { ScrollView, Image, Text, StyleSheet, TouchableOpacity, View, ActivityIndicator, Dimensions, Linking } from "react-native";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { ScrollView, Image, Text, StyleSheet, TouchableOpacity, View, ActivityIndicator, Dimensions, Linking, Alert, Modal, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import QRCode from "react-native-qrcode-svg";
@@ -19,6 +19,7 @@ import { mediaApi } from "@/app/apis/mediaApi";
 import { useAuth } from "@/app/auth/AuthContext";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 import { getSafeImageSource } from "@/utils/image";
+import { postResenia, getResenias, Review } from "@/utils/reviewsApi";
 
 const screenWidth = Dimensions.get("window").width;
 const QR_SIZE = 140;
@@ -33,16 +34,114 @@ type UiUserEntry = {
   nroEntrada?: number;
   qrImageUrl?: string;
   mediaId?: string; // idMedia asociado a la entrada (si existe)
+  estadoCd?: number;
+  estadoDs?: string;
+  idFiesta?: string; // identificador de fiesta para reseñas
 };
 
 function TicketPurchasedScreenContent() {
-  const { id, eventId, count, idCompra } = useLocalSearchParams<{ id?: string; eventId?: string; count?: string; idCompra?: string }>();
+  const { id, eventId, count, idCompra, openReview } = useLocalSearchParams<{ id?: string; eventId?: string; count?: string; idCompra?: string; openReview?: string }>();
   const { user } = useAuth();
   const [eventData, setEventData] = useState<EventItemWithExtras | null>(null);
   const [loading, setLoading] = useState(true);
   const ticketsCount = typeof count === "string" && count.trim() ? Number(count) : undefined;
   const [entries, setEntries] = useState<UiUserEntry[]>([]);
   const qrRefs = useRef<Record<string, any>>({});
+
+  // Modal reseña
+  const [showReview, setShowReview] = useState(false);
+  const [rating, setRating] = useState<number>(0);
+  const [comment, setComment] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
+  const [userReview, setUserReview] = useState<Review | null>(null);
+  const [readOnlyReview, setReadOnlyReview] = useState(false);
+  const [reviewLoaded, setReviewLoaded] = useState(false);
+
+  const userIdForReview: string | null =
+    (user as any)?.id ??
+    (user as any)?.idUsuario ??
+    (user as any)?.userId ??
+    null;
+
+  // Determinar idFiesta para reseñas a partir de las entradas mapeadas (fallback a eventId si fuese igual)
+  const fiestaIdForReview: string | null = useMemo(() => {
+    if (Array.isArray(entries) && entries.length > 0) {
+      const found = entries.find((e) => e.idFiesta)?.idFiesta;
+      if (found) return String(found);
+    }
+    return eventId ? String(eventId) : null;
+  }, [entries, eventId]);
+
+  const handleSubmitReview = async () => {
+    const trimmed = (comment ?? '').trim();
+    if (!userIdForReview || !fiestaIdForReview) return;
+    if (userReview) {
+      Alert.alert('Reseña existente', 'Ya dejaste una reseña para esta fiesta.');
+      setReadOnlyReview(true);
+      setShowReview(true);
+      return;
+    }
+    if (rating <= 0) {
+      Alert.alert('Calificación requerida', 'Por favor seleccioná al menos 1 estrella.');
+      return;
+    }
+    if (trimmed.length === 0) {
+      Alert.alert('Comentario requerido', 'Por favor escribí tu reseña.');
+      return;
+    }
+    try {
+      setSubmitting(true);
+      const created = await postResenia({
+        idUsuario: String(userIdForReview),
+        idFiesta: String(fiestaIdForReview),
+        estrellas: rating,
+        comentario: trimmed,
+      });
+      try { setUserReview(created); } catch {}
+      setShowReview(false);
+      Alert.alert('¡Gracias!', 'Tu reseña fue enviada correctamente.');
+    } catch (e) {
+      Alert.alert('Error', 'No pudimos enviar tu reseña. Intenta nuevamente.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Traer reseña existente del usuario para esta fiesta
+  useEffect(() => {
+    (async () => {
+      try {
+        setReviewLoaded(false);
+        if (!fiestaIdForReview || !userIdForReview) return;
+        const list = await getResenias({ idUsuario: String(userIdForReview), idFiesta: String(fiestaIdForReview) });
+        const first = Array.isArray(list) && list.length ? list[0] : null;
+        setUserReview(first);
+      } catch {}
+      finally {
+        setReviewLoaded(true);
+      }
+    })();
+  }, [fiestaIdForReview, userIdForReview]);
+
+  // Abrir modal automáticamente si viene desde el menú con openReview=1
+  useEffect(() => {
+    if (!openReview) return;
+    if (!reviewLoaded) return; // esperar a conocer si existe reseña
+    if (openReview && typeof openReview === 'string') {
+      const has = !!userReview;
+      if (has) {
+        setRating(Number(userReview?.estrellas || 0));
+        setComment(String(userReview?.comentario || ''));
+        setReadOnlyReview(true);
+        setShowReview(true);
+      } else {
+        setRating(0);
+        setComment("");
+        setReadOnlyReview(false);
+        setShowReview(true);
+      }
+    }
+  }, [openReview, userReview, reviewLoaded]);
 
   // Helpers para Maps: construir destino robusto a partir de la dirección
   const getText = (v: any): string => {
@@ -152,6 +251,12 @@ function TicketPurchasedScreenContent() {
             const s = String(idc ?? "").trim();
             return s ? s : null;
           };
+          const getFiestaId = (r: any): string | null => {
+            const f = r?.fiesta ?? r?.evento ?? r?.event ?? null;
+            const id = f?.idFiesta ?? f?.id_fiesta ?? r?.idFiesta ?? r?.fiestaId ?? r?.id_fiesta ?? null;
+            const s = String(id ?? "").trim();
+            return s ? s : null;
+          };
 
           const all = Array.isArray(raw) ? raw : [];
           const filteredByEvent = all.filter((r) => {
@@ -180,6 +285,9 @@ function TicketPurchasedScreenContent() {
             const nroEntradaRaw = Number(
               r?.nroEntrada ?? r?.entrada?.nroEntrada ?? r?.numero ?? r?.nro ?? NaN
             );
+            const estadoCdRaw = Number(r?.cdEstado ?? r?.estado?.cdEstado ?? NaN);
+            const estadoDsRaw = String(r?.dsEstado ?? r?.estado?.dsEstado ?? "").trim() || undefined;
+            const idFiesta = getFiestaId(r) || undefined;
             return {
               idEntrada,
               idFecha: idFecha || undefined,
@@ -188,6 +296,9 @@ function TicketPurchasedScreenContent() {
               tipoDs,
               precio: Number.isFinite(precio) ? (precio as number) : undefined,
               nroEntrada: Number.isFinite(nroEntradaRaw) ? (nroEntradaRaw as number) : undefined,
+              estadoCd: Number.isFinite(estadoCdRaw) ? (estadoCdRaw as number) : undefined,
+              estadoDs: estadoDsRaw,
+              idFiesta,
             };
           });
           // Obtener QR desde mediaApi por cada idEntrada y anexar su URL
@@ -405,6 +516,25 @@ function TicketPurchasedScreenContent() {
       </html>`;
   };
 
+  // Determinar si TODAS las entradas están controladas
+  const controlledMatch = useMemo(
+    () => (s?: string) => {
+      const t = (s || '').toLowerCase();
+      return (
+        t.includes('controlada') ||
+        t.includes('controlado') ||
+        t.includes('verificada') ||
+        t.includes('escaneada') ||
+        t.includes('canjeada')
+      );
+    },
+    []
+  );
+  const allControlled = useMemo(
+    () => entries.length > 0 && entries.every((e: any) => controlledMatch(e?.estadoDs)),
+    [entries, controlledMatch]
+  );
+
   if (loading) {
     return (
       <SafeAreaView style={styles.loaderWrapper}>
@@ -431,7 +561,7 @@ function TicketPurchasedScreenContent() {
     <SafeAreaView style={styles.container}>
       <Header title="Mis Entradas" />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+  <ScrollView contentContainerStyle={styles.scrollContent}>
         <Image source={getSafeImageSource(eventData.imageUrl)} style={styles.eventImage} />
 
         <Text style={styles.title}>{eventData.title}</Text>
@@ -485,74 +615,199 @@ function TicketPurchasedScreenContent() {
         )}
 
         {/* Mis Entradas */}
-        <View style={[styles.infoCard, { paddingBottom: 8 }]}>
-          <Text style={styles.sectionTitle}>Mis Entradas</Text>
-          {entries.length === 0 ? (
-            <Text style={styles.noEntriesText}>No se encontraron entradas para este evento.</Text>
-          ) : (
-            <View style={{ width: '100%', rowGap: 12 }}>
-              {entries.map((en, idx) => {
-                const qrText = en.mdQR || `Entrada:${en.idEntrada}|Evento:${eventData.id}|Fecha:${en.idFecha ?? ''}`;
-                const tipo = en.tipoDs ?? (en.tipoCd ?? 'Entrada');
-                const ticketNumber = Number.isFinite(en.nroEntrada as number) ? (en.nroEntrada as number) : (idx + 1);
-                const code = formatTicketCode(ticketNumber);
-                const price = typeof en.precio === 'number' ? `$${en.precio}` : '';
-                const valido = formatDateEs(eventData.date);
-                return (
-                  <View key={`${en.idEntrada}-${idx}`} style={styles.entryCard}>
-                    <View style={styles.entryHeaderRow}>
-                      <Text style={styles.entryHeaderLeft}>{String(tipo)}</Text>
-                      <Text style={styles.entryHeaderRight}>{code}</Text>
-                    </View>
-                    <Text style={styles.entryPriceLine}>{price}</Text>
-                    <View style={{ alignItems: 'center', marginTop: 6 }}>
-                      {en.qrImageUrl ? (
-                        <Image
-                          source={{ uri: en.qrImageUrl }}
-                          style={{ width: QR_SIZE, height: QR_SIZE, resizeMode: 'contain' }}
-                          accessible
-                          accessibilityLabel={`QR ${code}`}
-                        />
-                      ) : (
-                        <QRCode
-                          value={qrText}
-                          size={QR_SIZE}
-                          color={COLORS.textPrimary}
-                          backgroundColor={COLORS.cardBg}
-                          getRef={(c: any) => { if (c) { qrRefs.current[en.idEntrada] = c; } }}
-                        />
-                      )}
-                    </View>
-                    {/* Mostrar IDs solicitados */}
-                    <Text style={styles.entryIdsLine}>idEntrada: {en.idEntrada}  •  idMedia: {en.mediaId ? String(en.mediaId) : '-'}</Text>
-                    <Text style={styles.entryValidText}>Entrada válida para el {valido}</Text>
+        {(() => {
+          if (allControlled) {
+            // Agrupar por tipo y precio para mostrar cantidad x precio
+            const groups = new Map<string, { tipo: string; precio?: number; count: number }>();
+            entries.forEach((e) => {
+              const tipo = e.tipoDs ?? (e.tipoCd ?? 'Entrada');
+              const key = `${String(tipo)}__${typeof e.precio === 'number' ? e.precio : ''}`;
+              const g = groups.get(key) || { tipo: String(tipo), precio: e.precio, count: 0 };
+              g.count += 1;
+              groups.set(key, g);
+            });
+            const valido = formatDateEs(eventData.date);
+            const formatMoney = (n?: number) => (typeof n === 'number' && !isNaN(n) ? `$${n}` : '');
+            return (
+              <>
+                <View style={[styles.infoCard, { paddingBottom: 12 }]}> 
+                  <Text style={styles.sectionTitle}>Mis Entradas</Text>
+                  <View style={{ width: '100%', rowGap: 10 }}>
+                    {Array.from(groups.values()).map((g, idx) => (
+                      <View key={`${g.tipo}-${g.precio}-${idx}`} style={styles.controlRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.entryHeaderLeft}>{g.tipo}</Text>
+                          <Text style={styles.entryPriceLine}>
+                            {formatMoney(g.precio)} {g.precio ? '×' : ''} {g.count} {g.count === 1 ? 'entrada' : 'entradas'}
+                          </Text>
+                          <Text style={styles.entryValidText}>Entrada válida para el {valido}</Text>
+                        </View>
+                        <View style={styles.statusWrap}>
+                          <MaterialCommunityIcons name="check-circle-outline" size={16} color={COLORS.textSecondary} />
+                          <Text style={styles.statusText}>Controlada</Text>
+                        </View>
+                      </View>
+                    ))}
                   </View>
-                );
-              })}
-            </View>
-          )}
-        </View>
+                </View>
 
-        {/* Botón principal Descargar PDF (todas las entradas) */}
-        {entries.length > 0 && (
-          <TouchableOpacity style={styles.primaryButton} onPress={handleDownloadAll} activeOpacity={0.85}>
-            <MaterialCommunityIcons name="download" size={18} color={COLORS.backgroundLight} style={{ marginRight: 8 }} />
-            <Text style={styles.primaryButtonText}>Descargar PDF</Text>
+                {/* Botón Dejar reseña */}
+                <TouchableOpacity
+                  style={styles.primaryButton}
+                  onPress={() => {
+                    if (userReview) {
+                      setRating(Number(userReview.estrellas || 0));
+                      setComment(String(userReview.comentario || ''));
+                      setReadOnlyReview(true);
+                      setShowReview(true);
+                    } else {
+                      setRating(0);
+                      setComment("");
+                      setReadOnlyReview(false);
+                      setShowReview(true);
+                    }
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <MaterialCommunityIcons name="star" size={18} color={COLORS.backgroundLight} style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryButtonText}>{userReview ? 'Ver reseña' : 'Dejar reseña'}</Text>
+                </TouchableOpacity>
+              </>
+            );
+          }
+
+          // Caso no controladas: UI actual con QR
+          return (
+            <>
+              <View style={[styles.infoCard, { paddingBottom: 8 }]}> 
+                <Text style={styles.sectionTitle}>Mis Entradas</Text>
+                {entries.length === 0 ? (
+                  <Text style={styles.noEntriesText}>No se encontraron entradas para este evento.</Text>
+                ) : (
+                  <View style={{ width: '100%', rowGap: 12 }}>
+                    {entries.map((en, idx) => {
+                      const qrText = en.mdQR || `Entrada:${en.idEntrada}|Evento:${eventData.id}|Fecha:${en.idFecha ?? ''}`;
+                      const tipo = en.tipoDs ?? (en.tipoCd ?? 'Entrada');
+                      const ticketNumber = Number.isFinite(en.nroEntrada as number) ? (en.nroEntrada as number) : (idx + 1);
+                      const code = formatTicketCode(ticketNumber);
+                      const price = typeof en.precio === 'number' ? `$${en.precio}` : '';
+                      const valido = formatDateEs(eventData.date);
+                      return (
+                        <View key={`${en.idEntrada}-${idx}`} style={styles.entryCard}>
+                          <View style={styles.entryHeaderRow}>
+                            <Text style={styles.entryHeaderLeft}>{String(tipo)}</Text>
+                            <Text style={styles.entryHeaderRight}>{code}</Text>
+                          </View>
+                          <Text style={styles.entryPriceLine}>{price}</Text>
+                          <View style={{ alignItems: 'center', marginTop: 6 }}>
+                            {en.qrImageUrl ? (
+                              <Image
+                                source={{ uri: en.qrImageUrl }}
+                                style={{ width: QR_SIZE, height: QR_SIZE, resizeMode: 'contain' }}
+                                accessible
+                                accessibilityLabel={`QR ${code}`}
+                              />
+                            ) : (
+                              <QRCode
+                                value={qrText}
+                                size={QR_SIZE}
+                                color={COLORS.textPrimary}
+                                backgroundColor={COLORS.cardBg}
+                                getRef={(c: any) => { if (c) { qrRefs.current[en.idEntrada] = c; } }}
+                              />
+                            )}
+                          </View>
+                          {/* Mostrar IDs solicitados */}
+                          <Text style={styles.entryIdsLine}>idEntrada: {en.idEntrada}  •  idMedia: {en.mediaId ? String(en.mediaId) : '-'}</Text>
+                          <Text style={styles.entryValidText}>Entrada válida para el {valido}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+
+              {/* Botón principal Descargar PDF (todas las entradas) */}
+              {entries.length > 0 && (
+                <TouchableOpacity style={styles.primaryButton} onPress={handleDownloadAll} activeOpacity={0.85}>
+                  <MaterialCommunityIcons name="download" size={18} color={COLORS.backgroundLight} style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryButtonText}>Descargar PDF</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          );
+        })()}
+
+        {/* Botón secundario Cómo llegar (outline) - ocultar si todas controladas */}
+        {!allControlled && (
+          <TouchableOpacity style={styles.secondaryButton} onPress={openMapsDirections} activeOpacity={0.85}>
+            <MaterialCommunityIcons name="navigation-variant" size={18} color={COLORS.textPrimary} style={{ marginRight: 8 }} />
+            <Text style={styles.secondaryButtonText}>Cómo llegar</Text>
           </TouchableOpacity>
         )}
 
-        {/* Botón secundario Cómo llegar (outline) */}
-        <TouchableOpacity style={styles.secondaryButton} onPress={openMapsDirections} activeOpacity={0.85}>
-          <MaterialCommunityIcons name="navigation-variant" size={18} color={COLORS.textPrimary} style={{ marginRight: 8 }} />
-          <Text style={styles.secondaryButtonText}>Cómo llegar</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.reviewNote}>
-          * Una vez finalizado el evento, podrás dejar tu reseña...
-        </Text>
+        {/* Nota para reseña - ocultar si todas controladas */}
+        {!allControlled && (
+          <Text style={styles.reviewNote}>
+            * Una vez finalizado el evento, podrás dejar tu reseña...
+          </Text>
+        )}
 
         {/* Descripción adicional ya mostrada arriba */}
       </ScrollView>
+
+      {/* Modal reseña */}
+      <Modal visible={showReview} transparent animationType="fade" onRequestClose={() => !submitting && setShowReview(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Deja tu reseña</Text>
+            <Text style={styles.modalSubtitle}>
+              Has asistido a un evento de la fiesta {eventData?.title}. Si lo deseas, puedes dejar tu reseña sobre la fiesta.
+            </Text>
+            <View style={styles.starsRow}>
+              {[1,2,3,4,5].map((n) => (
+                <TouchableOpacity key={n} onPress={() => !readOnlyReview && setRating(n)} disabled={submitting || readOnlyReview}>
+                  <MaterialCommunityIcons
+                    name={rating >= n ? 'star' : 'star-outline'}
+                    size={28}
+                    color="#fbbf24"
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={styles.textarea}
+              placeholder="Comparte tu experiencia sobre la fiesta..."
+              placeholderTextColor={COLORS.textSecondary}
+              value={comment}
+              onChangeText={setComment}
+              editable={!submitting && !readOnlyReview}
+              multiline
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.btnGhost} onPress={() => !submitting && setShowReview(false)} disabled={submitting}>
+                <Text style={styles.btnGhostText}>Cerrar</Text>
+              </TouchableOpacity>
+              {!readOnlyReview && (
+                <TouchableOpacity
+                  style={[
+                    styles.btnPrimary,
+                    { opacity: rating > 0 && (comment?.trim()?.length ?? 0) > 0 && !submitting ? 1 : 0.6 },
+                  ]}
+                  onPress={handleSubmitReview}
+                  disabled={rating <= 0 || (comment?.trim()?.length ?? 0) === 0 || submitting}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color={COLORS.backgroundLight} />
+                  ) : (
+                    <Text style={styles.btnPrimaryText}>Enviar reseña</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Footer />
     </SafeAreaView>
@@ -754,6 +1009,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginVertical: 8,
   },
+  // Fila compacta para estado Controlada
+  controlRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    padding: 12,
+    backgroundColor: COLORS.cardBg,
+  },
+  statusWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 10 },
+  statusText: { color: COLORS.textSecondary, fontFamily: FONTS.bodyRegular },
   primaryButton: {
     marginTop: 8,
     width: '100%',
@@ -789,5 +1057,78 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.button,
     color: COLORS.textPrimary,
     textAlign: 'center',
-  }
+  },
+  // Modal reseña
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    padding: 16,
+  },
+  modalTitle: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.subTitle,
+    color: COLORS.textPrimary,
+    marginBottom: 6,
+  },
+  modalSubtitle: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
+    color: COLORS.textSecondary,
+    marginBottom: 12,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 6,
+  },
+  textarea: {
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    padding: 10,
+    minHeight: 90,
+    textAlignVertical: 'top',
+    color: COLORS.textPrimary,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 12,
+    columnGap: 10,
+  },
+  btnGhost: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: RADIUS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+  },
+  btnGhostText: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
+    color: COLORS.textPrimary,
+  },
+  btnPrimary: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.textPrimary,
+  },
+  btnPrimaryText: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
+    color: COLORS.backgroundLight,
+  },
 });

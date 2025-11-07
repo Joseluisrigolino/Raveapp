@@ -8,7 +8,7 @@ import {
   StyleSheet,
   GestureResponderEvent,
 } from "react-native";
-import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { getSafeImageSource } from "@/utils/image";
 
@@ -24,6 +24,8 @@ interface CardProps {
   onToggleFavorite?: () => void;
   disableFavorite?: boolean;
   hideFavorite?: boolean; // si true, no renderiza el corazón
+  // Zona opcional para acciones/controles dentro de la card (debajo de la fecha)
+  footer?: React.ReactNode;
 }
 
 export default function CardComponent({
@@ -36,6 +38,7 @@ export default function CardComponent({
   onToggleFavorite,
   disableFavorite = false,
   hideFavorite = false,
+  footer,
 }: CardProps) {
   const handleHeartPress = (e: GestureResponderEvent) => {
     e.stopPropagation();
@@ -73,6 +76,8 @@ export default function CardComponent({
           <MaterialCommunityIcons name="calendar-blank-outline" size={16} color={COLORS.textSecondary} />
           <Text style={styles.dateText}>{date}</Text>
         </View>
+
+        {footer ? <View style={styles.footerWrap}>{footer}</View> : null}
       </View>
     </TouchableOpacity>
   );
@@ -142,5 +147,8 @@ const styles = StyleSheet.create({
   dateText: {
     color: COLORS.textSecondary,
     fontSize: 13,
+  },
+  footerWrap: {
+    marginTop: 10,
   },
 });

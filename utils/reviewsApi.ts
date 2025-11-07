@@ -172,3 +172,65 @@ export async function getAvgResenias(opts?: { idFiesta?: string }): Promise<Revi
 		.filter(Boolean) as ReviewsAvg[];
 }
 
+// POST /v1/Resenia
+// Crea una reseña para una fiesta.
+// Body esperado:
+// {
+//   idUsuario: string,
+//   estrellas: number,
+//   comentario?: string,
+//   idFiesta: string
+// }
+export async function postResenia(payload: {
+	idUsuario: string;
+	estrellas: number;
+	comentario?: string;
+	idFiesta: string;
+}): Promise<Review> {
+	const token = await login();
+
+	const body = {
+		idUsuario: String(payload.idUsuario),
+		estrellas: Number(payload.estrellas),
+		comentario: payload.comentario ?? "",
+		idFiesta: String(payload.idFiesta),
+	};
+
+	const resp = await apiClient.post<any>("/v1/Resenia", body, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+
+	const data = resp?.data;
+	// Si el backend devuelve el recurso creado, normalizamos con la misma lógica que getResenias
+	const item = Array.isArray(data) ? data[0] : data;
+	if (!item || typeof item !== "object") {
+		// Fallback mínimo con el payload enviado
+		return {
+			idUsuario: body.idUsuario,
+			idFiesta: body.idFiesta,
+			estrellas: body.estrellas,
+			comentario: body.comentario,
+		} as Review;
+	}
+
+	const idRaw = item?.id ?? item?.idResenia ?? item?.IdResenia ?? item?.Id ?? undefined;
+	const idFiesta = item?.idFiesta ?? item?.IdFiesta ?? item?.fiestaId ?? payload.idFiesta;
+	const idUsuario = item?.idUsuario ?? item?.IdUsuario ?? item?.usuarioId ?? payload.idUsuario;
+	const estrellas = Number(
+		item?.estrellas ?? item?.Estrellas ?? payload.estrellas ?? NaN
+	);
+	const comentario = item?.comentario ?? item?.comentarios ?? item?.texto ?? item?.detalle ?? payload.comentario ?? "";
+	const fecha = item?.fecha ?? item?.dtResenia ?? item?.createdAt ?? item?.Fecha ?? undefined;
+
+	return {
+		id: idRaw ? String(idRaw) : undefined,
+		idResenia: idRaw ? String(idRaw) : undefined,
+		idFiesta: idFiesta ? String(idFiesta) : undefined,
+		idUsuario: idUsuario ? String(idUsuario) : undefined,
+		estrellas: Number.isFinite(estrellas) ? estrellas : payload.estrellas,
+		comentario,
+		fecha,
+		...item,
+	} as Review;
+}
+

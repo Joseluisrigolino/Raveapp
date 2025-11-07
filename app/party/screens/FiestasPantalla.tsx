@@ -247,7 +247,7 @@ export default function PartysScreen() {
       if (avg >= i) name = "star";
       else if (avg >= i - 0.5) name = "star-half-full";
       stars.push(
-        <MaterialCommunityIcons key={i} name={name} size={16} color={COLORS.textSecondary} />
+        <MaterialCommunityIcons key={i} name={name} size={16} color="#fbbf24" />
       );
     }
     return <View style={styles.starsRow}>{stars}</View>;

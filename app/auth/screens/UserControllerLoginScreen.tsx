@@ -96,29 +96,13 @@ export default function UserControllerLogin() {
 						Acceder como Controlador
 					</Button>
 
-					{/* ¿Olvidaste tu contraseña? */}
-					<Pressable onPress={() => { /* Recuperación próximamente */ }}> 
-						<Text style={styles.forgot}>¿Olvidaste tu contraseña?</Text>
+					{/* ¿Olvidaste tu contraseña? (mensaje informativo) */}
+					<Pressable onPress={() => { /* Recuperación no disponible: solicitar al organizador */ }}> 
+						<Text style={styles.forgot}>Si olvidaste tu contraseña, solicítala al usuario organizador.</Text>
 					</Pressable>
 				</View>
 
-				{/* Información de Seguridad */}
-				<View style={styles.infoCard}>
-					<View style={styles.infoHeader}>
-						<Icon name="info" size={18} color="#0f172a" />
-						<Text style={styles.infoTitle}> Información de Seguridad</Text>
-					</View>
-
-								<View style={styles.infoRow}>
-									<View style={styles.infoIconCircle}><Icon name="schedule" size={18} color="#0f172a" /></View>
-									<Text style={styles.infoText}>Sesión válida hasta terminar el evento</Text>
-								</View>
-					<View style={styles.infoRow}>
-						<View style={styles.infoIconCircle}><Icon name="fact-check" size={18} color="#0f172a" /></View>
-						<Text style={styles.infoText}>Actividad monitoreada y registrada</Text>
-					</View>
-								{/* Soporte 24/7 quitado */}
-				</View>
+				{/* Información de Seguridad eliminada */}
 
 				{/* Footer */}
 				<View style={styles.footer}>
@@ -179,36 +163,9 @@ const styles = StyleSheet.create({
 		marginTop: 6,
 		marginBottom: 10,
 	},
-	forgot: { color: "#0f172a", fontWeight: "600", textAlign: "center" },
+	forgot: { color: "#9ca3af", textAlign: "center" },
 
-	infoCard: {
-		marginTop: 16,
-		backgroundColor: "#fff",
-		borderRadius: 14,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: "#e6e9ef",
-		shadowColor: "#000",
-		shadowOpacity: 0.06,
-		shadowOffset: { width: 0, height: 6 },
-		shadowRadius: 12,
-		elevation: 4,
-	},
-	infoHeader: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-	infoTitle: { fontWeight: "700", color: "#111827" },
-	infoRow: { flexDirection: "row", alignItems: "center", marginVertical: 6 },
-	infoIconCircle: {
-		width: 28,
-		height: 28,
-		borderRadius: 14,
-		backgroundColor: "#eef2ff",
-		alignItems: "center",
-		justifyContent: "center",
-		marginRight: 10,
-		borderWidth: 1,
-		borderColor: "#e6e9ef",
-	},
-	infoText: { color: "#374151" },
+	// Estilos de Información de Seguridad eliminados
 
 	footer: { alignItems: "center", marginTop: 16, marginBottom: 8 },
 	footerMuted: { color: "#9ca3af", fontSize: 12, marginBottom: 8 },

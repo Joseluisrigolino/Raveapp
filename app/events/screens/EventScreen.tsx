@@ -25,7 +25,7 @@ import SeccionEntradas from "../components/SeccionEntradas";
 import ModalArtistas from "@/app/events/components/evento/ModalArtistas";
 import ResenasDelEvento from "@/app/events/components/evento/ResenasDelEvento";
 
-import { fetchEventById, getEventFlags } from "@/app/events/apis/eventApi";
+import { fetchEventById, getEventFlags, fetchGenres } from "@/app/events/apis/eventApi";
 import { ReviewItem } from "@/interfaces/ReviewProps";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 
@@ -70,6 +70,7 @@ export default function EventScreen() {
   const [loading, setLoading] = useState(true);
 
   const [showArtistsModal, setShowArtistsModal] = useState(false);
+  const [genreMap, setGenreMap] = useState<Map<number, string>>(new Map());
 
   const mockReviews: ReviewItem[] = [
     { id: 1, user: "Usuario99", comment: "Me gustó mucho la fiesta.", rating: 5, daysAgo: 6 },
@@ -159,6 +160,24 @@ export default function EventScreen() {
     };
   }, [id, userId]);
 
+  // Cargar mapa de géneros una vez
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const list = await fetchGenres();
+        if (!mounted) return;
+        const map = new Map<number, string>(list.map((g: any) => [Number(g.cdGenero), String(g.dsGenero)]));
+        setGenreMap(map);
+      } catch (e) {
+        if (mounted) setGenreMap(new Map());
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -226,6 +245,31 @@ export default function EventScreen() {
     const url = findSoundCloudUrl(eventData);
     return url || null;
   }, [eventData]);
+
+  const genreNames = useMemo(() => {
+    try {
+      const codes = Array.isArray((eventData as any)?.genero) ? (eventData as any).genero : [];
+      if (!codes.length) return [] as string[];
+      const seen = new Set<string>();
+      const names = codes
+        .map((c: any) => {
+          const num = Number(c);
+          const name = genreMap.get(num);
+          return name ? name : String(num);
+        })
+        .map((s: string) => s.trim())
+        .filter((s: string) => {
+          const k = s.toLowerCase();
+          if (!k) return false;
+          if (seen.has(k)) return false;
+          seen.add(k);
+          return true;
+        });
+      return names;
+    } catch {
+      return [] as string[];
+    }
+  }, [eventData, genreMap]);
 
   const addressDisplay = useMemo(() => {
     const addr = String(eventData?.address ?? "").trim();
@@ -354,11 +398,87 @@ export default function EventScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.heroContainer}>
             <HeroImagen imageUrl={eventData.imageUrl} onPress={() => eventData?.id && console.log("Evento id (image press):", String(eventData.id))} />
-            <View style={styles.badgesOverlay} pointerEvents="box-none"><BadgesEvento isLGBT={getEventFlags(eventData).isLGBT} isAfter={getEventFlags(eventData).isAfter} /></View>
+          </View>
+          <View style={styles.badgesRow}>
+            <BadgesEvento isLGBT={getEventFlags(eventData).isLGBT} isAfter={getEventFlags(eventData).isAfter} />
           </View>
           <TituloEvento title={eventData.title} isFavorite={isFavorite} favBusy={favBusy} onToggleFavorite={toggleFavorite} />
+          {/* Géneros */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Géneros</Text>
+            {genreNames.length > 0 ? (
+              genreNames.map((g: string, idx: number) => (
+                <View key={`${g}-${idx}`} style={styles.listRow}>
+                  <MaterialCommunityIcons name="tag-multiple-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} />
+                  <Text style={styles.listText}>{g}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.listTextMuted}>Próximamente</Text>
+            )}
+          </View>
           <View style={styles.card}><Text style={styles.cardTitle}>Artistas</Text>{(Array.isArray(eventData.artistas) ? eventData.artistas : []).slice(0, 8).map((art, idx) => (<View key={idx} style={styles.listRow}><MaterialCommunityIcons name="music" size={18} color={COLORS.info} style={{ marginRight: 8 }} /><Text style={styles.listText}>{getArtistName(art)}</Text></View>))}{(!eventData.artistas || eventData.artistas.length === 0) && (<Text style={styles.listTextMuted}>Próximamente</Text>)}</View>
-          <View style={styles.card}><Text style={styles.cardTitle}>Fecha y Horario</Text>{!!displayDate && (<View style={styles.listRow}><MaterialCommunityIcons name="calendar-blank-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} /><Text style={styles.listText}>{displayDate}</Text></View>)}{!!displayTime && (<View style={styles.listRow}><MaterialCommunityIcons name="clock-time-four-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} /><Text style={styles.listText}>{displayTime}</Text></View>)}</View>
+          {/* Fechas y horarios por día */}
+          {fechas && fechas.length > 0 ? (
+            fechas.map((f, idx) => {
+              const inicioDate = new Date(f.inicio);
+              const finDate = new Date(f.fin);
+              const validInicio = !isNaN(inicioDate.getTime());
+              const validFin = !isNaN(finDate.getTime());
+              const pad = (n: number) => String(n).padStart(2, '0');
+              const formatTime12 = (d: Date) => {
+                let h = d.getHours();
+                const m = d.getMinutes();
+                const ampm = h >= 12 ? 'PM' : 'AM';
+                h = h % 12;
+                if (h === 0) h = 12; // 12 AM/PM
+                return `${pad(h)}:${pad(m)} ${ampm}`;
+              };
+              const fechaStr = validInicio ? `${pad(inicioDate.getDate())}/${pad(inicioDate.getMonth() + 1)}/${inicioDate.getFullYear()}` : '';
+              const horaInicioStr = validInicio ? formatTime12(inicioDate) : '';
+              const horaFinStr = validFin ? formatTime12(finDate) : '';
+              const rangoHora = horaInicioStr && horaFinStr ? `${horaInicioStr} - ${horaFinStr}` : horaInicioStr || horaFinStr || '';
+              return (
+                <View key={f.idFecha || idx} style={styles.card}>
+                  <Text style={styles.cardTitle}>{`Fecha y Horario día ${idx + 1}`}</Text>
+                  {!!fechaStr && (
+                    <View style={styles.listRow}>
+                      <MaterialCommunityIcons name="calendar-blank-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} />
+                      <Text style={styles.listText}>{fechaStr}</Text>
+                    </View>
+                  )}
+                  {!!rangoHora && (
+                    <View style={styles.listRow}>
+                      <MaterialCommunityIcons name="clock-time-four-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} />
+                      <Text style={styles.listText}>{rangoHora}</Text>
+                    </View>
+                  )}
+                  {!fechaStr && !rangoHora && (
+                    <Text style={styles.listTextMuted}>Horario próximamente</Text>
+                  )}
+                </View>
+              );
+            })
+          ) : (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Fecha y Horario</Text>
+              {!!displayDate && (
+                <View style={styles.listRow}>
+                  <MaterialCommunityIcons name="calendar-blank-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} />
+                  <Text style={styles.listText}>{displayDate}</Text>
+                </View>
+              )}
+              {!!displayTime && (
+                <View style={styles.listRow}>
+                  <MaterialCommunityIcons name="clock-time-four-outline" size={18} color={COLORS.info} style={{ marginRight: 8 }} />
+                  <Text style={styles.listText}>{displayTime}</Text>
+                </View>
+              )}
+              {!displayDate && !displayTime && (
+                <Text style={styles.listTextMuted}>Horario próximamente</Text>
+              )}
+            </View>
+          )}
           <View style={styles.card}><Text style={styles.cardTitle}>Dirección</Text><TouchableOpacity onPress={openMapsDirections} disabled={!shortAddressDisplay || shortAddressDisplay === "-"} activeOpacity={0.75}><View style={styles.addressRow}><MaterialCommunityIcons name="map-marker-outline" size={18} color={COLORS.info} style={styles.addressIcon} /><View style={styles.addressTextCol}><Text style={styles.addressLinkText}>{shortAddressDisplay}</Text><Text style={styles.addressHintText}>Tocar para ver cómo llegar en Google Maps</Text></View></View></TouchableOpacity></View>
           {(() => { console.log("[EventScreen] multimedia URLs -> soundCloud:", soundCloudUrl, " youtube:", youTubeEmbedUrl); return null; })()}
           <ModalArtistas artistas={eventData.artistas} visible={showArtistsModal} onClose={() => setShowArtistsModal(false)} />
@@ -376,7 +496,7 @@ const HERO_RATIO = 16 / 9;
 
 const styles = StyleSheet.create({
   heroContainer: { position: "relative", marginBottom: 12 },
-  badgesOverlay: { position: "absolute", top: 10, right: 10 },
+  badgesRow: { paddingHorizontal: 16, marginBottom: 8, flexDirection: 'row', justifyContent: 'flex-start' },
   container: { flex: 1, backgroundColor: COLORS.backgroundLight },
   loaderWrapper: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContent: { paddingBottom: 32 },

@@ -18,6 +18,7 @@ import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
+import { GOOGLE_CONFIG } from "@/app/auth/googleConfig";
 import * as nav from "@/utils/navigation";
 import ROUTES from "@/routes";
 import globalStyles from "@/styles/globalStyles";
@@ -84,12 +85,13 @@ export default function LoginScreen() {
   const isWeb = Platform.OS === "web";
   const isMobile = !isWeb;
 
-  // Client ID (solo Android para Expo Go local)
-  const androidClientId = EX.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || undefined;
-
+  // Client IDs desde config centralizada (lee de app.json extra o EXPO_PUBLIC_*)
   const googleConfig: any = {
-    androidClientId,
-    // @ts-ignore 'useProxy' no figura en tipos pero está soportado en runtime por expo-auth-session
+    expoClientId: GOOGLE_CONFIG.expoClientId || undefined,
+    iosClientId: GOOGLE_CONFIG.iosClientId || undefined,
+    androidClientId: GOOGLE_CONFIG.androidClientId || undefined,
+    webClientId: GOOGLE_CONFIG.webClientId || undefined,
+    // @ts-ignore 'useProxy' existe en runtime (proxy recomendado en Expo Go)
     redirectUri: makeRedirectUri({ useProxy: true }),
     scopes: ["openid", "profile", "email"],
     responseType: "id_token",
@@ -211,7 +213,7 @@ export default function LoginScreen() {
           </View>
           <Text style={styles.brandTitle}>RaveApp</Text>
           <Text style={styles.brandSubtitle}>
-            Tu puerta al mejor entretenimiento
+            Tu pase al mejor ritmo
           </Text>
         </View>
 
@@ -311,7 +313,7 @@ export default function LoginScreen() {
 
           {/* Social: Google (expo-auth-session con proxy) */}
           <View style={styles.socialRow}>
-            {androidClientId ? (
+            {(googleConfig.androidClientId || googleConfig.iosClientId || googleConfig.expoClientId || googleConfig.webClientId) ? (
               <GoogleMobileButton />
             ) : (
               <Button
@@ -319,7 +321,7 @@ export default function LoginScreen() {
                 onPress={() =>
                   Alert.alert(
                     "Configuración requerida",
-                    "Falta EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID en app.json (extra) para usar Google en Expo Go."
+                    "Faltan Client IDs de Google en app.json (extra). Define EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID y/o EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID."
                   )
                 }
                 icon="google"
@@ -373,6 +375,27 @@ export default function LoginScreen() {
         </View>
 
         {/* Términos y privacidad */}
+        {/* Acceso staff / controlador */}
+        <View style={styles.staffAccessBox}>
+          <View style={styles.staffIconCircle}>
+            <Icon name="admin-panel-settings" size={28} color="#0f172a" />
+          </View>
+          <Text style={styles.staffPromptText}>¿Eres staff de evento?</Text>
+          <Link href={ROUTES.LOGIN.CONTROLLER as any} asChild>
+            <Button
+              mode="outlined"
+              icon="qrcode"
+              accessibilityRole="button"
+              contentStyle={styles.controllerOutlinedContent}
+              style={styles.controllerOutlinedButton}
+              labelStyle={{ fontWeight: "700", color: "#0f172a" }}
+            >
+              Acceso Controlador
+            </Button>
+          </Link>
+        </View>
+
+        {/* Términos y privacidad */}
         <View style={styles.termsRow}>
           <Text style={styles.termsText}>Al continuar, aceptas nuestros </Text>
           <Pressable
@@ -388,20 +411,6 @@ export default function LoginScreen() {
           >
             <Text style={styles.termsLink}>Política de Privacidad</Text>
           </Pressable>
-        </View>
-
-        {/* Footer: acceso controlador */}
-        <View style={styles.controllerRow}>
-          <Link href={ROUTES.LOGIN.CONTROLLER as any} asChild>
-            <Button
-              mode="text"
-              compact
-              labelStyle={{ color: globalStyles.COLORS.primary, fontWeight: "600" }}
-              accessibilityRole="link"
-            >
-              Ingresar como controlador
-            </Button>
-          </Link>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -595,6 +604,46 @@ const styles = StyleSheet.create({
   },
   termsText: { color: "#6b7280" },
   termsLink: { color: "#0f172a", fontWeight: "600" },
-  controllerRow: { marginTop: 12, alignItems: "center", paddingBottom: 8 },
-  controllerText: { color: globalStyles.COLORS.primary, fontWeight: "600" },
+  staffAccessBox: {
+    marginTop: 24,
+    marginHorizontal: 12,
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "#e6e9ef",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  staffIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  staffPromptText: {
+    fontSize: 14,
+    color: "#6b7280",
+    marginBottom: 12,
+    fontWeight: "500",
+  },
+  controllerOutlinedButton: {
+    borderRadius: 25,
+    height: 50,
+    justifyContent: "center",
+    borderColor: "#0f172a",
+    backgroundColor: "#ffffff",
+    width: "100%",
+  },
+  controllerOutlinedContent: { height: 50 },
 });

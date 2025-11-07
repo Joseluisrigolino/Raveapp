@@ -1,7 +1,14 @@
 // app/main/MenuPantalla.tsx
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { ScrollView, View, Text, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import {
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, usePathname } from "expo-router";
 import ROUTES from "@/routes";
@@ -15,7 +22,7 @@ import FiltersSection from "@/components/filters/FiltersSection";
 
 import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
 import { EventItem } from "@/interfaces/EventItem";
-import { fetchEvents, fetchEventsByEstados, ESTADO_CODES } from "@/app/events/apis/eventApi";
+import { fetchEventsByEstados, ESTADO_CODES } from "@/app/events/apis/eventApi";
 import {
   fetchProvinces,
   fetchMunicipalities,
@@ -25,10 +32,7 @@ import {
 
 import { useAuth } from "@/app/auth/AuthContext";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
-import {
-  putEventoFavorito,
-  getEventosFavoritos,
-} from "@/app/auth/userHelpers";
+import { putEventoFavorito, getEventosFavoritos } from "@/app/auth/userHelpers";
 
 // Helper para rango de semana
 function getWeekRange() {
@@ -58,10 +62,12 @@ export default function MenuPantalla() {
     {
       label: "EVENTOS A VALIDAR",
       route: ROUTES.ADMIN.EVENTS_VALIDATE.LIST,
-      isActive: currentScreen === ROUTES.ADMIN.EVENTS_VALIDATE.LIST.split("/").pop(),
+      isActive:
+        currentScreen === ROUTES.ADMIN.EVENTS_VALIDATE.LIST.split("/").pop(),
     },
     {
-      label: "EVENTOS APROBADOS",
+      // Mostramos solo los eventos EN_VENTA en esta pantalla
+      label: "EVENTOS EN VENTA",
       route: ROUTES.MAIN.EVENTS.MENU,
       isActive: currentScreen === ROUTES.MAIN.EVENTS.MENU.split("/").pop(),
     },
@@ -71,7 +77,9 @@ export default function MenuPantalla() {
     (user as any)?.idUsuario ?? (user as any)?.id ?? null;
 
   // Mantengo _ts en los eventos para evitar reparseos repetidos
-  const [allEvents, setAllEvents] = useState<Array<EventItem & { _ts: number }>>([]);
+  const [allEvents, setAllEvents] = useState<
+    Array<EventItem & { _ts: number }>
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,7 +94,8 @@ export default function MenuPantalla() {
         setLoading(true);
         setError(null);
 
-  const eventsPromise = fetchEventsByEstados([ESTADO_CODES.APROBADO, ESTADO_CODES.EN_VENTA]);
+        // Cargar únicamente eventos con estado EN_VENTA
+        const eventsPromise = fetchEventsByEstados([ESTADO_CODES.EN_VENTA]);
         const favsPromise = userId
           ? getEventosFavoritos(String(userId))
           : Promise.resolve<string[]>([]);
@@ -99,16 +108,8 @@ export default function MenuPantalla() {
           .map((e) => ({ ...e, _ts: parseDateToTs(e.date) }))
           .sort((a, b) => (a._ts || 0) - (b._ts || 0));
 
-        // Filtrar sólo eventos desde el inicio del día actual en adelante
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        const upcoming = enriched.filter((e) => {
-          const ts = Number(e._ts || 0);
-          // excluir aquellos sin fecha válida (ts NaN o 0)
-          return ts >= todayStart.getTime();
-        });
-
-        setAllEvents(upcoming);
+        // Mostrar todos los eventos EN_VENTA (sin filtrar por fecha actual)
+        setAllEvents(enriched);
         setFavSet(new Set(favIds.map(String)));
       } catch (err) {
         console.error("[MenuPantalla] Error cargando eventos/favoritos:", err);
@@ -167,40 +168,50 @@ export default function MenuPantalla() {
     setProvinceSuggestions([]);
   }, []);
 
-  const onMunicipalityTextChange = useCallback(async (v: string) => {
-    setMunicipalityText(v);
-    if (v.trim().length < 3 || !provinceText)
-      return setMunicipalitySuggestions([]);
-    try {
-      const results = await fetchMunicipalities(provinceText);
-      setMunicipalitySuggestions(
-        results.filter((m) => m.nombre.toLowerCase().includes(v.toLowerCase()))
-      );
-    } catch {
-      setMunicipalitySuggestions([]);
-    }
-  }, [provinceText]);
+  const onMunicipalityTextChange = useCallback(
+    async (v: string) => {
+      setMunicipalityText(v);
+      if (v.trim().length < 3 || !provinceText)
+        return setMunicipalitySuggestions([]);
+      try {
+        const results = await fetchMunicipalities(provinceText);
+        setMunicipalitySuggestions(
+          results.filter((m) =>
+            m.nombre.toLowerCase().includes(v.toLowerCase())
+          )
+        );
+      } catch {
+        setMunicipalitySuggestions([]);
+      }
+    },
+    [provinceText]
+  );
 
   const onPickMunicipality = useCallback((name: string) => {
     setMunicipalityText(name);
     setMunicipalitySuggestions([]);
   }, []);
 
-  const onLocalityTextChange = useCallback(async (v: string) => {
-    setLocalityText(v);
-    if (v.trim().length < 3) return setLocalitySuggestions([]);
-    try {
-      const results =
-        provinceText && municipalityText
-          ? await fetchLocalities(provinceText, municipalityText)
-          : await fetchLocalitiesByName(v);
-      setLocalitySuggestions(
-        results.filter((l) => l.nombre.toLowerCase().includes(v.toLowerCase()))
-      );
-    } catch {
-      setLocalitySuggestions([]);
-    }
-  }, [provinceText, municipalityText]);
+  const onLocalityTextChange = useCallback(
+    async (v: string) => {
+      setLocalityText(v);
+      if (v.trim().length < 3) return setLocalitySuggestions([]);
+      try {
+        const results =
+          provinceText && municipalityText
+            ? await fetchLocalities(provinceText, municipalityText)
+            : await fetchLocalitiesByName(v);
+        setLocalitySuggestions(
+          results.filter((l) =>
+            l.nombre.toLowerCase().includes(v.toLowerCase())
+          )
+        );
+      } catch {
+        setLocalitySuggestions([]);
+      }
+    },
+    [provinceText, municipalityText]
+  );
 
   const onPickLocality = useCallback((name: string) => {
     setLocalityText(name);
@@ -266,13 +277,10 @@ export default function MenuPantalla() {
     if (afterActive) results = results.filter((ev) => (ev as any).isAfter);
     if (lgbtActive) results = results.filter((ev) => (ev as any).isLgbt);
     if (selectedGenres.length) {
-      results = results.filter((ev) => selectedGenres.includes((ev as any).type));
+      results = results.filter((ev) =>
+        selectedGenres.includes((ev as any).type)
+      );
     }
-    // Ocultar eventos sin imagen
-    results = results.filter((ev) => {
-      const url = (ev as any).imageUrl;
-      return typeof url === "string" && url.trim().length > 0;
-    });
     return results;
   }, [
     allEvents,
@@ -306,47 +314,66 @@ export default function MenuPantalla() {
     setLocationFilterOpen(false);
   }, []);
 
-  const handleCardPress = useCallback((_: string, id?: string) => {
-    if (id) nav.push(router, { pathname: ROUTES.MAIN.EVENTS.EVENT, params: { id } });
-  }, [router]);
+  const handleCardPress = useCallback(
+    (_: string, id?: string) => {
+      if (id)
+        nav.push(router, {
+          pathname: ROUTES.MAIN.EVENTS.EVENT,
+          params: { id },
+        });
+    },
+    [router]
+  );
 
-  const handleToggleFavorite = useCallback(async (eventId: string) => {
-    if (!userId) {
-      Alert.alert("Iniciá sesión", "Necesitás estar logueado para marcar favoritos.");
-      return;
-    }
-    const wasFav = favSet.has(eventId);
+  const handleToggleFavorite = useCallback(
+    async (eventId: string) => {
+      if (!userId) {
+        Alert.alert(
+          "Iniciá sesión",
+          "Necesitás estar logueado para marcar favoritos."
+        );
+        return;
+      }
+      const wasFav = favSet.has(eventId);
 
-    // Actualización optimista usando función de estado
-    setFavSet((prev) => {
-      const next = new Set(prev);
-      if (wasFav) next.delete(eventId);
-      else next.add(eventId);
-      return next;
-    });
-
-    setFavBusy(eventId);
-
-    try {
-      await putEventoFavorito({ idUsuario: String(userId), idEvento: String(eventId) });
-    } catch (e) {
-      // Revertir si falla
+      // Actualización optimista usando función de estado
       setFavSet((prev) => {
-        const revert = new Set(prev);
-        if (wasFav) revert.add(eventId);
-        else revert.delete(eventId);
-        return revert;
+        const next = new Set(prev);
+        if (wasFav) next.delete(eventId);
+        else next.add(eventId);
+        return next;
       });
-      Alert.alert("Error", "No se pudo actualizar el favorito. Probá de nuevo.");
-    } finally {
-      setFavBusy(null);
-    }
-  }, [userId, favSet]);
+
+      setFavBusy(eventId);
+
+      try {
+        await putEventoFavorito({
+          idUsuario: String(userId),
+          idEvento: String(eventId),
+        });
+      } catch (e) {
+        // Revertir si falla
+        setFavSet((prev) => {
+          const revert = new Set(prev);
+          if (wasFav) revert.add(eventId);
+          else revert.delete(eventId);
+          return revert;
+        });
+        Alert.alert(
+          "Error",
+          "No se pudo actualizar el favorito. Probá de nuevo."
+        );
+      } finally {
+        setFavBusy(null);
+      }
+    },
+    [userId, favSet]
+  );
 
   if (loading) {
     return (
       <SafeAreaView style={styles.mainContainer}>
-  <Header title="EventApp" />
+        <Header title="EventApp" />
         <View style={{ flex: 1, justifyContent: "center" }}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
@@ -358,8 +385,10 @@ export default function MenuPantalla() {
   if (error) {
     return (
       <SafeAreaView style={styles.mainContainer}>
-  <Header title="EventApp" />
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Header title="EventApp" />
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
           <Text style={{ color: COLORS.negative }}>{error}</Text>
         </View>
         <Footer />
@@ -379,7 +408,9 @@ export default function MenuPantalla() {
         >
           <FiltersSection
             isDateActive={Boolean(startDate && endDate)}
-            isLocationActive={Boolean(provinceText || municipalityText || localityText)}
+            isLocationActive={Boolean(
+              provinceText || municipalityText || localityText
+            )}
             isGenreActive={selectedGenres.length > 0}
             weekActive={weekActive}
             afterActive={afterActive}
@@ -428,7 +459,9 @@ export default function MenuPantalla() {
 
           <View style={styles.containerCards}>
             {filteredEvents.length === 0 ? (
-              <Text style={styles.noEventsText}>No existen eventos con esos filtros.</Text>
+              <Text style={styles.noEventsText}>
+                No existen eventos con esos filtros.
+              </Text>
             ) : (
               filteredEvents.map((ev) => (
                 <CardComponent
@@ -440,7 +473,9 @@ export default function MenuPantalla() {
                   onPress={() => handleCardPress(ev.title, ev.id)}
                   isFavorite={ev.id ? favSet.has(String(ev.id)) : false}
                   onToggleFavorite={
-                    ev.id ? () => handleToggleFavorite(String(ev.id)) : undefined
+                    ev.id
+                      ? () => handleToggleFavorite(String(ev.id))
+                      : undefined
                   }
                   disableFavorite={favBusy === String(ev.id)}
                 />

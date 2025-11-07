@@ -191,7 +191,8 @@ export default function NewScreen() {
     }
   }, [newsItem?.dtPublicado]);
 
-  const busy = loading || loadingRelatedEvent || loadingImages;
+  // No bloqueamos la UI por prefetch de imágenes: sólo mostramos loader por datos principales
+  const busy = loading || loadingRelatedEvent;
   if (busy) {
     return (
       <SafeAreaView style={styles.container}>

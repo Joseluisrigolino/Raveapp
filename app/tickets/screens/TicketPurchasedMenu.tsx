@@ -1,6 +1,6 @@
 // app/main/TicketsScreens/TicketsPurchasedMenu.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { ScrollView, View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { ScrollView, View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import ROUTES from "@/routes";
@@ -12,12 +12,14 @@ import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import CardComponent from "@/app/events/components/CardComponent";
 
-import { COLORS, FONT_SIZES, FONTS } from "@/styles/globalStyles";
+import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
 import { useAuth } from "@/app/auth/AuthContext";
 import { getEntradasUsuario } from "@/app/auth/userHelpers";
 import { fetchEventById, EventItemWithExtras, ESTADO_CODES } from "@/app/events/apis/eventApi";
 import FiltroMisTickets from '@/components/filters/FiltroMisTickets';
+import { getResenias } from "@/utils/reviewsApi";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 function TicketsPurchasedMenuContent() {
   const router = useRouter();
@@ -35,6 +37,7 @@ function TicketsPurchasedMenuContent() {
   const [selectedEstadoIds, setSelectedEstadoIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userReviewsSet, setUserReviewsSet] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let mounted = true;
@@ -60,6 +63,12 @@ function TicketsPurchasedMenuContent() {
         };
         const getCompraId = (r: any): string | null => {
           const id = r?.idCompra ?? r?.IdCompra ?? r?.compraId ?? r?.purchaseId ?? r?.id_compra ?? r?.compra?.idCompra ?? r?.pago?.idCompra;
+          const s = String(id ?? "").trim();
+          return s ? s : null;
+        };
+        const getFiestaId = (r: any): string | null => {
+          const f = r?.fiesta ?? r?.evento ?? r?.event ?? null;
+          const id = f?.idFiesta ?? f?.id_fiesta ?? r?.idFiesta ?? r?.fiestaId ?? r?.id_fiesta ?? null;
           const s = String(id ?? "").trim();
           return s ? s : null;
         };
@@ -93,11 +102,13 @@ function TicketsPurchasedMenuContent() {
           evt: EventItemWithExtras | null;
           fallbackEvent: any;
           anyRaw: any;
+          fiestaId?: string | null;
         };
         const groups = new Map<string, Group>();
         list.forEach((r: any) => {
           const compraId = getCompraId(r);
           const eid = getEventId(r);
+          const fid = getFiestaId(r);
           const fallbackEvent = r?.evento ?? r?.event ?? {};
           if (!compraId && !eid) return; // si no hay compraId ni eventId, salteamos
           const key = compraId ? String(compraId) : String(eid);
@@ -109,6 +120,7 @@ function TicketsPurchasedMenuContent() {
               prev.eventId = eid;
               prev.evt = (eid && eventMap.get(eid)) || prev.evt;
             }
+            if (!prev.fiestaId && fid) prev.fiestaId = fid;
           } else {
             groups.set(key, {
               count: 1,
@@ -117,14 +129,41 @@ function TicketsPurchasedMenuContent() {
               evt: (eid && eventMap.get(eid)) || null,
               fallbackEvent,
               anyRaw: r,
+              fiestaId: fid || null,
             });
           }
         });
 
         // 5) Construir las cards usando datos del evento real; agregar indicador "xN entradas"
+        const getFiestaIdFromEvent = (evLike: any): string | null => {
+          if (!evLike) return null;
+          const raw = (evLike as any).__raw ?? evLike;
+          const tryGet = (...paths: any[]): string | null => {
+            for (const p of paths) {
+              const v = p;
+              const s = String(v ?? "").trim();
+              if (s) return s;
+            }
+            return null;
+          };
+          // Buscar en distintas variantes y anidaciones
+          const fid = tryGet(
+            raw?.fiesta?.idFiesta,
+            raw?.fiesta?.IdFiesta,
+            raw?.Fiesta?.idFiesta,
+            raw?.Fiesta?.IdFiesta,
+            raw?.idFiesta,
+            raw?.IdFiesta,
+            raw?.fiestaId,
+            raw?.id_fiesta
+          );
+          return fid;
+        };
         const mapped: TicketPurchasedMenuItem[] = Array.from(groups.values()).map((g, idx) => {
           const ev = g.evt;
           const fb = g.fallbackEvent || {};
+          // Resolver idFiesta final para UI/Reseñas: prioridad group -> event.raw -> fallback
+          const fiestaIdFinal = (g.fiestaId && String(g.fiestaId)) || getFiestaIdFromEvent(ev) || getFiestaIdFromEvent(fb) || undefined;
           const name = ev?.title ?? fb?.title ?? fb?.nombre ?? fb?.eventoNombre ?? "Evento";
           const date = ev?.date ?? fb?.date ?? fb?.fecha ?? "";
           const baseDesc = ev?.description ?? fb?.description ?? "";
@@ -163,6 +202,7 @@ function TicketsPurchasedMenuContent() {
             eventId: g.eventId ?? undefined,
             idCompra: g.compraId,
             ticketsCount: g.count,
+            fiestaId: fiestaIdFinal,
           } as any) as TicketPurchasedMenuItem;
         });
 
@@ -179,6 +219,22 @@ function TicketsPurchasedMenuContent() {
     };
   }, [userId]);
 
+  // Cargar reseñas del usuario y construir set de idFiesta con reseña
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!userId) return;
+        const list = await getResenias({ idUsuario: String(userId) });
+        const s = new Set<string>();
+        for (const r of list) {
+          const fid = (r && (r.idFiesta || (r as any).IdFiesta || (r as any).fiestaId)) as string | undefined;
+          if (fid) s.add(String(fid));
+        }
+        setUserReviewsSet(s);
+      } catch {}
+    })();
+  }, [userId]);
+
   const filteredItems = useMemo(() => {
     if (!selectedEstadoIds || selectedEstadoIds.length === 0) return items;
     return items.filter((it: any) => {
@@ -192,6 +248,11 @@ function TicketsPurchasedMenuContent() {
       a.isFinished === b.isFinished ? 0 : a.isFinished ? 1 : -1
     )
   ), [filteredItems]);
+
+  const controlledMatch = (s?: string) => {
+    const t = (s || '').toLowerCase();
+    return t.includes('controlada') || t.includes('controlado') || t.includes('verificada') || t.includes('escaneada') || t.includes('canjeada');
+  };
 
   const handlePress = (item: TicketPurchasedMenuItem) => {
     const anyItem: any = item as any;
@@ -243,17 +304,40 @@ function TicketsPurchasedMenuContent() {
           </Text>
         ) : (
           <View style={styles.containerCards}>
-            {sortedTickets.map((item) => (
-              <CardComponent
-                key={item.id}
-                title={item.eventName}
-                text={item.description}
-                date={item.date}
-                foto={item.imageUrl}
-                hideFavorite
-                onPress={() => handlePress(item)}
-              />
-            ))}
+            {sortedTickets.map((item) => {
+              const anyItem: any = item as any;
+              const showReviewBtn = controlledMatch(anyItem?.estadoLabel) && anyItem?.eventId;
+              const fiestaId = anyItem?.fiestaId ? String(anyItem.fiestaId) : undefined;
+              const hasReview = fiestaId ? userReviewsSet.has(fiestaId) : false;
+              const footer = showReviewBtn ? (
+                <TouchableOpacity
+                  style={styles.primaryButton}
+                  onPress={() => {
+                    const eventId = String(anyItem.eventId);
+                    nav.push(router, { pathname: ROUTES.MAIN.TICKETS.PURCHASED, params: { id: item.id, eventId, idCompra: anyItem.idCompra, openReview: '1' } });
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <MaterialCommunityIcons name="star" size={18} color={COLORS.backgroundLight} style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryButtonText}>
+                    {hasReview ? 'Ver reseña' : 'Dejar reseña'}
+                  </Text>
+                </TouchableOpacity>
+              ) : null;
+
+              return (
+                <CardComponent
+                  key={item.id}
+                  title={item.eventName}
+                  text={item.description}
+                  date={item.date}
+                  foto={item.imageUrl}
+                  hideFavorite
+                  onPress={() => handlePress(item)}
+                  footer={footer}
+                />
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -293,5 +377,23 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: "center",
     paddingHorizontal: 16,
+  },
+  // Primary button identical to TicketPurchasedScreen
+  primaryButton: {
+    marginTop: 8,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.textPrimary,
+    borderRadius: RADIUS.card,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  primaryButtonText: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
+    color: COLORS.backgroundLight,
+    textAlign: 'center',
   },
 });

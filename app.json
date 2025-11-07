@@ -48,7 +48,8 @@
       "eas": {
         "projectId": "96c3aafd-0d8e-456b-9f69-0181bad4c833"
       },
-      "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "728778718807-imc5ad9jh3om4oj48ohkaiv81o4e7gsv.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "728778718807-imc5ad9jh3om4oj48ohkaiv81o4e7gsv.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "728778718807-r65km9pj3scldf126tmo9plvpnuri2tl.apps.googleusercontent.com"
     }
   }
 }
