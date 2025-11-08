@@ -176,9 +176,6 @@ export default function NewsScreen() {
                       style={styles.newsImage}
                       resizeMode="cover"
                     />
-                    <View style={styles.categoryPill}>
-                      <Text style={styles.categoryText}>{getCategory(item.titulo, item.contenido)}</Text>
-                    </View>
                   </View>
 
                   <View style={styles.cardContent}>

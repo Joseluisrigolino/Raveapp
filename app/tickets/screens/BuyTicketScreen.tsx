@@ -478,7 +478,7 @@ function BuyTicketScreenContent() {
     return sub;
   }, [navigation, cancelAllReservations]);
 
-  // Al expirar el contador, cancelar reservas activas si las hubiera
+  // Al expirar el contador, cancelar reservas activas si las hubiera y avisar
   useEffect(() => {
     (async () => {
       if (remainingSec > 0) return;
@@ -495,7 +495,6 @@ function BuyTicketScreenContent() {
             }
           }
           setActiveReservas([]);
-          return;
         }
         // 2) Fallback: si no tenemos ids locales, intentar cancelar la reserva activa del usuario
         const uid: string | null = (user as any)?.id ?? (user as any)?.idUsuario ?? null;
@@ -511,6 +510,21 @@ function BuyTicketScreenContent() {
       } catch (e) {
         console.log("[BuyTicketScreen] Error al cancelar por expiración:", e);
       }
+
+      // Mostrar alerta y volver a la pantalla del evento cuando expira el tiempo
+      Alert.alert(
+        "Tiempo agotado",
+        "Su límite de tiempo para realizar la compra ha terminado, su reserva se canceló.",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              try { router.back(); } catch {}
+            },
+          },
+        ],
+        { cancelable: false }
+      );
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remainingSec]);
@@ -1085,16 +1099,9 @@ function BuyTicketScreenContent() {
           <Text style={styles.reserveTimer}>{mm}:{ss}</Text>
         </View>
         <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: isExpired ? COLORS.negative : COLORS.primary }]} />
+          <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: isExpired ? COLORS.negative : '#D926AA' }]} />
         </View>
-        {isExpired && (
-          <View style={styles.expiredBanner}>
-            <Text style={styles.expiredText}>Tu reserva expiró. Volvé a seleccionar las entradas.</Text>
-            <TouchableOpacity onPress={() => router.back()} style={styles.expiredBackBtn}>
-              <Text style={styles.expiredBackBtnText}>Volver al evento</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        {/* Sección de banner al expirar removida: ahora se muestra un popup y se vuelve al evento */}
 
         <Text style={styles.title}>Resumen de tu compra</Text>
 
@@ -1243,6 +1250,10 @@ function BuyTicketScreenContent() {
               />
             </View>
           </View>
+          {/* Nota sobre actualización de datos */}
+          <Text style={styles.hintInfo}>
+            En caso de que tus datos no estén actualizados, realizá el cambio desde tu perfil.
+          </Text>
         </View>
 
         <Text style={styles.sectionTitle}>Domicilio de facturación</Text>
@@ -1726,5 +1737,12 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: "center",
     marginBottom: 20,
+  },
+  hintInfo: {
+    fontSize: FONT_SIZES.smallText,
+    color: COLORS.textSecondary,
+    marginTop: -4,
+    marginBottom: 8,
+    paddingHorizontal: 4,
   },
 });

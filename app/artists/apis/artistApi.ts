@@ -22,6 +22,17 @@ import { apiClient, login } from "@/app/apis/apiConfig";
 import { mediaApi } from "@/app/apis/mediaApi";
 import { Artist } from "@/app/artists/types/Artist";
 
+// Helper: Title-case cada palabra (mantiene caracteres, sólo ajusta casing básico)
+function toTitleCaseArtist(name: string | undefined | null): string {
+  if (!name) return "";
+  return String(name)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 interface ApiMedia {
   idMedia: string;
   idEntidadMedia: string;
@@ -137,7 +148,7 @@ export async function fetchOneArtistFromApi(
 
     const artist: Artist & { isLiked?: boolean } = {
       idArtista: api.idArtista,
-      name: api.nombre,
+      name: toTitleCaseArtist(api.nombre),
       description: api.bio,
       creationDate: api.dtAlta,
       isActivo: api.isActivo === 1,
@@ -162,7 +173,7 @@ export async function fetchOneArtistFromApi(
 
 // Helper compatible with older callsites: createArtist(name, isActivoNum)
 export async function createArtist(name: string, isActivo: 0 | 1 = 1): Promise<string | null> {
-  return createArtistOnApi({ name, isActivo: isActivo === 1 });
+  return createArtistOnApi({ name: toTitleCaseArtist(name), isActivo: isActivo === 1 });
 }
 
 export async function fetchArtistsFromApi(): Promise<Artist[]> {
@@ -185,7 +196,7 @@ export async function createArtistOnApi(
 ): Promise<string | null> {
   const token = await login();
   const body = {
-    nombre: newArtist.name,
+    nombre: toTitleCaseArtist(newArtist.name),
     bio: newArtist.description,
     socials: {
       idSocial: "",
@@ -229,7 +240,7 @@ export async function updateArtistOnApi(
 
   const body: any = {
     idArtista: artist.idArtista,
-    nombre: artist.name,
+    nombre: toTitleCaseArtist(artist.name),
     bio: artist.description ?? "",
     // API contract expects a boolean here
     isActivo: artist.isActivo === true,
@@ -257,7 +268,7 @@ export async function createArtistInactive(payload: {
   isActivo: 0 | 1;
 }): Promise<string | null> {
   const token = await login();
-  const resp = await apiClient.post("/v1/Artista/CrearArtista", payload, {
+  const resp = await apiClient.post("/v1/Artista/CrearArtista", { ...payload, nombre: toTitleCaseArtist(payload.nombre) }, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",

@@ -402,7 +402,13 @@ export default function EventScreen() {
           <View style={styles.badgesRow}>
             <BadgesEvento isLGBT={getEventFlags(eventData).isLGBT} isAfter={getEventFlags(eventData).isAfter} />
           </View>
-          <TituloEvento title={eventData.title} isFavorite={isFavorite} favBusy={favBusy} onToggleFavorite={toggleFavorite} />
+          <TituloEvento
+            title={eventData.title}
+            isFavorite={isFavorite}
+            favBusy={favBusy}
+            onToggleFavorite={toggleFavorite}
+            showFavorite={!hasRole("admin")}
+          />
           {/* Géneros */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Géneros</Text>

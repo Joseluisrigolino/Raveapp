@@ -149,6 +149,17 @@ const norm = (s: string) =>
     .toLowerCase()
     .trim();
 
+// Convierte cada palabra a Title Case (Jose Luis Rigolino)
+const toTitleCase = (s?: string | null): string => {
+  if (!s) return "";
+  return String(s)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+};
+
 function extractBackendMessage(e: any): string {
   return (
     e?.response?.data?.message ||
@@ -508,7 +519,7 @@ export default function CreateEventScreen() {
 
       // Añadir visualmente como nuevo (una sola vez)
       const pendingArtist = {
-        name,
+        name: toTitleCase(name),
         image: "",
         __isNew: true,
       } as unknown as ArtistSel;
@@ -521,7 +532,7 @@ export default function CreateEventScreen() {
           const artistApi = await import("@/app/artists/apis/artistApi");
           if (artistApi && typeof artistApi.createArtistOnApi === "function") {
             const id = await artistApi.createArtistOnApi({
-              name,
+              name: toTitleCase(name),
               description: "",
               instagramURL: "",
               spotifyURL: "",
@@ -559,7 +570,12 @@ export default function CreateEventScreen() {
   const handleSelectArtistFromSuggestions = useCallback(
     (a: Artist) => {
       if (selectedArtists.some((s) => norm(s.name) === norm(a.name))) return;
-      setSelectedArtists((prev) => [...prev, a]);
+      // Mostrar en Title Case al usuario, preservando el idArtista
+      const display: ArtistSel = {
+        ...(a as any),
+        name: toTitleCase(a.name),
+      } as any;
+      setSelectedArtists((prev) => [...prev, display]);
       setArtistInput("");
     },
     [selectedArtists]
@@ -708,7 +724,60 @@ export default function CreateEventScreen() {
     (i: number, key: keyof DayTickets, val: string) => {
       setDaysTickets((prev) => {
         const arr = [...prev];
-        arr[i] = { ...arr[i], [key]: val.replace(/[^0-9]/g, "") };
+        const clean = val.replace(/[^0-9]/g, "");
+
+        // Copia del día a modificar para aplicar reglas cruzadas
+        const day = { ...arr[i] } as DayTickets;
+
+        const toInt = (s: string) => {
+          const n = parseInt(s || "0", 10);
+          return isFinite(n) ? n : 0;
+        };
+
+        if (key === "genQty") {
+          // Actualiza base General y ajusta EB General si quedó por encima
+          day.genQty = clean;
+          const base = toInt(day.genQty);
+          const eb = toInt(day.ebGenQty);
+          if (eb > base) {
+            // Si base es 0, dejar EB vacío para no mostrar 0 molesto
+            day.ebGenQty = base > 0 ? String(base) : "";
+          }
+        } else if (key === "vipQty") {
+          // Actualiza base VIP y ajusta EB VIP si quedó por encima
+          day.vipQty = clean;
+          const base = toInt(day.vipQty);
+          const eb = toInt(day.ebVipQty);
+          if (eb > base) {
+            day.ebVipQty = base > 0 ? String(base) : "";
+          }
+        } else if (key === "ebGenQty") {
+          // Clamp: EB General no puede superar General
+          const base = toInt(day.genQty);
+          let next = toInt(clean);
+          if (base <= 0) {
+            // Sin base definida, no permitir valor: mantener vacío
+            day.ebGenQty = "";
+          } else {
+            if (next > base) next = base;
+            day.ebGenQty = String(next);
+          }
+        } else if (key === "ebVipQty") {
+          // Clamp: EB VIP no puede superar VIP
+          const base = toInt(day.vipQty);
+          let next = toInt(clean);
+          if (base <= 0) {
+            day.ebVipQty = "";
+          } else {
+            if (next > base) next = base;
+            day.ebVipQty = String(next);
+          }
+        } else {
+          // Precios u otros campos: aplicar limpieza simple
+          (day as any)[key] = clean;
+        }
+
+        arr[i] = day;
         return arr;
       });
     },
@@ -1469,7 +1538,7 @@ export default function CreateEventScreen() {
       const body = {
         descripcion: eventDescription || "",
         domicilio: {
-          direccion: street || "",
+          direccion: street ? street.charAt(0).toUpperCase() + street.slice(1).toLowerCase() : "",
           latitud: 0,
           longitud: 0,
           provincia: { codigo: provinceId, nombre: provinceName },
@@ -2133,7 +2202,7 @@ export default function CreateEventScreen() {
                 nombre: localityName,
                 codigo: localityId,
               },
-              direccion: street,
+              direccion: street ? street.charAt(0).toUpperCase() + street.slice(1).toLowerCase() : "",
               latitud: 0,
               longitud: 0,
             },
@@ -2195,7 +2264,8 @@ export default function CreateEventScreen() {
     const selectedSet = new Set(selectedArtists.map((a) => norm(a.name)));
     return allArtists
       .filter((a) => !selectedSet.has(norm(a.name)) && norm(a.name).includes(q))
-      .slice(0, 8);
+      .slice(0, 8)
+      .map((a) => ({ ...a, name: toTitleCase(a.name) } as Artist));
   }, [artistInput, allArtists, selectedArtists]);
 
   const totalPerDay = useCallback(
@@ -2599,7 +2669,7 @@ export default function CreateEventScreen() {
               }}
               maxBytes={MAX_IMAGE_BYTES}
               allowedExts={["jpg", "jpeg", "png"]}
-              label="Imagen del evento"
+              label="Imagen del evento (obligatoria)"
             />
 
             <View style={styles.card}>

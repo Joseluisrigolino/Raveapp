@@ -9,8 +9,8 @@ import {
   Platform,
   Image,
   Pressable,
-  ScrollView,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Text, TextInput, Button } from "react-native-paper";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
@@ -187,20 +187,21 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.select({ ios: "padding", android: undefined })}
+      behavior={Platform.select({ ios: "padding", android: "height" })}
+      keyboardVerticalOffset={Platform.select({ ios: 0, android: 64 })}
       style={{ flex: 1 }}
     >
-      <ScrollView
+      <KeyboardAwareScrollView
+        enableOnAndroid
+        extraScrollHeight={140}
+        keyboardOpeningTime={0}
+        enableAutomaticScroll
         style={{
           flex: 1,
           backgroundColor: globalStyles.COLORS.backgroundLight,
         }}
         contentContainerStyle={styles.containerScroll}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        bounces={false}
-        alwaysBounceVertical={false}
-        overScrollMode="never"
+        keyboardShouldPersistTaps="always"
       >
         {/* Header con logo y tagline */}
         <View style={styles.headerBox}>
@@ -277,12 +278,8 @@ export default function LoginScreen() {
               </Pressable>
             </View>
             <Pressable
-              onPress={() =>
-                Alert.alert(
-                  "Recuperar contraseña",
-                  "Esta función estará disponible próximamente."
-                )
-              }
+              onPress={() => nav.push(router, ROUTES.LOGIN.RECOVER as any)}
+              accessibilityRole="link"
             >
               <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
             </Pressable>
@@ -412,7 +409,7 @@ export default function LoginScreen() {
             <Text style={styles.termsLink}>Política de Privacidad</Text>
           </Pressable>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </KeyboardAvoidingView>
   );
 }

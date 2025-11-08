@@ -21,6 +21,17 @@ import FiltroMisTickets from '@/components/filters/FiltroMisTickets';
 import { getResenias } from "@/utils/reviewsApi";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
+// Meta de estados de ENTRADAS (no confundir con estados de EVENTO). Los códigos
+// provienen del endpoint de entradas y coinciden con los filtros estáticos.
+// Ajusta colores si necesitas alinearlos con la paleta definitiva.
+const ESTADO_ENTRADA_META: Record<number, { label: string; short?: string; bg: string; color: string }> = {
+  2: { label: 'Pagada', short: 'Pagada', bg: '#D926AA', color: '#FFFFFF' },
+  3: { label: 'Asignada', short: 'Asignada', bg: '#673AB7', color: '#FFFFFF' },
+  4: { label: 'Controlada', short: 'Controlada', bg: '#2E7D32', color: '#FFFFFF' },
+  5: { label: 'Cancelada', short: 'Cancelada', bg: '#B00020', color: '#FFFFFF' },
+  6: { label: 'Transferida', short: 'Transferida', bg: '#0277BD', color: '#FFFFFF' },
+};
+
 function TicketsPurchasedMenuContent() {
   const router = useRouter();
   const { user } = useAuth();
@@ -94,47 +105,7 @@ function TicketsPurchasedMenuContent() {
           })
         );
 
-        // 4) Agrupar entradas por idCompra
-        type Group = {
-          count: number;
-          compraId: string;
-          eventId: string | null;
-          evt: EventItemWithExtras | null;
-          fallbackEvent: any;
-          anyRaw: any;
-          fiestaId?: string | null;
-        };
-        const groups = new Map<string, Group>();
-        list.forEach((r: any) => {
-          const compraId = getCompraId(r);
-          const eid = getEventId(r);
-          const fid = getFiestaId(r);
-          const fallbackEvent = r?.evento ?? r?.event ?? {};
-          if (!compraId && !eid) return; // si no hay compraId ni eventId, salteamos
-          const key = compraId ? String(compraId) : String(eid);
-          const prev = groups.get(key);
-          if (prev) {
-            prev.count += 1;
-            // si no teníamos eventId, tomar la primera aparición
-            if (!prev.eventId && eid) {
-              prev.eventId = eid;
-              prev.evt = (eid && eventMap.get(eid)) || prev.evt;
-            }
-            if (!prev.fiestaId && fid) prev.fiestaId = fid;
-          } else {
-            groups.set(key, {
-              count: 1,
-              compraId: compraId || key,
-              eventId: eid || null,
-              evt: (eid && eventMap.get(eid)) || null,
-              fallbackEvent,
-              anyRaw: r,
-              fiestaId: fid || null,
-            });
-          }
-        });
-
-        // 5) Construir las cards usando datos del evento real; agregar indicador "xN entradas"
+        // 4) Construir items SIN agrupar: cada entrada individual muestra su estado real.
         const getFiestaIdFromEvent = (evLike: any): string | null => {
           if (!evLike) return null;
           const raw = (evLike as any).__raw ?? evLike;
@@ -159,49 +130,43 @@ function TicketsPurchasedMenuContent() {
           );
           return fid;
         };
-        const mapped: TicketPurchasedMenuItem[] = Array.from(groups.values()).map((g, idx) => {
-          const ev = g.evt;
-          const fb = g.fallbackEvent || {};
-          // Resolver idFiesta final para UI/Reseñas: prioridad group -> event.raw -> fallback
-          const fiestaIdFinal = (g.fiestaId && String(g.fiestaId)) || getFiestaIdFromEvent(ev) || getFiestaIdFromEvent(fb) || undefined;
-          const name = ev?.title ?? fb?.title ?? fb?.nombre ?? fb?.eventoNombre ?? "Evento";
-          const date = ev?.date ?? fb?.date ?? fb?.fecha ?? "";
-          const baseDesc = ev?.description ?? fb?.description ?? "";
-          const desc = g.count > 1 ? `${baseDesc ? baseDesc + ' · ' : ''}x${g.count} entradas` : baseDesc;
-          const imageUrl = ev?.imageUrl ?? fb?.imageUrl ?? fb?.imagen ?? "";
-          // Estado de la ENTRADA: tomar SIEMPRE lo que viene del endpoint GetEntradas (sin machear con evento)
+        const mapped: TicketPurchasedMenuItem[] = list.map((r: any, idx) => {
+          const compraId = getCompraId(r);
+          const eid = getEventId(r);
+          const fid = getFiestaId(r);
+          const fallbackEvent = r?.evento ?? r?.event ?? {};
+          const ev = eid ? eventMap.get(eid) : null;
+          const fiestaIdFinal = (fid && String(fid)) || getFiestaIdFromEvent(ev) || getFiestaIdFromEvent(fallbackEvent) || undefined;
+          const name = ev?.title ?? fallbackEvent?.title ?? fallbackEvent?.nombre ?? fallbackEvent?.eventoNombre ?? 'Evento';
+          const date = ev?.date ?? fallbackEvent?.date ?? fallbackEvent?.fecha ?? '';
+          const desc = ev?.description ?? fallbackEvent?.description ?? '';
+          const imageUrl = ev?.imageUrl ?? fallbackEvent?.imageUrl ?? fallbackEvent?.imagen ?? '';
           let ticketEstadoCd: number | undefined = undefined;
           let ticketEstadoLabel: string | undefined = undefined;
-          const anyRaw = g.anyRaw ?? {};
-          if (typeof anyRaw?.cdEstado !== 'undefined') {
-            ticketEstadoCd = Number(anyRaw.cdEstado);
-            ticketEstadoLabel = anyRaw?.dsEstado ?? `Estado ${ticketEstadoCd}`;
-          } else if (anyRaw?.estado && typeof anyRaw.estado === 'object') {
-            const st = anyRaw.estado;
+          if (typeof r?.cdEstado !== 'undefined') {
+            ticketEstadoCd = Number(r.cdEstado);
+            ticketEstadoLabel = r?.dsEstado ?? `Estado ${ticketEstadoCd}`;
+          } else if (r?.estado && typeof r.estado === 'object') {
+            const st = r.estado;
             if (typeof st?.cdEstado !== 'undefined') ticketEstadoCd = Number(st.cdEstado);
             ticketEstadoLabel = st?.dsEstado ?? (typeof ticketEstadoCd !== 'undefined' ? `Estado ${ticketEstadoCd}` : undefined);
           }
-
-          // Estado del EVENTO (solo para ordenar/navegar): si hay evento, usamos su cdEstado
           const eventEstadoCd = typeof ev?.cdEstado !== 'undefined' ? Number(ev.cdEstado) : undefined;
           const isFinished = typeof eventEstadoCd === 'number'
             ? (eventEstadoCd === ESTADO_CODES.FINALIZADO || eventEstadoCd === ESTADO_CODES.CANCELADO)
             : false;
-
           return ({
             id: idx + 1,
-            imageUrl: String(imageUrl || ""),
-            eventName: String(name || "Evento"),
-            date: String(date || ""),
-            description: String(desc || ""),
+            imageUrl: String(imageUrl || ''),
+            eventName: String(name || 'Evento'),
+            date: String(date || ''),
+            description: String(desc || ''),
             isFinished,
-            // Exponer el estado (cdEstado + dsEstado) para permitir filtrado por código
             estadoCd: ticketEstadoCd,
             estadoLabel: ticketEstadoLabel,
-            // extras para navegación
-            eventId: g.eventId ?? undefined,
-            idCompra: g.compraId,
-            ticketsCount: g.count,
+            eventId: eid ?? undefined,
+            idCompra: compraId ?? undefined,
+            ticketsCount: 1,
             fiestaId: fiestaIdFinal,
           } as any) as TicketPurchasedMenuItem;
         });
@@ -324,7 +289,8 @@ function TicketsPurchasedMenuContent() {
                   </Text>
                 </TouchableOpacity>
               ) : null;
-
+              const estadoCd = typeof anyItem?.estadoCd === 'number' ? anyItem.estadoCd : undefined;
+              const meta = (estadoCd !== undefined) ? ESTADO_ENTRADA_META[estadoCd] : undefined;
               return (
                 <CardComponent
                   key={item.id}
@@ -335,6 +301,9 @@ function TicketsPurchasedMenuContent() {
                   hideFavorite
                   onPress={() => handlePress(item)}
                   footer={footer}
+                  badgeLabel={meta ? (anyItem?.estadoLabel || meta.short || meta.label) : undefined}
+                  badgeColor={meta?.bg}
+                  badgeTextColor={meta?.color}
                 />
               );
             })}

@@ -6,6 +6,14 @@ import { COLORS, RADIUS } from "@/styles/globalStyles";
 import SelectField from "@/components/common/selectField";
 import InputText from "@/components/common/inputText";
 
+// Helper: solo capitaliza la primera letra de toda la dirección
+function capitalizeFirst(s?: string): string {
+  if (!s) return "";
+  const trimmed = s.trim();
+  if (!trimmed) return "";
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+}
+
 interface Option {
   id: string;
   nombre: string;
@@ -193,7 +201,10 @@ export default function LocationSelector(props: Props) {
         value={street}
         isEditing={true}
         onBeginEdit={() => {}}
-        onChangeText={setStreet}
+        onChangeText={(t) => setStreet(t)}
+        onBlur={() => {
+          setStreet(capitalizeFirst(street));
+        }}
         placeholder="Dirección del evento"
         labelStyle={{ width: "100%", alignSelf: "flex-start", marginLeft: 2 }}
         inputStyle={{ width: "100%" }}

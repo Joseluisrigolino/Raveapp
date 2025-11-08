@@ -1,7 +1,7 @@
 // src/screens/admin/Tyc.tsx
 
 import React, { useState, useEffect } from "react";
-import { View, StyleSheet, ActivityIndicator, Dimensions, Text, TouchableOpacity, Alert, Linking } from "react-native";
+import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Alert, Linking, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import ProtectedRoute from "@/app/auth/ProtectedRoute";
@@ -13,16 +13,17 @@ import * as FileSystem from "expo-file-system/legacy";
 import { mediaApi } from "@/app/apis/mediaApi";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
-import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 
 export default function Tyc() {
+  // Id de la entidad media para T&C centralizado (evita strings "magic")
+  const ID_ENTIDAD_TYC = 'archivoTyc';
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [meta, setMeta] = useState<{ name?: string; sizeBytes?: number; updatedAt?: string } | null>(null);
   const [zoomPct, setZoomPct] = useState<number>(100);
-  const { height, width } = Dimensions.get("window");
+  const [previewFailed, setPreviewFailed] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -40,8 +41,12 @@ export default function Tyc() {
 
   const loadMediaMeta = async () => {
     try {
-      const data: any = await mediaApi.getByEntidad("archivoTyc");
+      const data: any = await mediaApi.getByEntidad(ID_ENTIDAD_TYC);
       const m = Array.isArray(data?.media) && data.media.length ? data.media[0] : null;
+      try {
+        const idMediaLog = m?.idMedia || m?.id || null;
+        console.log("[Tyc] idMedia", ID_ENTIDAD_TYC, ":", idMediaLog, "raw media object:", m);
+      } catch {}
       let name: string | undefined = m?.nombre || m?.fileName || m?.dsNombre || undefined;
       let sizeBytes: number | undefined = (typeof m?.size === 'number' && m.size) || (typeof m?.peso === 'number' && m.peso) || undefined;
       let updatedAt: string | undefined = m?.fecha || m?.dtCreacion || m?.createdAt || m?.fecAlta || undefined;
@@ -92,7 +97,8 @@ export default function Tyc() {
       // Cargar inmediatamente (flujo de 1 botón)
       await performUpload(file);
     } catch (e) {
-      // noop
+      console.warn('[Tyc] handleChangePdf error:', e);
+      Alert.alert('Error', 'No se pudo abrir el selector de documentos. Asegurate de tener la app actualizada y con permisos.');
     }
   };
 
@@ -101,7 +107,7 @@ export default function Tyc() {
       setUpdating(true);
       // Borrar media anterior (si existe) para reemplazarla
       try {
-        const data: any = await mediaApi.getByEntidad("archivoTyc");
+        const data: any = await mediaApi.getByEntidad(ID_ENTIDAD_TYC);
         if (Array.isArray(data?.media)) {
           for (const m of data.media) {
             if (m?.idMedia) {
@@ -112,7 +118,7 @@ export default function Tyc() {
       } catch {}
 
       const file = { uri: picked.uri, name: picked.name, type: picked.mimeType || "application/pdf" } as any;
-      await mediaApi.upload("archivoTyc", file, undefined, { maxBytes: 2 * 1024 * 1024 });
+      await mediaApi.upload(ID_ENTIDAD_TYC, file, undefined, { maxBytes: 2 * 1024 * 1024 });
       const url = await getTycPdfUrl();
       setPdfUrl(url);
       await loadMediaMeta();
@@ -130,26 +136,14 @@ export default function Tyc() {
     return `${(n / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const formatDatePretty = (iso?: string | null) => {
-    if (!iso) return "—";
-    const d = new Date(String(iso));
-    if (!isFinite(d.getTime())) return "—";
-    const months = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-    const dd = d.getDate().toString().padStart(2, '0');
-    const mm = months[d.getMonth()] || "";
-    const yyyy = d.getFullYear();
-    return `${dd} ${mm} ${yyyy}`;
-  };
+  // formatDatePretty eliminado (ya no se muestra última actualización)
 
   const handleOpenFullscreen = async () => {
     if (!pdfUrl) return;
     try { await WebBrowser.openBrowserAsync(pdfUrl); } catch { Linking.openURL(pdfUrl); }
   };
 
-  const handlePrint = async () => {
-    if (!pdfUrl) return;
-    try { await Print.printAsync({ uri: pdfUrl }); } catch (e) { Alert.alert("Error", "No se pudo abrir el diálogo de impresión."); }
-  };
+  // impresión eliminada
 
   const handleShare = async () => {
     if (!pdfUrl) return;
@@ -192,7 +186,7 @@ export default function Tyc() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>Términos y Condiciones</Text>
                 <Text style={styles.cardFileName} numberOfLines={1} ellipsizeMode="tail">{meta?.name || "archivo.pdf"}</Text>
-                <Text style={styles.cardUpdate}>Última actualización: {formatDatePretty(meta?.updatedAt)}</Text>
+                {/* Última actualización eliminada */}
               </View>
               <Text style={styles.cardSize}>{formatBytesMB(meta?.sizeBytes)}</Text>
               <TouchableOpacity style={styles.iconBtn} onPress={handleDownload}>
@@ -215,42 +209,38 @@ export default function Tyc() {
             </TouchableOpacity>
           </View>
 
-          {/* Zoom controls */}
-          <View style={styles.zoomRow}>
-            <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomPct((z) => Math.max(25, z - 25))}><Text style={styles.zoomBtnText}>−</Text></TouchableOpacity>
-            <Text style={styles.zoomPctText}>{zoomPct}%</Text>
-            <TouchableOpacity style={styles.zoomBtn} onPress={() => setZoomPct((z) => Math.min(300, z + 25))}><Text style={styles.zoomBtnText}>+</Text></TouchableOpacity>
-          </View>
+          {/* Controles de zoom eliminados */}
 
           {/* Preview card */}
           <View style={styles.previewCard}>
             {loading ? (
               <ActivityIndicator size="large" color={COLORS.primary} />
             ) : pdfUrl ? (
-              <WebView
-                source={{ uri: pdfUrl }}
-                style={{ flex: 1, borderRadius: 12, overflow: 'hidden' }}
-                scalesPageToFit
-              />
+              previewFailed ? (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                  <Text style={{ color: COLORS.textSecondary, marginBottom: 8, textAlign: 'center' }}>
+                    No se pudo previsualizar el PDF en esta vista. Usá los botones de descarga o compartir para abrir el archivo.
+                  </Text>
+                </View>
+              ) : (
+                <WebView
+                  source={{ uri: (Platform.OS === 'android' && pdfUrl) ? `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(pdfUrl)}` : pdfUrl }}
+                  originWhitelist={["*"]}
+                  javaScriptEnabled
+                  domStorageEnabled
+                  setSupportMultipleWindows={false}
+                  startInLoadingState
+                  onError={() => setPreviewFailed(true)}
+                  onHttpError={() => setPreviewFailed(true)}
+                  androidLayerType="software"
+                  style={{ flex: 1, borderRadius: 12, overflow: 'hidden' }}
+                />
+              )
             ) : (
               <Text style={{ color: COLORS.textSecondary }}>No hay documento para mostrar.</Text>
             )}
-            <View style={styles.pageFooter}>
-              <TouchableOpacity disabled style={styles.navArrow}><Icon name="chevron-left" size={22} color="#6b7280" /></TouchableOpacity>
-              <Text style={styles.pageText}>Página 1</Text>
-              <TouchableOpacity disabled style={styles.navArrow}><Icon name="chevron-right" size={22} color="#6b7280" /></TouchableOpacity>
-            </View>
           </View>
-
-          {/* Actions */}
-          <TouchableOpacity style={styles.actionBtn} onPress={handleOpenFullscreen}>
-            <Icon name="visibility" size={18} color="#111827" style={{ marginRight: 8 }} />
-            <Text style={styles.actionBtnText}>Ver en pantalla completa</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={handlePrint}>
-            <Icon name="print" size={18} color="#111827" style={{ marginRight: 8 }} />
-            <Text style={styles.actionBtnText}>Imprimir documento</Text>
-          </TouchableOpacity>
+          {/* Botón 'Ver en pantalla completa' eliminado */}
         </View>
 
         <Footer />
@@ -301,11 +291,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  cardUpdate: {
-    color: '#6b7280',
-    fontSize: 12,
-    marginTop: 2,
-  },
+  // cardUpdate estilo eliminado
   cardSize: {
     color: '#6b7280',
     fontSize: 12,
@@ -329,24 +315,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   changeButtonText: { color: '#fff', fontWeight: '700' },
-  zoomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  zoomBtn: {
-    width: 42,
-    height: 32,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#d1d5db',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-  },
-  zoomBtnText: { fontSize: 18, color: COLORS.textPrimary },
-  zoomPctText: { marginHorizontal: 12, color: COLORS.textPrimary, fontWeight: '700' },
+  // estilos de zoom eliminados
   previewCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -356,36 +325,5 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 12,
   },
-  pageFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e5e7eb',
-  },
-  navArrow: {
-    width: 36,
-    height: 32,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#d1d5db',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-  },
-  pageText: { color: COLORS.textPrimary, fontWeight: '700' },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
-    paddingVertical: 12,
-    marginBottom: 8,
-    backgroundColor: '#fff',
-  },
-  actionBtnText: { color: '#111827', fontWeight: '700' },
+  // estilos de footer de paginación y acción de fullscreen eliminados
 });

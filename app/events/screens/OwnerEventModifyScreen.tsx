@@ -44,6 +44,16 @@ type ArtistSel = {
 };
 
 const GREEN = "#17a34a";
+// Title-case helper para mostrar nombres de artistas consistentes
+const toTitleCase = (s?: string | null): string => {
+  if (!s) return "";
+  return String(s)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+};
 const createEmptyDayTickets = (): any => ({ genQty: "0", genPrice: "", ebGenQty: "0", ebGenPrice: "", vipQty: "0", vipPrice: "", ebVipQty: "0", ebVipPrice: "" });
 const createEmptySchedule = (): any => ({ start: new Date(), end: new Date() });
 const createEmptySaleConfig = (): any => ({ saleStart: new Date(), sellUntil: new Date() });
@@ -218,10 +228,10 @@ export default function ModifyEventScreen() {
 
         setSelectedGenres(Array.isArray(ev.genero) ? ev.genero : []);
 
-        const artistasFromApi: ArtistSel[] = Array.isArray(ev.artistas)
+    const artistasFromApi: ArtistSel[] = Array.isArray(ev.artistas)
           ? ev.artistas.map((a: any) => ({
               idArtista: a?.idArtista,
-              name: a?.nombre ?? a?.name ?? "",
+      name: toTitleCase(a?.nombre ?? a?.name ?? ""),
               image: a?.imagen ?? a?.image ?? "",
               description: a?.bio ?? a?.description ?? "",
               creationDate: a?.dtAlta ?? a?.creationDate ?? "",

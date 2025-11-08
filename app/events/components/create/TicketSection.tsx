@@ -71,6 +71,11 @@ export default function TicketsSection({
                 placeholderTextColor={COLORS.textSecondary}
               />
             </View>
+            <Text style={styles.hint}>
+              {`La cantidad ingresada es el total de entradas generales.
+Si agregas entradas EarlyBirds Generales, estas ya forman parte del total de entradas Generales, no se suman a la cantidad total.
+Ejemplo: Si ingresas 900 entradas Generales, y 100 Early Birds, el total es 900, no 1000.`}
+            </Text>
             <View style={styles.divider} />
 
             {/* Early Bird General */}
@@ -125,6 +130,11 @@ export default function TicketsSection({
                 placeholderTextColor={COLORS.textSecondary}
               />
             </View>
+            <Text style={styles.hint}>
+              {`La cantidad ingresada es el total de entradas vip.
+Si agregas entradas EarlyBirds Vip, estas ya forman parte del total de entradas Vip, no se suman a la cantidad total.
+Ejemplo: Si ingresas 800 entradas Vip, y 200 Early Birds, el total es 800, no 1000.`}
+            </Text>
             <View style={styles.divider} />
 
             {/* Early Bird VIP */}

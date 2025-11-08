@@ -6,9 +6,10 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   Pressable,
+  Image,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Text, TextInput, Button } from "react-native-paper";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
@@ -67,22 +68,30 @@ export default function RecuperarContrasenaScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.select({ ios: "padding", android: undefined })}
+      behavior={Platform.select({ ios: "padding", android: "height" })}
+      keyboardVerticalOffset={Platform.select({ ios: 0, android: 64 })}
       style={{ flex: 1 }}
     >
-      <ScrollView
-        style={{ flex: 1, backgroundColor: globalStyles.COLORS.backgroundLight }}
+      <KeyboardAwareScrollView
+        enableOnAndroid
+        extraScrollHeight={160}
+        keyboardOpeningTime={0}
+        enableAutomaticScroll
         contentContainerStyle={styles.containerScroll}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
+        style={{ flex: 1, backgroundColor: globalStyles.COLORS.backgroundLight }}
+        keyboardShouldPersistTaps="always"
       >
         {/* Header con logo y tagline */}
         <View style={styles.headerBox}>
           <View style={styles.logoCircle}>
-            <Icon name="music-note" size={28} color="#ffffff" />
+            <Image
+              source={require("../../../assets/images/raveapplogo/logo1.jpeg")}
+              style={styles.logoImage}
+              resizeMode="cover"
+            />
           </View>
           <Text style={styles.brandTitle}>RaveApp</Text>
-          <Text style={styles.brandSubtitle}>Tu puerta al mejor entretenimiento</Text>
+          <Text style={styles.brandSubtitle}>Tu pase al mejor ritmo</Text>
         </View>
 
         {/* Botón volver */}
@@ -148,22 +157,7 @@ export default function RecuperarContrasenaScreen() {
           </View>
         </View>
 
-        {/* Sección de ayuda */}
-        <View style={styles.helpSection}>
-          <View style={styles.helpIconCircle}>
-            <Text style={styles.helpIcon}>?</Text>
-          </View>
-          <Text style={styles.helpTitle}>¿Necesitas ayuda?</Text>
-          <Text style={styles.helpText}>
-            Si tienes problemas para recuperar tu cuenta, nuestro equipo está aquí para ayudarte.
-          </Text>
-          <Pressable 
-            style={styles.contactButton}
-            onPress={() => Alert.alert('Contactar Soporte', 'Esta función estará disponible próximamente.')}
-          >
-            <Text style={styles.contactButtonText}>Contactar{'\n'}Soporte</Text>
-          </Pressable>
-        </View>
+        {/* (Sección de ayuda removida a pedido) */}
 
         {/* Términos y privacidad */}
         <View style={styles.termsRow}>
@@ -176,7 +170,7 @@ export default function RecuperarContrasenaScreen() {
             <Text style={styles.termsLink}>Política de Privacidad</Text>
           </Pressable>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -200,6 +194,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+  },
+  logoImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
   },
   brandTitle: {
     fontSize: 28,
@@ -308,51 +307,6 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     fontWeight: '600',
     fontSize: 14,
-  },
-  helpSection: {
-    alignItems: 'center',
-    marginBottom: 32,
-    paddingHorizontal: 20,
-  },
-  helpIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#f3f4f6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  helpIcon: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#6b7280',
-  },
-  helpTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  helpText: {
-    textAlign: 'center',
-    color: '#6b7280',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  contactButton: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderWidth: 1,
-    borderColor: '#e6e9ef',
-  },
-  contactButtonText: {
-    textAlign: 'center',
-    color: '#0f172a',
-    fontWeight: '600',
-    lineHeight: 18,
   },
   termsRow: {
     flexDirection: 'row',

@@ -128,17 +128,18 @@ export default function EventBasicData(props: Props) {
             )}
 
             {/* Input para crear una nueva fiesta (manual) y botón + */}
-            <View style={{ flexDirection: "row", alignItems: "center", columnGap: 8, marginTop: 12 }}>
+            <Text style={[styles.label, { marginTop: 12, marginBottom: 6 }]}>O crear una nueva</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", columnGap: 8 }}>
               <View style={{ flex: 1 }}>
                 <InputText
-                  label="O crear una nueva"
+                  label=""
                   value={newPartyName}
                   isEditing={true}
                   onBeginEdit={() => {}}
                   onChangeText={setNewPartyName}
                   placeholder="Nombre de la nueva fiesta"
-                  labelStyle={{ width: "100%", alignSelf: "flex-start", marginLeft: 2 }}
-                  inputStyle={{ width: "100%" }}
+                  labelStyle={{ height: 0, marginBottom: 0, padding: 0 }}
+                  inputStyle={{ width: "100%", marginBottom: 0 }}
                   editable={!newPartyLocked}
                 />
               </View>

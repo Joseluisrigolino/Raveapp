@@ -23,10 +23,31 @@ export default function ReproductorYouTube({ youTubeEmbedUrl }: Props) {
 
   const WebViewComp: any = getWebView();
 
-  // Build embed URL with recommended params (memoized so the string doesn't change each render)
+  // Build embed URL with normalization and recommended params (helps avoid Error 153)
   const embedWithParams = useMemo(() => {
-    const sep = youTubeEmbedUrl.includes("?") ? "&" : "?";
-    return `${youTubeEmbedUrl}${sep}rel=0&modestbranding=1&playsinline=1&enablejsapi=1`;
+    const raw = (youTubeEmbedUrl || '').trim();
+    let videoId: string | null = null;
+    try {
+      if (/youtu\.be\//i.test(raw)) {
+        videoId = raw.split(/youtu\.be\//i)[1].split(/[?&#]/)[0];
+      } else if (/youtube\.com\/watch/i.test(raw)) {
+        const url = new URL(raw);
+        videoId = url.searchParams.get('v');
+      } else if (/youtube\.com\/embed\//i.test(raw)) {
+        videoId = raw.split(/embed\//i)[1].split(/[?&#]/)[0];
+      } else if (/youtube\.com\/shorts\//i.test(raw)) {
+        videoId = raw.split(/shorts\//i)[1].split(/[?&#]/)[0];
+      }
+    } catch {}
+    if (!videoId) {
+      const m = raw.match(/[\/?=]([A-Za-z0-9_-]{11})(?:[&?/]|$)/);
+      videoId = m ? m[1] : null;
+    }
+  // Preferir dominio sin cookies: puede evitar bloqueos de configuración en algunos entornos
+  const base = videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : raw;
+    const sep = base.includes('?') ? '&' : '?';
+    const originParam = 'origin=https://www.youtube.com';
+    return `${base}${sep}rel=0&modestbranding=1&playsinline=1&enablejsapi=1&${originParam}`;
   }, [youTubeEmbedUrl]);
 
   // Inject JS to detect YouTube player error UI and notify RN
@@ -79,7 +100,7 @@ export default function ReproductorYouTube({ youTubeEmbedUrl }: Props) {
   }, [embedError]);
 
   if (WebViewComp) {
-    console.log("[ReproductorYouTube] WebView disponible, mostrando embed:", youTubeEmbedUrl);
+    console.log("[ReproductorYouTube] WebView disponible, mostrando embed normalizado:", embedWithParams);
 
     return (
       <View style={styles.mediaBlock}>
@@ -89,6 +110,7 @@ export default function ReproductorYouTube({ youTubeEmbedUrl }: Props) {
               originWhitelist={["*"]}
               source={{ html }}
               allowsFullscreenVideo
+              allowsInlineMediaPlayback
               javaScriptEnabled
               domStorageEnabled
               mediaPlaybackRequiresUserAction={false}
@@ -104,16 +126,28 @@ export default function ReproductorYouTube({ youTubeEmbedUrl }: Props) {
               }}
               injectedJavaScript={injectedJS}
               {...(Platform.OS === 'android' ? { userAgent: userAgentAndroid } : {})}
+              onError={() => {
+                console.warn('[ReproductorYouTube] onError WebView');
+                setEmbedError(true);
+              }}
+              onHttpError={() => {
+                console.warn('[ReproductorYouTube] onHttpError WebView');
+                setEmbedError(true);
+              }}
             />
           ) : (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 12 }}>
-              <Text style={{ color: '#fff', marginBottom: 12 }}>No se pudo reproducir el video aquí.</Text>
+              <Text style={{ color: '#fff', marginBottom: 12, textAlign: 'center' }}>No se pudo reproducir el video aquí (Error 153 / configuración del player).
+Puede deberse a restricciones del video (privado, edad, región o embed deshabilitado).</Text>
               <TouchableOpacity onPress={() => {
                 // convert embed url to watch url
-                const watch = youTubeEmbedUrl.replace('/embed/', '/watch?v=');
+                const watch = embedWithParams.replace('/embed/', '/watch?v=').split('?')[0];
                 Linking.openURL(watch);
               }} style={{ backgroundColor: COLORS.primary, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8 }}>
                 <Text style={{ color: '#fff', fontWeight: '700' }}>Ver en YouTube</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => Linking.openURL(embedWithParams)} style={{ marginTop: 8 }}>
+                <Text style={{ color: COLORS.info, textDecorationLine: 'underline', fontSize: 12 }}>Abrir versión embed directa</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -127,7 +161,7 @@ export default function ReproductorYouTube({ youTubeEmbedUrl }: Props) {
     return (
       // @ts-ignore
       <div style={{ marginTop: 12, marginBottom: 12 }}>
-        <iframe src={youTubeEmbedUrl} style={{ width: "100%", height: 300, border: "none" }} title="YouTube" />
+        <iframe src={embedWithParams} style={{ width: "100%", height: 300, border: "none" }} title="YouTube" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="origin-when-cross-origin" allowFullScreen />
       </div>
     );
   }

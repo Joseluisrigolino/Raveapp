@@ -3,6 +3,16 @@ import { View, ScrollView, TouchableOpacity, Text, StyleSheet } from "react-nati
 import { COLORS, RADIUS, FONT_SIZES } from "@/styles/globalStyles";
 import { fetchEstadosEntrada, ApiEstadoEntrada } from "@/app/events/apis/entradaApi";
 
+// Filtros definitivos solicitados. Solo se muestran estos códigos, en este orden.
+// Se ignoran estados adicionales que pueda devolver la API.
+const STATIC_FILTERS_ORDERED: Array<{ cdEstado: number; dsEstado: string }> = [
+  { cdEstado: 4, dsEstado: 'Entradas a próximos eventos' },   // (ej: pagada / activa futura)
+  { cdEstado: 5, dsEstado: 'Entradas pendientes de pago' },   // pendiente
+  { cdEstado: 2, dsEstado: 'Entradas utilizadas' },           // controlada
+  { cdEstado: 6, dsEstado: 'Entradas no utilizadas' },        // no usada luego del evento
+  { cdEstado: 3, dsEstado: 'Entradas anuladas' },             // cancelada / anulada
+];
+
 interface FiltroMisTicketsProps {
   // ids de estado seleccionados (cdEstado)
   selectedEstadoIds: number[];
@@ -20,10 +30,11 @@ export default function FiltroMisTickets(props: FiltroMisTicketsProps) {
     let mounted = true;
     (async () => {
       try {
-        const es = await fetchEstadosEntrada();
-        if (mounted) setEstados(Array.isArray(es) ? es : []);
+        // Llamada solo para quizá validar existencia, pero no añadimos códigos extra.
+        await fetchEstadosEntrada().catch(() => [] as any[]);
+        if (mounted) setEstados(STATIC_FILTERS_ORDERED as any);
       } catch {
-        if (mounted) setEstados([]);
+        if (mounted) setEstados(STATIC_FILTERS_ORDERED as any);
       }
     })();
     return () => { mounted = false; };

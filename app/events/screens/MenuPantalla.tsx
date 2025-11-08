@@ -473,10 +473,11 @@ export default function MenuPantalla() {
                   onPress={() => handleCardPress(ev.title, ev.id)}
                   isFavorite={ev.id ? favSet.has(String(ev.id)) : false}
                   onToggleFavorite={
-                    ev.id
+                    !isAdmin && ev.id
                       ? () => handleToggleFavorite(String(ev.id))
                       : undefined
                   }
+                  hideFavorite={isAdmin}
                   disableFavorite={favBusy === String(ev.id)}
                 />
               ))

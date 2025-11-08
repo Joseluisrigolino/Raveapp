@@ -62,6 +62,7 @@ export const ROUTES = {
   LOGIN: {
     LOGIN: "/auth/screens/login",
     REGISTER: "/auth/screens/RegistroUsuario",
+    RECOVER: "/auth/screens/RecuperarContrasena",
     CONTROLLER: "/auth/screens/UserControllerLoginScreen",
   },
   NOT_FOUND: "/+not-found",

@@ -43,7 +43,8 @@ function getWeekRange() {
 
 export default function FavEventScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
+  const isAdmin = hasRole("admin");
 
   // Normalizo ID de usuario
   const userId: string | null =
@@ -449,7 +450,8 @@ export default function FavEventScreen() {
                   foto={ev.imageUrl}
                   onPress={() => handleCardPress(ev.title, ev.id)}
                   isFavorite={ev.id ? favSet.has(String(ev.id)) : false}
-                  onToggleFavorite={ev.id ? () => handleToggleFavorite(String(ev.id)) : undefined}
+                  onToggleFavorite={!isAdmin && ev.id ? () => handleToggleFavorite(String(ev.id)) : undefined}
+                  hideFavorite={isAdmin}
                   disableFavorite={favBusy === String(ev.id)}
                 />
               ))

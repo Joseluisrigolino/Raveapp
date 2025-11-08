@@ -640,7 +640,6 @@ function TicketPurchasedScreenContent() {
                           <Text style={styles.entryPriceLine}>
                             {formatMoney(g.precio)} {g.precio ? '×' : ''} {g.count} {g.count === 1 ? 'entrada' : 'entradas'}
                           </Text>
-                          <Text style={styles.entryValidText}>Entrada válida para el {valido}</Text>
                         </View>
                         <View style={styles.statusWrap}>
                           <MaterialCommunityIcons name="check-circle-outline" size={16} color={COLORS.textSecondary} />
@@ -717,9 +716,7 @@ function TicketPurchasedScreenContent() {
                               />
                             )}
                           </View>
-                          {/* Mostrar IDs solicitados */}
-                          <Text style={styles.entryIdsLine}>idEntrada: {en.idEntrada}  •  idMedia: {en.mediaId ? String(en.mediaId) : '-'}</Text>
-                          <Text style={styles.entryValidText}>Entrada válida para el {valido}</Text>
+                          {/* Se removieron idEntrada, idMedia y la leyenda de validez por solicitud */}
                         </View>
                       );
                     })}

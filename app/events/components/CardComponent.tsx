@@ -24,6 +24,10 @@ interface CardProps {
   onToggleFavorite?: () => void;
   disableFavorite?: boolean;
   hideFavorite?: boolean; // si true, no renderiza el corazón
+  // Badge de estado opcional (para tickets comprados, etc.)
+  badgeLabel?: string;
+  badgeColor?: string; // fondo del badge
+  badgeTextColor?: string; // color del texto
   // Zona opcional para acciones/controles dentro de la card (debajo de la fecha)
   footer?: React.ReactNode;
 }
@@ -38,6 +42,9 @@ export default function CardComponent({
   onToggleFavorite,
   disableFavorite = false,
   hideFavorite = false,
+  badgeLabel,
+  badgeColor = COLORS.primary,
+  badgeTextColor = '#FFFFFF',
   footer,
 }: CardProps) {
   const handleHeartPress = (e: GestureResponderEvent) => {
@@ -66,6 +73,11 @@ export default function CardComponent({
             />
           </TouchableOpacity>
         )}
+        {badgeLabel ? (
+          <View style={[styles.badge, { backgroundColor: badgeColor }]}> 
+            <Text style={[styles.badgeText, { color: badgeTextColor }]} numberOfLines={1}>{badgeLabel}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.infoContainer}>
@@ -123,6 +135,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 2,
     elevation: 1,
+  },
+  badge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 14,
+    maxWidth: '60%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  badgeText: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: 12,
+    letterSpacing: 0.3,
   },
   infoContainer: {
     paddingHorizontal: 14,

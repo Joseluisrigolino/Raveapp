@@ -35,22 +35,23 @@ export default function ArtistSelector({
   return (
     <View style={styles.card}>
       <View style={{ position: "relative" }}>
-        <View style={styles.artistRow}>
+        <Text style={[{ fontWeight: '700', color: COLORS.textPrimary, marginBottom: 6 }]}>O crear uno nuevo</Text>
+        <View style={[styles.artistRow, { alignItems: 'center' }] }>
           <View style={{ flex: 1 }}>
             <InputText
-              label="O crear uno nuevo"
+              label=""
               value={artistInput}
               isEditing={true}
               onBeginEdit={() => {}}
               onChangeText={setArtistInput}
               placeholder="Escribe el nombre del artista"
-              labelStyle={{ width: "100%", alignSelf: "flex-start", marginLeft: 2 }}
-              inputStyle={{ width: "100%" }}
+              labelStyle={{ height: 0, marginBottom: 0, padding: 0 }}
+              inputStyle={{ width: "100%", marginBottom: 0 }}
               autoFocus={false}
             />
           </View>
           <TouchableOpacity
-            style={styles.addIconBtn}
+            style={[styles.addIconBtn]}
             onPress={() => onAddManual(artistInput)}
           >
             <Text style={styles.addIconText}>+</Text>
@@ -155,6 +156,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.textPrimary,
     alignItems: "center",
     justifyContent: "center",
+  },
+  addIconBtnTall: {
+    height: '100%',
+    minHeight: 56,
+    alignSelf: 'stretch',
   },
   addIconText: {
     color: "#fff",
