@@ -182,7 +182,17 @@ export default function PartyRatingsScreen() {
             <View key={r.id} style={styles.reviewCard}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={styles.avatarCircle} />
+                  {r.userAvatar && r.userAvatar.trim().length > 0 ? (
+                    <Image
+                      source={{ uri: r.userAvatar }}
+                      style={styles.avatarImg}
+                      resizeMode="cover"
+                      accessible
+                      accessibilityLabel={`Avatar de ${r.userName}`}
+                    />
+                  ) : (
+                    <View style={styles.avatarCircle} />
+                  )}
                   <View>
                     <Text style={styles.userName}>{r.userName}</Text>
                     <Text style={styles.dateText}>{formatDateEsLong(r.dateISO)}</Text>
@@ -258,6 +268,14 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: 19,
     backgroundColor: COLORS.borderInput,
+  },
+  avatarImg: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.borderInput,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
   },
   userName: { color: COLORS.textPrimary, fontFamily: FONTS.subTitleMedium, fontSize: 14 },
   dateText: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },

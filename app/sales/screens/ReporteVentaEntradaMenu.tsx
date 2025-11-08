@@ -9,6 +9,7 @@ import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { fetchEventsByEstados, ESTADO_CODES, EventItemWithExtras } from "@/app/events/apis/eventApi";
+import { MaterialIcons as Icon } from "@expo/vector-icons";
 import { getSafeImageSource } from "@/utils/image";
 
 type FilterKey = "all" | "active" | "finished" | "draft";
@@ -27,20 +28,25 @@ export default function ReporteVentaEntradaMenu() {
   const [error, setError] = useState<string | null>(null);
   const [events, setEvents] = useState<EventItemWithExtras[]>([]);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<FilterKey>("all");
+  // Estados válidos: en_venta | fin_venta | finalizado
+  const STATUS_MAP: Record<string, number[]> = {
+    en_venta: [ESTADO_CODES.EN_VENTA],
+    fin_venta: [ESTADO_CODES.FIN_VENTA],
+    finalizado: [ESTADO_CODES.FINALIZADO],
+    todos: [ESTADO_CODES.EN_VENTA, ESTADO_CODES.FIN_VENTA, ESTADO_CODES.FINALIZADO],
+  };
+  const [filterStatus, setFilterStatus] = useState<string>("en_venta");
 
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
         setError(null);
-        // Aprobados + En venta + Finalizados + Fin Venta + Por Aprobar (borrador)
+        // Solo estados: 2 "En venta", 3 "Fin venta" y 4 "Finalizado"
         const estados = [
-          ESTADO_CODES.APROBADO,
           ESTADO_CODES.EN_VENTA,
           ESTADO_CODES.FIN_VENTA,
           ESTADO_CODES.FINALIZADO,
-          ESTADO_CODES.POR_APROBAR,
         ];
         let list = await fetchEventsByEstados(estados);
         // Si se pasó un owner id por params, filtrar solo eventos de ese owner
@@ -68,20 +74,17 @@ export default function ReporteVentaEntradaMenu() {
       const q = search.toLowerCase();
       arr = arr.filter((e) => e.title.toLowerCase().includes(q));
     }
-    if (filter !== "all") {
-      arr = arr.filter((e) => {
-        const code = Number((e as any).cdEstado ?? (e as any).estado ?? NaN);
-        if (filter === "active") return code === ESTADO_CODES.APROBADO || code === ESTADO_CODES.EN_VENTA;
-        if (filter === "finished") return code === ESTADO_CODES.FIN_VENTA || code === ESTADO_CODES.FINALIZADO;
-        if (filter === "draft") return code === ESTADO_CODES.POR_APROBAR;
-        return true;
-      });
-    }
+    const allowedCodes = STATUS_MAP[filterStatus] || STATUS_MAP.todos;
+    arr = arr.filter((e) => {
+      const code = Number((e as any).cdEstado ?? (e as any).estado ?? NaN);
+      return allowedCodes.includes(code);
+    });
     return arr;
-  }, [events, search, filter]);
+  }, [events, search, filterStatus]);
 
   const goReport = useCallback((id: string) => {
-    nav.push(router, { pathname: ROUTES.OWNER.TICKET_SOLD, params: { id } });
+    // Navega a la pantalla de reporte por evento directamente
+    nav.push(router, { pathname: ROUTES.OWNER.TICKET_SOLD_EVENT, params: { id } });
   }, [router]);
 
   return (
@@ -92,19 +95,28 @@ export default function ReporteVentaEntradaMenu() {
         <Text style={styles.title}>Mis Eventos</Text>
         <Text style={styles.subtitle}>Selecciona un evento para ver el reporte de entradas</Text>
 
-        <SearchBar value={search} onChangeText={setSearch} placeholder="Buscar eventos..." />
-
-        <View style={styles.filtersRow}>
-          {FILTERS.map((f) => (
+        {/* Chips de estado (estilo MenuPantalla) */}
+        <View style={styles.chipsRow}>
+          {([
+            { key: 'en_venta', label: 'En venta' },
+            { key: 'fin_venta', label: 'Fin venta' },
+            { key: 'finalizado', label: 'Finalizado' },
+          ] as const).map((c) => (
             <TouchableOpacity
-              key={f.key}
-              onPress={() => setFilter(f.key)}
-              style={[styles.chip, filter === f.key && styles.chipActive]}
+              key={c.key}
+              style={[styles.chip, filterStatus === c.key && styles.chipActive]}
+              activeOpacity={0.8}
+              onPress={() => setFilterStatus(c.key)}
             >
-              <Text style={[styles.chipText, filter === f.key && styles.chipTextActive]}>{f.label}</Text>
+              <Text style={[styles.chipText, filterStatus === c.key && styles.chipTextActive]}>
+                {c.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Barra de búsqueda visual como en eventos */}
+        <SearchBar value={search} onChangeText={setSearch} placeholder="Buscar eventos..." />
 
         {loading ? (
           <View style={{ paddingVertical: 20 }}>
@@ -113,10 +125,25 @@ export default function ReporteVentaEntradaMenu() {
         ) : error ? (
           <Text style={styles.error}>{error}</Text>
         ) : filtered.length === 0 ? (
-          <Text style={styles.empty}>No hay eventos.</Text>
+          <View style={styles.emptyWrap}>
+            <View style={styles.emptyIconCircle}>
+              <Icon name="event-busy" size={34} color="#9ca3af" />
+            </View>
+            <Text style={styles.emptyTitle}>No hay eventos disponibles</Text>
+            <Text style={styles.emptyText}>No tienes eventos con estados "En venta", "Fin venta" o "Finalizados" para mostrar reportes de entradas.</Text>
+            {/* Caja de leyenda eliminada */}
+            <TouchableOpacity style={styles.createBtn} onPress={() => nav.push(router, { pathname: ROUTES.OWNER.MANAGE_EVENTS })}>
+              <Text style={styles.createBtnText}>Ver estado de mis eventos →</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           filtered.map((e) => (
-            <View key={String(e.id)} style={styles.card}>
+            <TouchableOpacity
+              key={String(e.id)}
+              style={styles.card}
+              activeOpacity={0.9}
+              onPress={() => goReport(String(e.id))}
+            >
               <View style={styles.row}>
                 {e.imageUrl ? (
                   <Image source={getSafeImageSource(e.imageUrl)} style={styles.image} />
@@ -134,7 +161,7 @@ export default function ReporteVentaEntradaMenu() {
                   <Text style={styles.reportText}>Ver Reporte →</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </TouchableOpacity>
           ))
         )}
       </ScrollView>
@@ -149,7 +176,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 24 },
   title: { fontSize: 24, fontWeight: "700", color: COLORS.textPrimary },
   subtitle: { color: COLORS.textSecondary, marginTop: 6, marginBottom: 10 },
-  filtersRow: { flexDirection: "row", gap: 10, paddingHorizontal: 8, marginBottom: 10 },
+  chipsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 8, marginBottom: 8 },
   chip: {
     backgroundColor: COLORS.cardBg,
     borderRadius: 999,
@@ -158,11 +185,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.borderInput,
   },
-  chipActive: { backgroundColor: "#111827" },
+  chipActive: { backgroundColor: '#111827' },
   chipText: { color: COLORS.textSecondary },
-  chipTextActive: { color: "#fff", fontWeight: "700" },
+  chipTextActive: { color: '#fff', fontWeight: '700' },
   error: { color: COLORS.negative, textAlign: "center", marginTop: 16 },
-  empty: { color: COLORS.textSecondary, textAlign: "center", marginTop: 16 },
+  emptyWrap: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 20 },
+  emptyIconCircle: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
+  emptyIconText: { fontSize: 42 },
+  emptyTitle: { fontSize: 20, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 8, textAlign: 'center' },
+  emptyText: { color: COLORS.textSecondary, textAlign: 'center', marginBottom: 18, lineHeight: 20 },
+  legendBox: { width: '100%', backgroundColor: '#fff', borderRadius: 12, padding: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: COLORS.borderInput, marginBottom: 20 },
+  legendRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#374151', marginRight: 8 },
+  legendText: { color: COLORS.textSecondary },
+  createBtn: { backgroundColor: '#0f172a', paddingVertical: 14, paddingHorizontal: 18, borderRadius: 10 },
+  createBtnText: { color: '#fff', fontWeight: '700' },
   card: {
     backgroundColor: "#fff",
     borderRadius: RADIUS.card,

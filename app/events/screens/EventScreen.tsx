@@ -246,6 +246,42 @@ export default function EventScreen() {
     return url || null;
   }, [eventData]);
 
+  // Resolver idFiesta real a partir del evento cargado (varias variantes posibles en el payload)
+  const idFiestaResolved = useMemo(() => {
+    try {
+      const raw = (eventData as any)?.__raw || eventData || {};
+      const candidates = [
+        (eventData as any)?.idFiesta,
+        raw?.idFiesta,
+        raw?.IdFiesta,
+        raw?.idfiesta,
+        raw?.fiestaId,
+        raw?.FiestaId,
+        raw?.fiesta?.idFiesta,
+        raw?.fiesta?.IdFiesta,
+        raw?.fiesta?.id,
+        raw?.Fiesta?.IdFiesta,
+      ]
+        .map((v: any) => (typeof v === 'string' || typeof v === 'number') ? String(v) : '')
+        .map((s: string) => s.trim())
+        .filter(Boolean);
+      const val = candidates[0] || '';
+      if (val) return val;
+    } catch {}
+    return '';
+  }, [eventData]);
+
+  // Log de diagnóstico (una sola vez por evento)
+  useEffect(() => {
+    if (!eventData) return;
+    try {
+      console.log('[EventScreen] idEvento vs idFiesta ->', {
+        idEvento: String(eventData?.id || ''),
+        idFiesta: String(idFiestaResolved || ''),
+      });
+    } catch {}
+  }, [eventData, idFiestaResolved]);
+
   const genreNames = useMemo(() => {
     try {
       const codes = Array.isArray((eventData as any)?.genero) ? (eventData as any).genero : [];
@@ -490,7 +526,9 @@ export default function EventScreen() {
           <ModalArtistas artistas={eventData.artistas} visible={showArtistsModal} onClose={() => setShowArtistsModal(false)} />
           <SeccionEntradas fechas={fechas} entradasPorFecha={entradasPorFecha} loadingEntradas={loadingEntradas} selectedTickets={selectedTickets} setTicketQty={setTicketQty} subtotal={subtotal} noEntradasAvailable={noEntradasAvailable} onBuy={handleBuyPress} isAdmin={hasRole("admin")} />
           <View style={styles.mediaSection}><ReproductorSoundCloud soundCloudUrl={soundCloudUrl} /><ReproductorYouTube youTubeEmbedUrl={youTubeEmbedUrl} /></View>
-          <ResenasDelEvento />
+          {(eventData?.id || idFiestaResolved) && (
+            <ResenasDelEvento idFiesta={String(idFiestaResolved || eventData?.id)} limit={6} />
+          )}
         </ScrollView>
         <Footer />
       </SafeAreaView>

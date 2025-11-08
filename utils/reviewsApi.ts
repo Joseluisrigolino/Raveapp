@@ -189,16 +189,72 @@ export async function postResenia(payload: {
 }): Promise<Review> {
 	const token = await login();
 
-	const body = {
+	const bodyCamel = {
 		idUsuario: String(payload.idUsuario),
 		estrellas: Number(payload.estrellas),
 		comentario: payload.comentario ?? "",
 		idFiesta: String(payload.idFiesta),
 	};
+	const bodyPascal = {
+		IdUsuario: String(payload.idUsuario),
+		Estrellas: Number(payload.estrellas),
+		Comentario: payload.comentario ?? "",
+		IdFiesta: String(payload.idFiesta),
+	};
 
-	const resp = await apiClient.post<any>("/v1/Resenia", body, {
-		headers: { Authorization: `Bearer ${token}` },
-	});
+	// Preparar intentos con variantes de payload/endpoint para mejorar compatibilidad
+	const guidUpper = (s: string) => String(s || "").toUpperCase();
+	const attempts: Array<{ endpoint: string; body: any; note: string }> = [
+		{ endpoint: "/v1/Resenia", body: bodyCamel, note: "camel" },
+		{ endpoint: "/v1/Resenia", body: bodyPascal, note: "pascal" },
+		// Omitir IdUsuario (algunos backends lo infieren del token)
+		{ endpoint: "/v1/Resenia", body: { Estrellas: Number(payload.estrellas), Comentario: payload.comentario ?? "", IdFiesta: String(payload.idFiesta) }, note: "pascal_sin_IdUsuario" },
+		// Alternativas de clave para comentario
+		{ endpoint: "/v1/Resenia", body: { IdUsuario: String(payload.idUsuario), Estrellas: Number(payload.estrellas), Comentarios: payload.comentario ?? "", IdFiesta: String(payload.idFiesta) }, note: "Comentarios" },
+		{ endpoint: "/v1/Resenia", body: { IdUsuario: String(payload.idUsuario), Estrellas: Number(payload.estrellas), Detalle: payload.comentario ?? "", IdFiesta: String(payload.idFiesta) }, note: "Detalle" },
+		{ endpoint: "/v1/Resenia", body: { IdUsuario: String(payload.idUsuario), Estrellas: Number(payload.estrellas), Texto: payload.comentario ?? "", IdFiesta: String(payload.idFiesta) }, note: "Texto" },
+		// GUIDs en mayúscula
+		{ endpoint: "/v1/Resenia", body: { IdUsuario: guidUpper(payload.idUsuario), Estrellas: Number(payload.estrellas), Comentario: payload.comentario ?? "", IdFiesta: guidUpper(payload.idFiesta) }, note: "pascal_guid_upper" },
+		// Endpoint alternativo común
+		{ endpoint: "/v1/Resenia/Create", body: bodyPascal, note: "pascal_endpoint_create" },
+	];
+
+	let resp: any = null;
+	let lastErr: any = null;
+	let tried: Array<{ endpoint: string; note: string; status?: number; message?: string }> = [];
+	for (const at of attempts) {
+		try {
+			// Loguear SIEMPRE el payload con el formato pedido justo antes de cada intento
+			try {
+				const asCamel = {
+					idUsuario: String(payload.idUsuario),
+					estrellas: Number(payload.estrellas),
+					comentario: payload.comentario ?? "",
+					idFiesta: String(payload.idFiesta),
+				};
+				console.log('[postResenia] intentando POST', { endpoint: at.endpoint, note: at.note, body: asCamel });
+			} catch {}
+			resp = await apiClient.post<any>(at.endpoint, at.body, {
+				headers: {
+					Authorization: `Bearer ${token}`,
+					"Content-Type": "application/json",
+					accept: "*/*",
+				},
+			});
+			// Log cuál intento funcionó
+			try { console.log('[postResenia] intento OK', { endpoint: at.endpoint, note: at.note }); } catch {}
+			lastErr = null;
+			break;
+		} catch (e: any) {
+			lastErr = e;
+			tried.push({ endpoint: at.endpoint, note: at.note, status: e?.response?.status, message: e?.message });
+		}
+	}
+
+	if (!resp) {
+		try { console.log('[postResenia] todos los intentos fallaron', { tried }); } catch {}
+		throw lastErr || new Error('postResenia failed');
+	}
 
 	const data = resp?.data;
 	// Si el backend devuelve el recurso creado, normalizamos con la misma lógica que getResenias
@@ -206,10 +262,10 @@ export async function postResenia(payload: {
 	if (!item || typeof item !== "object") {
 		// Fallback mínimo con el payload enviado
 		return {
-			idUsuario: body.idUsuario,
-			idFiesta: body.idFiesta,
-			estrellas: body.estrellas,
-			comentario: body.comentario,
+			idUsuario: String(payload.idUsuario),
+			idFiesta: String(payload.idFiesta),
+			estrellas: Number(payload.estrellas),
+			comentario: payload.comentario ?? "",
 		} as Review;
 	}
 
@@ -232,5 +288,104 @@ export async function postResenia(payload: {
 		fecha,
 		...item,
 	} as Review;
+}
+
+// PUT /v1/Resenia
+// Actualiza una reseña existente del usuario para una fiesta.
+// Body esperado:
+// {
+//   idResenia: string,
+//   estrellas: number,
+//   comentario?: string
+// }
+export async function putResenia(payload: {
+	idResenia: string;
+	estrellas: number;
+	comentario?: string;
+}): Promise<Review> {
+	const token = await login();
+
+	const bodyCamel = {
+		idResenia: String(payload.idResenia),
+		estrellas: Number(payload.estrellas),
+		comentario: payload.comentario ?? "",
+	};
+	const bodyPascal = {
+		IdResenia: String(payload.idResenia),
+		Estrellas: Number(payload.estrellas),
+		Comentario: payload.comentario ?? "",
+	};
+
+	let resp: any;
+	let sentBody: any = bodyCamel;
+	try {
+		resp = await apiClient.put<any>("/v1/Resenia", bodyCamel, {
+			headers: { Authorization: `Bearer ${token}` },
+		});
+	} catch (e) {
+		try {
+			sentBody = bodyPascal;
+			resp = await apiClient.put<any>("/v1/Resenia", bodyPascal, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
+		} catch (e2) {
+			try { console.log('[putResenia] ambos intentos fallaron', { e: (e as any)?.message, e2: (e2 as any)?.message }); } catch {}
+			throw e2;
+		}
+	}
+
+	const data = resp?.data;
+	const item = Array.isArray(data) ? data[0] : data;
+	if (!item || typeof item !== "object") {
+		// Fallback mínimo: devolvemos payload mapeado a Review
+		return {
+			id: String(payload.idResenia),
+			idResenia: String(payload.idResenia),
+			estrellas: Number(payload.estrellas),
+			comentario: payload.comentario ?? "",
+			...data,
+		} as Review;
+	}
+
+	const idRaw = item?.id ?? item?.idResenia ?? item?.IdResenia ?? item?.Id ?? payload.idResenia;
+	const idFiesta = item?.idFiesta ?? item?.IdFiesta ?? item?.fiestaId ?? undefined;
+	const idUsuario = item?.idUsuario ?? item?.IdUsuario ?? item?.usuarioId ?? undefined;
+	const estrellas = Number(item?.estrellas ?? item?.Estrellas ?? payload.estrellas ?? NaN);
+	const comentario = item?.comentario ?? item?.comentarios ?? item?.texto ?? item?.detalle ?? payload.comentario ?? "";
+	const fecha = item?.fecha ?? item?.dtResenia ?? item?.updatedAt ?? item?.Fecha ?? undefined;
+
+	return {
+		id: idRaw ? String(idRaw) : undefined,
+		idResenia: idRaw ? String(idRaw) : undefined,
+		idFiesta: idFiesta ? String(idFiesta) : undefined,
+		idUsuario: idUsuario ? String(idUsuario) : undefined,
+		estrellas: Number.isFinite(estrellas) ? estrellas : payload.estrellas,
+		comentario,
+		fecha,
+		...item,
+	} as Review;
+}
+
+// DELETE /v1/Resenia (variantes)
+// Elimina una reseña por IdResenia.
+// Estrategia: intentos con
+// 1) DELETE con params { IdResenia }
+// 2) DELETE con body { IdResenia }
+// 3) POST a /v1/Resenia/Delete { IdResenia }
+// 4) POST a /v1/Resenia/Eliminar { IdResenia }
+// Versión simple: el backend elimina con DELETE /v1/Resenia/{id}
+export async function deleteResenia(idResenia: string): Promise<{ ok: boolean; idResenia: string }> {
+    const token = await login();
+    const id = String(idResenia);
+    try {
+        console.log('[deleteResenia] DELETE /v1/Resenia/' + id);
+        const resp = await apiClient.delete(`/v1/Resenia/${encodeURIComponent(id)}` , {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        return { ok: true, idResenia: id, ...resp?.data };
+    } catch (e: any) {
+        try { console.log('[deleteResenia] error', { status: e?.response?.status, message: e?.message, data: e?.response?.data }); } catch {}
+        throw e;
+    }
 }
 

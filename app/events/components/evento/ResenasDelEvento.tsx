@@ -1,71 +1,145 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
-import { Image } from "react-native";
-import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import React, { useEffect, useMemo, useState } from "react";
+import { View, Text, StyleSheet, ActivityIndicator, Image } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { getResenias } from "@/utils/reviewsApi";
+import { getUsuarioById } from "@/app/auth/userHelpers";
+import { mediaApi } from "@/app/apis/mediaApi";
 
-export default function ResenasDelEvento() {
+interface ReviewUI {
+  id: string;
+  userName: string;
+  userAvatar?: string;
+  estrellas: number;
+  comentario: string;
+  fechaISO: string;
+}
+
+interface Props {
+  idFiesta?: string | number;
+  limit?: number; // opcional para mostrar solo primeras N
+}
+
+export default function ResenasDelEvento({ idFiesta, limit }: Props) {
+  const [loading, setLoading] = useState(false);
+  const [reviews, setReviews] = useState<ReviewUI[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (!idFiesta) return;
+        setLoading(true);
+        setError(null);
+        const raw = await getResenias({ idFiesta: String(idFiesta) }).catch(() => []);
+        const uniqueUserIds = Array.from(new Set(raw.map(r => String(r.idUsuario || '').trim()).filter(Boolean)));
+        const usersMap: Record<string, { name: string; avatar?: string }> = {};
+        await Promise.all(uniqueUserIds.map(async uid => {
+          try {
+            const u = await getUsuarioById(uid);
+            const name = `${u?.nombre ?? ''} ${u?.apellido ?? ''}`.trim() || (u as any)?.correo || 'Usuario';
+            let avatar = '';
+            try { avatar = await mediaApi.getFirstImage(uid); } catch {}
+            usersMap[uid] = { name, avatar };
+          } catch {
+            usersMap[uid] = { name: 'Usuario', avatar: '' };
+          }
+        }));
+
+        const list: ReviewUI[] = raw.map(r => {
+          const uid = String(r.idUsuario || '').trim();
+          const u = usersMap[uid] || { name: 'Usuario', avatar: '' };
+          return {
+            id: String(r.id || r.idResenia || Math.random()),
+            userName: u.name,
+            userAvatar: u.avatar,
+            estrellas: Number(r.estrellas || 0),
+            comentario: String(r.comentario || '').trim(),
+            fechaISO: String(r.fecha || new Date().toISOString()),
+          };
+        });
+        if (mounted) setReviews(list);
+      } catch (e) {
+        if (mounted) setError('No se pudieron cargar las reseñas');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [idFiesta]);
+
+  const limited = useMemo(() => {
+    if (typeof limit === 'number' && limit > 0) return reviews.slice(0, limit);
+    return reviews;
+  }, [reviews, limit]);
+
+  const avg = useMemo(() => {
+    if (!reviews.length) return 0;
+    const sum = reviews.reduce((acc, r) => acc + r.estrellas, 0);
+    return sum / reviews.length;
+  }, [reviews]);
+
+  const renderStars = (rating: number, size = 16) => {
+    const stars: JSX.Element[] = [];
+    for (let i = 1; i <= 5; i++) {
+      const name = rating >= i ? 'star' : rating >= i - 0.5 ? 'star-half-full' : 'star-outline';
+      stars.push(<MaterialCommunityIcons key={i} name={name as any} size={size} color="#FFCC00" />);
+    }
+    return <View style={{ flexDirection: 'row', gap: 2 }}>{stars}</View>;
+  };
+
+  const daysAgo = (iso: string): string => {
+    try {
+      const d = new Date(iso);
+      const diffMs = Date.now() - d.getTime();
+      const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      if (days <= 0) return 'Hoy';
+      if (days === 1) return 'Ayer';
+      return `${days} días atrás`;
+    } catch { return ''; }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.title}>Reseñas del evento</Text>
+        <Text style={styles.title}>Reseñas de la fiesta</Text>
         <View style={styles.avgRow}>
-          <View style={styles.starsRowSmall}>
-            <MaterialCommunityIcons name="star" size={16} color="#FFCC00" />
-            <MaterialCommunityIcons name="star" size={16} color="#FFCC00" />
-            <MaterialCommunityIcons name="star" size={16} color="#FFCC00" />
-            <MaterialCommunityIcons name="star-half" size={16} color="#FFCC00" />
-            <MaterialCommunityIcons name="star-outline" size={16} color="#FFCC00" />
-          </View>
-          <Text style={styles.avgText}>3.5 (2 reseñas)</Text>
+          {renderStars(avg, 16)}
+          <Text style={styles.avgText}>{avg.toFixed(1)} ({reviews.length} reseña{reviews.length !== 1 ? 's' : ''})</Text>
         </View>
       </View>
-
-      <View style={styles.reviewItem}>
-        <View style={styles.reviewRow}>
-          <View style={styles.avatarCircle}>
-            <MaterialCommunityIcons name="account" size={20} color={COLORS.textPrimary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.reviewHeader}>
-              <Text style={styles.reviewerName}>Carlos Menem</Text>
-              <Text style={styles.timeAgo}>3 días atrás</Text>
-            </View>
-            <View style={styles.starsRow}>
-              <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
-              <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
-              <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
-              <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
-              <MaterialCommunityIcons name="star-outline" size={18} color="#FFCC00" />
-            </View>
-            <Text style={styles.comment}>Excelente evento, me encantó la música y el ambiente.</Text>
-          </View>
+      {loading && (
+        <View style={{ paddingVertical: 12 }}>
+          <ActivityIndicator size="small" color={COLORS.primary} />
         </View>
-      </View>
-
-      <View style={styles.divider} />
-
-      <View style={styles.reviewItem}>
-        <View style={styles.reviewRow}>
-          <View style={styles.avatarCircle}>
-            <MaterialCommunityIcons name="account" size={20} color={COLORS.textPrimary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.reviewHeader}>
-              <Text style={styles.reviewerName}>Teté Coustarot</Text>
-              <Text style={styles.timeAgo}>5 días atrás</Text>
+      )}
+      {!loading && error && <Text style={styles.emptyText}>{error}</Text>}
+      {!loading && !error && !limited.length && (
+        <Text style={styles.emptyText}>Todavía no hay reseñas.</Text>
+      )}
+      {limited.map((r, idx) => (
+        <View key={r.id} style={styles.reviewItem}>
+          <View style={styles.reviewRow}>
+            {r.userAvatar && r.userAvatar.trim().length > 0 ? (
+              <Image source={{ uri: r.userAvatar }} style={styles.avatarCircleImg} />
+            ) : (
+              <View style={styles.avatarCircle}>
+                <MaterialCommunityIcons name="account" size={20} color={COLORS.textPrimary} />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <View style={styles.reviewHeader}>
+                <Text style={styles.reviewerName}>{r.userName}</Text>
+                <Text style={styles.timeAgo}>{daysAgo(r.fechaISO)}</Text>
+              </View>
+              <View style={styles.starsRow}>{renderStars(r.estrellas, 18)}</View>
+              <Text style={styles.comment}>{r.comentario || 'Sin comentario'}</Text>
             </View>
-            <View style={styles.starsRow}>
-              <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
-              <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
-              <MaterialCommunityIcons name="star" size={18} color="#FFCC00" />
-              <MaterialCommunityIcons name="star-outline" size={18} color="#FFCC00" />
-              <MaterialCommunityIcons name="star-outline" size={18} color="#FFCC00" />
-            </View>
-            <Text style={styles.comment}>¡Increíble experiencia! Sin duda volvería a asistir.</Text>
           </View>
+          {idx < limited.length - 1 && <View style={styles.divider} />}
         </View>
-      </View>
+      ))}
     </View>
   );
 }
@@ -98,7 +172,7 @@ const styles = StyleSheet.create({
   avgRow: { alignItems: "flex-end" },
   starsRowSmall: { flexDirection: "row", marginBottom: 2 },
   avgText: { color: COLORS.primary, fontFamily: FONTS.bodyRegular, fontSize: FONT_SIZES.body - 1 },
-
+  emptyText: { color: COLORS.textSecondary, fontFamily: FONTS.bodyRegular, fontSize: FONT_SIZES.body - 1, paddingVertical: 4 },
   reviewItem: { paddingVertical: 8 },
   reviewRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   avatarCircle: {
@@ -109,6 +183,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
+  },
+  avatarCircleImg: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e5e7eb',
+    marginTop: 2,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
   },
   reviewHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   reviewerName: { fontFamily: FONTS.subTitleMedium, color: COLORS.textPrimary, fontSize: FONT_SIZES.body },

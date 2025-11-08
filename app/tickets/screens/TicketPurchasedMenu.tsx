@@ -201,11 +201,58 @@ function TicketsPurchasedMenuContent() {
   }, [userId]);
 
   const filteredItems = useMemo(() => {
-    if (!selectedEstadoIds || selectedEstadoIds.length === 0) return items;
-    return items.filter((it: any) => {
-      const estadoCd = typeof (it as any).estadoCd !== 'undefined' ? Number((it as any).estadoCd) : undefined;
-      return typeof estadoCd === 'number' && selectedEstadoIds.includes(estadoCd);
-    });
+    // 1) Filtrado por estado (si hay selección de filtros de estado de la entrada)
+    let base = (!selectedEstadoIds || selectedEstadoIds.length === 0)
+      ? items
+      : items.filter((it: any) => {
+          const estadoCd = typeof (it as any).estadoCd !== 'undefined' ? Number((it as any).estadoCd) : undefined;
+          return typeof estadoCd === 'number' && selectedEstadoIds.includes(estadoCd);
+        });
+
+    // 2) Agrupación por eventId + idCompra + estadoCd (versión previa restaurada)
+    //    Si varias entradas comparten los tres, se agrupan y se muestra el contador.
+    const groups: Record<string, any[]> = {};
+    const normalizeCompra = (v: any) => {
+      const s = String(v ?? '').trim();
+      if (!s) return 'SIN_COMPRA';
+      return s.replace(/^0+/, '').toLowerCase();
+    };
+    const normalizeEstado = (v: any) => {
+      if (v === null || v === undefined) return 'SIN_ESTADO';
+      const n = Number(v);
+      return isNaN(n) ? 'SIN_ESTADO' : String(n);
+    };
+    const normalizeEvent = (v: any) => {
+      const s = String(v ?? '').trim();
+      return s || 'SIN_EVENTO';
+    };
+    for (const it of base) {
+      const anyIt: any = it as any;
+      const idCompraNorm = normalizeCompra(anyIt.idCompra);
+      const estadoNorm = normalizeEstado(anyIt.estadoCd);
+      const eventNorm = normalizeEvent(anyIt.eventId);
+      const key = eventNorm + '|' + idCompraNorm + '|' + estadoNorm;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(anyIt);
+    }
+
+    const aggregated: any[] = [];
+    let autoId = 1;
+    for (const key of Object.keys(groups)) {
+      const list = groups[key];
+      const first = list[0];
+      const count = list.length;
+      aggregated.push({
+        ...first,
+        id: autoId++,
+        ticketsCount: count,
+        description: count > 1 ? `${first.description || ''}\nEntradas en este estado: ${count}` : first.description,
+      });
+    }
+    try {
+      console.log('[TicketPurchasedMenu] grupos agrupados (revert):', Object.keys(groups));
+    } catch {}
+    return aggregated;
   }, [items, selectedEstadoIds]);
 
   const sortedTickets = useMemo(() => (
@@ -224,9 +271,10 @@ function TicketsPurchasedMenuContent() {
     const eventId = anyItem?.eventId ? String(anyItem.eventId) : undefined;
     const ticketsCount = typeof anyItem?.ticketsCount === 'number' ? anyItem.ticketsCount : undefined;
     const idCompra = anyItem?.idCompra ? String(anyItem.idCompra) : undefined;
+    const estadoCd = typeof anyItem?.estadoCd === 'number' ? String(anyItem.estadoCd) : undefined;
     const route = item.isFinished
-      ? { pathname: ROUTES.MAIN.TICKETS.FINALIZED, params: { id: item.id, eventId, count: ticketsCount, idCompra } }
-      : { pathname: ROUTES.MAIN.TICKETS.PURCHASED, params: { id: item.id, eventId, count: ticketsCount, idCompra } };
+      ? { pathname: ROUTES.MAIN.TICKETS.FINALIZED, params: { id: item.id, eventId, count: ticketsCount, idCompra, estadoCd } }
+      : { pathname: ROUTES.MAIN.TICKETS.PURCHASED, params: { id: item.id, eventId, count: ticketsCount, idCompra, estadoCd } };
     nav.push(router, route);
   };
 
@@ -279,7 +327,8 @@ function TicketsPurchasedMenuContent() {
                   style={styles.primaryButton}
                   onPress={() => {
                     const eventId = String(anyItem.eventId);
-                    nav.push(router, { pathname: ROUTES.MAIN.TICKETS.PURCHASED, params: { id: item.id, eventId, idCompra: anyItem.idCompra, openReview: '1' } });
+                    const estadoCd = typeof anyItem?.estadoCd === 'number' ? String(anyItem.estadoCd) : undefined;
+                    nav.push(router, { pathname: ROUTES.MAIN.TICKETS.PURCHASED, params: { id: item.id, eventId, idCompra: anyItem.idCompra, estadoCd, openReview: '1' } });
                   }}
                   activeOpacity={0.85}
                 >
@@ -291,6 +340,9 @@ function TicketsPurchasedMenuContent() {
               ) : null;
               const estadoCd = typeof anyItem?.estadoCd === 'number' ? anyItem.estadoCd : undefined;
               const meta = (estadoCd !== undefined) ? ESTADO_ENTRADA_META[estadoCd] : undefined;
+              const count = typeof anyItem.ticketsCount === 'number' ? anyItem.ticketsCount : 1;
+              const badgeLabelBase = meta ? (anyItem?.estadoLabel || meta.short || meta.label) : undefined;
+              const badgeLabel = badgeLabelBase ? (count > 1 ? `${badgeLabelBase} (${count})` : badgeLabelBase) : undefined;
               return (
                 <CardComponent
                   key={item.id}
@@ -301,7 +353,7 @@ function TicketsPurchasedMenuContent() {
                   hideFavorite
                   onPress={() => handlePress(item)}
                   footer={footer}
-                  badgeLabel={meta ? (anyItem?.estadoLabel || meta.short || meta.label) : undefined}
+                  badgeLabel={badgeLabel}
                   badgeColor={meta?.bg}
                   badgeTextColor={meta?.color}
                 />

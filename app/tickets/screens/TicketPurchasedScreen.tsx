@@ -19,13 +19,14 @@ import { mediaApi } from "@/app/apis/mediaApi";
 import { useAuth } from "@/app/auth/AuthContext";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 import { getSafeImageSource } from "@/utils/image";
-import { postResenia, getResenias, Review } from "@/utils/reviewsApi";
+import { postResenia, getResenias, putResenia, deleteResenia, Review } from "@/utils/reviewsApi";
 
 const screenWidth = Dimensions.get("window").width;
 const QR_SIZE = 140;
 
 type UiUserEntry = {
   idEntrada: string;
+  idEvento?: string;
   idFecha?: string;
   mdQR?: string;
   tipoCd?: number;
@@ -40,7 +41,7 @@ type UiUserEntry = {
 };
 
 function TicketPurchasedScreenContent() {
-  const { id, eventId, count, idCompra, openReview } = useLocalSearchParams<{ id?: string; eventId?: string; count?: string; idCompra?: string; openReview?: string }>();
+  const { id, eventId, count, idCompra, estadoCd, openReview } = useLocalSearchParams<{ id?: string; eventId?: string; count?: string; idCompra?: string; estadoCd?: string; openReview?: string }>();
   const { user } = useAuth();
   const [eventData, setEventData] = useState<EventItemWithExtras | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +54,7 @@ function TicketPurchasedScreenContent() {
   const [rating, setRating] = useState<number>(0);
   const [comment, setComment] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [userReview, setUserReview] = useState<Review | null>(null);
   const [readOnlyReview, setReadOnlyReview] = useState(false);
   const [reviewLoaded, setReviewLoaded] = useState(false);
@@ -63,23 +65,69 @@ function TicketPurchasedScreenContent() {
     (user as any)?.userId ??
     null;
 
+  // Sanitiza posibles UUID/Guid con saltos de línea o espacios intermedios y valida formato canónico
+  const sanitizeUuid = (v: any): string | null => {
+    const raw = String(v ?? "").trim();
+    if (!raw) return null;
+    // Quitar cualquier whitespace en medio (\n, \r, \t, espacios) y cualquier caracter no hex ni guión
+    const compact = raw.replace(/[\s\r\n\t]+/g, "");
+    const clean = compact.replace(/[^0-9a-fA-F-]/g, "");
+    // Si viene como 32 hex sin guiones, formatear a 8-4-4-4-12
+    if (/^[0-9a-fA-F]{32}$/.test(clean)) {
+      const p1 = clean.slice(0, 8);
+      const p2 = clean.slice(8, 12);
+      const p3 = clean.slice(12, 16);
+      const p4 = clean.slice(16, 20);
+      const p5 = clean.slice(20);
+      return `${p1}-${p2}-${p3}-${p4}-${p5}`.toLowerCase();
+    }
+    // Aceptar formato con guiones estándar
+    if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(clean)) {
+      return clean.toLowerCase();
+    }
+    // Si no match, devolver igualmente lo "limpio" para diagnóstico
+    return clean || null;
+  };
+
   // Determinar idFiesta para reseñas a partir de las entradas mapeadas (fallback a eventId si fuese igual)
   const fiestaIdForReview: string | null = useMemo(() => {
+    // Prioridad: cualquier entrada con idFiesta propagado
     if (Array.isArray(entries) && entries.length > 0) {
-      const found = entries.find((e) => e.idFiesta)?.idFiesta;
-      if (found) return String(found);
+      const ff = entries.find((e) => !!e.idFiesta)?.idFiesta;
+      if (ff) return sanitizeUuid(ff);
     }
-    return eventId ? String(eventId) : null;
-  }, [entries, eventId]);
+    // Intentar obtener de eventData.__raw si existe
+    const raw = (eventData as any)?.__raw;
+    const fromRaw = raw?.idFiesta || raw?.fiestaId || raw?.id_fiesta || raw?.fiesta?.idFiesta;
+    if (fromRaw) return sanitizeUuid(fromRaw);
+    // Último recurso: NO usar eventId como fiesta si no estamos seguros (evita enviar id de evento en campo fiesta)
+    return null;
+  }, [entries, eventData]);
 
   const handleSubmitReview = async () => {
     const trimmed = (comment ?? '').trim();
-    if (!userIdForReview || !fiestaIdForReview) return;
-    if (userReview) {
-      Alert.alert('Reseña existente', 'Ya dejaste una reseña para esta fiesta.');
-      setReadOnlyReview(true);
-      setShowReview(true);
+    if (!userIdForReview) {
+      Alert.alert('Sesión requerida', 'No encontramos tu usuario. Volvé a iniciar sesión.');
       return;
+    }
+    // Fallbacks para idFiesta si aún no está disponible (tomar raw y sanitizar al final)
+    const rawFiestaCandidate =
+      fiestaIdForReview ||
+      (entries.find((e) => !!e.idFiesta)?.idFiesta ? String(entries.find((e) => !!e.idFiesta)!.idFiesta) : undefined) ||
+      ((eventData as any)?.__raw?.idFiesta || (eventData as any)?.__raw?.fiestaId ? String((eventData as any).__raw.idFiesta || (eventData as any).__raw.fiestaId) : undefined) ||
+      (eventId ? String(eventId) : undefined);
+    const fiestaIdToSend = sanitizeUuid(rawFiestaCandidate);
+    if (!fiestaIdToSend) {
+      Alert.alert('Datos incompletos', 'No encontramos la fiesta de esta entrada. Reabrí la pantalla e intentá nuevamente.');
+      try {
+        console.log('[handleSubmitReview] missing fiestaId', { fiestaIdForReview, fromEntries: entries.find((e)=>e.idFiesta)?.idFiesta, fromEventRaw: (eventData as any)?.__raw?.idFiesta || (eventData as any)?.__raw?.fiestaId, eventId });
+      } catch {}
+      return;
+    }
+    // Validación extra: asegurar patrón UUID estándar
+    const uuidOk = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(fiestaIdToSend);
+    if (!uuidOk) {
+      try { console.log('[handleSubmitReview] fiestaId no estándar tras sanitizar', { rawFiestaCandidate, fiestaIdToSend, len: fiestaIdToSend.length }); } catch {}
     }
     if (rating <= 0) {
       Alert.alert('Calificación requerida', 'Por favor seleccioná al menos 1 estrella.');
@@ -91,17 +139,92 @@ function TicketPurchasedScreenContent() {
     }
     try {
       setSubmitting(true);
-      const created = await postResenia({
-        idUsuario: String(userIdForReview),
-        idFiesta: String(fiestaIdForReview),
-        estrellas: rating,
-        comentario: trimmed,
-      });
-      try { setUserReview(created); } catch {}
-      setShowReview(false);
-      Alert.alert('¡Gracias!', 'Tu reseña fue enviada correctamente.');
-    } catch (e) {
-      Alert.alert('Error', 'No pudimos enviar tu reseña. Intenta nuevamente.');
+      try {
+        console.log('[handleSubmitReview] sending review', { userIdForReview, fiestaIdToSend, rating, comentarioLen: trimmed.length, hasExisting: !!userReview });
+        // Log en el formato EXACTO solicitado para lo que se intentará mandar (primer intento)
+        console.log('[handleSubmitReview] payload (primer intento POST) =>', {
+          idUsuario: String(userIdForReview),
+          estrellas: rating,
+            comentario: trimmed,
+          idFiesta: String(fiestaIdToSend),
+        });
+      } catch {}
+      // Preflight: si no tenemos userReview (porque fiestaIdForReview fue null) verificamos en backend con fiestaIdToSend para evitar duplicados (POST vs PUT)
+      let existing = userReview as Review | null;
+      if (!existing) {
+        try {
+          const list = await getResenias({ idUsuario: String(userIdForReview), idFiesta: String(fiestaIdToSend) });
+          existing = Array.isArray(list) && list.length ? list[0] : null;
+          if (existing) { try { console.log('[handleSubmitReview] preflight encontró reseña existente, usaremos PUT', { idResenia: existing.idResenia || existing.id }); } catch {} }
+        } catch {}
+      }
+      if (existing && (existing.idResenia || existing.id)) {
+        const updated = await putResenia({
+          idResenia: String(existing.idResenia || existing.id),
+          estrellas: rating,
+          comentario: trimmed,
+        });
+        try { setUserReview(updated); } catch {}
+        setShowReview(false);
+        Alert.alert('Listo', 'Tu reseña fue actualizada.');
+      } else {
+        let created: Review | null = null;
+        let originalError: any = null;
+        try {
+          created = await postResenia({
+            idUsuario: String(userIdForReview),
+            idFiesta: String(fiestaIdToSend),
+            estrellas: rating,
+            comentario: trimmed,
+          });
+        } catch (e1) {
+          originalError = e1;
+          // Intento de fallback: si eventId existe y es distinto al fiestaIdToSend (quizá confundimos fiesta vs evento)
+          const eventGuid = typeof eventId === 'string' ? eventId : undefined;
+          if (eventGuid && eventGuid.toLowerCase() !== fiestaIdToSend.toLowerCase()) {
+            try { console.log('[handleSubmitReview] retry con eventId como IdFiesta', { eventGuid, fiestaIdToSend }); } catch {}
+            try {
+              console.log('[handleSubmitReview] payload (fallback con eventId) =>', {
+                idUsuario: String(userIdForReview),
+                estrellas: rating,
+                comentario: trimmed,
+                idFiesta: String(eventGuid),
+              });
+            } catch {}
+            try {
+              created = await postResenia({
+                idUsuario: String(userIdForReview),
+                idFiesta: String(eventGuid),
+                estrellas: rating,
+                comentario: trimmed,
+              });
+            } catch (e2) {
+              try { console.log('[handleSubmitReview] fallback eventId también falló', { e1: (e1 as any)?.message, e2: (e2 as any)?.message }); } catch {}
+              throw e2; // Propagamos el segundo error
+            }
+          } else {
+            throw e1; // No había alternativa o eran iguales
+          }
+        }
+        if (!created) throw originalError || new Error('No se pudo crear la reseña');
+        try { setUserReview(created); } catch {}
+        setShowReview(false);
+        Alert.alert('¡Gracias!', 'Tu reseña fue enviada correctamente.');
+      }
+    } catch (e: any) {
+      // Log diagnóstico detallado
+      try {
+        console.log('[handleSubmitReview] error details:', {
+          fiestaIdForReview,
+          userIdForReview,
+          rating,
+          comentarioLen: trimmed.length,
+          errorMessage: e?.message,
+          status: e?.response?.status,
+          responseData: e?.response?.data,
+        });
+      } catch {}
+      Alert.alert('Error', 'No pudimos procesar tu reseña. Intenta nuevamente.');
     } finally {
       setSubmitting(false);
     }
@@ -132,7 +255,7 @@ function TicketPurchasedScreenContent() {
       if (has) {
         setRating(Number(userReview?.estrellas || 0));
         setComment(String(userReview?.comentario || ''));
-        setReadOnlyReview(true);
+        setReadOnlyReview(false);
         setShowReview(true);
       } else {
         setRating(0);
@@ -222,6 +345,21 @@ function TicketPurchasedScreenContent() {
 
   const formatTicketCode = (n: number) => `#${String(n).padStart(3, '0')}`;
 
+  // Fecha y hora local legible (ej: 15 de Enero 2025, 14:30)
+  const formatDateTimeEs = (raw?: any): string | null => {
+    const s = String(raw ?? '').trim();
+    if (!s) return null;
+    const dt = new Date(s);
+    if (isNaN(dt.getTime())) return null;
+    const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const dia = dt.getDate();
+    const mes = meses[dt.getMonth()];
+    const anio = dt.getFullYear();
+    const hh = String(dt.getHours()).padStart(2,'0');
+    const mm = String(dt.getMinutes()).padStart(2,'0');
+    return `${dia} de ${mes} ${anio}, ${hh}:${mm}`;
+  };
+
   useEffect(() => {
     (async () => {
       try {
@@ -234,7 +372,7 @@ function TicketPurchasedScreenContent() {
           setEventData(null);
         }
 
-        // Cargar entradas del usuario y filtrar por el evento actual y/o idCompra
+        // Cargar entradas del usuario y filtrar por el evento actual y/o idCompra y/o estadoCd (grupo seleccionado)
         const userId: string | null = (user as any)?.id ?? (user as any)?.idUsuario ?? null;
         if (userId) {
           const raw = await getEntradasUsuario(String(userId));
@@ -251,11 +389,33 @@ function TicketPurchasedScreenContent() {
             const s = String(idc ?? "").trim();
             return s ? s : null;
           };
+          // Busca idFiesta en múltiples niveles posibles dentro del registro de entrada
           const getFiestaId = (r: any): string | null => {
-            const f = r?.fiesta ?? r?.evento ?? r?.event ?? null;
-            const id = f?.idFiesta ?? f?.id_fiesta ?? r?.idFiesta ?? r?.fiestaId ?? r?.id_fiesta ?? null;
-            const s = String(id ?? "").trim();
-            return s ? s : null;
+            const tryVal = (v: any): string | null => {
+              const s = String(v ?? "").trim();
+              return s ? s : null;
+            };
+            // 1) claves directas
+            const direct = tryVal(r?.idFiesta) || tryVal(r?.fiestaId) || tryVal(r?.id_fiesta);
+            if (direct) return direct;
+            // 2) objeto fiesta directo
+            const fi = r?.fiesta ?? r?.Fiesta;
+            const fromFi = tryVal(fi?.idFiesta) || tryVal(fi?.id_fiesta) || tryVal(fi?.id) || tryVal(fi?.IdFiesta);
+            if (fromFi) return fromFi;
+            // 3) anidado bajo evento -> fiesta
+            const ev = r?.evento ?? r?.event;
+            const fromEv = tryVal(ev?.idFiesta) || tryVal(ev?.fiestaId) || tryVal(ev?.id_fiesta) || tryVal(ev?.Fiesta?.idFiesta) || tryVal(ev?.fiesta?.idFiesta);
+            if (fromEv) return fromEv;
+            // 4) anidado bajo entrada/fecha
+            const ent = r?.entrada ?? r?.ticket;
+            const fromEnt = tryVal(ent?.idFiesta) || tryVal(ent?.fiestaId) || tryVal(ent?.fiesta?.idFiesta) || tryVal(ent?.fecha?.fiesta?.idFiesta);
+            if (fromEnt) return fromEnt;
+            const fromFecha = tryVal(r?.fecha?.fiesta?.idFiesta) || tryVal(r?.fecha?.idFiesta);
+            if (fromFecha) return fromFecha;
+            // 5) último recurso: si tenemos el evento cargado y su __raw trae idFiesta
+            const fromEvtRaw = tryVal((evt as any)?.__raw?.idFiesta) || tryVal((evt as any)?.__raw?.fiestaId);
+            if (fromEvtRaw) return fromEvtRaw;
+            return null;
           };
 
           const all = Array.isArray(raw) ? raw : [];
@@ -270,8 +430,18 @@ function TicketPurchasedScreenContent() {
             return cid ? String(cid) === String(idCompra) : false;
           });
 
-          const mapped: UiUserEntry[] = filtered.map((r: any) => {
+          // Si viene estadoCd desde el menú (grupo), quedarnos sólo con entradas de ese estado
+          const estadoFilter = (typeof estadoCd === 'string' && estadoCd.trim()) ? Number(estadoCd) : undefined;
+          const filteredByEstado = typeof estadoFilter === 'number'
+            ? filtered.filter((r) => {
+                const cd = Number(r?.cdEstado ?? r?.estado?.cdEstado ?? NaN);
+                return !isNaN(cd) && cd === estadoFilter;
+              })
+            : filtered;
+
+          const mapped: UiUserEntry[] = filteredByEstado.map((r: any) => {
             const idEntrada = String(r?.idEntrada ?? r?.entrada?.idEntrada ?? r?.id_entrada ?? "");
+            const idEvento = getEventId(r) || undefined;
             const idFecha = String(
               r?.idFecha ?? r?.fecha?.idFecha ?? r?.entrada?.fecha?.idFecha ?? r?.id_fecha ?? ""
             );
@@ -287,9 +457,11 @@ function TicketPurchasedScreenContent() {
             );
             const estadoCdRaw = Number(r?.cdEstado ?? r?.estado?.cdEstado ?? NaN);
             const estadoDsRaw = String(r?.dsEstado ?? r?.estado?.dsEstado ?? "").trim() || undefined;
-            const idFiesta = getFiestaId(r) || undefined;
+            const idFiestaRaw = getFiestaId(r);
+            const idFiesta = sanitizeUuid(idFiestaRaw) || undefined;
             return {
               idEntrada,
+              idEvento,
               idFecha: idFecha || undefined,
               mdQR,
               tipoCd: Number.isFinite(tipoCd) ? (tipoCd as number) : undefined,
@@ -301,9 +473,47 @@ function TicketPurchasedScreenContent() {
               idFiesta,
             };
           });
+          // Si alguna entrada trajo idFiesta, propagarlo a las que no lo tengan; si no, intentar desde el evento crudo
+          const fiestaCandidate = (mapped.find((e) => !!e.idFiesta)?.idFiesta)
+            || (evt && (evt as any).__raw && ((evt as any).__raw.idFiesta || (evt as any).__raw.fiestaId)
+                  ? sanitizeUuid((evt as any).__raw.idFiesta || (evt as any).__raw.fiestaId) || undefined
+                  : undefined);
+          let mappedWithFiesta: UiUserEntry[] = fiestaCandidate
+            ? mapped.map((e) => ({ ...e, idFiesta: e.idFiesta ?? fiestaCandidate }))
+            : mapped;
+
+          // Paso extra: machear entrada->evento para derivar idFiesta desde el evento correspondiente
+          try {
+            const missing = mappedWithFiesta.filter((e) => !e.idFiesta && e.idEvento);
+            const uniqueEventIds = Array.from(new Set(missing.map((e) => String(e.idEvento))));
+            if (uniqueEventIds.length) {
+              const evPairs = await Promise.all(
+                uniqueEventIds.map(async (eid) => {
+                  try {
+                    const ev = await fetchEventById(eid);
+                    const raw = (ev as any)?.__raw;
+                    const f = sanitizeUuid(
+                      raw?.idFiesta || raw?.fiestaId || raw?.id_fiesta || raw?.fiesta?.idFiesta
+                    );
+                    return [eid, f] as const;
+                  } catch {
+                    return [eid, null] as const;
+                  }
+                })
+              );
+              const mapEventToFiesta = new Map<string, string | null>(evPairs);
+              mappedWithFiesta = mappedWithFiesta.map((e) => {
+                if (!e.idFiesta && e.idEvento && mapEventToFiesta.has(String(e.idEvento))) {
+                  const f = mapEventToFiesta.get(String(e.idEvento));
+                  return { ...e, idFiesta: f ?? undefined };
+                }
+                return e;
+              });
+            }
+          } catch {}
           // Obtener QR desde mediaApi por cada idEntrada y anexar su URL
           const withQrImages: UiUserEntry[] = await Promise.all(
-            mapped.map(async (e) => {
+            mappedWithFiesta.map(async (e) => {
               try {
                 // Traemos la lista de media para capturar también el idMedia
                 const data = await mediaApi.getByEntidad(e.idEntrada);
@@ -327,8 +537,15 @@ function TicketPurchasedScreenContent() {
           );
           setEntries(withQrImages);
           try {
-            // Loguear ids para diagnóstico rápido
-            console.log('[TicketPurchasedScreen] Entradas e idMedia:', withQrImages.map((x) => ({ idEntrada: x.idEntrada, idMedia: x.mediaId })));
+            // Loguear ids para diagnóstico rápido, incluyendo idFiesta de cada entrada
+            console.log(
+              '[TicketPurchasedScreen] Entradas (idEntrada, idFiesta, idMedia):',
+              withQrImages.map((x) => ({ idEntrada: x.idEntrada, idEvento: x.idEvento, idFiesta: x.idFiesta, idMedia: x.mediaId }))
+            );
+            // También logueamos un idFiesta "principal" derivado (si existe), útil para reseñas
+            const fiestaIdLogRaw = (withQrImages.find((e) => e.idFiesta)?.idFiesta) || (eventId ? String(eventId) : undefined);
+            const fiestaIdLog = sanitizeUuid(fiestaIdLogRaw);
+            if (fiestaIdLog) console.log('[TicketPurchasedScreen] idFiesta (derivado,sanitizado):', fiestaIdLog);
           } catch {}
         } else {
           setEntries([]);
@@ -657,7 +874,7 @@ function TicketPurchasedScreenContent() {
                     if (userReview) {
                       setRating(Number(userReview.estrellas || 0));
                       setComment(String(userReview.comentario || ''));
-                      setReadOnlyReview(true);
+                      setReadOnlyReview(false);
                       setShowReview(true);
                     } else {
                       setRating(0);
@@ -669,7 +886,7 @@ function TicketPurchasedScreenContent() {
                   activeOpacity={0.85}
                 >
                   <MaterialCommunityIcons name="star" size={18} color={COLORS.backgroundLight} style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryButtonText}>{userReview ? 'Ver reseña' : 'Dejar reseña'}</Text>
+                  <Text style={styles.primaryButtonText}>{userReview ? 'Editar reseña' : 'Dejar reseña'}</Text>
                 </TouchableOpacity>
               </>
             );
@@ -757,10 +974,11 @@ function TicketPurchasedScreenContent() {
       <Modal visible={showReview} transparent animationType="fade" onRequestClose={() => !submitting && setShowReview(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Deja tu reseña</Text>
+            <Text style={styles.modalTitle}>{userReview ? 'Editar reseña' : 'Deja tu reseña'}</Text>
             <Text style={styles.modalSubtitle}>
               Has asistido a un evento de la fiesta {eventData?.title}. Si lo deseas, puedes dejar tu reseña sobre la fiesta.
             </Text>
+            <Text style={styles.fieldLabel}>Calificación</Text>
             <View style={styles.starsRow}>
               {[1,2,3,4,5].map((n) => (
                 <TouchableOpacity key={n} onPress={() => !readOnlyReview && setRating(n)} disabled={submitting || readOnlyReview}>
@@ -772,6 +990,7 @@ function TicketPurchasedScreenContent() {
                 </TouchableOpacity>
               ))}
             </View>
+            <Text style={styles.fieldLabel}>Tu reseña</Text>
             <TextInput
               style={styles.textarea}
               placeholder="Comparte tu experiencia sobre la fiesta..."
@@ -797,11 +1016,48 @@ function TicketPurchasedScreenContent() {
                   {submitting ? (
                     <ActivityIndicator color={COLORS.backgroundLight} />
                   ) : (
-                    <Text style={styles.btnPrimaryText}>Enviar reseña</Text>
+                    <Text style={styles.btnPrimaryText}>{userReview ? 'Guardar cambios' : 'Enviar reseña'}</Text>
                   )}
                 </TouchableOpacity>
               )}
             </View>
+            {!!userReview && !readOnlyReview && (
+              <TouchableOpacity
+                style={[
+                  styles.btnGhostFull,
+                  { opacity: deleting ? 0.6 : 1 },
+                ]}
+                onPress={async () => {
+                  if (!userReview) return;
+                  const idRes = String(userReview.idResenia || userReview.id || '');
+                  if (!idRes) return;
+                  Alert.alert('Eliminar reseña', '¿Seguro que querés eliminar tu reseña?', [
+                    { text: 'Cancelar', style: 'cancel' },
+                    {
+                      text: 'Eliminar', style: 'destructive', onPress: async () => {
+                        try {
+                          setDeleting(true);
+                          try { console.log('[handleDeleteReview] deleting', { idResenia: idRes }); } catch {}
+                          await deleteResenia(idRes);
+                          setUserReview(null);
+                          setShowReview(false);
+                          Alert.alert('Listo', 'Tu reseña fue eliminada.');
+                        } catch (e: any) {
+                          try { console.log('[handleDeleteReview] error', { message: e?.message, status: e?.response?.status, data: e?.response?.data }); } catch {}
+                          Alert.alert('Error', 'No se pudo eliminar la reseña. Intenta nuevamente.');
+                        } finally {
+                          setDeleting(false);
+                        }
+                      }
+                    }
+                  ]);
+                }}
+                disabled={submitting || deleting}
+              >
+                <MaterialCommunityIcons name="trash-can-outline" size={16} color={COLORS.textPrimary} style={{ marginRight: 6 }} />
+                <Text style={styles.btnGhostText}>Eliminar reseña</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>
@@ -1101,7 +1357,9 @@ const styles = StyleSheet.create({
   },
   modalActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
     marginTop: 12,
     columnGap: 10,
   },
@@ -1111,6 +1369,24 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.card,
     borderWidth: 1,
     borderColor: COLORS.borderInput,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    flex: 1,
+  },
+  // Variante full width independiente (no flex:1 dentro de fila) para botón Eliminar
+  btnGhostFull: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: RADIUS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+    width: '100%',
+    flexDirection: 'row',
+    marginTop: 10,
   },
   btnGhostText: {
     fontFamily: FONTS.subTitleMedium,
@@ -1122,10 +1398,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: RADIUS.card,
     backgroundColor: COLORS.textPrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    flex: 1,
   },
   btnPrimaryText: {
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.button,
     color: COLORS.backgroundLight,
   },
+  // Nuevos estilos para modal edición
+  lastUpdateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  lastUpdateText: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
+    color: COLORS.textSecondary,
+  },
+  fieldLabel: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.smallText,
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+    marginTop: 4,
+  },
+  
 });

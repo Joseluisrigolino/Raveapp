@@ -50,8 +50,10 @@ export const ROUTES = {
     PARTY_RATINGS: "/reviews/screens/PartyRatingsScreen",
     PARTYS: "/party/screens/FiestasPantalla",
     MANAGE_EVENTS: "/events/screens/EventsAdminScreen",
-    // Apunta al menú de reporte de ventas (pantalla administrativa/menu)
+    // Menú de selección de evento para ver reportes
     TICKET_SOLD: "/sales/screens/ReporteVentaEntradaMenu",
+    // Pantalla de reporte de ventas por evento específico
+    TICKET_SOLD_EVENT: "/sales/screens/ReporteVentaEntradaEvento",
     MODIFY_EVENT: "/events/screens/OwnerEventModifyScreen",
     CANCEL_EVENT: "/events/screens/CancelarEventoPantalla",
   },

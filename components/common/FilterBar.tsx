@@ -10,12 +10,16 @@ import {
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 interface FilterBarProps {
-  filterStatus: string; // "todos" | "vigente" | "pendiente" | "finalizado"
+  filterStatus: string;
   onFilterStatusChange: (value: string) => void;
-  orderBy: string;      // "asc" | "desc"
-  onOrderByChange: (value: string) => void;
   searchText: string;
   onSearchTextChange: (value: string) => void;
+  // Opcionales
+  orderBy?: string; // "asc" | "desc"
+  onOrderByChange?: (value: string) => void;
+  showOrder?: boolean; // por defecto true
+  statusOptions?: string[]; // por defecto ["todos","vigente","pendiente","finalizado"]
+  searchPlaceholder?: string;
 }
 
 /**
@@ -27,10 +31,13 @@ interface FilterBarProps {
 export default function FilterBar({
   filterStatus,
   onFilterStatusChange,
-  orderBy,
-  onOrderByChange,
   searchText,
   onSearchTextChange,
+  orderBy = "asc",
+  onOrderByChange,
+  showOrder = true,
+  statusOptions,
+  searchPlaceholder,
 }: FilterBarProps) {
   // Controla si se ve la lista de estados
   const [showStatusList, setShowStatusList] = useState(false);
@@ -38,7 +45,9 @@ export default function FilterBar({
   const [showOrderList, setShowOrderList] = useState(false);
 
   // Opciones de estado
-  const statusOptions = ["todos", "vigente", "pendiente", "finalizado"];
+  const internalStatusOptions = statusOptions && statusOptions.length
+    ? statusOptions
+    : ["todos", "vigente", "pendiente", "finalizado"];
   // Opciones de orden
   const orderOptions = ["asc", "desc"];
 
@@ -50,7 +59,7 @@ export default function FilterBar({
 
   // Manejo de pulsar orden
   const handleOrderSelect = (ord: string) => {
-    onOrderByChange(ord);
+    onOrderByChange?.(ord);
     setShowOrderList(false);
   };
 
@@ -67,7 +76,7 @@ export default function FilterBar({
 
       {showStatusList && (
         <View style={styles.dropdownContainer}>
-          {statusOptions.map((opt) => (
+          {internalStatusOptions.map((opt) => (
             <TouchableOpacity
               key={opt}
               style={styles.dropdownItem}
@@ -80,33 +89,37 @@ export default function FilterBar({
       )}
 
       {/* FILTRO DE ORDEN */}
-      <Text style={[styles.label, { marginTop: 12 }]}>Orden:</Text>
-      <TouchableOpacity
-        style={styles.dropdownButton}
-        onPress={() => setShowOrderList(!showOrderList)}
-      >
-        <Text>{orderBy === "asc" ? "asc" : "desc"}</Text>
-      </TouchableOpacity>
+      {showOrder ? (
+        <>
+          <Text style={[styles.label, { marginTop: 12 }]}>Orden:</Text>
+          <TouchableOpacity
+            style={styles.dropdownButton}
+            onPress={() => setShowOrderList(!showOrderList)}
+          >
+            <Text>{orderBy === "asc" ? "asc" : "desc"}</Text>
+          </TouchableOpacity>
 
-      {showOrderList && (
-        <View style={styles.dropdownContainer}>
-          {orderOptions.map((opt) => (
-            <TouchableOpacity
-              key={opt}
-              style={styles.dropdownItem}
-              onPress={() => handleOrderSelect(opt)}
-            >
-              <Text>{opt}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+          {showOrderList && (
+            <View style={styles.dropdownContainer}>
+              {orderOptions.map((opt) => (
+                <TouchableOpacity
+                  key={opt}
+                  style={styles.dropdownItem}
+                  onPress={() => handleOrderSelect(opt)}
+                >
+                  <Text>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </>
+      ) : null}
 
       {/* BÚSQUEDA POR TEXTO */}
       <Text style={[styles.label, { marginTop: 12 }]}>Buscar evento:</Text>
       <TextInput
         style={styles.searchInput}
-        placeholder="Escribe nombre de evento..."
+        placeholder={searchPlaceholder || "Escribe nombre de evento..."}
         placeholderTextColor={COLORS.textSecondary}
         value={searchText}
         onChangeText={onSearchTextChange}
