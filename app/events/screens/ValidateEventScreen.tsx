@@ -43,7 +43,7 @@ export default function ValidateEventScreen() {
   const [entradasByFecha, setEntradasByFecha] = useState<Record<string, ApiEntradaFechaRaw[]>>({});
   const [entradasLoading, setEntradasLoading] = useState(false);
   const [tipoMap, setTipoMap] = useState<Map<number, string>>(new Map());
-  // Popup de edición/activación inline (igual a EditarArtistaPantalla)
+  // Popup de edición/activación inline (igual a EditArtistScreen)
   const [editVisible, setEditVisible] = useState(false);
   const [editBusy, setEditBusy] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -64,7 +64,7 @@ export default function ValidateEventScreen() {
   const [artistImages, setArtistImages] = useState<Record<string, string>>({});
   // track subscriptions
   useEffect(() => {
-    // Listen for artist activation updates coming back from EditarArtistaPantalla
+    // Listen for artist activation updates coming back from EditArtistScreen
     const off = eventBus.on("artist:activated", (payload: any) => {
       const activatedId = String(payload?.id ?? "");
       if (!activatedId) return;
@@ -630,7 +630,7 @@ export default function ValidateEventScreen() {
                               if (!idA) { Alert.alert('Error', 'ID de artista faltante'); return; }
                               // Navegar a la pantalla de edición/activación con prefill y flag de activación
                               nav.push(router, {
-                                pathname: '/artists/screens/EditarArtistaPantalla',
+                                pathname: ROUTES.ADMIN.ARTISTS.EDIT,
                                 params: { id: String(idA), activate: '1', prefillName: String(name || '') },
                               });
                             } catch (e:any) {

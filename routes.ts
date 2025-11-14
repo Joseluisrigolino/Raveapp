@@ -7,8 +7,8 @@ export const ROUTES = {
       FAV: "/events/screens/EventoLikeadoPantalla",
     },
     ARTISTS: {
-      LIST: "/artists/screens/ArtistasPantalla",
-      ITEM: "/artists/screens/ArtistaPantalla",
+      LIST: "/artists/screens/ArtistsScreen",
+      ITEM: "/artists/screens/ArtistScreen",
     },
     NEWS: {
       LIST: "/news/screens/NewsScreen",
@@ -28,9 +28,9 @@ export const ROUTES = {
   },
   ADMIN: {
     ARTISTS: {
-      MANAGE: "/artists/screens/AdministrarArtistasPantalla",
-      EDIT: "/artists/screens/EditarArtistaPantalla",
-      NEW: "/artists/screens/NuevoArtistaPantalla",
+      MANAGE: "/artists/screens/AdminArtistScreen",
+      EDIT: "/artists/screens/EditArtistScreen",
+      NEW: "/artists/screens/NewArtistScreen",
     },
     NEWS: {
       MANAGE: "/news/screens/ManageNewScreen",

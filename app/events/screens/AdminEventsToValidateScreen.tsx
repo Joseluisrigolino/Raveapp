@@ -1,7 +1,16 @@
-// src/screens/admin/EventsValidateScreens/EventsToValidateScreen.tsx
+// src/screens/admin/EventsValidateScreens/AdminEventsToValidateScreen.tsx
 
-import React, { useEffect, useState } from "react";
-import { View, Text, FlatList, Image, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
+// imports
+import React, { useEffect, useState, useMemo, useCallback } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
 import ROUTES from "@/routes";
@@ -13,33 +22,53 @@ import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import ProtectedRoute from "@/app/auth/ProtectedRoute";
 import SearchBarComponent from "@/components/common/SearchBarComponent";
-import { mediaApi } from "@/app/apis/mediaApi";
 import { getSafeImageSource } from "@/utils/image";
 
-import { fetchEvents, fetchGenres, ApiGenero } from "@/app/events/apis/eventApi";
-import { getProfile, getUsuarioById } from "@/app/auth/userHelpers";
+import {
+  fetchEvents,
+  fetchGenres,
+  ApiGenero,
+} from "@/app/events/apis/eventApi";
 import { EventItem } from "@/interfaces/EventItem";
-import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 
+// helpers
+// Comentario: imagen por defecto si no hay imagen del evento
 const PLACEHOLDER_IMAGE = "https://via.placeholder.com/400x200?text=Sin+imagen";
 
-export default function EventsToValidateScreen() {
+// Comentario: convierte los códigos de géneros en texto legible, o usa el tipo básico
+function getGenresText(ev: EventItem, genreMap: Map<number, string>): string {
+  const raw: any = ev as any;
+  const codes: number[] = Array.isArray(raw?.genero) ? raw.genero : [];
+  if (codes.length && genreMap.size) {
+    const names = codes
+      .map((c) => genreMap.get(Number(c)) || null)
+      .filter((n): n is string => Boolean(n));
+    if (names.length) return names.join(", ");
+  }
+  return ev.type || "Otros";
+}
+
+// componente principal
+export default function AdminEventsToValidateScreen() {
   const router = useRouter();
-
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchText, setSearchText] = useState("");
-  const [genreMap, setGenreMap] = useState<Map<number, string>>(new Map());
-
   const { refresh } = useLocalSearchParams<{ refresh?: string }>();
   const path = usePathname();
-  const currentScreen = path?.split("/").pop() || "";
 
+  // Comentario: estados simples para datos, carga, búsqueda y géneros
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [searchText, setSearchText] = useState<string>("");
+  const [genreMap, setGenreMap] = useState<Map<number, string>>(new Map());
+
+  // Comentario: tabs según rutas (UI en español se mantiene)
+  const currentScreen = path?.split("/").pop() || "";
   const tabs = [
     {
       label: "EVENTOS A VALIDAR",
       route: ROUTES.ADMIN.EVENTS_VALIDATE.LIST,
-      isActive: currentScreen === ROUTES.ADMIN.EVENTS_VALIDATE.LIST.split("/").pop(),
+      isActive:
+        currentScreen === ROUTES.ADMIN.EVENTS_VALIDATE.LIST.split("/").pop(),
     },
     {
       label: "EVENTOS APROBADOS",
@@ -48,212 +77,177 @@ export default function EventsToValidateScreen() {
     },
   ];
 
+  // Comentario: cargar géneros y eventos con estado 0 (por aprobar)
   useEffect(() => {
+    let mounted = true;
     (async () => {
       try {
         setLoading(true);
-        // Cargar mapa de géneros para poder mostrar varios por evento
         try {
           const gen = await fetchGenres();
-          const map = new Map<number, string>(gen.map((g: ApiGenero) => [g.cdGenero, g.dsGenero]));
+          if (!mounted) return;
+          const map = new Map<number, string>(
+            gen.map((g: ApiGenero) => [g.cdGenero, g.dsGenero])
+          );
           setGenreMap(map);
         } catch {}
-  const data = await fetchEvents(0); // ahora pedimos Estado = 0
-        // Asegurar que sólo guardamos eventos con estado 0 (por aprobar)
-        // y que además tengan imagen para mostrarse en esta vista.
-        const filteredByState = Array.isArray(data)
+
+        const data = await fetchEvents(0);
+        if (!mounted) return;
+        const onlyStateZero = Array.isArray(data)
           ? data.filter((ev: any) => {
-              // Preferir cdEstado cuando esté disponible (raw API), si no usar estado normalizado
-              const isCdEstadoZero = ev?.cdEstado === 0 || String(ev?.cdEstado) === "0";
-              const isEstadoZero = ev?.estado === 0 || String(ev?.estado) === "0";
-              // Aceptamos cualquier evento con estado 0.
+              const isCdEstadoZero =
+                ev?.cdEstado === 0 || String(ev?.cdEstado) === "0";
+              const isEstadoZero =
+                ev?.estado === 0 || String(ev?.estado) === "0";
               return isCdEstadoZero || isEstadoZero;
             })
           : [];
-        const withImages = filteredByState.filter((ev: any) =>
-          typeof ev?.imageUrl === "string" && ev.imageUrl.trim().length > 0
+        const withImages = onlyStateZero.filter(
+          (ev: any) =>
+            typeof ev?.imageUrl === "string" && ev.imageUrl.trim().length > 0
         );
-
-        // Enriquecer con datos reales del propietario (nombre y correo) buscando por email o id
-        const emailCache = new Map<string, any>();
-        const idCache = new Map<string, any>();
-        const enriched = await Promise.all(
-          withImages.map(async (ev: any) => {
-            const raw: any = ev;
-            const fallbackName = raw.ownerName ?? raw.owner?.name ?? raw.propietario?.nombre ?? raw.ownerDisplayName ?? null;
-            const fallbackEmail = raw.ownerEmail ?? raw.owner?.email ?? raw.propietario?.correo ?? raw.email ?? null;
-            const idUsuario = raw.ownerId ?? raw.propietario?.idUsuario ?? raw.usuario?.idUsuario ?? null;
-
-            let profile: any = null;
-            // Primero intentamos por email si lo tenemos, suele ser más directo
-            if (fallbackEmail) {
-              const key = String(fallbackEmail).toLowerCase();
-              if (emailCache.has(key)) {
-                profile = emailCache.get(key);
-              } else {
-                try {
-                  profile = await getProfile(key);
-                  if (profile) emailCache.set(key, profile);
-                } catch {}
-              }
-            }
-            // Si no hay email o falló, probamos por ID de usuario
-            if (!profile && idUsuario) {
-              const key = String(idUsuario);
-              if (idCache.has(key)) {
-                profile = idCache.get(key);
-              } else {
-                try {
-                  profile = await getUsuarioById(key);
-                  if (profile) idCache.set(key, profile);
-                } catch {}
-              }
-            }
-
-            if (profile) {
-              return {
-                ...ev,
-                ownerName: profile.nombre ? `${profile.nombre} ${profile.apellido ?? ""}`.trim() : fallbackName ?? "N/D",
-                ownerEmail: profile.correo ?? fallbackEmail ?? undefined,
-                ownerId: profile.idUsuario ?? idUsuario ?? undefined,
-              } as EventItem;
-            }
-            return ev as EventItem;
-          })
-        );
-
-        // Prefetch owner avatars and enrich events
-        try {
-          const uniqueOwnerIds = Array.from(
-            new Set(
-              enriched
-                .map((e: any) => e.ownerId)
-                .filter((id: any) => typeof id === "string" || typeof id === "number")
-                .map((id: any) => String(id))
-            )
-          );
-          const avatarMap = new Map<string, string>();
-          await Promise.all(
-            uniqueOwnerIds.map(async (id) => {
-              try {
-                const url = await mediaApi.getFirstImage(id);
-                if (typeof url === "string" && url.trim().length > 0) {
-                  avatarMap.set(id, url);
-                }
-              } catch {}
-            })
-          );
-
-          const enrichedWithAvatars = enriched.map((e: any) => {
-            const id = e.ownerId ? String(e.ownerId) : "";
-            const ownerAvatarUrl = id ? avatarMap.get(id) || "" : "";
-            return { ...e, ownerAvatarUrl } as EventItem & { ownerAvatarUrl?: string };
-          });
-          setEvents(enrichedWithAvatars);
-        } catch {
-          setEvents(enriched);
-        }
+        setEvents(withImages as EventItem[]);
       } catch (e) {
         console.error("Error al cargar eventos:", e);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     })();
+    return () => {
+      mounted = false;
+    };
   }, [refresh]);
 
-  // Helper: genera el texto de géneros a partir de los códigos (si están) o del type simple
-  const getGenresText = (ev: EventItem): string => {
-    const raw: any = ev as any;
-    const codes: number[] = Array.isArray(raw?.genero) ? raw.genero : [];
-    if (codes.length && genreMap.size) {
-      const names = codes
-        .map((c) => genreMap.get(Number(c)) || null)
-        .filter((n): n is string => Boolean(n));
-      if (names.length) return names.join(", ");
-    }
-    // fallback al type normalizado (un solo género)
-    return ev.type || "Otros";
-  };
-
-  const filtered = events.filter((ev) => {
+  // Comentario: filtrar por texto en título, dirección o datos básicos del propietario
+  const filteredEvents = useMemo(() => {
     const q = searchText.toLowerCase();
-    const raw: any = ev as any;
-    const ownerName = raw.ownerName ?? raw.owner?.name ?? raw.propietario?.nombre ?? raw.ownerDisplayName ?? "";
-    const ownerEmail = raw.ownerEmail ?? raw.owner?.email ?? raw.propietario?.correo ?? raw.email ?? "";
-    return (
-      ev.title.toLowerCase().includes(q) ||
-      ev.address.toLowerCase().includes(q) ||
-      String(ownerName).toLowerCase().includes(q) ||
-      String(ownerEmail).toLowerCase().includes(q)
-    );
-  });
+    return events.filter((ev: any) => {
+      const ownerName =
+        ev?.ownerName ||
+        ev?.owner?.name ||
+        ev?.propietario?.nombre ||
+        ev?.ownerDisplayName ||
+        "";
+      const ownerEmail =
+        ev?.ownerEmail ||
+        ev?.owner?.email ||
+        ev?.propietario?.correo ||
+        ev?.email ||
+        "";
+      return (
+        ev.title?.toLowerCase?.().includes(q) ||
+        ev.address?.toLowerCase?.().includes(q) ||
+        String(ownerName).toLowerCase().includes(q) ||
+        String(ownerEmail).toLowerCase().includes(q)
+      );
+    });
+  }, [events, searchText]);
 
-  const handleVerify = (id: string) => {
-    nav.push(router, { pathname: ROUTES.ADMIN.EVENTS_VALIDATE.VALIDATE, params: { id } });
-  };
-
-  const renderItem = ({ item }: { item: EventItem }) => (
-    <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => handleVerify(item.id)}>
-      <Image
-        source={getSafeImageSource(item.imageUrl || PLACEHOLDER_IMAGE)}
-        style={styles.image}
-        resizeMode="cover"
-      />
-      <View style={styles.cardContent}>
-        <View style={styles.metaRow}>
-          <View style={styles.dateRow}>
-            <MaterialCommunityIcons name="calendar-blank-outline" size={16} color={COLORS.textSecondary} />
-            <Text style={styles.dateText}>{item.date}</Text>
-          </View>
-          <View style={styles.genreChip}>
-            <MaterialCommunityIcons name="music" size={14} color={COLORS.textSecondary} />
-            <Text style={styles.genreChipText} numberOfLines={1}>{getGenresText(item)}</Text>
-          </View>
-        </View>
-
-        <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-
-        {(() => {
-          const raw: any = item as any;
-          const ownerName = raw.ownerName ?? raw.owner?.name ?? raw.propietario?.nombre ?? raw.ownerDisplayName ?? "N/D";
-          const ownerEmail = raw.ownerEmail ?? raw.owner?.email ?? raw.propietario?.correo ?? raw.email ?? null;
-          return (
-            <View style={styles.ownerRow}>
-              {(item as any).ownerAvatarUrl ? (
-                <Image
-                  source={getSafeImageSource((item as any).ownerAvatarUrl)}
-                  style={styles.avatarImage}
-                />
-              ) : (
-                <View style={styles.avatarCircle}>
-                  <MaterialCommunityIcons name="account-outline" size={18} color={COLORS.textPrimary} />
-                </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <Text style={styles.ownerName} numberOfLines={1}>{ownerName}</Text>
-                {ownerEmail ? (
-                  <Text style={styles.ownerEmail} numberOfLines={1}>{ownerEmail}</Text>
-                ) : null}
-              </View>
-            </View>
-          );
-        })()}
-
-        <TouchableOpacity style={styles.verifyBtn} onPress={() => handleVerify(item.id)} activeOpacity={0.85}>
-          <Text style={styles.verifyBtnText}>Verificar</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
+  // Comentario: navegar a la pantalla de validación con el id del evento
+  const handleVerify = useCallback(
+    (id: string) => {
+      nav.push(router, {
+        pathname: ROUTES.ADMIN.EVENTS_VALIDATE.VALIDATE,
+        params: { id },
+      });
+    },
+    [router]
   );
 
+  // Comentario: render de una tarjeta simple de evento
+  const renderItem = ({ item }: { item: EventItem }) => {
+    const raw: any = item as any;
+    const ownerName =
+      raw.ownerName ||
+      raw.owner?.name ||
+      raw.propietario?.nombre ||
+      raw.ownerDisplayName ||
+      "N/D";
+    const ownerEmail =
+      raw.ownerEmail ||
+      raw.owner?.email ||
+      raw.propietario?.correo ||
+      raw.email ||
+      null;
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.9}
+        onPress={() => handleVerify(item.id)}
+      >
+        <Image
+          source={getSafeImageSource(item.imageUrl || PLACEHOLDER_IMAGE)}
+          style={styles.image}
+          resizeMode="cover"
+        />
+        <View style={styles.cardContent}>
+          <View style={styles.metaRow}>
+            <View style={styles.dateRow}>
+              <MaterialCommunityIcons
+                name="calendar-blank-outline"
+                size={16}
+                color={COLORS.textSecondary}
+              />
+              <Text style={styles.dateText}>{item.date}</Text>
+            </View>
+            <View style={styles.genreChip}>
+              <MaterialCommunityIcons
+                name="music"
+                size={14}
+                color={COLORS.textSecondary}
+              />
+              <Text style={styles.genreChipText} numberOfLines={1}>
+                {getGenresText(item, genreMap)}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.title} numberOfLines={2}>
+            {item.title}
+          </Text>
+
+          <View style={styles.ownerRow}>
+            <View style={styles.avatarCircle}>
+              <MaterialCommunityIcons
+                name="account-outline"
+                size={18}
+                color={COLORS.textPrimary}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.ownerName} numberOfLines={1}>
+                {ownerName}
+              </Text>
+              {ownerEmail ? (
+                <Text style={styles.ownerEmail} numberOfLines={1}>
+                  {ownerEmail}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.verifyBtn}
+            onPress={() => handleVerify(item.id)}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.verifyBtnText}>Verificar</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Comentario: layout básico con header, tabs, buscador, lista y footer
   return (
     <ProtectedRoute allowedRoles={["admin"]}>
       <SafeAreaView style={styles.container}>
         <Header title="EventApp" />
+        <TabMenuComponent tabs={tabs} />
 
-  <TabMenuComponent tabs={tabs} />
-
-  <View style={styles.content}>
+        <View style={styles.content}>
           <SearchBarComponent
             value={searchText}
             onChangeText={setSearchText}
@@ -262,15 +256,15 @@ export default function EventsToValidateScreen() {
 
           {loading ? (
             <ActivityIndicator size="large" color={COLORS.primary} />
-          ) : filtered.length === 0 ? (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <Text style={{ color: COLORS.textSecondary }}>
+          ) : filteredEvents.length === 0 ? (
+            <View style={styles.emptyWrapper}>
+              <Text style={styles.emptyText}>
                 No hay eventos para aprobar en este momento.
               </Text>
             </View>
           ) : (
             <FlatList
-              data={filtered}
+              data={filteredEvents}
               keyExtractor={(item) => item.id}
               renderItem={renderItem}
               contentContainerStyle={{ paddingBottom: 40 }}
@@ -284,6 +278,7 @@ export default function EventsToValidateScreen() {
   );
 }
 
+// estilos al final
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -293,12 +288,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 12,
     paddingTop: 12,
-  },
-  titleScreen: {
-    fontFamily: FONTS.titleBold,
-  fontSize: FONT_SIZES.titleMain,
-    color: COLORS.textPrimary,
-    marginBottom: 12,
   },
   card: {
     backgroundColor: COLORS.backgroundLight,
@@ -322,23 +311,6 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 6,
     marginTop: 6,
-  },
-  label: {
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textSecondary,
-    marginBottom: 2,
-  },
-  labelEmail: {
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textSecondary,
-    marginBottom: 2,
-    marginLeft: 0,
-  },
-  bold: {
-    fontFamily: FONTS.subTitleMedium,
-    color: COLORS.textPrimary,
   },
   metaRow: {
     flexDirection: "row",
@@ -385,12 +357,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarImage: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: COLORS.borderInput,
-  },
   ownerName: {
     color: COLORS.textPrimary,
     fontFamily: FONTS.subTitleMedium,
@@ -413,5 +379,12 @@ const styles = StyleSheet.create({
     color: COLORS.backgroundLight,
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.body,
+  },
+  emptyWrapper: {
+    padding: 20,
+    alignItems: "center",
+  },
+  emptyText: {
+    color: COLORS.textSecondary,
   },
 });

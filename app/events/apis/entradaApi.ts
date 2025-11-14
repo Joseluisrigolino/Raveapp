@@ -101,11 +101,12 @@ export type ReservaActiva =
  *                         CACHES EN MEMORIA
  *  ======================================================================= */
 
-let _tiposCache: ApiTipoEntrada[] | null = null;
-let _tipoMapCache: Map<number, string> | null = null;
+// Caches simples en memoria (nombres en inglés)
+let typesCache: ApiTipoEntrada[] | null = null;
+let typeMapCache: Map<number, string> | null = null;
 
-let _estadosCache: ApiEstadoEntrada[] | null = null;
-let _estadoMapCache: Map<number, string> | null = null;
+let statesCache: ApiEstadoEntrada[] | null = null;
+let stateMapCache: Map<number, string> | null = null;
 
 /** =========================================================================
  *                           ENDPOINTS: TIPOS
@@ -113,26 +114,26 @@ let _estadoMapCache: Map<number, string> | null = null;
 
 export async function fetchTiposEntrada(): Promise<ApiTipoEntrada[]> {
   try {
-    if (_tiposCache) return _tiposCache;
+    if (typesCache) return typesCache;
     const token = await login().catch(() => null);
     const { data } = await apiClient.get<ApiTipoEntrada[]>(
       "/v1/Entrada/GetTiposEntrada",
       { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
     );
-    _tiposCache = Array.isArray(data) ? data : [];
-    _tipoMapCache = new Map(_tiposCache.map((t) => [t.cdTipo, t.dsTipo]));
-    return _tiposCache;
+    typesCache = Array.isArray(data) ? data : [];
+    typeMapCache = new Map(typesCache.map((t) => [t.cdTipo, t.dsTipo]));
+    return typesCache;
   } catch {
-    _tiposCache = [];
-    _tipoMapCache = new Map();
+    typesCache = [];
+    typeMapCache = new Map();
     return [];
   }
 }
 
 export async function getTipoMap(): Promise<Map<number, string>> {
-  if (_tipoMapCache) return _tipoMapCache;
+  if (typeMapCache) return typeMapCache;
   await fetchTiposEntrada();
-  return _tipoMapCache ?? new Map();
+  return typeMapCache ?? new Map();
 }
 
 /** =========================================================================
@@ -141,31 +142,31 @@ export async function getTipoMap(): Promise<Map<number, string>> {
 
 export async function fetchEstadosEntrada(): Promise<ApiEstadoEntrada[]> {
   try {
-    if (_estadosCache) return _estadosCache;
+    if (statesCache) return statesCache;
     const token = await login().catch(() => null);
     const { data } = await apiClient.get<ApiEstadoEntrada[]>(
       "/v1/Entrada/GetEstadosEntrada",
       { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
     );
-    _estadosCache = Array.isArray(data) ? data : [];
-    _estadoMapCache = new Map(
-      _estadosCache.map((e) => [
+    statesCache = Array.isArray(data) ? data : [];
+    stateMapCache = new Map(
+      statesCache.map((e) => [
         e.cdEstado,
         e.dsEstado ?? `Estado ${e.cdEstado}`,
       ])
     );
-    return _estadosCache;
+    return statesCache;
   } catch {
-    _estadosCache = [];
-    _estadoMapCache = new Map();
+    statesCache = [];
+    stateMapCache = new Map();
     return [];
   }
 }
 
 export async function getEstadoMap(): Promise<Map<number, string>> {
-  if (_estadoMapCache) return _estadoMapCache;
+  if (stateMapCache) return stateMapCache;
   await fetchEstadosEntrada();
-  return _estadoMapCache ?? new Map();
+  return stateMapCache ?? new Map();
 }
 
 /** =========================================================================
@@ -221,17 +222,11 @@ export async function ensureFechaListo(
     try {
       // si responde 200 (aunque sea []), consideramos que la fecha ya es “visible”
       await fetchEntradasFechaRaw(idFecha);
-      if (i > 0) console.log(`[ensureFechaListo] OK en intento ${i + 1}`);
       return;
     } catch (e: any) {
-      const st = e?.response?.status;
-      console.log(
-        `[ensureFechaListo] intento ${i + 1}/${tries} fallo (status=${st}). Esperando ${delayMs}ms…`
-      );
       await new Promise((r) => setTimeout(r, delayMs));
     }
   }
-  console.log("[ensureFechaListo] seguimos igual; continuamos con creación.");
 }
 
 /** =========================================================================
@@ -274,12 +269,10 @@ export async function createEntrada(body: CreateEntradaBody): Promise<void> {
 
   // hasta 2 intentos por formato (camel -> pascal)
   try {
-    console.debug("[CrearEntrada] camelCase =>", body);
     await postCrearEntradasCamel(body);
     return;
   } catch (e) {
     lastErr = e;
-    console.debug("[CrearEntrada] camelCase falló, probando PascalCase…");
   }
 
   try {
@@ -320,9 +313,6 @@ export async function createEntradasBulk(
         lastErr = e;
         const st = e?.status || e?.response?.status;
         const is5xx = st >= 500 && st < 600;
-        console.log(
-          `[createEntradasBulk] item #${i + 1} intento ${attempt} falló (status=${st})`
-        );
         if (is5xx && attempt < 3) {
           const wait = 300 * attempt;
           await new Promise((r) => setTimeout(r, wait));
@@ -370,23 +360,11 @@ export async function reservarEntradas(
   body: ReservarEntradasBody
 ): Promise<ReservarEntradasResponse> {
   const token = await login();
-  // Basic validation: ensure there's at least one entrada with cantidad > 0
-  try {
-    if (!Array.isArray(body.entradas) || body.entradas.every((it) => Number(it.cantidad) <= 0)) {
-      const msg = "[reservarEntradas] Invalid payload: all 'cantidad' are zero or missing";
-      try {
-        console.warn(msg, JSON.stringify(body));
-      } catch {}
-      // Throw a structured error so callers can handle it
-      throw Object.assign(new Error(msg), { status: 400, payload: body });
-    }
-  } catch (vErr) {
-    // If validation itself fails for any reason, just continue and let the request run
+  // Validación simple: al menos una entrada con cantidad > 0
+  if (!Array.isArray(body.entradas) || body.entradas.every((it) => Number(it.cantidad) <= 0)) {
+    const msg = "Payload inválido: 'cantidad' es cero o falta en todas las entradas";
+    throw Object.assign(new Error(msg), { status: 400, payload: body });
   }
-  // Log request payload for debugging
-  try {
-    console.debug("[reservarEntradas] payload:", JSON.stringify(body));
-  } catch {}
 
   // Helper de normalización del idCompra (con soporte a body string)
   const normalizeIdCompra = (data: any) => {
@@ -445,18 +423,9 @@ export async function reservarEntradas(
         },
       }
     );
-    try {
-      console.debug("[reservarEntradas] response status:", (resp as any)?.status);
-      console.debug("[reservarEntradas] response headers:", (resp as any)?.headers);
-      console.debug("[reservarEntradas] response data:", JSON.stringify((resp as any)?.data));
-    } catch {}
     return normalizeIdCompra((resp as any)?.data ?? {});
   } catch (e: any) {
     const st = e?.response?.status;
-    try {
-      console.warn("[reservarEntradas] camelCase error status:", st);
-      console.warn("[reservarEntradas] camelCase error body:", JSON.stringify(e?.response?.data));
-    } catch {}
     // Fallback con PascalCase solo si falló (p.ej. 400/415/422)
     if (st && st >= 400 && st < 500) {
       const pascal = {
@@ -467,9 +436,6 @@ export async function reservarEntradas(
           Cantidad: it.cantidad,
         })),
       } as any;
-      try {
-        console.debug("[reservarEntradas] intentando fallback PascalCase payload:", JSON.stringify(pascal));
-      } catch {}
       const resp2 = await apiClient.put<ReservarEntradasResponse>(
         "/v1/Entrada/ReservarEntradas",
         pascal,
@@ -480,10 +446,6 @@ export async function reservarEntradas(
           },
         }
       );
-      try {
-        console.debug("[reservarEntradas] fallback response status:", (resp2 as any)?.status);
-        console.debug("[reservarEntradas] fallback response data:", JSON.stringify((resp2 as any)?.data));
-      } catch {}
       return normalizeIdCompra((resp2 as any)?.data ?? {});
     }
     throw e;
@@ -507,16 +469,10 @@ export async function fetchReservaActiva(
   // Try multiple times in case the reservation is not immediately visible due to propagation
   for (let i = 0; i < attempts; i++) {
     try {
-      try {
-        console.debug("[fetchReservaActiva] intentando petición", { idUsuario, attempt: i + 1 });
-      } catch {}
       const { data, status } = await apiClient.get<any>("/v1/Entrada/GetReservaActiva", {
         params: { idUsuario },
         headers: { Authorization: `Bearer ${token}` },
       });
-      try {
-        console.debug("[fetchReservaActiva] status:", status, "data:", JSON.stringify(data));
-      } catch {}
 
       // Si la API responde 400/404, no retry
       if (status === 400 || status === 404) return null;
@@ -533,9 +489,6 @@ export async function fetchReservaActiva(
       return data ?? null;
     } catch (e: any) {
       const st = e?.response?.status;
-      try {
-        console.warn("[fetchReservaActiva] intento fallo status:", st, "body:", JSON.stringify(e?.response?.data));
-      } catch {}
       if (st === 400 || st === 404) return null;
       // Si no es un error terminal, retry si quedan intentos
       if (i < attempts - 1) {
@@ -638,18 +591,9 @@ export async function confirmarPagoMP(idPagoMP: string): Promise<void> {
       if (status >= 200 && status < 300) return;
     } catch (err: any) {
       lastErr = err;
-      const st = (err as any)?.response?.status;
-      // seguir intentando ante 400/404/405/422/5xx, ya que puede ser endpoint/forma distinta
-      if (![400,401,403,404,405,409,415,422,500,502,503,504].includes(Number(st))) {
-        // error inesperado: continuar igual con otros intentos
-      }
       continue;
     }
   }
-  // Si ninguno funcionó, arrojar último error con más contexto
-  try {
-    console.warn("[entradaApi.confirmarPagoMP] todos los intentos fallaron para idPagoMP=", idPagoMP);
-  } catch {}
   throw lastErr || new Error("No se pudo confirmar el pago con Mercado Pago.");
 }
 
@@ -760,24 +704,12 @@ export async function solicitarReembolso(idCompra: string): Promise<ReembolsoRes
   pushPathVariants("/v1/Pago/Reembolsar");
 
   let lastErr: any = null;
-  const attempted: Array<{ index: number; method?: string; url?: string; params?: any; body?: any; status?: any; message?: any }> = [];
   for (const fn of attempts) {
     try {
       const { data } = await fn();
       return { ok: true, data };
     } catch (e: any) {
       lastErr = e;
-      try {
-        attempted.push({
-          index: attempted.length,
-          method: e?.config?.method,
-          url: e?.config?.url,
-          params: e?.config?.params,
-          body: e?.config?.data,
-          status: e?.response?.status,
-          message: e?.response?.data || e?.message,
-        });
-      } catch {}
       continue;
     }
   }
@@ -786,13 +718,10 @@ export async function solicitarReembolso(idCompra: string): Promise<ReembolsoRes
     lastErr?.response?.data?.Message ||
     lastErr?.message ||
     "No se pudo solicitar el reembolso.";
-  try {
-    console.warn("[solicitarReembolso] Falló todas las variantes", { idCompra, attempts: attempted.slice(0, 12) });
-  } catch {}
-  const last = attempted.at(-1);
-  const mensajeDetallado = `${mensajeBase} (intentos: ${attempted.length}, último status: ${last?.status || 'desconocido'})`;
+  const status = lastErr?.response?.status;
+  const mensajeDetallado = `${mensajeBase}`;
   // Afinar explicación en 404: puede ser compra inexistente o endpoint no implementado
-  if ((last?.status ?? 0) === 404) {
+  if ((status ?? 0) === 404) {
     return {
       ok: false,
       mensaje:
@@ -863,8 +792,9 @@ export async function solicitarReembolsoMasivo(idEvento: string): Promise<Reembo
  *                 RESOLUCIÓN DE CÓDIGOS DE TIPOS
  *  ======================================================================= */
 
-const norm = (s: string) =>
-  (s || "")
+// Normaliza texto para comparar sin acentos y en minúsculas
+const norm = (text: string) =>
+  (text || "")
     .normalize("NFD")
     // @ts-ignore
     .replace(/\p{Diacritic}/gu, "")
@@ -893,8 +823,6 @@ export async function resolveTipoCodes(): Promise<TipoCodes> {
     else if (n === "vip") codes.vip = cd;
     else if (n === "vip early bird") codes.earlyVip = cd;
   }
-
-  console.log("[resolveTipoCodes] mapeo final:", codes, " (desde: ", tipos, ")");
   return codes;
 }
 

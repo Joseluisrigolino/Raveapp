@@ -1,156 +1,143 @@
 // src/screens/admin/EditArtistScreen.tsx
 
+// Imports (mantener arriba)
 import React, { useEffect, useState } from "react";
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Image, Alert, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system/legacy";
+import * as FileSystem from "expo-file-system/legacy"; // usado para tamaño de archivo
 import { useLocalSearchParams, useRouter } from "expo-router";
-
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-
 import { fetchOneArtistFromApi, updateArtistOnApi } from "@/app/artists/apis/artistApi";
 import { mediaApi } from "@/app/apis/mediaApi";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
-import InputText from "@/components/common/inputText";
-import InputDesc from "@/components/common/inputDesc";
-import eventBus from "@/utils/eventBus";
+import InputText from "@/components/common/inputText"; // reutilizo componente compartido
+import InputDesc from "@/components/common/inputDesc"; // para descripción multi‑línea
+import eventBus from "@/utils/eventBus"; // para emitir evento de activación
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 export default function EditArtistScreen() {
+  // Params recibidos (id del artista, flag de activación y nombre prellenado)
   const { id, activate, prefillName } = useLocalSearchParams<{ id: string; activate?: string; prefillName?: string }>();
   const router = useRouter();
 
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [instagramURL, setInstagramURL] = useState("");
-  const [spotifyURL, setSpotifyURL] = useState("");
-  const [soundcloudURL, setSoundcloudURL] = useState("");
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [idMedia, setIdMedia] = useState<string | null>(null);
-  const [idSocial, setIdSocial] = useState<string | null>(null);
-  const [isActivo, setIsActivo] = useState(true);
-  const [newImageLocalUri, setNewImageLocalUri] = useState<string | null>(null);
-  const isActivationFlow = String(activate || "0") === "1";
+  // Estados (nombres en inglés, comentarios en español)
+  const [artistName, setArtistName] = useState(""); // nombre
+  const [artistDesc, setArtistDesc] = useState(""); // descripción
+  const [instagramUrl, setInstagramUrl] = useState(""); // url instagram
+  const [spotifyUrl, setSpotifyUrl] = useState(""); // url spotify
+  const [soundcloudUrl, setSoundcloudUrl] = useState(""); // url soundcloud
+  const [imageUri, setImageUri] = useState<string | null>(null); // imagen actual o nueva
+  const [mediaId, setMediaId] = useState<string | null>(null); // id media para borrar
+  const [socialId, setSocialId] = useState<string | null>(null); // id social (si existe)
+  const [activeFlag, setActiveFlag] = useState(true); // estado activo
+  const [localNewImage, setLocalNewImage] = useState<string | null>(null); // imagen local temporal
+  const activationFlow = String(activate || "0") === "1"; // true si venimos a activar
 
+  // Cargar datos del artista
   useEffect(() => {
     if (!id || id === "undefined") {
-      Alert.alert("Error", "ID inválido recibido.");
+      Alert.alert("Error", "ID inválido");
       return;
     }
-
-    const loadArtist = async () => {
+    const load = async () => {
       try {
-  const a = await fetchOneArtistFromApi(id);
-  setName(prefillName && String(prefillName).trim().length ? String(prefillName) : a.name);
-        setDescription(a.description || "");
-        setInstagramURL(a.instagramURL || "");
-        setSpotifyURL(a.spotifyURL || "");
-        setSoundcloudURL(a.soundcloudURL || "");
-        setIdSocial(a.idSocial ?? null);
-        // Si venimos con activate=1, forzar previsualización como activo
-  const shouldActivate = isActivationFlow;
-  setIsActivo(shouldActivate ? true : (a.isActivo ?? true));
-        setImageUri(a.image || null);
-
-        const media = await mediaApi.getByEntidad(id);
-        if (Array.isArray(media.media) && media.media.length > 0) {
-          setIdMedia(media.media[0].idMedia || null);
-        }
-    } catch (err) {
-      const anyErr = err as any;
-      console.error("❌ Error cargando artista:", anyErr?.response?.data || err);
-        Alert.alert("Error", "No se pudo cargar el artista.");
+        const data = await fetchOneArtistFromApi(id);
+        // Si hay prefillName lo uso, sino el nombre original
+        setArtistName(prefillName?.trim() ? String(prefillName) : data.name);
+        setArtistDesc(data.description || "");
+        setInstagramUrl(data.instagramURL || "");
+        setSpotifyUrl(data.spotifyURL || "");
+        setSoundcloudUrl(data.soundcloudURL || "");
+        setSocialId(data.idSocial ?? null);
+        // Si es flujo de activación fuerzo activo
+        setActiveFlag(activationFlow ? true : (data.isActivo ?? true));
+        setImageUri(data.image || null);
+        // Buscar media asociada para permitir borrar
+        try {
+          const media = await mediaApi.getByEntidad(id);
+          if (Array.isArray(media.media) && media.media.length) {
+            setMediaId(media.media[0].idMedia || null);
+          }
+        } catch {}
+      } catch (e) {
+        console.log("Error loading artist", e);
+        Alert.alert("Error", "No se pudo cargar el artista");
       }
     };
+    load();
+  }, [id, prefillName, activationFlow]);
 
-    loadArtist();
-  }, [id]);
-
-  const handleSelectImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets?.length > 0) {
-      const asset = result.assets[0];
-      const fileInfo: any = await FileSystem.getInfoAsync(asset.uri);
-
-      if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
-        Alert.alert("Error", "La imagen supera los 2MB permitidos.");
-        return;
-      }
-
-      setNewImageLocalUri(asset.uri);
-      setImageUri(asset.uri); // actualiza vista previa
+  // Seleccionar imagen de galería
+  const onSelectImage = async () => {
+    const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    if (picked.canceled || !picked.assets?.length) return; // nada elegido
+    const asset = picked.assets[0];
+    const info: any = await FileSystem.getInfoAsync(asset.uri);
+    if (info?.size && info.size > 2 * 1024 * 1024) {
+      Alert.alert("Error", "La imagen supera los 2MB");
+      return;
     }
+    setLocalNewImage(asset.uri);
+    setImageUri(asset.uri); // actualizar vista previa
   };
 
-  const handleDeleteImage = async () => {
-    if (!idMedia) {
-      return Alert.alert("Error", "No se encontró imagen para eliminar.");
+  // Borrar imagen actual en backend (si existe mediaId)
+  const onDeleteImage = async () => {
+    if (!mediaId) {
+      Alert.alert("Error", "No hay imagen para borrar");
+      return;
     }
     try {
-      await mediaApi.delete(idMedia);
+      await mediaApi.delete(mediaId);
       setImageUri(null);
-      setIdMedia(null);
-      Alert.alert("Imagen eliminada correctamente.");
-    } catch (error) {
-      console.error("Error al eliminar imagen:", error);
-      Alert.alert("Error", "No se pudo eliminar la imagen.");
+      setMediaId(null);
+      Alert.alert("Listo", "Imagen eliminada");
+    } catch (e) {
+      console.log("Error deleting image", e);
+      Alert.alert("Error", "No se pudo eliminar la imagen");
     }
   };
 
-  const handleUpdateArtist = async () => {
-    if (!id || id === "undefined" || !name.trim()) {
-      return Alert.alert("Error", "El nombre del artista es obligatorio.");
+  // Guardar cambios / activar
+  const onSave = async () => {
+    if (!id || id === "undefined" || !artistName.trim()) {
+      Alert.alert("Error", "El nombre es obligatorio");
+      return;
     }
-
     try {
-      if (newImageLocalUri) {
-        const fileName = newImageLocalUri.split("/").pop() ?? "foto.jpg";
-        const file: any = {
-          uri: newImageLocalUri,
-          name: fileName,
-          type: "image/jpeg",
-        };
-
-        await mediaApi.upload(id, file, undefined, { compress: true }); // sube la imagen nueva
-        setNewImageLocalUri(null); // limpia estado
+      // Subir nueva imagen si corresponde
+      if (localNewImage) {
+        const fileName = localNewImage.split('/').pop() || 'image.jpg';
+        const file: any = { uri: localNewImage, name: fileName, type: 'image/jpeg' };
+        await mediaApi.upload(id, file, undefined, { compress: true });
+        setLocalNewImage(null);
       }
-
-      const shouldActivate = isActivationFlow;
+      // Actualizar artista en API
       await updateArtistOnApi({
         idArtista: id,
-        name,
-        description,
-        instagramURL,
-        spotifyURL,
-        soundcloudURL,
-        idSocial,
-        isActivo: shouldActivate ? true : isActivo,
+        name: artistName,
+        description: artistDesc,
+        instagramURL: instagramUrl,
+        spotifyURL: spotifyUrl,
+        soundcloudURL: soundcloudUrl,
+        idSocial: socialId,
+        isActivo: activationFlow ? true : activeFlag,
       });
-
-      // Emitir evento global sólo si se activó (o ya estaba activo)
-      // Volver a la pantalla anterior y luego notificar (para que el Alert se muestre allí)
+      // Volver y lanzar evento si se activó
       router.back();
       setTimeout(() => {
-        if (shouldActivate || isActivo === true) {
-          eventBus.emit("artist:activated", { id, name });
+        if (activationFlow || activeFlag) {
+          eventBus.emit('artist:activated', { id, name: artistName });
         } else {
-          // si no fue un flujo de activación, mostramos el aviso local
-          Alert.alert("Éxito", "Artista actualizado correctamente.");
+          Alert.alert('Éxito', 'Artista actualizado');
         }
       }, 250);
     } catch (err: any) {
-      console.error("Error al actualizar artista:", err?.response?.data || err);
-      const msg =
-        typeof err?.response?.data === "string"
-          ? err.response.data
-          : JSON.stringify(err?.response?.data || err, null, 2);
-      Alert.alert("Error al actualizar", msg);
+      console.log('Error updating artist', err?.response?.data || err);
+      const msg = typeof err?.response?.data === 'string' ? err.response.data : 'No se pudo actualizar';
+      Alert.alert('Error', msg);
     }
   };
 
@@ -158,21 +145,22 @@ export default function EditArtistScreen() {
     <SafeAreaView style={styles.container}>
       <Header />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Modificar artista</Text>
+        {/* Título principal */}
+        <Text style={styles.title}>Edit Artist</Text>
 
+        {/* Nombre del artista */}
         <InputText
-          label="Nombre del artista"
-          value={name}
+          label="Artist Name"
+          value={artistName}
           isEditing={true}
           onBeginEdit={() => {}}
-          onChangeText={setName}
-          placeholder="Ingresa el nombre del artista..."
-          containerStyle={{ width: "100%", alignItems: "stretch" }}
-          labelStyle={{ width: "100%", textAlign: "left" }}
-          inputStyle={{ width: "100%" }}
+          onChangeText={setArtistName}
+          placeholder="Enter artist name..."
+          containerStyle={{ width: '100%' }}
         />
 
-        <Text style={styles.sectionLabel}>Foto del artista</Text>
+        {/* Imagen del artista */}
+        <Text style={styles.sectionLabel}>Artist Photo</Text>
         <View style={styles.imageContainer}>
           {imageUri ? (
             <>
@@ -181,13 +169,13 @@ export default function EditArtistScreen() {
                 style={styles.artistImage}
                 onError={() => setImageUri(null)}
               />
-              {idMedia ? (
-                <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteImage}>
-                  <Text style={styles.deleteButtonText}>Eliminar imagen actual</Text>
+              {mediaId ? (
+                <TouchableOpacity style={styles.deleteButton} onPress={onDeleteImage}>
+                  <Text style={styles.deleteButtonText}>Eliminar imagen</Text>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity style={styles.deleteButton} onPress={() => setImageUri(null)}>
-                  <Text style={styles.deleteButtonText}>Quitar vista previa</Text>
+                  <Text style={styles.deleteButtonText}>Eliminar vista previa</Text>
                 </TouchableOpacity>
               )}
             </>
@@ -198,39 +186,37 @@ export default function EditArtistScreen() {
             </View>
           )}
 
-          <TouchableOpacity style={styles.selectImageButton} onPress={handleSelectImage}>
+          <TouchableOpacity style={styles.selectImageButton} onPress={onSelectImage}>
             <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
           </TouchableOpacity>
 
-          <Text style={styles.imageNotice}>
-            Se permiten imágenes JPG, JPEG o PNG. Peso máximo: 2MB.
-          </Text>
+          <Text style={styles.imageNotice}>JPG / PNG hasta 2MB.</Text>
         </View>
 
+        {/* Descripción del artista */}
         <InputDesc
-          label="Información sobre el artista"
-          value={description}
+          label="Informacion del artista"
+          value={artistDesc}
           isEditing={true}
           onBeginEdit={() => {}}
-          onChangeText={setDescription}
+          onChangeText={setArtistDesc}
           autoFocus={false}
-          placeholder="Describe la información del artista, género musical, biografía..."
-          containerStyle={{ width: "100%", alignItems: "stretch" }}
-          labelStyle={{ width: "100%", textAlign: "left" }}
-          inputStyle={{ width: "100%" }}
+          placeholder="Describe artist bio, style, etc..."
+          containerStyle={{ width: '100%' }}
         />
 
         {/* Social URLs with left icons (visual parity with NewArtist) */}
+        {/* Instagram URL */}
         <View style={styles.fieldBlock}>
-          <Text style={styles.sectionLabel}>URL de Instagram del artista</Text>
+          <Text style={styles.sectionLabel}>Instagram URL</Text>
           <View style={styles.iconInputRow}>
             <MaterialCommunityIcons name="instagram" size={18} color={COLORS.textSecondary} style={{ marginHorizontal: 10 }} />
             <TextInput
               style={styles.textInputBare}
-              value={instagramURL}
-              onChangeText={setInstagramURL}
+              value={instagramUrl}
+              onChangeText={setInstagramUrl}
               keyboardType="url"
-              placeholder="https://instagram.com/artista"
+              placeholder="https://instagram.com/artist"
               placeholderTextColor={COLORS.textSecondary}
               autoCapitalize="none"
               autoCorrect={false}
@@ -238,14 +224,15 @@ export default function EditArtistScreen() {
           </View>
         </View>
 
+        {/* SoundCloud URL */}
         <View style={styles.fieldBlock}>
-          <Text style={styles.sectionLabel}>URL de SoundCloud del artista</Text>
+          <Text style={styles.sectionLabel}>SoundCloud URL</Text>
           <View style={styles.iconInputRow}>
             <MaterialCommunityIcons name="soundcloud" size={18} color={COLORS.textSecondary} style={{ marginHorizontal: 10 }} />
             <TextInput
               style={styles.textInputBare}
-              value={soundcloudURL}
-              onChangeText={setSoundcloudURL}
+              value={soundcloudUrl}
+              onChangeText={setSoundcloudUrl}
               keyboardType="url"
               placeholder="https://soundcloud.com/artista"
               placeholderTextColor={COLORS.textSecondary}
@@ -255,14 +242,15 @@ export default function EditArtistScreen() {
           </View>
         </View>
 
+        {/* Spotify URL */}
         <View style={styles.fieldBlock}>
-          <Text style={styles.sectionLabel}>URL de Spotify del artista</Text>
+          <Text style={styles.sectionLabel}>Spotify URL</Text>
           <View style={styles.iconInputRow}>
             <MaterialCommunityIcons name="spotify" size={18} color={COLORS.textSecondary} style={{ marginHorizontal: 10 }} />
             <TextInput
               style={styles.textInputBare}
-              value={spotifyURL}
-              onChangeText={setSpotifyURL}
+              value={spotifyUrl}
+              onChangeText={setSpotifyUrl}
               keyboardType="url"
               placeholder="https://open.spotify.com/artist/..."
               placeholderTextColor={COLORS.textSecondary}
@@ -272,8 +260,9 @@ export default function EditArtistScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.btn} onPress={handleUpdateArtist}>
-          <Text style={styles.btnText}>{isActivationFlow ? 'Activar Artista' : 'Confirmar'}</Text>
+        {/* Botón de guardar / activar */}
+        <TouchableOpacity style={styles.btn} onPress={onSave}>
+          <Text style={styles.btnText}>{activationFlow ? 'Activar artista' : 'Guardar cambios'}</Text>
         </TouchableOpacity>
       </ScrollView>
       <Footer />

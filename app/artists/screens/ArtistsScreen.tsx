@@ -1,7 +1,13 @@
 // src/screens/ArtistsScreens/ArtistsScreen.tsx
 
 import React, { useState, useEffect, useMemo } from "react";
-import { View, ScrollView, Text, ActivityIndicator, StyleSheet } from "react-native";
+import {
+  View,
+  ScrollView,
+  Text,
+  ActivityIndicator,
+  StyleSheet,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, usePathname } from "expo-router";
 import ROUTES from "@/routes";
@@ -19,7 +25,7 @@ import { useAuth } from "@/app/auth/AuthContext";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import SearchBarComponent from "@/components/common/SearchBarComponent";
 
-export default function ArtistasPantalla() {
+export default function ArtistsScreen() {
   const router = useRouter();
   const path = usePathname();
   // Usar helpers del contexto para roles y autenticación
@@ -46,25 +52,27 @@ export default function ArtistasPantalla() {
   const filteredArtists = useMemo<Artist[]>(() => {
     const q = searchText.toLowerCase();
     return artists
-      .filter(a => a.isActivo)
-      .filter(a => a.name.toLowerCase().includes(q));
+      .filter((a) => a.isActivo)
+      .filter((a) => a.name.toLowerCase().includes(q));
   }, [artists, searchText]);
 
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
   const handlePress = (artist: Artist) => {
-    nav.push(router, { pathname: ROUTES.MAIN.ARTISTS.ITEM, params: { id: artist.idArtista } });
+    nav.push(router, {
+      pathname: ROUTES.MAIN.ARTISTS.ITEM,
+      params: { id: artist.idArtista },
+    });
   };
 
   const currentScreen = path.split("/").pop() || "";
-  // Si el usuario es admin, mostrar sólo 'ADM ARTISTAS' seguido de 'ARTISTAS'
-  // Si no, mostrar 'Noticias' y 'Artistas' (como antes)
   const tabs = isAdmin
     ? [
         {
           label: "Administrar artistas",
           route: ROUTES.ADMIN.ARTISTS.MANAGE,
-          isActive: currentScreen === ROUTES.ADMIN.ARTISTS.MANAGE.split("/").pop(),
+          isActive:
+            currentScreen === ROUTES.ADMIN.ARTISTS.MANAGE.split("/").pop(),
         },
         {
           label: "Artistas",
@@ -106,13 +114,11 @@ export default function ArtistasPantalla() {
         ) : (
           <ScrollView contentContainerStyle={styles.scrollContent}>
             {filteredArtists.length === 0 && (
-              <Text style={styles.emptyText}>
-                No se encontraron artistas.
-              </Text>
+              <Text style={styles.emptyText}>No se encontraron artistas.</Text>
             )}
-            {alphabet.map(letter => {
+            {alphabet.map((letter) => {
               const group = filteredArtists.filter(
-                a => a.name.charAt(0).toUpperCase() === letter
+                (a) => a.name.charAt(0).toUpperCase() === letter
               );
               if (!group.length) return null;
 
@@ -127,11 +133,8 @@ export default function ArtistasPantalla() {
                     <View style={styles.letterDivider} />
                   </View>
                   <View style={[styles.cardsRow, rowStyle]}>
-                    {group.map(artist => (
-                      <View
-                        key={artist.idArtista}
-                        style={styles.cardWrapper}
-                      >
+                    {group.map((artist) => (
+                      <View key={artist.idArtista} style={styles.cardWrapper}>
                         <ArtistCard
                           artist={artist}
                           onPress={() => handlePress(artist)}
@@ -161,8 +164,8 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
     backgroundColor: COLORS.cardBg,
-    width: '100%',
-    alignSelf: 'stretch',
+    width: "100%",
+    alignSelf: "stretch",
   },
   searchRow: {
     flexDirection: "row",

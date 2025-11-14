@@ -1,93 +1,91 @@
-// src/screens/admin/NewArtistScreen.tsx
+// Pantalla para crear un nuevo artista
+// Se simplifica la lógica y se usan nombres en inglés
 
 import React, { useState } from "react";
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Image, Alert, TextInput } from "react-native";
+import {
+  ScrollView,
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  Alert,
+  TextInput,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
 import { useRouter } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
+// Componentes de layout
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import {
-  createArtistOnApi,
-  fetchArtistsFromApi,
-} from "@/app/artists/apis/artistApi";
+// API helpers
+import { createArtistOnApi, fetchArtistsFromApi } from "@/app/artists/apis/artistApi";
 import { mediaApi } from "@/app/apis/mediaApi";
+// Estilos globales y entradas
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import InputText from "@/components/common/inputText";
 import InputDesc from "@/components/common/inputDesc";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 
+// Componente principal
 export default function NewArtistScreen() {
   const router = useRouter();
 
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [instagramURL, setInstagramURL] = useState("");
-  const [spotifyURL, setSpotifyURL] = useState("");
-  const [soundcloudURL, setSoundcloudURL] = useState("");
+  // Estados para datos del formulario
+  const [artistName, setArtistName] = useState("");
+  const [artistDesc, setArtistDesc] = useState("");
+  const [instagramUrl, setInstagramUrl] = useState("");
+  const [spotifyUrl, setSpotifyUrl] = useState("");
+  const [soundcloudUrl, setSoundcloudUrl] = useState("");
   const [imageUri, setImageUri] = useState<string | null>(null);
 
-  const handleSelectImage = async () => {
+  // Seleccionar imagen desde la galería
+  const onPickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.9,
     });
-
     if (!result.canceled && result.assets.length > 0) {
-      const asset = result.assets[0];
-      // Tamaño se valida/optimiza en mediaApi.upload (con compresión). Permitimos seleccionar y avisamos luego si falla.
-      setImageUri(asset.uri);
+      setImageUri(result.assets[0].uri);
     }
   };
 
-  const handleDeleteImage = () => {
-    setImageUri(null);
-  };
+  // Quitar imagen seleccionada
+  const onRemoveImage = () => setImageUri(null);
 
-  const handleCreateArtist = async () => {
-    if (!name.trim()) {
-      return Alert.alert("Error", "El nombre del artista es obligatorio.");
+  // Crear artista y subir imagen si corresponde
+  const onSave = async () => {
+    if (!artistName.trim()) {
+      Alert.alert("Error", "El nombre del artista es obligatorio.");
+      return;
     }
-
     try {
+      // Crear el artista
       await createArtistOnApi({
-        name,
-        description,
-        instagramURL,
-        spotifyURL,
-        soundcloudURL,
+        name: artistName,
+        description: artistDesc,
+        instagramURL: instagramUrl,
+        spotifyURL: spotifyUrl,
+        soundcloudURL: soundcloudUrl,
       });
 
-      // Obtener el último artista creado (por nombre)
-      const artistas = await fetchArtistsFromApi();
-      const creado = artistas.find((a) => a.name === name);
-      if (!creado) throw new Error("No se pudo identificar el artista creado.");
-
-      // Subir imagen si existe
-      if (imageUri) {
-        const fileName = imageUri.split("/").pop() ?? "image.jpg";
+      // Buscar el artista recién creado por nombre
+      const all = await fetchArtistsFromApi();
+      const created = all.find((a) => a.name === artistName);
+      if (created && imageUri) {
+        const fileName = imageUri.split("/").pop() || "image.jpg";
         const fileType = fileName.endsWith(".png") ? "image/png" : "image/jpeg";
-
-        const file: any = {
-          uri: imageUri,
-          name: fileName,
-          type: fileType,
-        };
-
-  await mediaApi.upload(creado.idArtista, file, undefined, { compress: true });
+        const file: any = { uri: imageUri, name: fileName, type: fileType };
+        await mediaApi.upload(created.idArtista, file, undefined, { compress: true });
       }
 
       Alert.alert("Éxito", "Artista creado correctamente.");
       router.back();
     } catch (err: any) {
-      console.error("Error al crear artista:", err);
-      const msg =
-        typeof err?.response?.data === "string"
-          ? err.response.data
-          : JSON.stringify(err?.response?.data || err, null, 2);
-      Alert.alert("Error al crear artista", msg);
+      // Manejo de error simple
+      console.error("Error creando artista", err);
+      Alert.alert("Error al crear artista", "Revisá los datos ingresados.");
     }
   };
 
@@ -95,14 +93,16 @@ export default function NewArtistScreen() {
     <SafeAreaView style={styles.container}>
       <Header title="EventApp" />
       <ScrollView contentContainerStyle={styles.content}>
+        {/* Título principal */}
         <Text style={styles.title}>Ingresar nuevo artista</Text>
 
+        {/* Bloque de imagen */}
         <Text style={styles.sectionLabel}>Foto del artista</Text>
         <View style={styles.imageContainer}>
           {imageUri ? (
             <>
               <Image source={{ uri: imageUri }} style={styles.artistImage} />
-              <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteImage}>
+              <TouchableOpacity style={styles.deleteButton} onPress={onRemoveImage}>
                 <Text style={styles.deleteButtonText}>Eliminar imagen</Text>
               </TouchableOpacity>
             </>
@@ -112,30 +112,31 @@ export default function NewArtistScreen() {
               <Text style={styles.previewText}>Vista previa</Text>
             </View>
           )}
-
-          <TouchableOpacity style={styles.selectImageButton} onPress={handleSelectImage}>
+          <TouchableOpacity style={styles.selectImageButton} onPress={onPickImage}>
             <Text style={styles.selectImageButtonText}>Seleccionar imagen</Text>
           </TouchableOpacity>
         </View>
 
+        {/* Nombre del artista */}
         <InputText
           label="Nombre del artista"
-          value={name}
+          value={artistName}
           isEditing={true}
           onBeginEdit={() => {}}
-          onChangeText={setName}
+          onChangeText={setArtistName}
           placeholder="Ingresa el nombre del artista..."
           containerStyle={{ width: "100%", alignItems: "stretch" }}
           labelStyle={{ width: "100%", textAlign: "left" }}
           inputStyle={{ width: "100%" }}
         />
 
+        {/* Descripción del artista */}
         <InputDesc
           label="Información del artista"
-          value={description}
+          value={artistDesc}
           isEditing={true}
           onBeginEdit={() => {}}
-          onChangeText={setDescription}
+          onChangeText={setArtistDesc}
           autoFocus={false}
           placeholder="Describe la información del artista, género musical, biografía..."
           containerStyle={{ width: "100%", alignItems: "stretch" }}
@@ -143,15 +144,15 @@ export default function NewArtistScreen() {
           inputStyle={{ width: "100%" }}
         />
 
-        {/* Social URLs with left icons */}
+        {/* URLs sociales */}
         <View style={styles.fieldBlock}>
           <Text style={styles.sectionLabel}>URL de Instagram del artista</Text>
           <View style={styles.iconInputRow}>
             <MaterialCommunityIcons name="instagram" size={18} color={COLORS.textSecondary} style={{ marginHorizontal: 10 }} />
             <TextInput
               style={styles.textInputBare}
-              value={instagramURL}
-              onChangeText={setInstagramURL}
+              value={instagramUrl}
+              onChangeText={setInstagramUrl}
               keyboardType="url"
               placeholder="https://instagram.com/artista"
               placeholderTextColor={COLORS.textSecondary}
@@ -167,8 +168,8 @@ export default function NewArtistScreen() {
             <MaterialCommunityIcons name="soundcloud" size={18} color={COLORS.textSecondary} style={{ marginHorizontal: 10 }} />
             <TextInput
               style={styles.textInputBare}
-              value={soundcloudURL}
-              onChangeText={setSoundcloudURL}
+              value={soundcloudUrl}
+              onChangeText={setSoundcloudUrl}
               keyboardType="url"
               placeholder="https://soundcloud.com/artista"
               placeholderTextColor={COLORS.textSecondary}
@@ -184,8 +185,8 @@ export default function NewArtistScreen() {
             <MaterialCommunityIcons name="spotify" size={18} color={COLORS.textSecondary} style={{ marginHorizontal: 10 }} />
             <TextInput
               style={styles.textInputBare}
-              value={spotifyURL}
-              onChangeText={setSpotifyURL}
+              value={spotifyUrl}
+              onChangeText={setSpotifyUrl}
               keyboardType="url"
               placeholder="https://open.spotify.com/artist/..."
               placeholderTextColor={COLORS.textSecondary}
@@ -195,7 +196,8 @@ export default function NewArtistScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.btn} onPress={handleCreateArtist}>
+        {/* Botón para guardar */}
+        <TouchableOpacity style={styles.btn} onPress={onSave}>
           <Text style={styles.btnText}>Crear artista</Text>
         </TouchableOpacity>
       </ScrollView>

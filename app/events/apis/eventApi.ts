@@ -1,3 +1,7 @@
+import { EventItem } from "@/app/events/types/EventItem";
+import { apiClient, login } from "@/app/apis/apiConfig";
+import { mediaApi } from "@/app/apis/mediaApi";
+
 /**
  * Devuelve los flags isAfter y isLGBT de un evento dado (EventItemWithExtras)
  */
@@ -7,9 +11,6 @@ export function getEventFlags(event: EventItemWithExtras): { isAfter: boolean; i
     isLGBT: Boolean(event.isLGBT)
   };
 }
-import { EventItem } from "@/app/events/types/EventItem";
-import { apiClient, login } from "@/app/apis/apiConfig";
-import { mediaApi } from "@/app/apis/mediaApi";
 
 /** ---------- constantes de estados ---------- */
 export const ESTADO_CODES = {
@@ -90,31 +91,31 @@ export interface ApiGenero {
   cdGenero: number;
   dsGenero: string;
 }
-let _genresCache: ApiGenero[] | null = null;
-let _genreMapCache: Map<number, string> | null = null;
+// Caches simples en memoria
+let genresCache: ApiGenero[] | null = null;
+let genreMapCache: Map<number, string> | null = null;
 
 export async function fetchGenres(): Promise<ApiGenero[]> {
   try {
-    if (_genresCache) return _genresCache;
+    if (genresCache) return genresCache;
     const token = await login().catch(() => null);
     const resp = await apiClient.get<ApiGenero[]>("/v1/Evento/GetGeneros", {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
     const list = Array.isArray(resp.data) ? resp.data : [];
-    _genresCache = list;
-    _genreMapCache = new Map(list.map((g) => [g.cdGenero, g.dsGenero]));
+    genresCache = list;
+    genreMapCache = new Map(list.map((g) => [g.cdGenero, g.dsGenero]));
     return list;
   } catch (e) {
-    console.warn("[eventApi] fetchGenres error:", e);
-    _genresCache = [];
-    _genreMapCache = new Map();
+    genresCache = [];
+    genreMapCache = new Map();
     return [];
   }
 }
 async function getGenreMap(): Promise<Map<number, string>> {
-  if (_genreMapCache) return _genreMapCache;
+  if (genreMapCache) return genreMapCache;
   await fetchGenres();
-  return _genreMapCache ?? new Map();
+  return genreMapCache ?? new Map();
 }
 
 /** ---------- estados de evento ---------- */
@@ -132,7 +133,6 @@ export async function fetchEventStates(): Promise<ApiEstadoEvento[]> {
     );
     return Array.isArray(resp.data) ? resp.data : [];
   } catch (e) {
-    console.warn("[eventApi] fetchEventStates error:", e);
     return [];
   }
 }
@@ -165,7 +165,8 @@ export type EventItemWithExtras = EventItem & {
   __raw?: any;
 };
 
-async function normalizeEvento(e: RawEvento): Promise<EventItemWithExtras> {
+// Normaliza un evento crudo del backend a la forma usada en la app
+async function normalizeEvent(e: RawEvento): Promise<EventItemWithExtras> {
   const genreMap = await getGenreMap();
 
   const inicioIso =
@@ -291,7 +292,7 @@ export async function fetchEventsByEstado(
     }
   );
   const list: RawEvento[] = resp.data?.eventos ?? [];
-  const normalized = await Promise.all(list.map(normalizeEvento));
+  const normalized = await Promise.all(list.map(normalizeEvent));
   return normalized;
 }
 
@@ -310,10 +311,7 @@ export async function fetchEventsByEstados(
         const arr = await fetchEventsByEstado(st);
         acc.push(...arr);
       } catch (e: any) {
-        console.warn(
-          `[fetchEventsByEstados] Estado=${st} ->`,
-          e?.response?.status || e?.message
-        );
+        // Ignorar errores por estado específico y continuar con los demás
       }
     })
   );
@@ -361,11 +359,9 @@ export async function fetchEventById(
       const resp = await fn();
       const data = resp?.data?.evento ?? resp?.data;
       if (!data) continue;
-      return await normalizeEvento(data);
+      return await normalizeEvent(data);
     } catch (e: any) {
       const status = e?.response?.status;
-      if (status && status !== 404)
-        console.warn("[fetchEventById] intento fallido:", status);
       continue;
     }
   }
@@ -388,9 +384,7 @@ export async function fetchEventById(
           String(e?.idEvento ?? "").toLowerCase() === id.toLowerCase()
       );
     if (found) return found;
-  } catch (e) {
-    console.warn("[fetchEventById] fallback estados falló:", e);
-  }
+  } catch (e) {}
 
   const err: any = new Error("Evento no encontrado.");
   err.code = "NOT_FOUND";
@@ -476,18 +470,6 @@ export async function createEvent(body: any): Promise<string> {
     { headers }
   );
 
-  // Only log the created idEvento to avoid noisy output in production-like logs
-  try {
-    const anyData: any = resp?.data;
-    const id =
-      (anyData && (anyData.idEvento ?? anyData.IdEvento ?? anyData.evento?.idEvento ?? anyData.evento?.IdEvento)) ||
-      (typeof anyData === "string" && anyData)
-      || null;
-    if (id) {
-      try { console.info('[createEvent] idEvento:', String(id)); } catch {}
-    }
-  } catch {}
-
   const data = resp?.data;
 
   // La API puede devolver directamente el id como string
@@ -501,10 +483,7 @@ export async function createEvent(body: any): Promise<string> {
     (data as any)?.evento?.IdEvento ??
     "";
 
-  if (!id) {
-    console.warn("[createEvent] respuesta sin id, data:", data);
-    throw new Error("La API no devolvió el id del evento.");
-  }
+  if (!id) throw new Error("La API no devolvió el id del evento.");
   return String(id);
 }
 
@@ -640,8 +619,7 @@ export async function updateEvent(
         await apiClient.put("/v1/Evento/UpdateEvento", fullBody, { headers });
         return;
       } catch (err) {
-        console.warn('[updateEvent] intento directo UpdateEvento con body completo falló, continuando intentos:', String((err as any)?.message || err));
-        // continue to generic attempts
+        // continuar con intentos genéricos
       }
     }
     // fechas-aware: if payload includes fechas, some backends require full body as well
@@ -697,8 +675,7 @@ export async function updateEvent(
         return;
       }
     } catch (err) {
-      console.warn('[updateEvent] intento fechas-aware con body completo falló, continuando intentos:', String((err as any)?.message || err));
-      // continue to generic attempts
+      // continuar con intentos genéricos
     }
   } catch {
     // no-op: fall back to generic attempts below
@@ -763,23 +740,9 @@ export async function updateEvent(
       continue;
     }
   }
-  // build a diagnostic message including HTTP status / body if available
-  const status = lastErr?.response?.status ?? lastErr?.status;
-  const respData = lastErr?.response?.data ?? lastErr?.response?.data?.toString?.() ?? lastErr?.toString?.();
-  const baseMsg = (lastErr?.response?.data && (lastErr?.response?.data?.message || lastErr?.response?.data)) || lastErr?.message || "No se pudo actualizar el evento (endpoint desconocido).";
-  const diag = {
-    attemptedEndpoints,
-    lastStatus: status,
-    lastResponseData: respData,
-    lastErrorMessage: String(lastErr?.message || lastErr),
-  };
-  try {
-    console.warn("[updateEvent] todos los endpoints intentados fallaron:", JSON.stringify(diag, null, 2));
-  } catch {
-    console.warn("[updateEvent] todos los endpoints intentados fallaron: (no se pudo stringify diag)", diag);
-  }
-  const msg = `${String(baseMsg)} | diagnostics: ${JSON.stringify(diag)}`;
-  throw new Error(msg);
+  // Lanzar un error simple con el último mensaje disponible
+  const baseMsg = (lastErr?.response?.data && (lastErr?.response?.data?.message || lastErr?.response?.data)) || lastErr?.message || "No se pudo actualizar el evento.";
+  throw new Error(String(baseMsg));
 }
 
 /**
