@@ -14,3 +14,4 @@ export interface Artist {
   // Campos opcionales que vienen desde el API
   idSocial?: string | null;
 }
+
