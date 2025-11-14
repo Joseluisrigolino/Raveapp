@@ -402,7 +402,10 @@ function BuyTicketScreenContent() {
             const qp = parsed?.queryParams || {};
             const idParam = qp?.id;
             const idPagoMP = qp?.idPagoMP || qp?.payment_id || qp?.collection_id || qp?.paymentId || qp?.paymentid;
-            try { console.log('[BuyTicketScreen] extracted params:', { idParam, idPagoMP }); } catch {}
+            try {
+              console.log('[BuyTicketScreen] extracted params:', { idParam, idPagoMP });
+              if (qp?.payment_id) console.log('[BuyTicketScreen] payment_id (raw):', qp.payment_id);
+            } catch {}
             const params: any = {};
             if (idParam) params.id = String(idParam);
             if (idPagoMP) params.idPagoMP = String(idPagoMP);

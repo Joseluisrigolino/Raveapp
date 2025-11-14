@@ -13,13 +13,39 @@ import ROUTES from "@/routes";
 
 export default function VueltaCompraPantalla() {
   const router = useRouter();
-  const { id, idPagoMP } = useLocalSearchParams<{ id?: string; idPagoMP?: string }>();
+  const {
+    id,
+    idPagoMP,
+    payment_id,
+    collection_id,
+    paymentId,
+    paymentid,
+  } = useLocalSearchParams<{
+    id?: string;
+    idPagoMP?: string;
+    payment_id?: string;
+    collection_id?: string;
+    paymentId?: string;
+    paymentid?: string;
+  }>();
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const pagoId = idPagoMP ? String(idPagoMP) : undefined;
+        const pagoId = (idPagoMP || payment_id || collection_id || paymentId || paymentid)
+          ? String(idPagoMP || payment_id || collection_id || paymentId || paymentid)
+          : undefined;
+        try {
+          console.log('[VueltaCompraPantalla] payment_id candidates:', {
+            idPagoMP,
+            payment_id,
+            collection_id,
+            paymentId,
+            paymentid,
+            chosen: pagoId,
+          });
+        } catch {}
         if (!pagoId) return;
         setProcessing(true);
         // Confirmar pago en backend (actualiza estados automáticamente)
@@ -33,7 +59,7 @@ export default function VueltaCompraPantalla() {
         setProcessing(false);
       }
     })();
-  }, [idPagoMP]);
+  }, [idPagoMP, payment_id, collection_id, paymentId, paymentid]);
 
   const handleGoToTickets = () => {
     router.replace(ROUTES.MAIN.TICKETS.MENU);

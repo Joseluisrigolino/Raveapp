@@ -174,7 +174,8 @@ export default function ManageEventsScreen() {
 
   const handleTicketsSold = (eventId: string | number) => {
     const id = String(eventId);
-    nav.push(router, { pathname: ROUTES.OWNER.TICKET_SOLD, params: { id } });
+    // Ir directo al reporte de ventas del evento seleccionado
+    nav.push(router, { pathname: ROUTES.OWNER.TICKET_SOLD_EVENT, params: { id } });
   };
 
   const handleModify = (eventId: string | number) => {

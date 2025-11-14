@@ -17,7 +17,8 @@ import { useAuth } from "@/app/auth/AuthContext";
 import { getProfile, updateUsuario } from "@/app/auth/userHelpers";
 import { mediaApi } from "@/app/apis/mediaApi";
 import { apiClient } from "@/app/apis/apiConfig";
-import InputText from "@/components/common/inputText";
+import { sendConfirmEmail } from "@/app/apis/mailsApi";
+// InputText ya no se usa en esta pantalla; se replica UI deshabilitada por sección
 
 // Georef
 import {
@@ -44,6 +45,15 @@ export default function UserProfileEditScreen() {
   const [pendingPhotoUri, setPendingPhotoUri] = useState<string | null>(null);
   const [previousProfileImage, setPreviousProfileImage] = useState<string>("");
   const [savingPhoto, setSavingPhoto] = useState(false);
+  // Verificación de correo
+  const [sendingVerification, setSendingVerification] = useState(false);
+  // Modal de verificación enviada
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+
+  // Editar sección completa "Tus datos"
+  const [editDatos, setEditDatos] = useState(false);
+  // Editar sección completa "Tu domicilio"
+  const [editDomicilio, setEditDomicilio] = useState(false);
 
   // Edit modes
   const [editMode, setEditMode] = useState<Record<string, boolean>>({
@@ -65,6 +75,7 @@ export default function UserProfileEditScreen() {
     lastName: "",
     dni: "",
     phone: "",
+    cbu: "",
     email: "",
     birthdate: "",
     address: {
@@ -172,6 +183,7 @@ export default function UserProfileEditScreen() {
           lastName: u.apellido,
           dni: u.dni,
           phone: u.telefono,
+          cbu: u.cbu || "",
           email: u.correo,
           birthdate: u.dtNacimiento?.split?.("T")?.[0] ?? "",
           address: {
@@ -521,7 +533,7 @@ export default function UserProfileEditScreen() {
       correo: userData.email.trim(),
       dni: userData.dni.trim(),
       telefono: userData.phone?.trim() || "",
-      cbu: apiUser.cbu || "",
+      cbu: userData.cbu?.trim() || "",
       nombreFantasia: apiUser.nombreFantasia || "",
       bio: apiUser.bio || "",
       dtNacimiento: formattedBirthdate,
@@ -678,54 +690,103 @@ export default function UserProfileEditScreen() {
 
         {/* Card: Tus datos */}
         <View style={styles.sectionCard}>
-          <View style={styles.sectionTitleRow}>
-            <MaterialIcons name="person" size={18} color={COLORS.textPrimary} />
+          <View style={[styles.sectionTitleRow, { justifyContent: 'space-between' }]}>
             <Text style={styles.sectionCardTitle}>Tus datos</Text>
+            <TouchableOpacity onPress={() => setEditDatos((v) => !v)} accessibilityLabel="Editar tus datos">
+              <MaterialIcons name={editDatos ? "check" : "edit"} size={20} color={COLORS.textPrimary} />
+            </TouchableOpacity>
           </View>
 
-        {/* Mi perfil */}
-        <InputText
-          label="Nombre"
+        {/* Nombre */}
+        <Text style={styles.addressSubtitle}>Nombre</Text>
+        <TextInput
+          style={[styles.inputFull, !editDatos && styles.inputDisabled]}
+          editable={editDatos}
           value={userData.firstName}
-          isEditing={!!editMode["firstName"]}
-          onBeginEdit={() => setEditMode((m) => ({ ...m, firstName: true }))}
           onChangeText={(t) => onChange("firstName", t)}
+          placeholder="Nombre"
         />
-        <InputText
-          label="Apellido"
+        {/* Apellido */}
+        <Text style={styles.addressSubtitle}>Apellido</Text>
+        <TextInput
+          style={[styles.inputFull, !editDatos && styles.inputDisabled]}
+          editable={editDatos}
           value={userData.lastName}
-          isEditing={!!editMode["lastName"]}
-          onBeginEdit={() => setEditMode((m) => ({ ...m, lastName: true }))}
           onChangeText={(t) => onChange("lastName", t)}
+          placeholder="Apellido"
         />
-        <InputText
-          label="DNI"
-          value={userData.dni}
-          isEditing={!!editMode["dni"]}
-          onBeginEdit={() => setEditMode((m) => ({ ...m, dni: true }))}
+        {/* DNI */}
+        <Text style={styles.addressSubtitle}>DNI</Text>
+        <TextInput
+          style={[styles.inputFull, !editDatos && styles.inputDisabled]}
+          editable={editDatos}
           keyboardType="numeric"
+          value={userData.dni}
           onChangeText={(t) => onChange("dni", t)}
+          placeholder="DNI"
         />
-        <InputText
-          label="Teléfono"
-          value={userData.phone}
-          isEditing={!!editMode["phone"]}
-          onBeginEdit={() => setEditMode((m) => ({ ...m, phone: true }))}
+        {/* Teléfono */}
+        <Text style={styles.addressSubtitle}>Teléfono</Text>
+        <TextInput
+          style={[styles.inputFull, !editDatos && styles.inputDisabled]}
+          editable={editDatos}
           keyboardType="phone-pad"
+          value={userData.phone}
           onChangeText={(t) => onChange("phone", t)}
+          placeholder="Teléfono"
         />
-        <InputText
-          label="Correo"
-          value={userData.email}
-          isEditing={!!editMode["email"]}
-          onBeginEdit={() => setEditMode((m) => ({ ...m, email: true }))}
-          keyboardType="email-address"
-          onChangeText={(t) => onChange("email", t)}
-        />
+        {/* Correo con botón Verificar cuando bio === "0" */}
+        <Text style={styles.addressSubtitle}>Correo electrónico</Text>
+        <View style={styles.rowInputWithButton}>
+          <TextInput
+            style={[styles.inputFull, { flex: 1, marginBottom: 0 }, !editDatos && styles.inputDisabled]}
+            editable={editDatos}
+            keyboardType="email-address"
+            value={userData.email}
+            onChangeText={(t) => onChange("email", t)}
+            placeholder="Correo"
+          />
+          {apiUser?.bio === "0" ? (
+            <TouchableOpacity
+              style={[styles.verifyBtn, sendingVerification && { opacity: 0.6 }]}
+              disabled={sendingVerification}
+              onPress={async () => {
+                if (!userData.email?.trim()) {
+                  Alert.alert("Error", "El correo está vacío.");
+                  return;
+                }
+                const fullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.firstName || 'Usuario';
+                setSendingVerification(true);
+                try {
+                  await sendConfirmEmail({
+                    to: userData.email.trim(),
+                    name: fullName,
+                    confirmationUrl: "https://raveapp.com.ar/confirmacion-mail",
+                  });
+                  // Mostrar popup de confirmación
+                  setShowVerifyModal(true);
+                } catch (e: any) {
+                  console.error("Error enviando verificación:", e?.response?.data || e);
+                  Alert.alert("Error", e?.response?.data?.title || "No se pudo enviar el correo de verificación.");
+                } finally {
+                  setSendingVerification(false);
+                }
+              }}
+            >
+              <Text style={styles.verifyBtnText}>{sendingVerification ? "Enviando..." : "Verificar"}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        {apiUser?.bio === "0" ? (
+          <View style={[styles.verifyHintRow, { width: '100%' }]}>
+            <MaterialIcons name="error-outline" size={14} color={COLORS.textSecondary} />
+            <Text style={styles.verifyHint}>Correo no verificado</Text>
+          </View>
+        ) : null}
         
         {/* Fecha de nacimiento con selectores */}
         <Text style={styles.addressSubtitle}>Fecha de nacimiento</Text>
-        {editMode["birthdate"] ? (
+        {editDatos ? (
           <>
             <View style={styles.dateContainer}>
               {/* Selector de Día */}
@@ -820,31 +881,28 @@ export default function UserProfileEditScreen() {
             </View>
           </>
         ) : (
-          <View style={styles.rowNoLabel}>
-            <Text style={[styles.valueText, { flex: 1 }]}>{
-              userData.birthdate ? 
-                (() => {
-                  const date = new Date(userData.birthdate + 'T00:00:00');
-                  return date.toLocaleDateString('es-ES', {
-                    day: '2-digit',
-                    month: '2-digit', 
-                    year: 'numeric'
-                  });
-                })() 
-                : "–"
-            }</Text>
-            <TouchableOpacity
-              onPress={() => toggle("birthdate")}
-              style={styles.icon}
-            >
-              <MaterialIcons
-                name="edit"
-                size={20}
-                color={COLORS.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
+          <TextInput
+            style={[styles.inputFull, styles.inputDisabled]}
+            editable={false}
+            value={(() => {
+              if (!userData.birthdate) return "";
+              const date = new Date(userData.birthdate + 'T00:00:00');
+              return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            })()}
+            placeholder="dd/mm/aaaa"
+          />
         )}
+
+        {/* CBU (movido debajo de fecha de nacimiento) */}
+        <Text style={styles.addressSubtitle}>CBU</Text>
+        <TextInput
+          style={[styles.inputFull, !editDatos && styles.inputDisabled]}
+          editable={editDatos}
+          keyboardType="numeric"
+          value={userData.cbu}
+          onChangeText={(t) => onChange("cbu", t)}
+          placeholder="CBU"
+        />
 
           {/* Cambiar contraseña (gris dentro de la card) */}
           <TouchableOpacity style={styles.resetContainerCard} onPress={openPwdModal}>
@@ -855,14 +913,29 @@ export default function UserProfileEditScreen() {
 
         {/* Card: Tu domicilio */}
         <View style={styles.sectionCard}>
-          <View style={styles.sectionTitleRow}>
-            <MaterialIcons name="home" size={18} color={COLORS.textPrimary} />
+          <View style={[styles.sectionTitleRow, { justifyContent: 'space-between' }]}>
             <Text style={styles.sectionCardTitle}>Tu domicilio</Text>
+            <TouchableOpacity
+              onPress={() => setEditDomicilio((prev) => {
+                const nv = !prev;
+                setEditMode((m) => ({
+                  ...m,
+                  ["address.province"]: nv,
+                  ["address.municipality"]: nv && provinceId !== '02',
+                  ["address.locality"]: nv,
+                  ["address.street"]: nv,
+                }));
+                return nv;
+              })}
+              accessibilityLabel="Editar domicilio"
+            >
+              <MaterialIcons name={editDomicilio ? "check" : "edit"} size={20} color={COLORS.textPrimary} />
+            </TouchableOpacity>
           </View>
 
         {/* Provincia */}
         <Text style={styles.addressSubtitle}>Provincia</Text>
-        {editMode["address.province"] ? (
+        {editDomicilio ? (
           <>
             <TouchableOpacity
               style={styles.dropdownButton}
@@ -891,28 +964,16 @@ export default function UserProfileEditScreen() {
             )}
           </>
         ) : (
-          <View style={styles.rowNoLabel}>
-            <Text style={[styles.valueText, { flex: 1 }]}>
-              {userData.address.province || "–"}
-            </Text>
-            <TouchableOpacity
-              onPress={() => toggle("address.province")}
-              style={styles.icon}
-            >
-              <MaterialIcons
-                name="edit"
-                size={20}
-                color={COLORS.textSecondary}
-              />
-            </TouchableOpacity>
-    </View>
+          <View style={[styles.dropdownButton, styles.inputDisabled]}>
+            <Text style={[styles.dropdownText, { opacity: 0.8 }]}>{userData.address.province || "–"}</Text>
+          </View>
   )}
 
         {/* Municipio: ocultar por completo si la provincia seleccionada es CABA (02) */}
         {provinceId !== '02' && (
           <>
             <Text style={styles.addressSubtitle}>Municipio</Text>
-            {editMode["address.municipality"] ? (
+            {editDomicilio ? (
               <>
                 <TouchableOpacity
                   style={[styles.dropdownButton, (!provinceId) && { opacity: 0.5 }, addressErrors.municipality && styles.errorBorder]}
@@ -944,20 +1005,8 @@ export default function UserProfileEditScreen() {
                 )}
               </>
             ) : (
-              <View style={styles.rowNoLabel}>
-                <Text style={[styles.valueText, { flex: 1 }]}>
-                  {userData.address.municipality || "–"}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => toggle("address.municipality")}
-                  style={styles.icon}
-                >
-                  <MaterialIcons
-                    name="edit"
-                    size={20}
-                    color={COLORS.textSecondary}
-                  />
-                </TouchableOpacity>
+              <View style={[styles.dropdownButton, styles.inputDisabled]}>
+                <Text style={[styles.dropdownText, { opacity: 0.8 }]}>{userData.address.municipality || "–"}</Text>
               </View>
             )}
           </>
@@ -965,7 +1014,7 @@ export default function UserProfileEditScreen() {
 
         {/* Localidad */}
         <Text style={styles.addressSubtitle}>Localidad</Text>
-        {editMode["address.locality"] ? (
+        {editDomicilio ? (
           <>
             <TouchableOpacity
               style={[styles.dropdownButton, (!municipalityId && provinceId !== '02') && { opacity: 0.5 }]}
@@ -1000,26 +1049,14 @@ export default function UserProfileEditScreen() {
             )}
           </>
         ) : (
-          <View style={styles.rowNoLabel}>
-            <Text style={[styles.valueText, { flex: 1 }]}>
-              {userData.address.locality || "–"}
-            </Text>
-            <TouchableOpacity
-              onPress={() => toggle("address.locality")}
-              style={styles.icon}
-            >
-              <MaterialIcons
-                name="edit"
-                size={20}
-                color={COLORS.textSecondary}
-              />
-            </TouchableOpacity>
+          <View style={[styles.dropdownButton, styles.inputDisabled]}>
+            <Text style={[styles.dropdownText, { opacity: 0.8 }]}>{userData.address.locality || "–"}</Text>
           </View>
         )}
 
         {/* Dirección */}
         <Text style={styles.addressSubtitle}>Dirección</Text>
-        {editMode["address.street"] ? (
+        {editDomicilio ? (
           <TextInput
             style={[styles.inputFull, addressErrors.street && styles.errorBorder]}
             placeholder="Ej: Av. Rivadavia 1234 5°B"
@@ -1027,21 +1064,12 @@ export default function UserProfileEditScreen() {
             onChangeText={(v) => onAddressChange("street", v)}
           />
         ) : (
-          <View style={styles.rowNoLabel}>
-            <Text style={[styles.valueText, { flex: 1 }]}>
-              {userData.address.street?.trim() || "–"}
-            </Text>
-            <TouchableOpacity
-              onPress={() => toggle("address.street")}
-              style={styles.icon}
-            >
-              <MaterialIcons
-                name="edit"
-                size={20}
-                color={COLORS.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
+          <TextInput
+            style={[styles.inputFull, styles.inputDisabled]}
+            editable={false}
+            value={userData.address.street?.trim() || ""}
+            placeholder="Dirección"
+          />
         )}
 
   </View>
@@ -1069,63 +1097,41 @@ export default function UserProfileEditScreen() {
               <Text style={styles.fullButtonSecondaryText}>Cerrar sesión</Text>
             </View>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.fullButton, styles.fullButtonDangerOutline]}
+            onPress={openDeleteModal}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <MaterialIcons name="delete-outline" size={18} color={'#ef4444'} />
+              <Text style={styles.fullButtonDangerText}>Eliminar cuenta</Text>
+            </View>
+          </TouchableOpacity>
         </View>
-
-        {/* Eliminar cuenta (link) */}
-        <TouchableOpacity onPress={openDeleteModal} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <MaterialIcons name="delete-outline" size={18} color={COLORS.textSecondary} />
-          <Text style={styles.deleteLink}>Eliminar cuenta</Text>
-        </TouchableOpacity>
-        {/* Hacer administrador (assign role 1) */}
-        <TouchableOpacity onPress={async () => {
-          if (!apiUser) return;
-          Alert.alert(
-            "Confirmar",
-            "¿Querés otorgar permiso de administrador a este usuario?",
-            [
-              { text: "Cancelar", style: "cancel" },
-              { text: "Confirmar", onPress: async () => {
-                try {
-                  const newRoles = Array.isArray(apiUser.cdRoles) ? [...apiUser.cdRoles] : [];
-                  if (!newRoles.includes(1)) newRoles.push(1);
-                  const adminPayload = {
-                    idUsuario: apiUser.idUsuario,
-                    nombre: apiUser.nombre || userData.firstName || "",
-                    apellido: apiUser.apellido || userData.lastName || "",
-                    correo: apiUser.correo || userData.email || "",
-                    dni: apiUser.dni || userData.dni || "",
-                    telefono: apiUser.telefono || userData.phone || "",
-                    cbu: apiUser.cbu || "",
-                    nombreFantasia: apiUser.nombreFantasia || "",
-                    bio: apiUser.bio || "",
-                    dtNacimiento: apiUser.dtNacimiento || null,
-                    domicilio: apiUser.domicilio || {},
-                    cdRoles: newRoles,
-                    socials: {
-                      idSocial: apiUser.socials?.idSocial ?? "",
-                      mdInstagram: apiUser.socials?.mdInstagram ?? "",
-                      mdSpotify: apiUser.socials?.mdSpotify ?? "",
-                      mdSoundcloud: apiUser.socials?.mdSoundcloud ?? "",
-                    }
-                  };
-                  await updateUsuario(adminPayload);
-                  Alert.alert("Listo", "El usuario ahora tiene rol de administrador.");
-                  // refrescar perfil
-                  if (user) {
-                    const updatedProfile = await getProfile(user.username);
-                    setApiUser(updatedProfile);
-                  }
-                } catch (e: any) {
-                  console.error("Error asignando admin:", e);
-                  Alert.alert("Error", e?.response?.data?.title || "No se pudo asignar rol de administrador.");
-                }
-              } }
-            ]
-          );
-        }}>
-          <Text style={[styles.deleteLink, { textDecorationLine: 'none' }]}>Hacer administrador</Text>
-        </TouchableOpacity>
+        {/* Hacer administrador eliminado por solicitud */}
       </ScrollView>
+
+      {/* ===== MODAL VERIFICACIÓN DE CORREO ENVIADA ===== */}
+      <Modal
+        transparent
+        animationType="fade"
+        visible={showVerifyModal}
+        onRequestClose={() => setShowVerifyModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, styles.verifyModalCard]}>
+            <Text style={styles.verifyModalTitle}>Correo enviado</Text>
+            <Text style={styles.verifyModalMessage}>
+              Te enviamos un correo electrónico para que puedas verificar tu dirección.
+            </Text>
+            <TouchableOpacity
+              style={styles.verifyModalBtn}
+              onPress={() => setShowVerifyModal(false)}
+            >
+              <Text style={styles.verifyModalBtnText}>Aceptar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* ===== MODAL CAMBIO DE CONTRASEÑA ===== */}
       <Modal
@@ -1321,7 +1327,7 @@ const styles = StyleSheet.create({
   icon: { padding: 4 },
 
   inputFull: {
-    width: "90%",
+    width: "100%",
     marginBottom: 14,
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -1341,6 +1347,18 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     // Elevation para Android
     elevation: 2,
+  },
+  inputDisabled: {
+    backgroundColor: "#f3f4f6",
+    color: "#6b7280",
+  },
+
+  rowInputWithButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
   },
 
   errorBorder: {
@@ -1395,8 +1413,37 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
+  // Verificación de correo
+  verifyRow: {
+    width: '90%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: -8,
+    marginBottom: 8,
+  },
+  verifyHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: -4,
+    marginBottom: 8,
+  },
+  verifyHint: { color: COLORS.textSecondary },
+  verifyBtn: {
+    backgroundColor: '#E9E5FF',
+    paddingHorizontal: 16,
+    height: 56,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e6e9ef',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyBtnText: { color: COLORS.primary, fontWeight: '700' },
+
   dropdownButton: {
-    width: "90%",
+    width: "100%",
     backgroundColor: "#fff",
     borderRadius: 12,
     borderColor: "#d1d5db",
@@ -1419,7 +1466,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   dropdownContainer: {
-    width: "90%",
+    width: "100%",
     backgroundColor: "#fff",
     borderRadius: 8,
     maxHeight: 200,
@@ -1448,7 +1495,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 16,
     gap: 8,
-    width: "90%",
+    width: "100%",
   },
   selectorContainer: {
     flex: 1,
@@ -1558,6 +1605,16 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.button,
   },
+  fullButtonDangerOutline: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ef4444',
+  },
+  fullButtonDangerText: {
+    color: '#ef4444',
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
+  },
 
   deleteLink: {
     marginTop: 16,
@@ -1657,4 +1714,35 @@ const styles = StyleSheet.create({
   deleteCancel: { backgroundColor: "#E9E5FF", marginLeft: 8 },
   deleteConfirmText: { color: "#fff", fontFamily: FONTS.subTitleMedium },
   deleteCancelText: { color: COLORS.primary, fontFamily: FONTS.subTitleMedium },
+  // Popup verificación correo
+  verifyModalCard: {
+    alignItems: 'center',
+  },
+  verifyModalTitle: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.subTitle,
+    color: COLORS.primary,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  verifyModalMessage: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  verifyModalBtn: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: RADIUS.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyModalBtnText: {
+    color: '#fff',
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
+  },
 });

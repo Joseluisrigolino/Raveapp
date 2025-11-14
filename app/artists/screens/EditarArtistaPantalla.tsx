@@ -32,6 +32,7 @@ export default function EditArtistScreen() {
   const [idSocial, setIdSocial] = useState<string | null>(null);
   const [isActivo, setIsActivo] = useState(true);
   const [newImageLocalUri, setNewImageLocalUri] = useState<string | null>(null);
+  const isActivationFlow = String(activate || "0") === "1";
 
   useEffect(() => {
     if (!id || id === "undefined") {
@@ -41,16 +42,16 @@ export default function EditArtistScreen() {
 
     const loadArtist = async () => {
       try {
-        const a = await fetchOneArtistFromApi(id);
-        setName(prefillName && String(prefillName).trim().length ? String(prefillName) : a.name);
+  const a = await fetchOneArtistFromApi(id);
+  setName(prefillName && String(prefillName).trim().length ? String(prefillName) : a.name);
         setDescription(a.description || "");
         setInstagramURL(a.instagramURL || "");
         setSpotifyURL(a.spotifyURL || "");
         setSoundcloudURL(a.soundcloudURL || "");
         setIdSocial(a.idSocial ?? null);
         // Si venimos con activate=1, forzar previsualización como activo
-        const shouldActivate = String(activate || "0") === "1";
-        setIsActivo(shouldActivate ? true : (a.isActivo ?? true));
+  const shouldActivate = isActivationFlow;
+  setIsActivo(shouldActivate ? true : (a.isActivo ?? true));
         setImageUri(a.image || null);
 
         const media = await mediaApi.getByEntidad(id);
@@ -120,7 +121,7 @@ export default function EditArtistScreen() {
         setNewImageLocalUri(null); // limpia estado
       }
 
-      const shouldActivate = String(activate || "0") === "1";
+      const shouldActivate = isActivationFlow;
       await updateArtistOnApi({
         idArtista: id,
         name,
@@ -272,7 +273,7 @@ export default function EditArtistScreen() {
         </View>
 
         <TouchableOpacity style={styles.btn} onPress={handleUpdateArtist}>
-          <Text style={styles.btnText}>Confirmar</Text>
+          <Text style={styles.btnText}>{isActivationFlow ? 'Activar Artista' : 'Confirmar'}</Text>
         </TouchableOpacity>
       </ScrollView>
       <Footer />

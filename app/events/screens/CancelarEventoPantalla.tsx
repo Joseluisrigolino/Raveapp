@@ -15,7 +15,8 @@ import {
   EventItemWithExtras,
   cancelEvent,
 } from "@/app/events/apis/eventApi";
-import { getTicketsSoldDataById } from "@/utils/owners/ownerEventTicketsSoldHelper";
+import { useAuth } from "@/app/auth/AuthContext";
+import { fetchReporteVentasEvento, ReporteVentasEvento } from "@/app/events/apis/entradaApi";
 
 type TicketSoldInfo = { type: string; quantity: number; price: number };
 type OwnerEventCancelItem = {
@@ -32,6 +33,9 @@ export default function CancelEventScreen() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
   const id = rawId ? decodeURIComponent(String(rawId)) : "";
+  const { user, hasRole } = useAuth();
+  const baseUserId = String((user as any)?.id ?? (user as any)?.idUsuario ?? "");
+  const isAdmin = !!hasRole?.("admin");
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -52,7 +56,29 @@ export default function CancelEventScreen() {
         const ev = await fetchEventById(id);
         if (!ev) throw new Error("Evento no encontrado.");
 
-        const mapped: OwnerEventCancelItem = mapToCancel(ev);
+        // Determinar organizador para el reporte (igual que en pantalla de reporte)
+        const pickOwnerId = (e: any): string | null => {
+          return (
+            (e?.ownerId && String(e.ownerId)) ||
+            (e?.__raw?.propietario?.idUsuario && String(e.__raw.propietario.idUsuario)) ||
+            (e?.__raw?.usuario?.idUsuario && String(e.__raw.usuario.idUsuario)) ||
+            null
+          );
+        };
+
+        const orgForReport = isAdmin ? pickOwnerId(ev) || baseUserId : baseUserId;
+
+        // Intentar traer el reporte real de ventas por evento
+        let report: ReporteVentasEvento | null = null;
+        if (orgForReport) {
+          try {
+            report = await fetchReporteVentasEvento(String(id), String(orgForReport));
+          } catch (e) {
+            report = null;
+          }
+        }
+
+        const mapped: OwnerEventCancelItem = mapToCancel(ev, report || undefined);
         if (mounted) setCancelData(mapped);
       } catch (e: any) {
         if (mounted) setErrorMsg(e?.message || "No se pudo obtener el evento.");
@@ -66,31 +92,51 @@ export default function CancelEventScreen() {
     };
   }, [id]);
 
-  const mapToCancel = (ev: EventItemWithExtras): OwnerEventCancelItem => ({
-    id: Number(String(ev.id)) || 0,
-    eventName: ev.title || "Evento",
-    imageUrl: ev.imageUrl || "",
-    dateText: ev.date || (Array.isArray(ev.fechas) && ev.fechas[0]?.inicio ? new Date(ev.fechas[0].inicio).toLocaleDateString() : ""),
-    // intentar obtener datos de ventas por ID desde helper local (mock o real)
-    ticketsSold: (() => {
-      try {
-        const numericId = Number(String(ev.id));
-        const sold = isFinite(numericId) ? getTicketsSoldDataById(numericId) : null;
-        if (sold && Array.isArray(sold.rows)) {
-          return sold.rows.map((r) => ({ type: r.type, quantity: Number(r.quantity || 0), price: Number(r.price || 0) }));
+  const mapToCancel = (ev: EventItemWithExtras, rep?: ReporteVentasEvento): OwnerEventCancelItem => {
+    // Aggregate real sold entries from report if available
+    const aggregateFromReport = (report: ReporteVentasEvento | undefined) => {
+      if (!report || !Array.isArray(report.dias)) return { rows: [] as TicketSoldInfo[], total: 0 };
+      type Acc = { qty: number; subtotal: number };
+      const byType = new Map<string, Acc>();
+      for (const d of report.dias) {
+        for (const it of d.items || []) {
+          // Saltar fila TOTAL si existiera
+          const label = String(it?.tipo || it?.entrada || "");
+          if (label.trim().toUpperCase() === "TOTAL") continue;
+          const derCantidad = Number(it?.cantidadVendida ?? 0);
+          const unit = Number(it?.precioUnitario ?? 0);
+          // Preferir subtotal exacto si viene; si no, qty * unit
+          const subtotal = typeof it?.subtotal === "number" && isFinite(it.subtotal)
+            ? Number(it.subtotal)
+            : derCantidad * unit;
+          const acc = byType.get(label) || { qty: 0, subtotal: 0 };
+          acc.qty += derCantidad;
+          acc.subtotal += subtotal;
+          byType.set(label, acc);
         }
-      } catch {}
-      return [];
-    })(),
-    totalRefund: (() => {
-      try {
-        const numericId = Number(String(ev.id));
-        const sold = isFinite(numericId) ? getTicketsSoldDataById(numericId) : null;
-        if (sold) return Number(sold.totalRevenue || sold.rows?.reduce((s, r) => s + (Number(r.total || (r.price || 0) * (r.quantity || 0))), 0) || 0);
-      } catch {}
-      return 0;
-    })(),
-  });
+      }
+      const rows: TicketSoldInfo[] = Array.from(byType.entries()).map(([type, acc]) => {
+        const price = acc.qty > 0 ? acc.subtotal / acc.qty : 0; // promedio cuando hay múltiples precios
+        return { type, quantity: acc.qty, price };
+      });
+      const total = Array.from(byType.values()).reduce((s, v) => s + v.subtotal, 0);
+      return { rows, total };
+    };
+
+    const agg = aggregateFromReport(rep);
+    return {
+      id: Number(String(ev.id)) || 0,
+      eventName: ev.title || "Evento",
+      imageUrl: ev.imageUrl || "",
+      dateText:
+        ev.date ||
+        (Array.isArray(ev.fechas) && ev.fechas[0]?.inicio
+          ? new Date(ev.fechas[0].inicio).toLocaleDateString()
+          : ""),
+      ticketsSold: agg.rows,
+      totalRefund: agg.total,
+    };
+  };
 
   const backendMsg = (e: any) =>
     e?.response?.data?.message ||
@@ -186,28 +232,44 @@ export default function CancelEventScreen() {
             </View>
           </View>
 
-          {/* Tickets sold list */}
-          <View style={[styles.ticketListContainer, { marginTop: 12 }]}>
-            <Text style={styles.ticketSubtitle}>Se reembolsarán un total de {cancelData.ticketsSold.reduce((s, r) => s + r.quantity, 0)} entradas:</Text>
-            {cancelData.ticketsSold.length === 0 ? (
-              <Text style={styles.ticketItem}>(No se encontraron entradas vendidas para este evento)</Text>
-            ) : (
-              cancelData.ticketsSold.map((t, i) => (
-                <View key={i} style={styles.ticketRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.ticketRowTitle}>{t.quantity} entradas <Text style={styles.ticketRowType}>{t.type}</Text></Text>
-                    <Text style={styles.ticketRowSubtitle}>de ${Number(t.price).toLocaleString()} c/u</Text>
+          {/* Tickets sold section (real data). If none, show previous banner/card */}
+          {(() => {
+            const totalQty = cancelData.ticketsSold.reduce((s, r) => s + r.quantity, 0);
+            if (totalQty === 0) {
+              return (
+                <View style={[styles.infoCard, { marginTop: 12 }]}> 
+                  <View style={styles.infoIconBox}>
+                    <MaterialCommunityIcons name="information-outline" size={22} color={COLORS.textSecondary} />
                   </View>
-                  <Text style={styles.ticketRowAmount}>${(t.quantity * t.price).toLocaleString()}</Text>
+                  <View style={styles.infoTextCol}>
+                    <Text style={styles.infoCardTitle}>Sin entradas vendidas</Text>
+                    <Text style={styles.infoCardBody}>
+                      No se encontraron entradas vendidas para este evento. Al cancelarlo, no se realizarán reembolsos.
+                    </Text>
+                  </View>
                 </View>
-              ))
-            )}
-            <View style={styles.ticketDivider} />
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total a devolver:</Text>
-              <Text style={styles.totalAmount}>${cancelData.totalRefund.toLocaleString()}</Text>
-            </View>
-          </View>
+              );
+            }
+            return (
+              <View style={[styles.ticketListContainer, { marginTop: 12 }]}>
+                <Text style={styles.ticketSubtitle}>Se reembolsarán un total de {totalQty} entradas:</Text>
+                {cancelData.ticketsSold.map((t, i) => (
+                  <View key={i} style={styles.ticketRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.ticketRowTitle}>{t.quantity} entradas <Text style={styles.ticketRowType}>{t.type}</Text></Text>
+                      <Text style={styles.ticketRowSubtitle}>de ${Number(t.price).toLocaleString()} c/u</Text>
+                    </View>
+                    <Text style={styles.ticketRowAmount}>${(t.quantity * t.price).toLocaleString()}</Text>
+                  </View>
+                ))}
+                <View style={styles.ticketDivider} />
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>Total a devolver:</Text>
+                  <Text style={styles.totalAmount}>${cancelData.totalRefund.toLocaleString()}</Text>
+                </View>
+              </View>
+            );
+          })()}
 
           {/* Motivo */}
           <View style={styles.formGroup}>

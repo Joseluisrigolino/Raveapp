@@ -585,14 +585,234 @@ export async function createPago(body: CrearPagoBody): Promise<CrearPagoResponse
  */
 export async function confirmarPagoMP(idPagoMP: string): Promise<void> {
   const token = await login();
-  await apiClient.post("/v1/Pago/PagoMP", null, {
-    params: { idPagoMP },
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } as const;
+
+  // Algunos backends esperan el parámetro en PascalCase (IdPagoMP) o como payment_id.
+  const queryVariants: Array<Record<string, any>> = [
+    { IdPagoMP: idPagoMP },
+    { idPagoMP },
+    { payment_id: idPagoMP },
+  ];
+  const bodyVariants: Array<Record<string, any> | null> = [
+    null,
+    { IdPagoMP: idPagoMP },
+    { idPagoMP },
+    { payment_id: idPagoMP },
+  ];
+
+  const attempts: Array<() => Promise<any>> = [];
+
+  const pushPost = (url: string) => {
+    for (const body of bodyVariants) {
+      attempts.push(() => apiClient.post(url, body, { headers, params: undefined }));
+    }
+    for (const params of queryVariants) {
+      attempts.push(() => apiClient.post(url, null, { headers, params }));
+    }
+  };
+  const pushGet = (url: string) => {
+    for (const params of queryVariants) {
+      attempts.push(() => apiClient.get(url, { headers, params }));
+    }
+  };
+
+  // Endpoint principal y variantes comunes
+  pushPost("/v1/Pago/PagoMP");
+  pushGet("/v1/Pago/PagoMP");
+  pushPost("/v1/Pago/ConfirmarPagoMP");
+  pushGet("/v1/Pago/ConfirmarPagoMP");
+  pushPost("/v1/Pago/ConfirmarMP");
+  pushGet("/v1/Pago/ConfirmarMP");
+  pushPost("/v1/Pago/Confirmar");
+  pushGet("/v1/Pago/Confirmar");
+  // Algunos back usan Callback/Notificación
+  pushPost("/v1/Pago/CallbackMP");
+  pushGet("/v1/Pago/CallbackMP");
+
+  let lastErr: any = null;
+  for (const fn of attempts) {
+    try {
+      const resp = await fn();
+      // Consideramos 2xx como éxito; el backend debería actualizar estados
+      const status = (resp as any)?.status ?? 200;
+      if (status >= 200 && status < 300) return;
+    } catch (err: any) {
+      lastErr = err;
+      const st = (err as any)?.response?.status;
+      // seguir intentando ante 400/404/405/422/5xx, ya que puede ser endpoint/forma distinta
+      if (![400,401,403,404,405,409,415,422,500,502,503,504].includes(Number(st))) {
+        // error inesperado: continuar igual con otros intentos
+      }
+      continue;
+    }
+  }
+  // Si ninguno funcionó, arrojar último error con más contexto
+  try {
+    console.warn("[entradaApi.confirmarPagoMP] todos los intentos fallaron para idPagoMP=", idPagoMP);
+  } catch {}
+  throw lastErr || new Error("No se pudo confirmar el pago con Mercado Pago.");
 }
 
 // Los métodos manuales de actualización de estado por compra/entrada se eliminaron;
 // ahora el backend realiza el cambio de estado al confirmar el pago mediante PagoMP.
+
+/** =========================================================================
+ *                               REEMBOLSOS
+ *  - POST /v1/Pago/Reembolso?idCompra=<id>
+ *  - POST /v1/Pago/ReembolsoMasivo?idEvento=<id>
+ *  Tolerante a variantes de casing y método (POST/GET) según backend.
+ *  ======================================================================= */
+
+export type ReembolsoResponse = { ok: boolean; data?: any; mensaje?: string };
+
+/** Solicita reembolso por una compra específica. */
+export async function solicitarReembolso(idCompra: string): Promise<ReembolsoResponse> {
+  const token = await login();
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } as const;
+
+  const queryVariants: Array<Record<string, any>> = [
+    { idCompra },
+    { IdCompra: idCompra },
+    { id_compra: idCompra },
+    { IDCOMPRA: idCompra },
+    { compraId: idCompra },
+  ];
+  const bodyVariants: Array<Record<string, any> | null> = [
+    null,
+    { idCompra },
+    { IdCompra: idCompra },
+    { compraId: idCompra },
+    { IDCOMPRA: idCompra },
+  ];
+
+  const attempts: Array<() => Promise<any>> = [];
+
+  const pushPost = (url: string) => {
+    for (const q of queryVariants) {
+      attempts.push(() => apiClient.post(url, null, { params: q, headers }));
+      for (const b of bodyVariants) {
+        attempts.push(() => apiClient.post(url, b, { params: q, headers }));
+      }
+    }
+  };
+  const pushGet = (url: string) => {
+    for (const q of queryVariants) {
+      attempts.push(() => apiClient.get(url, { params: q, headers }));
+    }
+  };
+  const pushPut = (url: string) => {
+    for (const q of queryVariants) {
+      for (const b of bodyVariants) {
+        attempts.push(() => apiClient.put(url, b, { params: q, headers }));
+      }
+    }
+  };
+  const pushPathVariants = (base: string) => {
+    // /v1/Pago/Reembolso/{id}
+    attempts.push(() => apiClient.post(`${base}/${encodeURIComponent(idCompra)}`, null, { headers }));
+    attempts.push(() => apiClient.get(`${base}/${encodeURIComponent(idCompra)}`, { headers }));
+    attempts.push(() => apiClient.put(`${base}/${encodeURIComponent(idCompra)}`, { idCompra }, { headers }));
+  };
+
+  pushPost("/v1/Pago/Reembolso");
+  pushGet("/v1/Pago/Reembolso");
+  pushPut("/v1/Pago/Reembolso");
+
+  // variantes adicionales observadas en implementaciones de backend
+  pushPost("/v1/Pago/SolicitarReembolso");
+  pushGet("/v1/Pago/SolicitarReembolso");
+  pushPut("/v1/Pago/SolicitarReembolso");
+  pushPost("/v1/Pago/ReembolsoCompra");
+  pushGet("/v1/Pago/ReembolsoCompra");
+  pushPut("/v1/Pago/ReembolsoCompra");
+  pushPathVariants("/v1/Pago/Reembolso");
+  pushPathVariants("/v1/Pago/SolicitarReembolso");
+
+  let lastErr: any = null;
+  const attempted: Array<{ index: number; method?: string; url?: string; params?: any; body?: any; status?: any; message?: any }> = [];
+  for (const fn of attempts) {
+    try {
+      const { data } = await fn();
+      return { ok: true, data };
+    } catch (e: any) {
+      lastErr = e;
+      try {
+        attempted.push({
+          index: attempted.length,
+          method: e?.config?.method,
+          url: e?.config?.url,
+          params: e?.config?.params,
+          body: e?.config?.data,
+          status: e?.response?.status,
+          message: e?.response?.data || e?.message,
+        });
+      } catch {}
+      continue;
+    }
+  }
+  const mensajeBase =
+    lastErr?.response?.data?.message ||
+    lastErr?.response?.data?.Message ||
+    lastErr?.message ||
+    "No se pudo solicitar el reembolso.";
+  try {
+    console.warn("[solicitarReembolso] Falló todas las variantes", { idCompra, attempts: attempted.slice(0, 8) });
+  } catch {}
+  const mensajeDetallado = `${mensajeBase} (intentos: ${attempted.length}, último status: ${attempted.at(-1)?.status || 'desconocido'})`;
+  return { ok: false, mensaje: mensajeDetallado };
+}
+
+/** Solicita reembolso masivo por evento. */
+export async function solicitarReembolsoMasivo(idEvento: string): Promise<ReembolsoResponse> {
+  const token = await login();
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } as const;
+
+  const queryVariants: Array<Record<string, any>> = [
+    { idEvento },
+    { IdEvento: idEvento },
+    { id_evento: idEvento },
+  ];
+  const bodyVariants: Array<Record<string, any> | null> = [
+    null,
+    { idEvento },
+    { IdEvento: idEvento },
+  ];
+
+  const attempts: Array<() => Promise<any>> = [];
+  const pushPost = (url: string) => {
+    for (const q of queryVariants) {
+      attempts.push(() => apiClient.post(url, null, { params: q, headers }));
+      for (const b of bodyVariants) {
+        attempts.push(() => apiClient.post(url, b, { params: q, headers }));
+      }
+    }
+  };
+  const pushGet = (url: string) => {
+    for (const q of queryVariants) {
+      attempts.push(() => apiClient.get(url, { params: q, headers }));
+    }
+  };
+
+  pushPost("/v1/Pago/ReembolsoMasivo");
+  pushGet("/v1/Pago/ReembolsoMasivo");
+
+  let lastErr: any = null;
+  for (const fn of attempts) {
+    try {
+      const { data } = await fn();
+      return { ok: true, data };
+    } catch (e: any) {
+      lastErr = e;
+      continue;
+    }
+  }
+  const mensaje =
+    lastErr?.response?.data?.message ||
+    lastErr?.response?.data?.Message ||
+    lastErr?.message ||
+    "No se pudo solicitar el reembolso masivo.";
+  return { ok: false, mensaje };
+}
 
 /** =========================================================================
  *                 RESOLUCIÓN DE CÓDIGOS DE TIPOS

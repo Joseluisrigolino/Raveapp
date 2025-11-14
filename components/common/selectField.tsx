@@ -1,5 +1,8 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, TextStyle } from "react-native";
+// Import sin tipos: definimos declaración mínima para evitar error TS si no existe @types
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 
@@ -28,7 +31,9 @@ export default function SelectField({
   valueStyle,
   fieldStyle,
 }: SelectFieldProps) {
-  const showPlaceholder = !value || !value.trim();
+  // Defender contra valores no string (p.ej. null, undefined, números)
+  const safeValue = typeof value === 'string' ? value : (value != null ? String(value) : '');
+  const showPlaceholder = !safeValue || !safeValue.trim();
 
   return (
     <View style={[styles.wrapper, containerStyle]}>
@@ -47,7 +52,7 @@ export default function SelectField({
           ]}
           numberOfLines={1}
         >
-          {showPlaceholder ? placeholder || "Seleccioná una opción" : value}
+          {showPlaceholder ? placeholder || "Seleccioná una opción" : safeValue}
         </Text>
         <MaterialCommunityIcons
           name={isOpen ? "chevron-up" : "chevron-down"}

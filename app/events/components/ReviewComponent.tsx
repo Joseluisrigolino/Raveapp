@@ -15,6 +15,23 @@ export default function ReviewComponent({ reviews }: ReviewComponentProps) {
   const totalRatings = reviews.reduce((acc, r) => acc + r.rating, 0);
   const avgRating = reviews.length > 0 ? totalRatings / reviews.length : 0;
 
+  const formatFechaEs = (iso?: string): string => {
+    try {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      const dia = d.getDate();
+      const mes = meses[d.getMonth()];
+      const anio = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      const showHora = !(hh === '00' && min === '00');
+      const fechaTxt = `${dia} de ${mes} de ${anio}`;
+      return showHora ? `${fechaTxt} - ${hh}:${min}` : fechaTxt;
+    } catch { return ''; }
+  };
+
   const renderStars = (rating: number) => {
     const stars = [];
     for (let i = 1; i <= 5; i++) {
@@ -50,7 +67,10 @@ export default function ReviewComponent({ reviews }: ReviewComponentProps) {
             <View style={styles.reviewHeader}>
               <Text style={styles.user}>{review.user}</Text>
               {renderStars(review.rating)}
-              <Text style={styles.daysAgo}>Hace {review.daysAgo} días</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 'auto' }}>
+                <MaterialCommunityIcons name="calendar-blank-outline" size={14} color={COLORS.textSecondary} style={{ marginRight: 4 }} />
+                <Text style={styles.daysAgo}>{formatFechaEs(review.dateISO) || (typeof review.daysAgo === 'number' ? `Hace ${review.daysAgo} días` : '-')}</Text>
+              </View>
             </View>
             <Text style={styles.comment}>{review.comment}</Text>
           </View>

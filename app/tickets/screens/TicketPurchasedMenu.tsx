@@ -130,7 +130,39 @@ function TicketsPurchasedMenuContent() {
           );
           return fid;
         };
-        const mapped: TicketPurchasedMenuItem[] = list.map((r: any, idx) => {
+        // Ordenar por fecha de compra descendente (últimas compradas primero).
+        // Prioriza dtInsert provisto por la API; si no, intenta variantes comunes.
+        const parseDate = (v: any): number => {
+          if (!v) return 0;
+            const s = String(v);
+            const d = new Date(s);
+            const t = d.getTime();
+            return isFinite(t) ? t : 0;
+        };
+        const withIndex = list.map((r: any, i: number) => ({ r, i }));
+        withIndex.sort((a, b) => {
+          const ar = a.r;
+          const br = b.r;
+          // Buscar posibles campos de fecha/hora de compra
+          const aTs = parseDate(
+            ar?.dtInsert || ar?.DtInsert || ar?.dt_insert || ar?.compra?.dtInsert ||
+            ar?.fechaCompra || ar?.compraFecha || ar?.fecha ||
+            ar?.createdAt || ar?.created_at || ar?.creado ||
+            ar?.purchaseDate || ar?.purchasedAt || ar?.purchased_at
+          );
+          const bTs = parseDate(
+            br?.dtInsert || br?.DtInsert || br?.dt_insert || br?.compra?.dtInsert ||
+            br?.fechaCompra || br?.compraFecha || br?.fecha ||
+            br?.createdAt || br?.created_at || br?.creado ||
+            br?.purchaseDate || br?.purchasedAt || br?.purchased_at
+          );
+          // Descendente: más reciente primero
+          if (bTs !== aTs) return bTs - aTs;
+          // fallback: mantener orden original si no hay timestamp
+          return a.i - b.i;
+        });
+
+        const mapped: TicketPurchasedMenuItem[] = withIndex.map(({ r }, idx) => {
           const compraId = getCompraId(r);
           const eid = getEventId(r);
           const fid = getFiestaId(r);
@@ -239,9 +271,9 @@ function TicketsPurchasedMenuContent() {
     const aggregated: any[] = [];
     let autoId = 1;
     for (const key of Object.keys(groups)) {
-      const list = groups[key];
-      const first = list[0];
-      const count = list.length;
+      const listGroup = groups[key];
+      const first = listGroup[0];
+      const count = listGroup.length;
       aggregated.push({
         ...first,
         id: autoId++,
@@ -319,8 +351,13 @@ function TicketsPurchasedMenuContent() {
           <View style={styles.containerCards}>
             {sortedTickets.map((item) => {
               const anyItem: any = item as any;
-              const showReviewBtn = controlledMatch(anyItem?.estadoLabel) && anyItem?.eventId;
-              const fiestaId = anyItem?.fiestaId ? String(anyItem.fiestaId) : undefined;
+              // Fiesta ID normalizado (solo si existe y no está vacío)
+              const fiestaIdRaw = typeof anyItem?.fiestaId !== 'undefined' && anyItem?.fiestaId !== null
+                ? String(anyItem.fiestaId).trim()
+                : '';
+              const fiestaId = fiestaIdRaw || undefined;
+              // Mostrar botón reseña SOLO si la entrada está controlada y existe un idFiesta válido
+              const showReviewBtn = controlledMatch(anyItem?.estadoLabel) && !!fiestaIdRaw;
               const hasReview = fiestaId ? userReviewsSet.has(fiestaId) : false;
               const footer = showReviewBtn ? (
                 <TouchableOpacity

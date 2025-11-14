@@ -366,7 +366,26 @@ export default function EventScreen() {
     } catch { return null; }
   };
 
-  const displayDate = useMemo(() => { return eventData?.date || formatFechaRango(fechas) || ""; }, [eventData?.date, fechas]);
+  // Formato completo: "Jueves, 11 de Diciembre, 2025"
+  const formatFullDateEs = (iso?: string | null): string => {
+    if (!iso) return '';
+    const d = new Date(String(iso));
+    if (isNaN(d.getTime())) return '';
+    const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const diaSemana = dias[d.getDay()];
+    const dia = String(d.getDate()).padStart(2,'0');
+    const mes = meses[d.getMonth()];
+    const anio = d.getFullYear();
+    return `${diaSemana}, ${dia} de ${mes}, ${anio}`;
+  };
+  const displayDate = useMemo(() => {
+    // Prioridad: primera fecha de evento con inicio ISO;
+    const firstInicio = Array.isArray((eventData as any)?.fechas) && (eventData as any).fechas.length
+      ? (eventData as any).fechas[0]?.inicio
+      : undefined;
+    return formatFullDateEs(firstInicio) || formatFullDateEs(eventData?.date) || formatFechaRango(fechas) || '';
+  }, [eventData?.date, (eventData as any)?.fechas, fechas]);
   const displayTime = useMemo(() => { return eventData?.timeRange || ""; }, [eventData?.timeRange]);
 
   const getArtistName = (a: any): string => a?.nombreArtistico || a?.name || a?.nombre || (typeof a === "string" ? a : "");
@@ -444,6 +463,7 @@ export default function EventScreen() {
             favBusy={favBusy}
             onToggleFavorite={toggleFavorite}
             showFavorite={!hasRole("admin")}
+            dateText={displayDate}
           />
           {/* Géneros */}
           <View style={styles.card}>
@@ -476,7 +496,7 @@ export default function EventScreen() {
                 if (h === 0) h = 12; // 12 AM/PM
                 return `${pad(h)}:${pad(m)} ${ampm}`;
               };
-              const fechaStr = validInicio ? `${pad(inicioDate.getDate())}/${pad(inicioDate.getMonth() + 1)}/${inicioDate.getFullYear()}` : '';
+              const fechaStr = validInicio ? formatFullDateEs(f.inicio) : '';
               const horaInicioStr = validInicio ? formatTime12(inicioDate) : '';
               const horaFinStr = validFin ? formatTime12(finDate) : '';
               const rangoHora = horaInicioStr && horaFinStr ? `${horaInicioStr} - ${horaFinStr}` : horaInicioStr || horaFinStr || '';
@@ -526,9 +546,12 @@ export default function EventScreen() {
           <ModalArtistas artistas={eventData.artistas} visible={showArtistsModal} onClose={() => setShowArtistsModal(false)} />
           <SeccionEntradas fechas={fechas} entradasPorFecha={entradasPorFecha} loadingEntradas={loadingEntradas} selectedTickets={selectedTickets} setTicketQty={setTicketQty} subtotal={subtotal} noEntradasAvailable={noEntradasAvailable} onBuy={handleBuyPress} isAdmin={hasRole("admin")} />
           <View style={styles.mediaSection}><ReproductorSoundCloud soundCloudUrl={soundCloudUrl} /><ReproductorYouTube youTubeEmbedUrl={youTubeEmbedUrl} /></View>
-          {(eventData?.id || idFiestaResolved) && (
-            <ResenasDelEvento idFiesta={String(idFiestaResolved || eventData?.id)} limit={6} />
-          )}
+          {/* Sección de reseñas: solo mostrar si el evento tiene idFiesta real (no usar idEvento como fallback) */}
+          {(() => {
+            const idFiestaFinal = String(idFiestaResolved || '').trim();
+            if (!idFiestaFinal) return null; // si no hay idFiesta -> no se renderiza
+            return <ResenasDelEvento idFiesta={idFiestaFinal} limit={6} />;
+          })()}
         </ScrollView>
         <Footer />
       </SafeAreaView>

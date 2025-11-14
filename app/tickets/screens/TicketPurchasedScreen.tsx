@@ -1,6 +1,6 @@
 // app/main/TicketsScreens/TicketPurchasedScreen.tsx
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { ScrollView, Image, Text, StyleSheet, TouchableOpacity, View, ActivityIndicator, Dimensions, Linking, Alert, Modal, TextInput } from "react-native";
+import { ScrollView, Image, Text, StyleSheet, TouchableOpacity, View, ActivityIndicator, Dimensions, Linking, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import QRCode from "react-native-qrcode-svg";
@@ -14,7 +14,8 @@ import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import { fetchEventById, EventItemWithExtras } from "@/app/events/apis/eventApi";
 import { getEntradasUsuario } from "@/app/auth/userHelpers";
-import { getTipoMap } from "@/app/events/apis/entradaApi";
+import { getTipoMap, solicitarReembolso } from "@/app/events/apis/entradaApi";
+import { mailsApi, buildCancellationEmailBody } from "@/app/apis/mailsApi";
 import { mediaApi } from "@/app/apis/mediaApi";
 import { useAuth } from "@/app/auth/AuthContext";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
@@ -38,6 +39,8 @@ type UiUserEntry = {
   estadoCd?: number;
   estadoDs?: string;
   idFiesta?: string; // identificador de fiesta para reseñas
+  compraId?: string; // idCompra asociado
+  dtInsert?: string; // fecha/hora de compra
 };
 
 function TicketPurchasedScreenContent() {
@@ -58,6 +61,14 @@ function TicketPurchasedScreenContent() {
   const [userReview, setUserReview] = useState<Review | null>(null);
   const [readOnlyReview, setReadOnlyReview] = useState(false);
   const [reviewLoaded, setReviewLoaded] = useState(false);
+
+  // Botón de arrepentimiento (cancelar compra)
+  const [showRefund, setShowRefund] = useState(false);
+  const [refundChecked, setRefundChecked] = useState(false);
+  const [refundBlockedReason, setRefundBlockedReason] = useState<string | null>(null);
+  const [refundSubmitting, setRefundSubmitting] = useState(false);
+  const [showRefundSuccess, setShowRefundSuccess] = useState(false);
+  const [refundAmount, setRefundAmount] = useState<number | null>(null);
 
   const userIdForReview: string | null =
     (user as any)?.id ??
@@ -250,6 +261,8 @@ function TicketPurchasedScreenContent() {
   useEffect(() => {
     if (!openReview) return;
     if (!reviewLoaded) return; // esperar a conocer si existe reseña
+    // No abrir si no hay idFiesta válido
+    if (!fiestaIdForReview) return;
     if (openReview && typeof openReview === 'string') {
       const has = !!userReview;
       if (has) {
@@ -316,7 +329,7 @@ function TicketPurchasedScreenContent() {
     Linking.openURL(url);
   };
 
-  // Formateador de fecha legible en español (ej: 28 Marzo 2025)
+  // Formateador de fecha legible en español (ej: Jueves, 11 de Diciembre, 2025)
   const formatDateEs = (raw: string | undefined | null): string => {
     const s = String(raw ?? '').trim();
     if (!s) return '';
@@ -328,16 +341,17 @@ function TicketPurchasedScreenContent() {
       const d = m[1].padStart(2, '0');
       const mo = m[2].padStart(2, '0');
       const y = m[3];
-      tryList.push(`${y}-${mo}-${d}T12:00:00Z`);
+      tryList.push(`${y}-${mo}-${d}T12:00:00`);
     }
     for (const cand of tryList) {
       const dt = new Date(cand);
       if (!isNaN(dt.getTime())) {
-        const dia = dt.getUTCDate();
+        const diaSemana = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][dt.getDay()];
+        const dia = dt.getDate().toString().padStart(2, '0');
         const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-        const mes = meses[dt.getUTCMonth()];
-        const anio = dt.getUTCFullYear();
-        return `${dia} ${mes} ${anio}`;
+        const mes = meses[dt.getMonth()];
+        const anio = dt.getFullYear();
+        return `${diaSemana}, ${dia} de ${mes}, ${anio}`;
       }
     }
     return s;
@@ -388,6 +402,25 @@ function TicketPurchasedScreenContent() {
             const idc = r?.idCompra ?? r?.IdCompra ?? r?.compraId ?? r?.purchaseId ?? r?.id_compra ?? r?.compra?.idCompra ?? r?.pago?.idCompra;
             const s = String(idc ?? "").trim();
             return s ? s : null;
+          };
+          // Fecha de inserción/compra (dtInsert) en formatos posibles
+          const getDtInsert = (r: any): string | null => {
+            const cands = [
+              r?.dtInsert,
+              r?.DtInsert,
+              r?.dt_insert,
+              r?.fechaCompra,
+              r?.fecha_compra,
+              r?.createdAt,
+              r?.created_at,
+              r?.pago?.dtInsert,
+              r?.compra?.dtInsert,
+            ];
+            for (const v of cands) {
+              const s = String(v ?? '').trim();
+              if (s) return s;
+            }
+            return null;
           };
           // Busca idFiesta en múltiples niveles posibles dentro del registro de entrada
           const getFiestaId = (r: any): string | null => {
@@ -459,6 +492,8 @@ function TicketPurchasedScreenContent() {
             const estadoDsRaw = String(r?.dsEstado ?? r?.estado?.dsEstado ?? "").trim() || undefined;
             const idFiestaRaw = getFiestaId(r);
             const idFiesta = sanitizeUuid(idFiestaRaw) || undefined;
+            const compraId = getCompraId(r) || undefined;
+            const dtInsert = getDtInsert(r) || undefined;
             return {
               idEntrada,
               idEvento,
@@ -471,6 +506,8 @@ function TicketPurchasedScreenContent() {
               estadoCd: Number.isFinite(estadoCdRaw) ? (estadoCdRaw as number) : undefined,
               estadoDs: estadoDsRaw,
               idFiesta,
+              compraId,
+              dtInsert,
             };
           });
           // Si alguna entrada trajo idFiesta, propagarlo a las que no lo tengan; si no, intentar desde el evento crudo
@@ -752,6 +789,60 @@ function TicketPurchasedScreenContent() {
     [entries, controlledMatch]
   );
 
+  // Detectar entradas pendientes de pago (robusto por texto y fallback por código)
+  const isPendingPayment = useMemo(
+    () => (ds?: string, cd?: number) => {
+      const t = (ds || '').toLowerCase();
+      if (
+        t.includes('pend') || // pendiente, pendiente de pago
+        t.includes('reserva') || // en reserva
+        t.includes('a confirmar') ||
+        t.includes('sin pago') ||
+        t.includes('no pago')
+      ) {
+        return true;
+      }
+      // Fallback por códigos comunes de "pendiente" si el backend los usa
+      if (typeof cd === 'number' && [0, -1].includes(cd)) return true;
+      return false;
+    },
+    []
+  );
+
+  // Si todas las entradas de esta compra (o del listado actual) están pendientes, ocultar QR
+  const allPendingForSelection = useMemo(() => {
+    const selected = Array.isArray(entries)
+      ? entries.filter((e) => (idCompra ? e.compraId === String(idCompra) : true))
+      : [];
+    if (selected.length === 0) return false;
+    return selected.every((e) => isPendingPayment(e?.estadoDs, e?.estadoCd));
+  }, [entries, idCompra, isPendingPayment]);
+
+  // Detectar entradas anuladas/canceladas
+  const isCanceledEntry = useMemo(
+    () => (ds?: string, cd?: number) => {
+      const t = (ds || '').toLowerCase();
+      if (
+        t.includes('anul') || // anulada / anulado / anulación
+        t.includes('cancel') // cancelada / cancelado / cancelación
+      ) {
+        return true;
+      }
+      // fallback por código (5 suele mapear a CANCELADO en eventos, reutilizamos si aplica)
+      if (typeof cd === 'number' && [5].includes(cd)) return true;
+      return false;
+    },
+    []
+  );
+
+  const allCanceledForSelection = useMemo(() => {
+    const selected = Array.isArray(entries)
+      ? entries.filter((e) => (idCompra ? e.compraId === String(idCompra) : true))
+      : [];
+    if (selected.length === 0) return false;
+    return selected.every((e) => isCanceledEntry(e?.estadoDs, e?.estadoCd));
+  }, [entries, idCompra, isCanceledEntry]);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.loaderWrapper}>
@@ -791,7 +882,7 @@ function TicketPurchasedScreenContent() {
           <Text style={styles.sectionTitle}>Información del Evento</Text>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="calendar-blank-outline" size={16} color={COLORS.textSecondary} />
-            <Text style={styles.infoText}>{eventData.date}</Text>
+            <Text style={styles.infoText}>{formatDateEs((eventData as any)?.fechas?.[0]?.inicio || eventData.date)}</Text>
           </View>
           {!!eventData.timeRange && (
             <View style={styles.infoRow}>
@@ -845,6 +936,7 @@ function TicketPurchasedScreenContent() {
             });
             const valido = formatDateEs(eventData.date);
             const formatMoney = (n?: number) => (typeof n === 'number' && !isNaN(n) ? `$${n}` : '');
+            const canReview = !!fiestaIdForReview; // Solo permitir reseña si existe idFiesta
             return (
               <>
                 <View style={[styles.infoCard, { paddingBottom: 12 }]}> 
@@ -867,7 +959,8 @@ function TicketPurchasedScreenContent() {
                   </View>
                 </View>
 
-                {/* Botón Dejar reseña */}
+                {/* Botón Dejar reseña (solo si hay idFiesta) */}
+                {canReview && (
                 <TouchableOpacity
                   style={styles.primaryButton}
                   onPress={() => {
@@ -888,6 +981,7 @@ function TicketPurchasedScreenContent() {
                   <MaterialCommunityIcons name="star" size={18} color={COLORS.backgroundLight} style={{ marginRight: 8 }} />
                   <Text style={styles.primaryButtonText}>{userReview ? 'Editar reseña' : 'Dejar reseña'}</Text>
                 </TouchableOpacity>
+                )}
               </>
             );
           }
@@ -899,6 +993,16 @@ function TicketPurchasedScreenContent() {
                 <Text style={styles.sectionTitle}>Mis Entradas</Text>
                 {entries.length === 0 ? (
                   <Text style={styles.noEntriesText}>No se encontraron entradas para este evento.</Text>
+                ) : allPendingForSelection ? (
+                  <View style={styles.pendingBox}>
+                    <MaterialCommunityIcons name="clock-outline" size={16} color={COLORS.textSecondary} style={{ marginRight: 6 }} />
+                    <Text style={styles.pendingText}>Los QR's estarán disponibles cuando el pago esté concretado.</Text>
+                  </View>
+                ) : allCanceledForSelection ? (
+                  <View style={styles.canceledBox}>
+                    <MaterialCommunityIcons name="close-circle-outline" size={16} color={COLORS.textSecondary} style={{ marginRight: 6 }} />
+                    <Text style={styles.canceledText}>Entradas anuladas</Text>
+                  </View>
                 ) : (
                   <View style={{ width: '100%', rowGap: 12 }}>
                     {entries.map((en, idx) => {
@@ -908,6 +1012,7 @@ function TicketPurchasedScreenContent() {
                       const code = formatTicketCode(ticketNumber);
                       const price = typeof en.precio === 'number' ? `$${en.precio}` : '';
                       const valido = formatDateEs(eventData.date);
+                      const canceled = isCanceledEntry(en.estadoDs, en.estadoCd);
                       return (
                         <View key={`${en.idEntrada}-${idx}`} style={styles.entryCard}>
                           <View style={styles.entryHeaderRow}>
@@ -915,24 +1020,31 @@ function TicketPurchasedScreenContent() {
                             <Text style={styles.entryHeaderRight}>{code}</Text>
                           </View>
                           <Text style={styles.entryPriceLine}>{price}</Text>
-                          <View style={{ alignItems: 'center', marginTop: 6 }}>
-                            {en.qrImageUrl ? (
-                              <Image
-                                source={{ uri: en.qrImageUrl }}
-                                style={{ width: QR_SIZE, height: QR_SIZE, resizeMode: 'contain' }}
-                                accessible
-                                accessibilityLabel={`QR ${code}`}
-                              />
-                            ) : (
-                              <QRCode
-                                value={qrText}
-                                size={QR_SIZE}
-                                color={COLORS.textPrimary}
-                                backgroundColor={COLORS.cardBg}
-                                getRef={(c: any) => { if (c) { qrRefs.current[en.idEntrada] = c; } }}
-                              />
-                            )}
-                          </View>
+                          {canceled ? (
+                            <View style={styles.canceledBox}>
+                              <MaterialCommunityIcons name="close-circle-outline" size={16} color={COLORS.textSecondary} style={{ marginRight: 6 }} />
+                              <Text style={styles.canceledText}>Entrada anulada</Text>
+                            </View>
+                          ) : (
+                            <View style={{ alignItems: 'center', marginTop: 6 }}>
+                              {en.qrImageUrl ? (
+                                <Image
+                                  source={{ uri: en.qrImageUrl }}
+                                  style={{ width: QR_SIZE, height: QR_SIZE, resizeMode: 'contain' }}
+                                  accessible
+                                  accessibilityLabel={`QR ${code}`}
+                                />
+                              ) : (
+                                <QRCode
+                                  value={qrText}
+                                  size={QR_SIZE}
+                                  color={COLORS.textPrimary}
+                                  backgroundColor={COLORS.cardBg}
+                                  getRef={(c: any) => { if (c) { qrRefs.current[en.idEntrada] = c; } }}
+                                />
+                              )}
+                            </View>
+                          )}
                           {/* Se removieron idEntrada, idMedia y la leyenda de validez por solicitud */}
                         </View>
                       );
@@ -942,7 +1054,7 @@ function TicketPurchasedScreenContent() {
               </View>
 
               {/* Botón principal Descargar PDF (todas las entradas) */}
-              {entries.length > 0 && (
+              {entries.length > 0 && !allPendingForSelection && !allCanceledForSelection && (
                 <TouchableOpacity style={styles.primaryButton} onPress={handleDownloadAll} activeOpacity={0.85}>
                   <MaterialCommunityIcons name="download" size={18} color={COLORS.backgroundLight} style={{ marginRight: 8 }} />
                   <Text style={styles.primaryButtonText}>Descargar PDF</Text>
@@ -960,6 +1072,87 @@ function TicketPurchasedScreenContent() {
           </TouchableOpacity>
         )}
 
+        {/* Botón de arrepentimiento */}
+        {!allControlled && (
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => {
+              // Reset checkbox
+              setRefundChecked(false);
+              // Calcular bloqueos por 10 días y 48hs antes del evento
+              try {
+                const relevant = Array.isArray(entries)
+                  ? entries.filter((e) => (idCompra ? e.compraId === String(idCompra) : true))
+                  : [];
+                // dtInsert de la compra: tomamos el más antiguo válido entre las entradas relevantes
+                let dtInsertStr: string | undefined = undefined;
+                for (const e of relevant) {
+                  if (e?.dtInsert && !dtInsertStr) dtInsertStr = e.dtInsert;
+                }
+                // Parse helper
+                const toDate = (s?: string | null): Date | null => {
+                  if (!s) return null;
+                  const t = new Date(String(s));
+                  if (!isNaN(t.getTime())) return t;
+                  // dd/mm/yyyy fallback simple
+                  const m = String(s).match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+                  if (m) {
+                    const d = m[1].padStart(2, '0');
+                    const mo = m[2].padStart(2, '0');
+                    const y = m[3];
+                    const hh = (m[4] ?? '12').padStart(2, '0');
+                    const mm = (m[5] ?? '00').padStart(2, '0');
+                    const iso = `${y}-${mo}-${d}T${hh}:${mm}:00Z`;
+                    const t2 = new Date(iso);
+                    return isNaN(t2.getTime()) ? null : t2;
+                  }
+                  return null;
+                };
+                const purchaseDate = toDate(dtInsertStr);
+                const now = new Date();
+                const msPerDay = 24 * 60 * 60 * 1000;
+                // Regla 10 días
+                if (purchaseDate && (now.getTime() - purchaseDate.getTime()) > 10 * msPerDay) {
+                  setRefundBlockedReason("No se puede cancelar la compra porque han pasado más de 10 días desde que se realizó.");
+                  setShowRefund(true);
+                  return;
+                }
+                // Regla 48hs antes del evento
+                // Determinar inicio del evento de las fechas asociadas a las entradas
+                let startIso: string | undefined = undefined;
+                if (eventData?.fechas && eventData.fechas.length) {
+                  // prioridad: fechas usadas por estas entradas
+                  const usedFechaIds = new Set(relevant.map((e) => e.idFecha).filter(Boolean) as string[]);
+                  const candidates = usedFechaIds.size
+                    ? eventData.fechas.filter((f) => usedFechaIds.has(String(f.idFecha)))
+                    : eventData.fechas;
+                  const valid = candidates.map((f) => new Date(String(f.inicio))).filter((d) => !isNaN(d.getTime()));
+                  if (valid.length) {
+                    valid.sort((a, b) => a.getTime() - b.getTime());
+                    const start = valid[0];
+                    if ((start.getTime() - now.getTime()) < (48 * 60 * 60 * 1000)) {
+                      setRefundBlockedReason("No se puede cancelar la compra porque el evento está a menos de 48hs de dar inicio.");
+                      setShowRefund(true);
+                      return;
+                    }
+                  }
+                }
+                // Si no está bloqueado, limpiar razón y abrir
+                setRefundBlockedReason(null);
+                setShowRefund(true);
+              } catch {
+                // En caso de error, permitir mostrar modal normal sin bloquear
+                setRefundBlockedReason(null);
+                setShowRefund(true);
+              }
+            }}
+            activeOpacity={0.85}
+          >
+            <MaterialCommunityIcons name="undo-variant" size={18} color={COLORS.textPrimary} style={{ marginRight: 8 }} />
+            <Text style={styles.secondaryButtonText}>Botón de arrepentimiento</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Nota para reseña - ocultar si todas controladas */}
         {!allControlled && (
           <Text style={styles.reviewNote}>
@@ -970,10 +1163,13 @@ function TicketPurchasedScreenContent() {
         {/* Descripción adicional ya mostrada arriba */}
       </ScrollView>
 
-      {/* Modal reseña */}
+      {/* Modal reseña con mejor manejo de teclado */}
       <Modal visible={showReview} transparent animationType="fade" onRequestClose={() => !submitting && setShowReview(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={styles.modalBackdrop}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
+              <View style={styles.modalCard}>
+                <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
             <Text style={styles.modalTitle}>{userReview ? 'Editar reseña' : 'Deja tu reseña'}</Text>
             <Text style={styles.modalSubtitle}>
               Has asistido a un evento de la fiesta {eventData?.title}. Si lo deseas, puedes dejar tu reseña sobre la fiesta.
@@ -999,6 +1195,9 @@ function TicketPurchasedScreenContent() {
               onChangeText={setComment}
               editable={!submitting && !readOnlyReview}
               multiline
+              returnKeyType="done"
+              blurOnSubmit
+              onSubmitEditing={() => Keyboard.dismiss()}
             />
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.btnGhost} onPress={() => !submitting && setShowReview(false)} disabled={submitting}>
@@ -1058,6 +1257,137 @@ function TicketPurchasedScreenContent() {
                 <Text style={styles.btnGhostText}>Eliminar reseña</Text>
               </TouchableOpacity>
             )}
+                </ScrollView>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Modal Botón de arrepentimiento / Cancelar compra */}
+      <Modal visible={showRefund} transparent animationType="fade" onRequestClose={() => setShowRefund(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Botón de arrepentimiento - Cancelar compra de entradas</Text>
+            <Text style={styles.modalSubtitle}>
+              Contás con el derecho al reembolso de la compra de entradas siempre y cuando no hayan transcurrido 10 días corridos desde su compra, y siempre y cuando no falten menos de 48 horas para que comience el evento.
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              Una vez recibida la solicitud, ejecutaremos el reembolso a la cuenta de MercadoPago de dónde salieron los fondos dentro de los 7 días hábiles.
+            </Text>
+
+            {/* Alerta de bloqueo */}
+            {refundBlockedReason ? (
+              <View style={styles.alertBox}>
+                <Text style={styles.alertText}>{refundBlockedReason}</Text>
+              </View>
+            ) : null}
+
+            {/* Checkbox de confirmación */}
+            {!refundBlockedReason && (
+              <>
+                <TouchableOpacity
+                  style={styles.refundCheckRow}
+                  onPress={() => setRefundChecked((v) => !v)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.refundCheckbox, refundChecked && styles.refundCheckboxOn]} />
+                  <Text style={styles.refundCheckText}>
+                    Confirmo que deseo reembolsar la orden mencionada en este formulario bajo los términos y condiciones de nuestro servicio.
+                  </Text>
+                </TouchableOpacity>
+                <Text style={[styles.modalSubtitle, { fontWeight: '700' }]}>Todo reembolso únicamente incluye el valor de la/s entrada/s, siendo excluido el costo por el servicio utilizado.</Text>
+              </>
+            )}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.btnGhost} onPress={() => setShowRefund(false)}>
+                <Text style={styles.btnGhostText}>Cancelar</Text>
+              </TouchableOpacity>
+              {!refundBlockedReason && (
+                <TouchableOpacity
+                  style={[styles.btnPrimary, { opacity: refundChecked ? 1 : 0.6 }]}
+                  onPress={async () => {
+                    if (!refundChecked || refundSubmitting) return;
+                    // Determinar idCompra aplicable
+                    const compraIdFinal = (idCompra && String(idCompra)) || (entries.find(e => e.compraId)?.compraId ? String(entries.find(e => e.compraId)!.compraId) : null);
+                    if (!compraIdFinal) {
+                      Alert.alert('Error', 'No se encontró el identificador de la compra para solicitar el reembolso.');
+                      return;
+                    }
+                    try {
+                      setRefundSubmitting(true);
+                      // Calcular importe a reembolsar (solo valor de entradas, excluyendo cost/service según requisito)
+                      const related = entries.filter(e => String(e.compraId) === compraIdFinal);
+                      const amount = related.reduce((acc, e) => acc + (typeof e.precio === 'number' ? e.precio : 0), 0);
+                      // Determinar fecha de compra (earliest dtInsert válida de las entradas relacionadas)
+                      let purchaseDateStr: string | undefined = undefined;
+                      for (const r of related) { if (r.dtInsert && !purchaseDateStr) purchaseDateStr = r.dtInsert; }
+                      const resp = await solicitarReembolso(compraIdFinal);
+                      if (!resp.ok) {
+                        Alert.alert('Reembolso', resp.mensaje || 'No se pudo solicitar el reembolso.');
+                        return;
+                      }
+                      setRefundAmount(amount);
+                      setShowRefund(false);
+                      setShowRefundSuccess(true);
+                      // Intentar enviar correo genérico de confirmación
+                      try {
+                        const toMail = (user as any)?.correo || (user as any)?.email || (user as any)?.username || '';
+                        if (toMail) {
+                          const nombreUsuario = ((user as any)?.nombre && (user as any)?.apellido)
+                            ? `${(user as any).nombre} ${(user as any).apellido}`
+                            : ( (user as any)?.displayName || (user as any)?.name || (user as any)?.username || 'Usuario' );
+                          const numeroOperacionMP = resp?.data?.numeroOperacionMP || resp?.data?.idOperacionMP || resp?.data?.mpOperationId || '';
+                          let fechaCompraForEmail: Date | string = purchaseDateStr || new Date();
+                          try {
+                            if (purchaseDateStr) {
+                              const d = new Date(purchaseDateStr);
+                              if (!isNaN(d.getTime())) fechaCompraForEmail = d; else fechaCompraForEmail = purchaseDateStr;
+                            }
+                          } catch {}
+                          const { titulo, cuerpo } = buildCancellationEmailBody({
+                            nombreUsuario,
+                            nombreEvento: eventData?.title || '',
+                            importeReembolsado: amount,
+                            fechaCompra: fechaCompraForEmail,
+                            numeroOperacionMP,
+                          });
+                          await mailsApi.sendGenericEmail({ to: toMail, titulo, cuerpo, botonUrl: '', botonTexto: '' });
+                          try { console.log('[RefundEmail] enviado correo genérico de cancelación'); } catch {}
+                        } else {
+                          try { console.log('[RefundEmail] sin email destino en user'); } catch {}
+                        }
+                      } catch (mailErr: any) {
+                        try { console.warn('[RefundEmail] error al enviar correo de cancelación', mailErr?.message); } catch {}
+                      }
+                    } catch (e:any) {
+                      Alert.alert('Error', e?.message || 'Fallo al solicitar el reembolso.');
+                    } finally {
+                      setRefundSubmitting(false);
+                    }
+                  }}
+                  disabled={!refundChecked || refundSubmitting}
+                >
+                  {refundSubmitting ? <ActivityIndicator color={COLORS.backgroundLight} /> : <Text style={styles.btnPrimaryText}>Aceptar</Text>}
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal éxito de reembolso */}
+      <Modal visible={showRefundSuccess} transparent animationType="fade" onRequestClose={() => setShowRefundSuccess(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Botón de arrepentimiento - Cancelar compra de entradas</Text>
+            <Text style={styles.refundSuccessMsg}>Cancelación realizada con éxito.</Text>
+            <Text style={styles.refundSuccessDesc}>Recibirás un mail con la confirmación de la cancelación de tus entradas y el reembolso a MercadoPago.</Text>
+            <Text style={styles.refundSuccessAmount}>Importe reembolsado: {typeof refundAmount === 'number' ? `$${refundAmount}` : '—'}</Text>
+            <TouchableOpacity style={styles.refundSuccessBtn} onPress={() => setShowRefundSuccess(false)} activeOpacity={0.85}>
+              <Text style={styles.refundSuccessBtnText}>OK</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1262,6 +1592,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginVertical: 8,
   },
+  pendingBox: {
+    marginTop: 4,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
+    borderRadius: RADIUS.card,
+    padding: 10,
+  },
+  pendingText: {
+    flex: 1,
+    color: COLORS.textSecondary,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
+  },
   // Fila compacta para estado Controlada
   controlRow: {
     flexDirection: 'row',
@@ -1310,6 +1657,46 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.button,
     color: COLORS.textPrimary,
     textAlign: 'center',
+  },
+  // Refund modal checkbox
+  refundCheckRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  refundCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+  },
+  refundCheckboxOn: {
+    backgroundColor: COLORS.primary,
+  },
+  refundCheckText: {
+    flex: 1,
+    color: COLORS.textPrimary,
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
+  },
+  // Aviso bloqueante para reembolsos
+  alertBox: {
+    backgroundColor: '#fee2e2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: RADIUS.card,
+    padding: 12,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  alertText: {
+    color: '#b91c1c',
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
+    textAlign: 'left',
   },
   // Modal reseña
   modalBackdrop: {
@@ -1426,6 +1813,60 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 4,
     marginTop: 4,
+  },
+  refundSuccessMsg: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.body,
+    color: '#059669',
+    fontWeight: '700',
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  refundSuccessDesc: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
+    color: COLORS.textSecondary,
+    lineHeight: FONT_SIZES.smallText * 1.4,
+    marginBottom: 10,
+  },
+  refundSuccessAmount: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textPrimary,
+    fontWeight: '600',
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  refundSuccessBtn: {
+    backgroundColor: '#5B21B6',
+    borderRadius: RADIUS.card,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  refundSuccessBtnText: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  canceledBox: {
+    marginTop: 4,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fef3f2', // tono claro rojizo
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    borderRadius: RADIUS.card,
+    padding: 10,
+  },
+  canceledText: {
+    flex: 1,
+    color: '#b91c1c',
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
+    fontWeight: '600',
   },
   
 });

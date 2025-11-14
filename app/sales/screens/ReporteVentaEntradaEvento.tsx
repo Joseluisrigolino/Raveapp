@@ -22,6 +22,7 @@ import {
 	fetchReporteVentasEvento,
 } from "@/app/events/apis/entradaApi";
 import { fetchEventById } from "@/app/events/apis/eventApi";
+import { ApiUserFull, getUsuarioById } from "@/app/auth/userHelpers";
 
 const money = (n: number | undefined) =>
 	typeof n === "number" && isFinite(n) ? `$${n.toFixed(2)}` : "$0.00";
@@ -124,6 +125,8 @@ export default function ReporteVentaEntradaEventoScreen() {
 	const [error, setError] = useState<string | null>(null);
 	const [report, setReport] = useState<ReporteVentasEvento>({ dias: [] });
 	const [now, setNow] = useState<Date>(new Date());
+	const [ownerUser, setOwnerUser] = useState<ApiUserFull | null>(null);
+	const [ownerError, setOwnerError] = useState<string | null>(null);
 
 	const idEvento = String(id ?? "");
 		const baseUserId = String((user as any)?.id ?? (user as any)?.idUsuario ?? "");
@@ -161,6 +164,23 @@ export default function ReporteVentaEntradaEventoScreen() {
 
 					// 2) Traemos el reporte con el organizador correcto
 					const rep = await fetchReporteVentasEvento(idEvento, String(orgForReport));
+
+					// 2.1) Para admins: traer datos del usuario dueño del evento y guardarlos
+					if (isAdmin) {
+						setOwnerError(null);
+						setOwnerUser(null);
+						try {
+							const ownerId = pickOwnerId(ev);
+							if (ownerId) {
+								const u = await getUsuarioById(String(ownerId));
+								setOwnerUser(u);
+							} else {
+								setOwnerError("No se encontró el ID del organizador del evento.");
+							}
+						} catch (e: any) {
+							setOwnerError(e?.message || "Error al obtener datos del dueño del evento.");
+						}
+					}
 
 					// 3) Map idFecha -> fecha formateada (dd/mm/yyyy)
 					const idFechaToDate = new Map<string, string>();
@@ -233,6 +253,20 @@ export default function ReporteVentaEntradaEventoScreen() {
 		const cargo = report.dias.reduce((acc, d) => acc + computeDayTotals(d).cargo, 0);
 		return { vendidos, recEntradas, cargo, total: recEntradas + cargo };
 	}, [report]);
+
+	// Helper para formatear domicilio: solo nombre de calle; si la provincia es CABA, agregar sufijo " - CABA"
+	const domicilioFmt = useMemo(() => {
+		if (!ownerUser?.domicilio) return "";
+		const d = ownerUser.domicilio;
+		const raw = String(d?.direccion || "");
+		// Tomar solo la primera parte antes de coma y remover numeración
+		let base = raw.split(",")[0] || raw;
+		base = base.replace(/\s*\d+.*$/, "").trim(); // quita número y lo que siga
+		if (!base) return "";
+		const prov = (d?.provincia?.nombre || "").toLowerCase();
+		const isCaba = prov.includes("ciudad autónoma de buenos aires") || prov.includes("ciudad autonoma de buenos aires") || prov === "caba";
+		return isCaba ? `${base} - CABA` : base;
+	}, [ownerUser]);
 
 	return (
 		<SafeAreaView style={styles.container}>
@@ -320,6 +354,47 @@ export default function ReporteVentaEntradaEventoScreen() {
 													) : null}
 													<View style={styles.totalPill}><Text style={styles.totalPillText}>{isAdmin ? "TOTAL RECAUDADO (ENTRADAS + SERVICIO)  " : "TOTAL RECAUDADO  "}{money(isAdmin ? grand.total : grand.recEntradas)}</Text></View>
 						</View>
+
+						{/* Divider solicitada debajo del total de entradas */}
+						{isAdmin ? <View style={styles.sectionDivider} /> : null}
+
+						{/* Datos del usuario dueño del evento (solo admins) */}
+						{isAdmin ? (
+							<View style={styles.ownerSection}>
+								<Text style={styles.ownerHeader}>Datos del usuario dueño del evento</Text>
+								{ownerError ? (
+									<Text style={styles.ownerError}>{ownerError}</Text>
+								) : !ownerUser ? (
+									<ActivityIndicator color={COLORS.primary} />
+								) : (
+									<>
+										{/* Card 1: Nombre y Apellido + Correo */}
+										<View style={styles.ownerCard}>
+											<Text style={styles.ownerLabel}>Nombre y Apellido</Text>
+											<Text style={styles.ownerValue}>{ownerUser.nombre} {ownerUser.apellido}</Text>
+											<View style={{ height: 8 }} />
+											<Text style={styles.ownerLabel}>Correo</Text>
+											<Text style={styles.ownerValue}>{ownerUser.correo}</Text>
+										</View>
+
+										{/* Card 2: Teléfono + CBU */}
+										<View style={styles.ownerCard}>
+											<Text style={styles.ownerLabel}>Teléfono</Text>
+											<Text style={styles.ownerValue}>{ownerUser.telefono || "—"}</Text>
+											<View style={{ height: 8 }} />
+											<Text style={styles.ownerLabel}>CBU</Text>
+											<Text style={styles.ownerValue}>{ownerUser.cbu || "CBU aún no informado por el dueño del evento"}</Text>
+										</View>
+
+										{/* Card 3: Domicilio (solo calle; CABA simplificado) */}
+										<View style={styles.ownerCard}>
+											<Text style={styles.ownerLabel}>Domicilio</Text>
+											<Text style={styles.ownerValue}>{domicilioFmt || "—"}</Text>
+										</View>
+									</>
+								)}
+							</View>
+						) : null}
 					</>
 				)}
 			</ScrollView>
@@ -425,5 +500,36 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 14,
 	},
 	totalPillText: { color: "#fff", fontWeight: "800", textAlign: "center" },
+
+	// Divider y sección del dueño del evento (solo admins)
+	sectionDivider: {
+		height: 1,
+		backgroundColor: "#e5e7eb",
+		marginVertical: 24,
+		borderRadius: 1,
+	},
+	ownerSection: {
+		marginBottom: 36,
+	},
+	ownerHeader: {
+		fontSize: 16,
+		fontWeight: "700",
+		color: COLORS.textPrimary,
+		marginBottom: 12,
+	},
+	ownerCard: {
+		backgroundColor: "#fff",
+		borderRadius: 10,
+		paddingVertical: 12,
+		paddingHorizontal: 14,
+		marginBottom: 12,
+		shadowColor: "#000",
+		shadowOpacity: 0.05,
+		shadowRadius: 4,
+		elevation: 1,
+	},
+	ownerLabel: { fontWeight: "600", color: COLORS.textSecondary, marginBottom: 4 },
+	ownerValue: { color: COLORS.textPrimary, fontWeight: "500" },
+	ownerError: { color: COLORS.alert },
 });
 

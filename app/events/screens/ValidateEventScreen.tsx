@@ -1,7 +1,7 @@
 // src/screens/admin/EventsValidateScreens/ValidateEventScreen.tsx
 
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Modal, Image, Linking } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Modal, Image, Linking, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import InputDesc from "@/components/common/inputDesc";
@@ -37,7 +37,7 @@ export default function ValidateEventScreen() {
   const [eventData, setEventData] = useState<EventItemWithExtras | null>(null);
   const [loading, setLoading] = useState(true);
   const [rejectReason, setRejectReason] = useState("");
-  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  // Eliminamos modal, ahora rechazo inline
   const [genreMap, setGenreMap] = useState<Map<number, string>>(new Map());
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [entradasByFecha, setEntradasByFecha] = useState<Record<string, ApiEntradaFechaRaw[]>>({});
@@ -58,6 +58,10 @@ export default function ValidateEventScreen() {
   const [newImageLocalUri, setNewImageLocalUri] = useState<string | null>(null);
   // Avatar del propietario
   const [ownerAvatarUrl, setOwnerAvatarUrl] = useState<string | null>(null);
+  // Fullscreen image modal
+  const [heroOpen, setHeroOpen] = useState(false);
+  // Cache de imágenes por artista
+  const [artistImages, setArtistImages] = useState<Record<string, string>>({});
   // track subscriptions
   useEffect(() => {
     // Listen for artist activation updates coming back from EditarArtistaPantalla
@@ -240,6 +244,59 @@ export default function ValidateEventScreen() {
     })();
   }, [eventData?.ownerId]);
 
+  // Normaliza URL absoluta (agrega baseURL si viene relativa)
+  const ensureAbs = (url?: string | null): string => {
+    const u = String(url || "").trim();
+    if (!u) return "";
+    if (/^https?:\/\//i.test(u)) return u;
+    const base = apiClient.defaults.baseURL ?? "";
+    return base ? `${base}${u.startsWith("/") ? "" : "/"}${u}` : u;
+  };
+
+  // Resolver imágenes de artistas cuando cambia la lista
+  useEffect(() => {
+    (async () => {
+      const list = ((eventData as any)?.artistas || []) as any[];
+      if (!Array.isArray(list) || list.length === 0) {
+        setArtistImages({});
+        return;
+      }
+      try {
+        const pairs = await Promise.all(
+          list.map(async (a: any) => {
+            const id = String(a?.idArtista ?? a?.id ?? a?.artistId ?? "");
+            if (!id) return null;
+            // usar media existente si viene en el objeto
+            const existing = a?.image || a?.imagen || a?.media?.[0]?.url || null;
+            let url = ensureAbs(existing);
+            if (!url) {
+              try {
+                // Primero probamos Media API directa
+                const fromMedia = await mediaApi.getFirstImage(id);
+                url = ensureAbs(fromMedia);
+                // Si aún no hay, probar fetchOneArtistFromApi (que también resuelve absoluta)
+                if (!url) {
+                  try {
+                    const det = await fetchOneArtistFromApi(id);
+                    url = ensureAbs((det as any)?.image);
+                  } catch {}
+                }
+              } catch {}
+            }
+            return url ? ([id, url] as [string, string]) : null;
+          })
+        );
+        const map: Record<string, string> = {};
+        for (const p of pairs) {
+          if (p && p[0] && p[1]) map[p[0]] = p[1];
+        }
+        setArtistImages(map);
+      } catch {
+        // mantener cache anterior si algo falla
+      }
+    })();
+  }, [(eventData as any)?.artistas]);
+
   const handleValidate = () => {
     if (!eventData?.id) return;
     (async () => {
@@ -258,13 +315,12 @@ export default function ValidateEventScreen() {
   };
 
   const handleReject = () => {
-    // validate reason then open confirmation modal
     if (!eventData?.id) return;
-    if (!rejectReason || !rejectReason.trim()) {
-      Alert.alert("Error", "Debés escribir el motivo del rechazo.");
+    if (!rejectReason.trim()) {
+      Alert.alert("Falta el motivo", "Por favor, escribí el motivo del rechazo.");
       return;
     }
-    setRejectModalVisible(true);
+    handleRejectConfirmed();
   };
 
   const handleRejectConfirmed = () => {
@@ -279,7 +335,7 @@ export default function ValidateEventScreen() {
         await setEventStatus(String(eventData.id), ESTADO_CODES.RECHAZADO, { motivoRechazo: rejectReason.trim() });
 
   Alert.alert("Evento rechazado", "El evento fue marcado como rechazado.");
-  setRejectModalVisible(false);
+  // modal eliminado
   nav.replace(router, { pathname: ROUTES.ADMIN.EVENTS_VALIDATE.LIST, params: { refresh: Date.now() } });
       } catch (e: any) {
         console.error("Error rechazando evento:", e);
@@ -407,46 +463,331 @@ export default function ValidateEventScreen() {
     try { await Linking.openURL(String(url)); } catch {};
   };
 
+  const openMaps = (query: string) => {
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    Linking.openURL(url).catch(() => {});
+  };
+
   // Render principal: resumen, multimedia y acciones
   return (
     <ProtectedRoute allowedRoles={["admin"]}>
       <SafeAreaView style={styles.container}>
         <Header />
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          <View style={{ padding: 12 }}>
-            <Text style={{ fontFamily: FONTS.subTitleMedium, fontSize: FONT_SIZES.titleMain }}>{eventData.title}</Text>
-            <Text style={{ color: COLORS.textSecondary, marginTop: 6 }}>{getGenresText(eventData)}</Text>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* Título */}
+          <View style={styles.headerBlock}>
+            <Text style={styles.title}>{eventData.title}</Text>
           </View>
 
-          <HeroImagen imageUrl={eventData.imageUrl} />
+          {/* Hero imagen clickable */}
+          <TouchableOpacity activeOpacity={0.85} onPress={() => setHeroOpen(true)}>
+            <HeroImagen imageUrl={eventData.imageUrl} />
+          </TouchableOpacity>
 
-          <View style={{ padding: 12 }}>
-            <Text style={{ fontFamily: FONTS.subTitleMedium, fontSize: FONT_SIZES.subTitle }}>Propietario</Text>
-            <Text>{ownerName} {creatorEmail ? `· ${creatorEmail}` : ''}</Text>
+          {/* Título debajo de la imagen */}
+          <View style={styles.headerBlock}>
+            <Text style={styles.title}>{eventData.title}</Text>
           </View>
 
-          <View style={{ padding: 12 }}>
-            <Text style={{ fontFamily: FONTS.subTitleMedium, fontSize: FONT_SIZES.subTitle }}>Artistas</Text>
-            <Text>{getArtistsText((eventData as any).artistas || [])}</Text>
+          {/* Flags + Géneros (debajo de la imagen) */}
+          <View style={styles.pillsBlock}>
+            <View style={styles.flagsRow}>
+              {(() => {
+                const flags = getEventFlags(eventData);
+                const items: Array<{ key: string; label: string }> = [];
+                if (flags.isLGBT) items.push({ key: 'lgbt', label: 'LGTB' });
+                if (flags.isAfter) items.push({ key: 'after', label: 'AFTER' });
+                return items.map((f) => (
+                  <View key={f.key} style={styles.darkChip}>
+                    <Text style={styles.darkChipText}>{f.label}</Text>
+                  </View>
+                ));
+              })()}
+            </View>
+            <Text style={styles.sectionLabel}>Géneros</Text>
+            <View style={styles.genresRow}>
+              {getGenresText(eventData)
+                .split(',')
+                .filter((g) => g.trim().length > 0)
+                .map((g, i) => (
+                  <View key={`genre-below-${i}`} style={styles.genreChip}>
+                    <Text style={styles.genreChipText}>{g.trim()}</Text>
+                  </View>
+                ))}
+            </View>
           </View>
 
-          <View style={{ padding: 12 }}>
-            <Text style={{ fontFamily: FONTS.subTitleMedium, fontSize: FONT_SIZES.subTitle }}>Multimedia</Text>
-            <ReproductorSoundCloud soundCloudUrl={(eventData as any).musica || ''} />
-            <ReproductorYouTube youTubeEmbedUrl={(eventData as any).video || ''} />
+          {/* Propietario */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Propietario</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}>
+              {ownerAvatarUrl ? (
+                <Image source={{ uri: ownerAvatarUrl }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, { backgroundColor: COLORS.borderInput }]} />
+              )}
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={styles.ownerName}>{ownerName}</Text>
+                {!!creatorEmail && <Text style={styles.ownerEmail}>{creatorEmail}</Text>}
+              </View>
+            </View>
           </View>
 
-          <View style={{ padding: 12, flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity style={{ backgroundColor: COLORS.primary, padding: 12, borderRadius: 10 }} onPress={handleValidate}>
-              <Text style={{ color: '#fff' }}>Aprobar</Text>
+          {/* Fecha y Horario */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Fecha y Horario</Text>
+            <View style={{ marginTop: 10, gap: 10 }}>
+              {Array.isArray((eventData as any).fechas) && (eventData as any).fechas.length > 0 ? (
+                (eventData as any).fechas.map((f: any, idx: number) => (
+                  <View key={`fh-${String(f.idFecha || idx)}`} style={styles.miniCard}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <MCIcon name="calendar" size={18} color={COLORS.textSecondary} />
+                      <Text style={[styles.miniCardTitle, { marginLeft: 8 }]}>{formatFechaTitulo(f.inicio, true)}</Text>
+                    </View>
+                    <Text style={styles.miniCardSubtitle}>{formatHorasRango(f.inicio, f.fin)}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.infoTextMuted}>Sin fechas asignadas</Text>
+              )}
+            </View>
+          </View>
+
+          {/* Descripción */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Descripción</Text>
+            <Text style={styles.descriptionText}>{(eventData.description || '').trim() ? eventData.description : 'Sin descripción'}</Text>
+          </View>
+
+          {/* Dirección */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Dirección</Text>
+            {(() => {
+              // Mostrar sólo nombre de la dirección y la localidad (pedido usuario)
+              const d = (eventData as any).domicilio || {};
+              const direccion = pickName(d.direccion) || 'Dirección no especificada';
+              const localidad = pickName(d.localidad);
+              const query = [direccion, localidad].filter(Boolean).join(', ');
+              return (
+                <View style={{ marginTop: 10 }}>
+                  <View style={styles.miniCard}>
+                    <Text style={styles.miniCardTitle}>{direccion}</Text>
+                    {!!localidad && <Text style={styles.miniCardSubtitle}>{localidad}</Text>}
+                  </View>
+                  {!!query && (
+                    <TouchableOpacity style={styles.goBtn} onPress={() => openMaps(query)}>
+                      <MCIcon name="map-marker" color="#fff" size={16} />
+                      <Text style={styles.goBtnText}>Cómo llegar</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })()}
+          </View>
+
+          {/* Artistas (cards con activar) */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Artistas</Text>
+            <View style={{ marginTop: 8 }}>
+              {(() => {
+                const list = ((eventData as any).artistas || []) as any[];
+                if (!Array.isArray(list) || list.length === 0) return <Text style={styles.infoTextMuted}>Sin artistas</Text>;
+                return list.map((a: any, i: number) => {
+                  const name = a?.nombre || a?.name || a?.dsNombre || a?.titulo || a?.tituloArtist || a?.artistName || `Artista ${i+1}`;
+                  const activeFlag = (() => {
+                    const v = a?.isActivo ?? a?.activo ?? a?.isActive ?? a?.estaActivo ?? a?.enabled ?? null;
+                    if (typeof v === 'boolean') return v;
+                    if (typeof v === 'number') return v === 1;
+                    const st = a?.estado ?? a?.cdEstado ?? a?.status;
+                    if (typeof st === 'number') return st === 1;
+                    if (typeof st === 'string') return ['1','aprobado','activo','true'].includes(st.toLowerCase());
+                    return true;
+                  })();
+                  const img = a?.image || a?.imagen || a?.media?.[0]?.url || null;
+                  return (
+                    <View key={`artist-card-${i}`} style={styles.artistCard}>
+                      <View style={styles.artistLeft}>
+                        {(() => {
+                          const idA = a?.idArtista || a?.id || a?.artistId;
+                          const resolved = ensureAbs(artistImages[String(idA)] || img);
+                          return resolved ? (
+                            <Image source={{ uri: resolved }} style={styles.artistAvatar} />
+                          ) : (
+                            <View style={[styles.artistAvatar, styles.artistAvatarPlaceholder]} />
+                          );
+                        })()}
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.artistName}>{name}</Text>
+                          <Text style={[styles.artistStatus, { color: activeFlag ? COLORS.positive : COLORS.textSecondary }]}>{activeFlag ? 'Activo' : 'Inactivo'}</Text>
+                        </View>
+                      </View>
+                      {!activeFlag && (
+                        <TouchableOpacity
+                          style={styles.activateBtn}
+                          onPress={() => {
+                            try {
+                              const idA = a?.idArtista || a?.id || a?.artistId;
+                              if (!idA) { Alert.alert('Error', 'ID de artista faltante'); return; }
+                              // Navegar a la pantalla de edición/activación con prefill y flag de activación
+                              nav.push(router, {
+                                pathname: '/artists/screens/EditarArtistaPantalla',
+                                params: { id: String(idA), activate: '1', prefillName: String(name || '') },
+                              });
+                            } catch (e:any) {
+                              Alert.alert('Error', e?.message || 'No se pudo abrir la edición del artista');
+                            }
+                          }}
+                        >
+                          <Text style={styles.activateBtnText}>Activar</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                });
+              })()}
+            </View>
+          </View>
+
+          {/* Información de Entradas */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Información de Entradas</Text>
+            {entradasLoading ? (
+              <View style={{ paddingVertical: 12 }}>
+                <ActivityIndicator color={COLORS.primary} />
+              </View>
+            ) : Array.isArray((eventData as any).fechas) && (eventData as any).fechas.length ? (
+              (eventData as any).fechas.map((f: any, idx: number) => {
+                const idF = String(f.idFecha || "");
+                const arr = entradasByFecha[idF] || [];
+                return (
+                  <View key={`entr-${idF || idx}`} style={{ marginTop: idx === 0 ? 6 : 14 }}>
+                    <Text style={styles.entryDateTitle}>{formatFechaTitulo(f.inicio, false)}</Text>
+                    {(() => {
+                      // Mostrar inicio/fin de venta como items visualmente iguales a entradas
+                      const starts: Date[] = [];
+                      const ends: Date[] = [];
+                      for (const it of arr) {
+                        const s = (it as any)?.fecha?.inicioVenta;
+                        const e = (it as any)?.fecha?.finVenta;
+                        if (s) { const d = new Date(s); if (!isNaN(d as any)) starts.push(d); }
+                        if (e) { const d = new Date(e); if (!isNaN(d as any)) ends.push(d); }
+                      }
+                      const startIso = starts.length ? new Date(Math.min(...starts.map(d=>d.getTime()))).toISOString() : undefined;
+                      const endIso = ends.length ? new Date(Math.max(...ends.map(d=>d.getTime()))).toISOString() : undefined;
+
+                      const blocks: React.ReactNode[] = [];
+                      if (startIso) {
+                        blocks.push(
+                          <View key={`venta-start-${idF}`} style={styles.entryItem}>
+                            <Text style={styles.entryTipo}>Inicio de venta de entradas</Text>
+                            <Text style={styles.entryPrice}>{formatFechaHoraAR(startIso)}</Text>
+                          </View>
+                        );
+                      }
+                      if (endIso) {
+                        blocks.push(
+                          <View key={`venta-end-${idF}`} style={styles.entryItem}>
+                            <Text style={styles.entryTipo}>Fin venta de entradas</Text>
+                            <Text style={styles.entryPrice}>{formatFechaHoraAR(endIso)}</Text>
+                          </View>
+                        );
+                      }
+                      return blocks.length ? <View style={{ marginTop: 6 }}>{blocks}</View> : null;
+                    })()}
+                    {/* Separador visual entre ventana de venta y lista de tipos */}
+                    {arr.length ? <View style={styles.divider} /> : null}
+                    {arr.length ? (
+                      arr.map((it: any, j: number) => {
+                        // Resolver nombre de tipo (usa objeto tipo { cdTipo, dsTipo } si viene)
+                        const cdTipo = Number(it?.tipo?.cdTipo ?? it?.cdTipo ?? it?.tipoEntrada ?? it?.tipo);
+                        const nombreTipo = (it?.tipo?.dsTipo && String(it.tipo.dsTipo).trim())
+                          || (Number.isFinite(cdTipo) && tipoMap.get(cdTipo))
+                          || (Number.isFinite(cdTipo) ? `Tipo ${cdTipo}` : 'Sin tipo');
+                        const qty = toNumber(it?.cantidad ?? it?.stock ?? it?.disponible ?? it?.cantidadDisponible);
+                        const price = Number(it?.precio);
+                        return (
+                          <View key={`e-${j}`} style={styles.entryItem}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.entryTipo}>{nombreTipo}</Text>
+                              {qty ? <Text style={styles.entryQty}>{`Cantidad: ${qty}`}</Text> : null}
+                            </View>
+                            <Text style={styles.entryPrice}>{formatMoneyARS(price)}</Text>
+                          </View>
+                        );
+                      })
+                    ) : (
+                      <Text style={styles.infoTextMuted}>Sin entradas cargadas para este día</Text>
+                    )}
+                  </View>
+                );
+              })
+            ) : (
+              <Text style={styles.infoTextMuted}>Este evento no tiene fechas para mostrar entradas.</Text>
+            )}
+          </View>
+
+          {/* Multimedia (solo si hay algo) */}
+          {((eventData as any).musica || (eventData as any).video) && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Contenido Multimedia</Text>
+              <View style={{ marginTop: 10 }}>
+                {(eventData as any).musica && (
+                  <View style={styles.mediaBox}>
+                    <ReproductorSoundCloud soundCloudUrl={(eventData as any).musica || ''} />
+                  </View>
+                )}
+                {(eventData as any).video && (
+                  <View style={styles.mediaBox}>
+                    <ReproductorYouTube youTubeEmbedUrl={(eventData as any).video || ''} />
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* Sección validación / rechazo */}
+          <View style={styles.validationBlock}>
+            <Text style={styles.validationInfo}>En caso de rechazar el evento, completar el motivo de rechazo:</Text>
+            <TextInput
+              placeholder="Escribir motivo del rechazo..."
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              multiline
+              style={styles.rejectInput}
+              placeholderTextColor={COLORS.textSecondary}
+            />
+            {/* Aviso si hay artistas inactivos */}
+            {((global as any).__hasInactiveArtists) ? (
+              <Text style={styles.validationInfoWarning}>Para validar el evento, activá todos los artistas.</Text>
+            ) : null}
+            <TouchableOpacity
+              style={[styles.primaryBtn, ((global as any).__hasInactiveArtists) && styles.primaryBtnDisabled]}
+              onPress={((global as any).__hasInactiveArtists) ? undefined : handleValidate}
+              disabled={Boolean((global as any).__hasInactiveArtists)}
+            >
+              <Text style={styles.primaryBtnText}>Validar Evento</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={{ backgroundColor: COLORS.negative, padding: 12, borderRadius: 10 }} onPress={() => setRejectModalVisible(true)}>
-              <Text style={{ color: '#fff' }}>Rechazar</Text>
+            <TouchableOpacity style={[styles.outlineBtn]} onPress={handleReject}>
+              <Text style={styles.outlineBtnText}>Rechazar Evento</Text>
             </TouchableOpacity>
           </View>
 
         </ScrollView>
         <Footer />
+
+        {/* Modal Imagen */}
+        <Modal visible={heroOpen} transparent onRequestClose={() => setHeroOpen(false)}>
+          <View style={styles.modalBackdrop}>
+            <TouchableOpacity style={styles.modalClose} onPress={() => setHeroOpen(false)}>
+              <Icon name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+            {eventData?.imageUrl ? (
+              <Image source={{ uri: eventData.imageUrl }} resizeMode="contain" style={styles.fullImage} />
+            ) : null}
+          </View>
+        </Modal>
+
+        {/* Modal rechazo eliminado (usamos sección inline) */}
       </SafeAreaView>
     </ProtectedRoute>
   );
@@ -456,5 +797,162 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.backgroundLight },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  errorText: { color: COLORS.negative }
+  errorText: { color: COLORS.negative },
+  scrollContent: { paddingBottom: 56 },
+  headerBlock: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+  title: { fontFamily: FONTS.subTitleMedium, fontSize: FONT_SIZES.titleMain, color: COLORS.textPrimary },
+  pillsBlock: { paddingHorizontal: 16, paddingTop: 10 },
+  flagsRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  darkChip: { backgroundColor: '#0F172A', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999 },
+  darkChipText: { color: '#fff', fontSize: 12, fontFamily: FONTS.subTitleMedium },
+  sectionLabel: { color: COLORS.textSecondary, marginBottom: 8 },
+  genresRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  genreChip: { backgroundColor: '#fff', borderColor: COLORS.borderInput, borderWidth: 1, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999 },
+  genreChipText: { color: COLORS.textPrimary, fontSize: 12 },
+  card: { backgroundColor: COLORS.cardBg, marginHorizontal: 16, marginTop: 12, borderRadius: 12, padding: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: COLORS.borderInput },
+  cardTitle: { fontFamily: FONTS.subTitleMedium, fontSize: FONT_SIZES.subTitle, color: COLORS.textPrimary },
+  avatar: { width: 48, height: 48, borderRadius: 24 },
+  ownerName: { fontFamily: FONTS.subTitleMedium, color: COLORS.textPrimary },
+  ownerEmail: { color: COLORS.textSecondary, marginTop: 2 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  infoText: { color: COLORS.textPrimary },
+  infoTextMuted: { color: COLORS.textSecondary, marginTop: 6 },
+  descriptionText: { color: COLORS.textPrimary, marginTop: 10 },
+  fechaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  badgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
+  badge: { borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10 },
+  badgeText: { color: '#fff', fontSize: 12 },
+  badgeGroupTitle: { color: COLORS.textSecondary, fontSize: 12 },
+  /* Entradas (Total) */
+  entryDateTitle: { color: COLORS.textPrimary, marginBottom: 8 },
+  entryItem: { backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.borderInput, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  entryTipo: { color: COLORS.textPrimary, fontFamily: FONTS.subTitleMedium },
+  entryQty: { color: COLORS.textSecondary },
+  entryPrice: { color: COLORS.textPrimary, fontFamily: FONTS.subTitleMedium },
+  divider: { height: 1, backgroundColor: COLORS.borderInput, marginVertical: 6, opacity: 0.6 },
+  actionsBar: { flexDirection: 'row', gap: 12, marginTop: 16, marginBottom: 8, paddingHorizontal: 16 },
+  actionBtn: { flex: 1, paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
+  actionText: { color: '#fff', fontFamily: FONTS.subTitleMedium },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center' },
+  fullImage: { width: '90%', height: '70%' },
+  modalClose: { position: 'absolute', top: 40, right: 20, padding: 8 },
+  rejectCard: { width: '90%', backgroundColor: COLORS.cardBg, borderRadius: 12, padding: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: COLORS.borderInput },
+  rejectTitle: { fontFamily: FONTS.subTitleMedium, fontSize: FONT_SIZES.subTitle, color: COLORS.textPrimary, marginBottom: 10 },
+  rejectActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  rejectBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  rejectText: { color: '#fff' },
+  /* Artists */
+  artistCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: COLORS.borderInput, marginBottom: 10 },
+  artistLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
+  artistAvatar: { width: 46, height: 46, borderRadius: 8, backgroundColor: '#eee' },
+  artistAvatarPlaceholder: { justifyContent: 'center', alignItems: 'center' },
+  artistName: { fontFamily: FONTS.subTitleMedium, color: COLORS.textPrimary, fontSize: 14 },
+  artistStatus: { fontSize: 12, marginTop: 2 },
+  activateBtn: { backgroundColor: '#0F172A', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8 },
+  activateBtnText: { color: '#fff', fontSize: 12, fontFamily: FONTS.subTitleMedium },
+  /* Media */
+  mediaBox: { backgroundColor: '#ECEEF2', borderRadius: 12, padding: 16, marginBottom: 14 },
+  /* Mini Cards (fecha/ubicación) */
+  miniCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.borderInput, borderRadius: 12, padding: 12 },
+  miniCardTitle: { color: COLORS.textPrimary, fontFamily: FONTS.subTitleMedium },
+  miniCardSubtitle: { color: COLORS.textSecondary, marginTop: 4 },
+  goBtn: { marginTop: 10, backgroundColor: '#0F172A', borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 8 },
+  goBtnText: { color: '#fff', fontFamily: FONTS.subTitleMedium },
+  /* Validation Block */
+  validationBlock: { marginHorizontal: 16, marginTop: 20, marginBottom: 40 },
+  validationInfo: { color: COLORS.textSecondary, fontSize: 12, marginBottom: 8 },
+  rejectInput: { backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.borderInput, borderRadius: 12, minHeight: 120, padding: 12, textAlignVertical: 'top', color: COLORS.textPrimary, marginBottom: 16 },
+  primaryBtn: { backgroundColor: '#0F172A', paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginBottom: 12 },
+  primaryBtnText: { color: '#fff', fontFamily: FONTS.subTitleMedium },
+  primaryBtnDisabled: { backgroundColor: '#9ca3af' },
+  outlineBtn: { backgroundColor: 'transparent', paddingVertical: 14, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#0F172A' },
+  outlineBtnText: { color: '#0F172A', fontFamily: FONTS.subTitleMedium },
+  validationInfoWarning: { color: COLORS.negative, fontSize: 12, marginBottom: 8 },
 });
+
+// Helpers locales
+function isFiniteNum(n: any): n is number {
+  return typeof n === 'number' && isFinite(n);
+}
+
+function formatFechaRango(inicio?: string, fin?: string): string {
+  const fmt = (iso?: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const dd = d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${dd} ${hh}:${mm}`;
+  };
+  const a = fmt(inicio);
+  const b = fmt(fin);
+  if (a && b) return `${a} — ${b}`;
+  return a || b || 'Sin horario';
+}
+
+// Nuevo: formato de título de fecha ("Viernes 15 de Marzo, 2025")
+function formatFechaTitulo(iso?: string, includeYear: boolean = true): string {
+  if (!iso) return 'Fecha';
+  const d = new Date(iso);
+  const diaSemana = d.toLocaleDateString('es-AR', { weekday: 'long' });
+  const dia = d.getDate();
+  const mes = d.toLocaleDateString('es-AR', { month: 'long' });
+  const año = d.getFullYear();
+  const base = `${capitalize(diaSemana)} ${dia} de ${capitalize(mes)}`;
+  return includeYear ? `${base}, ${año}` : base;
+}
+
+// Nuevo: rango de horas ("23:00 - 06:00")
+function formatHorasRango(inicio?: string, fin?: string): string {
+  const fmt = (iso?: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  };
+  const a = fmt(inicio);
+  const b = fmt(fin);
+  if (a && b) return `${a} - ${b}`;
+  return a || b || 'Sin horario';
+}
+
+function toNumber(v: any): number {
+  const n = Number(v);
+  return isFinite(n) ? n : 0;
+}
+
+function capitalize(s: string): string { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// Formatea número a moneda ARS simple (sin locales costosos en RN)
+function formatMoneyARS(v: number): string {
+  if (!Number.isFinite(v)) return '$0';
+  // Mostrar sin decimales si es entero, sino con 2 decimales
+  const opts = Number.isInteger(v) ? 0 : 2;
+  return '$' + v.toFixed(opts).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+// Fecha y hora corta en formato d/m/aaaa - hh:mm a. m./p. m.
+function formatFechaHoraAR(iso?: string): string {
+  if (!iso) return 'N/D';
+  const d = new Date(iso);
+  if (isNaN(d as any)) return 'N/D';
+  const dia = String(d.getDate()).padStart(1, '0');
+  const mes = String(d.getMonth() + 1);
+  const año = d.getFullYear();
+  let horas = d.getHours();
+  const minutos = String(d.getMinutes()).padStart(2, '0');
+  const ampm = horas >= 12 ? 'p. m.' : 'a. m.';
+  if (horas === 0) horas = 12; else if (horas > 12) horas -= 12;
+  const hh = String(horas).padStart(2, '0');
+  return `${dia}/${mes}/${año} - ${hh}:${minutos} ${ampm}`;
+}
+
+// Normaliza valores que pueden venir como string u objeto { nombre, codigo }
+function pickName(val: any): string {
+  if (!val) return "";
+  if (typeof val === 'string') return val;
+  if (typeof val === 'object') {
+    const n = (val as any).nombre || (val as any).name || (val as any).dsNombre || (val as any).descripcion;
+    if (typeof n === 'string') return n;
+  }
+  try { return String(val); } catch { return ""; }
+}

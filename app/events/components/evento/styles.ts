@@ -14,6 +14,10 @@ export const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  titleCol: {
+    flex: 1,
+    marginRight: 8,
+  },
   title: {
     flex: 1,
     marginRight: 8,
@@ -21,6 +25,12 @@ export const styles = StyleSheet.create({
     fontSize: FONT_SIZES.titleMain,
     color: COLORS.textPrimary,
     textDecorationLine: "underline",
+  },
+  dateUnderTitle: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textSecondary,
+    marginTop: 4,
   },
   heartBtn: {},
 
