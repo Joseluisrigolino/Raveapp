@@ -130,28 +130,134 @@ export async function updateUsuario(payload: UpdateUsuarioPayload): Promise<void
     longitud: typeof payload.domicilio?.longitud === 'number' ? payload.domicilio.longitud : 0,
   };
 
-  const finalPayload: UpdateUsuarioPayload = {
-    ...payload,
-    domicilio: safeDomicilio as any,
-    cdRoles: Array.isArray(payload.cdRoles) ? payload.cdRoles : [],
-    socials: safeSocials as any,
+  // Part 1: intentar completar campos faltantes con el perfil actual (merge),
+  // ya que el backend requiere payload completo.
+  const needsString = (v: any) => typeof v !== "string" || v.trim() === "";
+  const needsArray = (v: any) => !Array.isArray(v) || v.length === 0;
+  let base: Partial<ApiUserFull> | null = null;
+  try {
+    const missingCritical =
+      needsString((payload as any).nombre) ||
+      needsString((payload as any).apellido) ||
+      needsString((payload as any).correo) ||
+      needsString((payload as any).dni) ||
+      needsString((payload as any).telefono) ||
+      needsString((payload as any).cbu) ||
+      needsString((payload as any).bio) ||
+      needsString((payload as any).dtNacimiento) ||
+      !payload.domicilio ||
+      needsArray(payload.cdRoles);
+    if (missingCritical) {
+      base = await getUsuarioById(String((payload as any).idUsuario));
+    }
+  } catch (e) {
+    // Si falla el GET no abortamos; seguimos con lo que tenemos
+  }
+
+  const merged: UpdateUsuarioPayload = {
+    idUsuario: String((payload as any).idUsuario ?? (base as any)?.idUsuario ?? ""),
+    nombre: !needsString(payload.nombre) ? payload.nombre : String((base as any)?.nombre ?? ""),
+    apellido: !needsString(payload.apellido) ? payload.apellido : String((base as any)?.apellido ?? ""),
+    correo: !needsString(payload.correo) ? payload.correo : String((base as any)?.correo ?? ""),
+    dni: !needsString(payload.dni) ? payload.dni : String((base as any)?.dni ?? ""),
+    telefono: !needsString(payload.telefono) ? payload.telefono : String((base as any)?.telefono ?? ""),
+    cbu: !needsString(payload.cbu) ? payload.cbu : String((base as any)?.cbu ?? ""),
+    nombreFantasia: !needsString(payload.nombreFantasia)
+      ? payload.nombreFantasia
+      : String((base as any)?.nombreFantasia ?? ""),
+    bio: !needsString(payload.bio) ? payload.bio : String((base as any)?.bio ?? ""),
+    dtNacimiento: !needsString(payload.dtNacimiento)
+      ? payload.dtNacimiento
+      : String((base as any)?.dtNacimiento ?? ""),
+    domicilio: {
+      direccion: safeDomicilio.direccion || (base as any)?.domicilio?.direccion || "",
+      localidad: {
+        nombre: safeDomicilio.localidad.nombre || (base as any)?.domicilio?.localidad?.nombre || "",
+        codigo: safeDomicilio.localidad.codigo || (base as any)?.domicilio?.localidad?.codigo || "",
+      },
+      municipio: {
+        nombre: safeDomicilio.municipio.nombre || (base as any)?.domicilio?.municipio?.nombre || "",
+        codigo: safeDomicilio.municipio.codigo || (base as any)?.domicilio?.municipio?.codigo || "",
+      },
+      provincia: {
+        nombre: safeDomicilio.provincia.nombre || (base as any)?.domicilio?.provincia?.nombre || "",
+        codigo: safeDomicilio.provincia.codigo || (base as any)?.domicilio?.provincia?.codigo || "",
+      },
+      latitud:
+        typeof safeDomicilio.latitud === "number"
+          ? safeDomicilio.latitud
+          : (base as any)?.domicilio?.latitud ?? 0,
+      longitud:
+        typeof safeDomicilio.longitud === "number"
+          ? safeDomicilio.longitud
+          : (base as any)?.domicilio?.longitud ?? 0,
+    } as DomicilioApi,
+    // cdRoles: fusionar roles existentes con los nuevos
+    cdRoles: (() => {
+      const incoming = Array.isArray(payload.cdRoles) ? payload.cdRoles : [];
+      const existing = Array.isArray((base as any)?.cdRoles)
+        ? ((base as any)?.cdRoles as number[])
+        : [];
+      const mergedSet = new Set<number>();
+      for (const v of [...incoming, ...existing]) {
+        const n = Number(v);
+        if (Number.isFinite(n)) mergedSet.add(n);
+      }
+      return Array.from(mergedSet);
+    })(),
+    socials: {
+      idSocial:
+        safeSocials.idSocial || (base as any)?.socials?.idSocial || "",
+      mdInstagram:
+        safeSocials.mdInstagram || (base as any)?.socials?.mdInstagram || "",
+      mdSpotify:
+        safeSocials.mdSpotify || (base as any)?.socials?.mdSpotify || "",
+      mdSoundcloud:
+        safeSocials.mdSoundcloud || (base as any)?.socials?.mdSoundcloud || "",
+    },
   };
 
-  console.log("updateUsuario - Payload recibido:", JSON.stringify(finalPayload, null, 2));
+  // Asegurar cdRoles numérico/único por si base aportó valores no numéricos
+  const finalPayload: UpdateUsuarioPayload = {
+    ...merged,
+    cdRoles: Array.from(
+      new Set(
+        (merged.cdRoles as any[])
+          .map((v) => Number(v))
+          .filter((n) => Number.isFinite(n)) as number[]
+      )
+    ),
+  };
 
-  try {
-    const response = await apiClient.put("/v1/Usuario/UpdateUsuario", finalPayload, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-    console.log("updateUsuario - Respuesta exitosa:", response.status);
-  } catch (error: any) {
-    console.error("updateUsuario - Error:", error);
-    console.error("updateUsuario - Response data:", error?.response?.data);
-    console.error("updateUsuario - Response status:", error?.response?.status);
-    throw error;
+  console.log("updateUsuario - Payload final (merge):", JSON.stringify(finalPayload, null, 2));
+
+  // Intento 1: enviar plano (sin wrapper)
+  const tryRequests: Array<{ label: string; body: any }> = [
+    { label: "plain", body: finalPayload },
+    { label: "wrapped", body: { request: finalPayload } },
+  ];
+
+  let lastError: any = null;
+  for (const variant of tryRequests) {
+    try {
+      console.log("updateUsuario - Intento", variant.label);
+      const response = await apiClient.put(
+        "/v1/Usuario/UpdateUsuario",
+        variant.body,
+        { headers: { "Content-Type": "application/json" } }
+      );
+      console.log("updateUsuario - OK con variante", variant.label, response.status);
+      return;
+    } catch (error: any) {
+      lastError = error;
+      console.error("updateUsuario - Variante", variant.label, "falló:", error?.response?.status, error?.response?.data);
+      // Si es 400 por validación, probamos la siguiente variante
+      continue;
+    }
   }
+
+  // Si todas fallaron, re-lanzar el último error
+  throw lastError ?? new Error("UpdateUsuario falló en todos los intentos");
 }
 
 // 3) Crear usuario

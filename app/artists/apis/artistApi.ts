@@ -182,7 +182,8 @@ export async function fetchArtistsFromApi(): Promise<Artist[]> {
     "/v1/Artista/GetArtista",
     { headers: { Authorization: `Bearer ${token}` } }
   );
-  const list = resp.data.artistas ?? [];
+  // Filtrar solo artistas activos (isActivo === 1)
+  const list = (resp.data.artistas ?? []).filter((a) => a.isActivo === 1);
   return Promise.all(
     list.map(async (api) => {
       const a = await fetchOneArtistFromApi(api.idArtista);

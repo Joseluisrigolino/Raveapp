@@ -68,13 +68,19 @@ export async function sendGenericEmail(payload: GenericEmailRequest): Promise<an
  * Inserta los valores solicitados, aplicando negritas en nombre de evento, importe y nombre de la app.
  * Los marcadores se reemplazan directamente; si el backend soporta HTML, podría adaptarse.
  */
+/**
+ * Genera el contenido (texto y opcional HTML) para el correo de cancelación de entradas.
+ * Mejora: corrige tildes/typos, formato de fecha, agrega versión HTML con <strong> y <br/>.
+ * El endpoint actual solo envía `cuerpo` (texto plano); se incluye `cuerpoHtml` por si en el futuro
+ * se habilita soporte HTML. Las asteriscos ** se mantienen para backend que interprete markdown simple.
+ */
 export function buildCancellationEmailBody(params: {
 	nombreUsuario: string; // Nombre y apellido del usuario
 	nombreEvento: string;
 	importeReembolsado: number; // valor sin cargo de servicio
 	fechaCompra: Date | string; // fecha original de la compra
 	numeroOperacionMP?: string; // número de operación MercadoPago
-}): { titulo: string; cuerpo: string } {
+}): { titulo: string; cuerpo: string; cuerpoHtml?: string } {
 	const {
 		nombreUsuario,
 		nombreEvento,
@@ -82,22 +88,63 @@ export function buildCancellationEmailBody(params: {
 		fechaCompra,
 		numeroOperacionMP = "",
 	} = params;
+
 	const fecha = (() => {
 		try {
 			const d = new Date(fechaCompra);
 			if (!isNaN(d.getTime())) {
-				const dd = String(d.getDate()).padStart(2, '0');
-				const mm = String(d.getMonth() + 1).padStart(2, '0');
+				const dd = String(d.getDate()).padStart(2, "0");
+				const mm = String(d.getMonth() + 1).padStart(2, "0");
 				const yy = d.getFullYear();
 				return `${dd}/${mm}/${yy}`;
 			}
 			return String(fechaCompra);
-		} catch { return String(fechaCompra); }
+		} catch {
+			return String(fechaCompra);
+		}
 	})();
-	const importeStr = `$ ${importeReembolsado}`;
+
+	// Formatear importe con separador de miles local si hay soporte, sino fallback.
+	const importeStr = (() => {
+		try {
+			return `$ ${importeReembolsado.toLocaleString("es-AR", {
+				minimumFractionDigits: 2,
+				maximumFractionDigits: 2,
+			})}`;
+		} catch {
+			return `$ ${importeReembolsado}`;
+		}
+	})();
+
 	const titulo = `RaveApp - Cancelación de entradas a ${nombreEvento}`;
-	const cuerpo = `Estimado ${nombreUsuario},\n\nHas cancelado tu/s entrada/s al evento **${nombreEvento}** por un importe de **${importeStr}**, que habias adquirido el dia ${fecha}.\nDicho importe se te ha reembolsado al medio de pago que hayas utilizado en MercadoPago y lo verás acreditado dentro de los 7 dias habiles.\n\nNumero de opercaion de MercadoPago: ${numeroOperacionMP}\n\nAtentamente,\nEl equipo de **RaveApp**`;
-	return { titulo, cuerpo };
+
+	// Construcción de líneas en texto plano (usar CRLF para mayor compatibilidad en algunos parsers).
+	const lineBreak = "\r\n"; // muchos servidores de correo esperan CRLF
+	const partes: string[] = [];
+	partes.push(`Estimado/a ${nombreUsuario},`);
+	partes.push(
+		`Has cancelado tu/s entrada/s al evento **${nombreEvento}** por un importe de **${importeStr}**, adquiridas el día ${fecha}.`
+	);
+	partes.push(
+		`El importe se ha reembolsado al medio de pago que utilizaste en MercadoPago y lo verás acreditado dentro de los próximos 7 días hábiles.`
+	);
+	if (numeroOperacionMP) {
+		partes.push(`Número de operación de MercadoPago: ${numeroOperacionMP}`);
+	}
+	partes.push(`Atentamente,`);
+	partes.push(`El equipo de **RaveApp**`);
+	const cuerpo = partes.join(lineBreak + lineBreak); // doble salto entre párrafos
+
+	// Versión HTML (solo si el backend la llegara a soportar en el futuro)
+	const cuerpoHtml = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8" /><title>${titulo}</title></head><body style="font-family:Arial,sans-serif;line-height:1.5;color:#111;">
+	<p>Estimado/a <strong>${nombreUsuario}</strong>,</p>
+	<p>Has cancelado tu/s entrada/s al evento <strong>${nombreEvento}</strong> por un importe de <strong>${importeStr}</strong>, adquiridas el día ${fecha}.</p>
+	<p>El importe se ha reembolsado al medio de pago que utilizaste en MercadoPago y lo verás acreditado dentro de los próximos 7 días hábiles.</p>
+	${numeroOperacionMP ? `<p><strong>Número de operación MercadoPago:</strong> ${numeroOperacionMP}</p>` : ""}
+	<p>Atentamente,<br/><strong>El equipo de RaveApp</strong></p>
+</body></html>`;
+
+	return { titulo, cuerpo, cuerpoHtml };
 }
 
 /**
@@ -171,7 +218,7 @@ export async function sendConfirmEmailRaw(payload: ConfirmEmailRequest): Promise
 
 /**
  * Envía el correo de recuperación de contraseña.
- * POST /v1/Email/EnviarRecuperarContrasena
+ * POST /v1/Email/EnviarPassRecoveryEmail
  * Body:
  * {
  *   to: string,
@@ -204,7 +251,7 @@ export async function sendPasswordRecoveryEmail(params: {
 	const token = await login().catch(() => null);
 
 	const { data } = await apiClient.post(
-		"/v1/Email/EnviarRecuperarContrasena",
+		"/v1/Email/EnviarPassRecoveryEmail",
 		payload,
 		{
 			headers: {
@@ -224,7 +271,7 @@ export async function sendPasswordRecoveryEmailRaw(payload: RecoveryEmailRequest
 	}
 	const token = await login().catch(() => null);
 	const { data } = await apiClient.post(
-		"/v1/Email/EnviarRecuperarContrasena",
+		"/v1/Email/EnviarPassRecoveryEmail",
 		payload,
 		{
 			headers: {

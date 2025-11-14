@@ -1046,17 +1046,7 @@ export default function CreateEventScreen() {
               );
               return false;
             }
-            // No permitir fechas de venta anteriores al día de hoy (comparación por fecha local)
-            const saleIsBeforeToday = isBeforeTuple(getLocalTuple(new Date(ss)), getLocalTuple(new Date()));
-            if (saleIsBeforeToday) {
-              Alert.alert(
-                "Validación",
-                `La fecha de inicio de venta del día ${
-                  i + 1
-                } no puede ser anterior al día de hoy.`
-              );
-              return false;
-            }
+            // (Regla eliminada) Permitido iniciar venta antes o el mismo día de la creación.
           }
         }
       } catch (e) {
@@ -1607,19 +1597,14 @@ export default function CreateEventScreen() {
           const sy = new Date(inicio).getUTCFullYear();
           const fy = new Date(fin).getUTCFullYear();
           if ((sy && sy <= 1) || (fy && fy <= 1)) return true;
-          // No permitir inicio anterior a hoy
-          const startOnly = new Date(si);
-          startOnly.setHours(0, 0, 0, 0);
-          if (startOnly.getTime() < today.getTime()) return true;
+          // Permitimos inicio en el mismo día o días previos (la validación de "> ahora" ya se hace arriba para el evento)
           // si existen fechas de venta, validarlas también
           if (inicioVenta) {
             const svi = new Date(inicioVenta).getTime();
             if (!isFinite(svi)) return true;
             const syv = new Date(inicioVenta).getUTCFullYear();
             if (syv && syv <= 1) return true;
-            const saleOnly = new Date(svi);
-            saleOnly.setHours(0, 0, 0, 0);
-            if (saleOnly.getTime() < today.getTime()) return true;
+            // Permitimos que el inicio de venta sea hoy o anterior.
           }
           if (finVenta) {
             const sve = new Date(finVenta).getTime();
@@ -1633,7 +1618,7 @@ export default function CreateEventScreen() {
         if (bad) {
           Alert.alert(
             "Validación",
-            "Hay fechas inválidas o anteriores al día de hoy. Revisá las fechas antes de crear el evento."
+            "Hay fechas inválidas. Revisá las fechas antes de crear el evento."
           );
           return;
         }

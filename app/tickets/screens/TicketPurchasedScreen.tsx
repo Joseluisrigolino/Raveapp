@@ -1317,6 +1317,7 @@ function TicketPurchasedScreenContent() {
                     }
                     try {
                       setRefundSubmitting(true);
+                      try { console.log('[Refund] solicitando reembolso para compraIdFinal=', compraIdFinal); } catch {}
                       // Calcular importe a reembolsar (solo valor de entradas, excluyendo cost/service según requisito)
                       const related = entries.filter(e => String(e.compraId) === compraIdFinal);
                       const amount = related.reduce((acc, e) => acc + (typeof e.precio === 'number' ? e.precio : 0), 0);

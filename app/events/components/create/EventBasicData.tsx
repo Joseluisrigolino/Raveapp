@@ -139,7 +139,11 @@ export default function EventBasicData(props: Props) {
                   onChangeText={setNewPartyName}
                   placeholder="Nombre de la nueva fiesta"
                   labelStyle={{ height: 0, marginBottom: 0, padding: 0 }}
-                  inputStyle={{ width: "100%", marginBottom: 0 }}
+                  inputStyle={
+                    newPartyLocked
+                      ? { width: "100%", marginBottom: 0, backgroundColor: COLORS.borderInput, color: COLORS.textSecondary }
+                      : { width: "100%", marginBottom: 0 }
+                  }
                   editable={!newPartyLocked}
                 />
               </View>

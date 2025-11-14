@@ -728,6 +728,37 @@ export async function solicitarReembolso(idCompra: string): Promise<ReembolsoRes
   pushPathVariants("/v1/Pago/Reembolso");
   pushPathVariants("/v1/Pago/SolicitarReembolso");
 
+  // Variantes adicionales comunes en APIs similares
+  pushPost("/v1/Compra/Reembolso");
+  pushGet("/v1/Compra/Reembolso");
+  pushPut("/v1/Compra/Reembolso");
+  pushPathVariants("/v1/Compra/Reembolso");
+
+  pushPost("/v1/Compra/CancelarCompra");
+  pushGet("/v1/Compra/CancelarCompra");
+  pushPut("/v1/Compra/CancelarCompra");
+  pushPathVariants("/v1/Compra/CancelarCompra");
+
+  pushPost("/v1/Entrada/CancelarCompra");
+  pushGet("/v1/Entrada/CancelarCompra");
+  pushPut("/v1/Entrada/CancelarCompra");
+  pushPathVariants("/v1/Entrada/CancelarCompra");
+
+  pushPost("/v1/Pago/Refund");
+  pushGet("/v1/Pago/Refund");
+  pushPut("/v1/Pago/Refund");
+  pushPathVariants("/v1/Pago/Refund");
+
+  pushPost("/v1/Pago/Devolucion");
+  pushGet("/v1/Pago/Devolucion");
+  pushPut("/v1/Pago/Devolucion");
+  pushPathVariants("/v1/Pago/Devolucion");
+
+  pushPost("/v1/Pago/Reembolsar");
+  pushGet("/v1/Pago/Reembolsar");
+  pushPut("/v1/Pago/Reembolsar");
+  pushPathVariants("/v1/Pago/Reembolsar");
+
   let lastErr: any = null;
   const attempted: Array<{ index: number; method?: string; url?: string; params?: any; body?: any; status?: any; message?: any }> = [];
   for (const fn of attempts) {
@@ -756,9 +787,23 @@ export async function solicitarReembolso(idCompra: string): Promise<ReembolsoRes
     lastErr?.message ||
     "No se pudo solicitar el reembolso.";
   try {
-    console.warn("[solicitarReembolso] Falló todas las variantes", { idCompra, attempts: attempted.slice(0, 8) });
+    console.warn("[solicitarReembolso] Falló todas las variantes", { idCompra, attempts: attempted.slice(0, 12) });
   } catch {}
-  const mensajeDetallado = `${mensajeBase} (intentos: ${attempted.length}, último status: ${attempted.at(-1)?.status || 'desconocido'})`;
+  const last = attempted.at(-1);
+  const mensajeDetallado = `${mensajeBase} (intentos: ${attempted.length}, último status: ${last?.status || 'desconocido'})`;
+  // Afinar explicación en 404: puede ser compra inexistente o endpoint no implementado
+  if ((last?.status ?? 0) === 404) {
+    return {
+      ok: false,
+      mensaje:
+        `No se pudo solicitar el reembolso. El servidor respondió 404.
+Posibles causas:
+• La compra ${idCompra} no existe o no está paga.
+• El endpoint de reembolso no está disponible en este entorno.
+• La compra pertenece a otro entorno/tenant.
+Detalle: ${mensajeDetallado}`,
+    };
+  }
   return { ok: false, mensaje: mensajeDetallado };
 }
 
