@@ -3,6 +3,9 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import Constants from "expo-constants";
 import { loginUser, AuthUser as ApiAuthUser } from "@/app/auth/authHelpers";
 import { fbLoginWithGoogleIdToken, fbLogout, AuthUser as FbAuthUser, fbLoginWithGooglePopup } from "@/app/auth/firebaseAuthHelpers";
+import jwtDecode from "jwt-decode";
+import { apiClient, login as apiLogin } from "@/app/apis/apiConfig";
+import { getProfile, createUsuario } from "@/app/auth/userHelpers";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
@@ -26,6 +29,8 @@ interface AuthContextValue {
   login: (u: string, p: string) => Promise<AuthUser | null>;
   loginWithGoogle: (idToken: string) => Promise<AuthUser | null>;
   loginWithGooglePopup?: () => Promise<AuthUser | null>;
+  loginOrCreateWithGoogleIdToken?: (idToken: string) => Promise<ApiAuthUser | null>;
+  loginOrCreateWithGoogleProfile?: (p: { email: string; givenName?: string; familyName?: string; pictureUrl?: string }) => Promise<ApiAuthUser | null>;
   logout: () => void;
   isAuthenticated: boolean;
   hasRole: (role: string) => boolean;
@@ -39,6 +44,8 @@ const AuthContext = createContext<AuthContextValue>({
   login: async () => null,
   loginWithGoogle: async () => null,
   loginWithGooglePopup: async () => null,
+  loginOrCreateWithGoogleIdToken: async () => null,
+  loginOrCreateWithGoogleProfile: async () => null,
   logout: () => {},
   isAuthenticated: false,
   hasRole: () => false,
@@ -111,6 +118,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Comentario: dado un perfil de Google, busca el usuario por correo en el backend.
+  // Si existe, lo setea en contexto. Si no existe, lo crea con datos básicos y luego lo setea.
+  async function loginOrCreateWithGoogleProfile(p: { email: string; givenName?: string; familyName?: string; pictureUrl?: string }): Promise<ApiAuthUser | null> {
+    const email = String(p?.email || '').trim().toLowerCase();
+    if (!email) return null;
+    try {
+      // 1) Intentar obtener perfil existente
+      const existing = await getProfile(email).catch(() => null);
+      if (existing) {
+        setUser(existing as any);
+        await AsyncStorage.setItem('raveapp_user', JSON.stringify(existing));
+        return existing as any;
+      }
+
+      // 2) Crear usuario nuevo con datos básicos de Google
+      const token = await apiLogin().catch(() => null);
+      if (token) apiClient.defaults.headers.common.Authorization = `Bearer ${token}`;
+
+      const randomPass = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+      await createUsuario({
+        domicilio: {
+          localidad: { nombre: "", codigo: "" },
+          municipio: { nombre: "", codigo: "" },
+          provincia: { nombre: "", codigo: "" },
+          direccion: "",
+          latitud: 0,
+          longitud: 0,
+        },
+        nombre: (p.givenName || '').trim() || 'Usuario',
+        apellido: (p.familyName || '').trim(),
+        correo: email,
+        cbu: "",
+        dni: "",
+        telefono: "",
+        nombreFantasia: "",
+        bio: "0",
+        password: randomPass,
+        socials: { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
+        dtNacimiento: new Date('2000-01-01').toISOString(),
+      });
+
+      const created = await getProfile(email);
+      setUser(created as any);
+      await AsyncStorage.setItem('raveapp_user', JSON.stringify(created));
+      return created as any;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Comentario: decodifica id_token para extraer email/nombre y delega en el helper anterior.
+  async function loginOrCreateWithGoogleIdToken(idToken: string): Promise<ApiAuthUser | null> {
+    try {
+      const payload: any = jwtDecode(idToken);
+      const email = payload?.email || payload?.upn || '';
+      const givenName = payload?.given_name || payload?.givenName || '';
+      const familyName = payload?.family_name || payload?.familyName || '';
+      const pictureUrl = payload?.picture || '';
+      return await loginOrCreateWithGoogleProfile({ email, givenName, familyName, pictureUrl });
+    } catch {
+      return null;
+    }
+  }
+
   // utilidades memoizadas para evitar recrearlas en cada render
   const isAuthenticated = useMemo(() => !!user, [user]);
 
@@ -142,7 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, login, loginWithGoogle, loginWithGooglePopup, logout, isAuthenticated, hasRole, hasAnyRole, updateUsuario, stashLoginExtras }}
+      value={{ user, login, loginWithGoogle, loginWithGooglePopup, loginOrCreateWithGoogleIdToken, loginOrCreateWithGoogleProfile, logout, isAuthenticated, hasRole, hasAnyRole, updateUsuario, stashLoginExtras }}
     >
       {children}
     </AuthContext.Provider>

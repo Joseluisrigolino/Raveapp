@@ -46,7 +46,7 @@ export default function LoginScreen() {
     </Pressable>
   );
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, loginOrCreateWithGoogleIdToken } = useAuth() as any;
   const EX =
     (Constants?.expoConfig as any)?.extra ||
     (Constants as any)?.manifest2?.extra ||
@@ -118,8 +118,16 @@ export default function LoginScreen() {
             const res = await (promptAsync as any)({ useProxy: true });
             if (res?.type !== "success") return;
             const idToken = res?.params?.id_token as string | undefined;
-            console.log("Google id_token:", idToken);
-            Alert.alert("Login con Google exitoso");
+            if (!idToken) {
+              Alert.alert("Error", "No se recibió id_token de Google");
+              return;
+            }
+            const ok = await (loginOrCreateWithGoogleIdToken?.(idToken));
+            if (ok) {
+              nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
+            } else {
+              Alert.alert("Error", "No se pudo iniciar sesión con Google");
+            }
           } catch (e) {
             Alert.alert("Error", "No se pudo iniciar sesión con Google");
           } finally {

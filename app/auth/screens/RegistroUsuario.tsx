@@ -23,7 +23,7 @@ import { mailsApi } from "@/app/apis/mailsApi";
 export default function RegisterUserScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const { loginWithGooglePopup, loginWithGoogle, login } = useAuth();
+  const { loginWithGooglePopup, loginWithGoogle, login, loginOrCreateWithGoogleIdToken, loginOrCreateWithGoogleProfile } = useAuth() as any;
   // Google Cloud removed; keep only email/password registration
   const isAndroid = Platform.OS === "android";
   const isIOS = Platform.OS === "ios";
@@ -175,87 +175,16 @@ export default function RegisterUserScreen() {
             const res = await (promptAsync as any)({ useProxy: isExpoGo });
             if (res.type !== "success") return;
             const idToken = res.authentication?.idToken || (res.params?.id_token as string | undefined);
-            const accessToken = res.authentication?.accessToken as string | undefined;
-            const tokenToUse = idToken || (accessToken ? `access:${accessToken}` : undefined);
-            if (!tokenToUse) {
+            if (!idToken) {
               Alert.alert("Error", "No se recibió id_token de Google");
               return;
             }
-            const u = await loginWithGoogle(tokenToUse);
-            if (!u) {
-              Alert.alert("Error", "No se pudo registrar/iniciar con Google (Firebase)");
+            const ok = await loginOrCreateWithGoogleIdToken?.(idToken);
+            if (!ok) {
+              Alert.alert("Error", "No se pudo registrar/iniciar con Google");
               return;
             }
-            // Sincronizar con API (update o create)
-            try {
-              const rootToken = await apiLogin();
-              apiClient.defaults.headers.common.Authorization = `Bearer ${rootToken}`;
-              const correo = (u as any)?.username || "";
-              const displayName = `${(u as any)?.nombre ?? ""} ${(u as any)?.apellido ?? ""}`.trim();
-              const [nombreFB, ...restFB] = displayName.split(" ");
-              const apellidoFB = restFB.join(" ").trim();
-              try {
-                const perfil = await getProfile(correo);
-                const payload = {
-                  idUsuario: perfil.idUsuario,
-                  nombre: nombreFB || perfil.nombre,
-                  apellido: apellidoFB || perfil.apellido,
-                  correo: perfil.correo,
-                  dni: perfil.dni || "",
-                  telefono: perfil.telefono || "",
-                  cbu: perfil.cbu || "",
-                  nombreFantasia: perfil.nombreFantasia || "",
-                  bio: perfil.bio || "",
-                  dtNacimiento: perfil.dtNacimiento || new Date().toISOString(),
-                  domicilio: perfil.domicilio || {
-                    localidad: { nombre: "", codigo: "" },
-                    municipio: { nombre: "", codigo: "" },
-                    provincia: { nombre: "", codigo: "" },
-                    direccion: "",
-                    latitud: 0,
-                    longitud: 0,
-                  },
-                  cdRoles: perfil.cdRoles || [],
-                  socials: perfil.socials || {
-                    idSocial: "",
-                    mdInstagram: "",
-                    mdSpotify: "",
-                    mdSoundcloud: "",
-                  },
-                } as const;
-                await updateUsuario(payload as any);
-              } catch (err: any) {
-                const randomPassword = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-                const [nombre, ...rest] = (displayName || "").split(" ");
-                const apellido = rest.join(" ").trim();
-                const createPayload = {
-                  domicilio: {
-                    localidad: { nombre: "", codigo: "" },
-                    municipio: { nombre: "", codigo: "" },
-                    provincia: { nombre: "", codigo: "" },
-                    direccion: "",
-                    latitud: 0,
-                    longitud: 0,
-                  },
-                  nombre: nombre || "",
-                  apellido: apellido || "",
-                  correo,
-                  cbu: "",
-                  dni: "",
-                  telefono: "",
-                  nombreFantasia: "",
-                  bio: "0",
-                  password: randomPassword,
-                  socials: { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
-                  dtNacimiento: new Date().toISOString(),
-                };
-                await createUsuario(createPayload as any);
-              }
-              nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
-            } catch (syncErr) {
-              console.error("Google register sync error:", syncErr);
-              Alert.alert("Atención", "Te registraste con Google pero no se pudo sincronizar con la base de datos.");
-            }
+            nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
           } catch (e) {
             Alert.alert("Error", "No se pudo completar el registro con Google");
           }
@@ -391,74 +320,13 @@ export default function RegisterUserScreen() {
                         Alert.alert("Error", "No se pudo registrar/iniciar con Google (Firebase)");
                         return;
                       }
-                      // Sincronizar con API: update si existe, si no create
-                      try {
-                        const rootToken = await apiLogin();
-                        apiClient.defaults.headers.common.Authorization = `Bearer ${rootToken}`;
-                        const correo = (u as any)?.username || "";
-                        const displayName = `${(u as any)?.nombre ?? ""} ${(u as any)?.apellido ?? ""}`.trim();
-                        const [nombreFB, ...restFB] = displayName.split(" ");
-                        const apellidoFB = restFB.join(" ").trim();
-                        try {
-                          const perfil = await getProfile(correo);
-                          const payload = {
-                            idUsuario: perfil.idUsuario,
-                            nombre: nombreFB || perfil.nombre,
-                            apellido: apellidoFB || perfil.apellido,
-                            correo: perfil.correo,
-                            dni: perfil.dni || "",
-                            telefono: perfil.telefono || "",
-                            cbu: perfil.cbu || "",
-                            nombreFantasia: perfil.nombreFantasia || "",
-                            bio: perfil.bio || "",
-                            dtNacimiento: perfil.dtNacimiento || new Date().toISOString(),
-                            domicilio: perfil.domicilio || {
-                              localidad: { nombre: "", codigo: "" },
-                              municipio: { nombre: "", codigo: "" },
-                              provincia: { nombre: "", codigo: "" },
-                              direccion: "",
-                              latitud: 0,
-                              longitud: 0,
-                            },
-                            cdRoles: perfil.cdRoles || [],
-                            socials: perfil.socials || {
-                              idSocial: "",
-                              mdInstagram: "",
-                              mdSpotify: "",
-                              mdSoundcloud: "",
-                            },
-                          } as const;
-                          await updateUsuario(payload as any);
-                        } catch (err: any) {
-                          const randomPassword = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-                          const [nombre, ...rest] = (displayName || "").split(" ");
-                          const apellido = rest.join(" ").trim();
-                          const createPayload = {
-                            domicilio: {
-                              localidad: { nombre: "", codigo: "" },
-                              municipio: { nombre: "", codigo: "" },
-                              provincia: { nombre: "", codigo: "" },
-                              direccion: "",
-                              latitud: 0,
-                              longitud: 0,
-                            },
-                            nombre: nombre || "",
-                            apellido: apellido || "",
-                            correo,
-                            cbu: "",
-                            dni: "",
-                            telefono: "",
-                            nombreFantasia: "",
-                                bio: "0",
-                            password: randomPassword,
-                            socials: { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
-                            dtNacimiento: new Date().toISOString(),
-                          };
-                          await createUsuario(createPayload as any);
-                        }
-                      } catch (syncErr) {
-                        console.error("Google register sync error:", syncErr);
-                        Alert.alert("Atención", "Te registraste con Google pero no se pudo sincronizar con la base de datos.");
+                      const email = (u as any)?.username || (u as any)?.email || "";
+                      const givenName = (u as any)?.nombre || (u as any)?.displayName || "";
+                      const familyName = (u as any)?.apellido || "";
+                      const ok = await loginOrCreateWithGoogleProfile?.({ email, givenName, familyName });
+                      if (!ok) {
+                        Alert.alert("Atención", "No se pudo sincronizar tu cuenta de Google con la base de datos.");
+                        return;
                       }
                       nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
                     } catch (e) {

@@ -95,6 +95,7 @@ export function buildCancellationEmailBody(params: {
     fechaCompra,
     numeroOperacionMP = "",
   } = params;
+
   const fechaFmt = (() => {
     const d = new Date(fechaCompra);
     if (!isNaN(d.getTime()))
@@ -103,9 +104,32 @@ export function buildCancellationEmailBody(params: {
       ).padStart(2, "0")}/${d.getFullYear()}`;
     return String(fechaCompra);
   })();
-  const importeStr = `$ ${importeReembolsado}`;
-  const titulo = `RaveApp - Cancelación de entradas a ${nombreEvento}`;
-  const cuerpo = `Estimado ${nombreUsuario},\n\nHas cancelado tu/s entrada/s al evento **${nombreEvento}** por un importe de **${importeStr}**, que habias adquirido el dia ${fechaFmt}.\nDicho importe se te ha reembolsado al medio de pago que hayas utilizado en MercadoPago y lo verás acreditado dentro de los 7 dias habiles.\n\nNumero de opercaion de MercadoPago: ${numeroOperacionMP}\n\nAtentamente,\nEl equipo de **RaveApp**`;
+
+  const importeStr = `$ ${
+    typeof importeReembolsado === "number"
+      ? importeReembolsado.toLocaleString("es-AR")
+      : String(importeReembolsado)
+  }`;
+
+  // Título alineado al ejemplo de tu compañero
+  const titulo = `Cancelación de entradas a evento ${nombreEvento}`;
+
+  // Cuerpo en HTML, como en el ejemplo compartido
+  const operacionHtml = numeroOperacionMP
+    ? `<p>Número de operación de MercadoPago: ${numeroOperacionMP}</p>`
+    : "";
+
+  const cuerpo = `
+<p>Estimado ${nombreUsuario},</p>
+<p>
+Has cancelado tu/s entrada/s al evento <strong>${nombreEvento}</strong> por un importe de <strong>${importeStr}</strong>,
+que habías adquirido el día ${fechaFmt}.<br>
+Dicho importe se te ha reembolsado al medio de pago que hayas utilizado en MercadoPago y lo verás acreditado dentro de los 7 días hábiles.
+</p>
+${operacionHtml}
+<p>Atentamente,
+`.trim();
+
   return { titulo, cuerpo };
 }
 
