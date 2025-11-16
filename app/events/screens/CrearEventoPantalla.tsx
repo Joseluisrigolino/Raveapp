@@ -1124,6 +1124,34 @@ export default function CreateEventScreen() {
     }
   };
 
+  // Variante para campos de venta (inicioVenta/finVenta) que compensa el corrimiento de zona.
+  // Algunas APIs .NET interpretan valores sin zona como hora local del servidor y luego los convierten a UTC,
+  // lo que en servidores configurados en UTC-3 termina guardando +3 horas en BBDD.
+  // Para preservar el instante real elegido por el usuario, generamos una fecha "naive" ya ajustada
+  // restando el timezone offset local. De esa forma, cuando el backend sume el offset al guardar en UTC,
+  // el horario final coincide con el seleccionado en pantalla.
+  const formatBackendIsoVenta = (
+    d?: Date | string | undefined | null
+  ): string | undefined => {
+    if (!d) return undefined;
+    try {
+      const dt = new Date(d as any);
+      if (!isFinite(dt.getTime())) return undefined;
+      const offsetMs = dt.getTimezoneOffset() * 60 * 1000; // minutos -> ms
+      const adj = new Date(dt.getTime() - offsetMs);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const YYYY = adj.getFullYear();
+      const MM = pad(adj.getMonth() + 1);
+      const DD = pad(adj.getDate());
+      const hh = pad(adj.getHours());
+      const mm = pad(adj.getMinutes());
+      const ss = pad(adj.getSeconds());
+      return `${YYYY}-${MM}-${DD}T${hh}:${mm}:${ss}`;
+    } catch {
+      return undefined;
+    }
+  };
+
   async function createPendingEntities(userId: string) {
     const result: {
       partyCreated?: any;
@@ -1539,15 +1567,15 @@ export default function CreateEventScreen() {
         fechas: daySchedules.map((d, i) => ({
           inicio: formatBackendIso(d.start),
           fin: formatBackendIso(d.end),
-          inicioVenta: formatBackendIso(daySaleConfigs[i]?.saleStart),
-          finVenta: formatBackendIso(daySaleConfigs[i]?.sellUntil),
+          inicioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart),
+          finVenta: formatBackendIsoVenta(daySaleConfigs[i]?.sellUntil),
           // include both correct and typo spellings for backend compatibility
-          fechaInicioVenta: formatBackendIso(daySaleConfigs[i]?.saleStart),
-          FechaInicioVenta: formatBackendIso(daySaleConfigs[i]?.saleStart),
-          fechaIncioVenta: formatBackendIso(daySaleConfigs[i]?.saleStart),
-          FechaIncioVenta: formatBackendIso(daySaleConfigs[i]?.saleStart),
-          fechaFinVenta: formatBackendIso(daySaleConfigs[i]?.sellUntil),
-          FechaFinVenta: formatBackendIso(daySaleConfigs[i]?.sellUntil),
+          fechaInicioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart),
+          FechaInicioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart),
+          fechaIncioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart),
+          FechaIncioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart),
+          fechaFinVenta: formatBackendIsoVenta(daySaleConfigs[i]?.sellUntil),
+          FechaFinVenta: formatBackendIsoVenta(daySaleConfigs[i]?.sellUntil),
           estado: 0,
         })),
         // permiso explícito para backends que esperan campos raíz
@@ -1561,15 +1589,15 @@ export default function CreateEventScreen() {
           selectedPartyId ||
           null,
         idUsuario: userId,
-        inicioVenta: formatBackendIso(daySaleConfigs[0]?.saleStart),
-        finVenta: formatBackendIso(daySaleConfigs[0]?.sellUntil),
+        inicioVenta: formatBackendIsoVenta(daySaleConfigs[0]?.saleStart),
+        finVenta: formatBackendIsoVenta(daySaleConfigs[0]?.sellUntil),
         // duplicate top-level sale fields with both correct and typo spellings
-        FechaInicioVenta: formatBackendIso(daySaleConfigs[0]?.saleStart),
-        FechaFinVenta: formatBackendIso(daySaleConfigs[0]?.sellUntil),
-        fechaInicioVenta: formatBackendIso(daySaleConfigs[0]?.saleStart),
-        fechaFinVenta: formatBackendIso(daySaleConfigs[0]?.sellUntil),
-        fechaIncioVenta: formatBackendIso(daySaleConfigs[0]?.saleStart),
-        FechaIncioVenta: formatBackendIso(daySaleConfigs[0]?.saleStart),
+        FechaInicioVenta: formatBackendIsoVenta(daySaleConfigs[0]?.saleStart),
+        FechaFinVenta: formatBackendIsoVenta(daySaleConfigs[0]?.sellUntil),
+        fechaInicioVenta: formatBackendIsoVenta(daySaleConfigs[0]?.saleStart),
+        fechaFinVenta: formatBackendIsoVenta(daySaleConfigs[0]?.sellUntil),
+        fechaIncioVenta: formatBackendIsoVenta(daySaleConfigs[0]?.saleStart),
+        FechaIncioVenta: formatBackendIsoVenta(daySaleConfigs[0]?.saleStart),
         isAfter,
         isLgbt: isLGBT,
         nombre: eventName,

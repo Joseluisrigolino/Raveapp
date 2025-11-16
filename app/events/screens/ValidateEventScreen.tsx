@@ -15,6 +15,7 @@ import ProtectedRoute from "@/app/auth/ProtectedRoute";
 import { fetchEvents, setEventStatus, ESTADO_CODES, getEventFlags, EventItemWithExtras, fetchGenres, ApiGenero } from "@/app/events/apis/eventApi";
 import { fetchEntradasFechaRaw, ApiEntradaFechaRaw, getTipoMap } from "@/app/events/apis/entradaApi";
 import { apiClient, login } from "@/app/apis/apiConfig";
+import { sendGenericEmail } from "@/app/apis/mailsApi";
 import * as nav from "@/utils/navigation";
 import ROUTES from "@/routes";
 import { EventItem } from "@/interfaces/EventItem";
@@ -303,8 +304,34 @@ export default function ValidateEventScreen() {
       try {
         setLoading(true);
         await setEventStatus(String(eventData.id), ESTADO_CODES.APROBADO);
-  Alert.alert("Éxito", "El evento fue validado.");
-  nav.replace(router, { pathname: ROUTES.ADMIN.EVENTS_VALIDATE.LIST, params: { refresh: Date.now() } });
+
+        // Enviar mail genérico de aprobación (best-effort)
+        try {
+          const raw: any = (eventData as any)?.__raw ?? {};
+          const to: string = String(
+            (eventData as any)?.ownerEmail ||
+            raw?.ownerEmail ||
+            raw?.propietario?.correo ||
+            (eventData as any)?.usuario?.correo ||
+            ""
+          ).trim();
+
+          if (to) {
+            const nombreEvento: string = String(
+              (eventData as any)?.title || raw?.nombre || raw?.dsNombre || raw?.titulo || "Evento"
+            ).trim();
+            const titulo = `Evento aprobado: ${nombreEvento}`;
+            const cuerpo = `<p>El evento puede tardar algunos minutos en aparecer en RaveApp.</p>`;
+            const botonUrl = `https://raveapp.com.ar/evento/${String(eventData.id)}`;
+            const botonTexto = "Ver evento";
+            await sendGenericEmail({ to, titulo, cuerpo, botonUrl, botonTexto });
+          }
+        } catch (mailErr) {
+          console.warn("[ValidateEvent] Error enviando mail de aprobación:", (mailErr as any)?.message || mailErr);
+        }
+
+        Alert.alert("Éxito", "El evento fue validado.");
+        nav.replace(router, { pathname: ROUTES.ADMIN.EVENTS_VALIDATE.LIST, params: { refresh: Date.now() } });
       } catch (e: any) {
         console.error("Error validando evento:", e);
         Alert.alert("Error", e?.message || "No se pudo validar el evento.");
@@ -332,11 +359,38 @@ export default function ValidateEventScreen() {
         // optimistic update: marcar localmente como RECHAZADO (cdEstado y estado)
         setEventData(prevData => prevData ? { ...prevData, cdEstado: ESTADO_CODES.RECHAZADO, estado: ESTADO_CODES.RECHAZADO } : prevData);
 
+        // 1) Cambiar estado en backend
         await setEventStatus(String(eventData.id), ESTADO_CODES.RECHAZADO, { motivoRechazo: rejectReason.trim() });
 
-  Alert.alert("Evento rechazado", "El evento fue marcado como rechazado.");
-  // modal eliminado
-  nav.replace(router, { pathname: ROUTES.ADMIN.EVENTS_VALIDATE.LIST, params: { refresh: Date.now() } });
+        // 2) Enviar mail al propietario (best-effort)
+        try {
+          // Intentar resolver email y nombre de evento desde eventData y su raw
+          const raw: any = (eventData as any)?.__raw ?? {};
+          const to: string = String(
+            (eventData as any)?.ownerEmail ||
+            raw?.ownerEmail ||
+            raw?.propietario?.correo ||
+            (eventData as any)?.usuario?.correo ||
+            ""
+          ).trim();
+
+          if (to) {
+            const nombreEvento: string = String(
+              (eventData as any)?.title || raw?.nombre || raw?.dsNombre || raw?.titulo || "Evento"
+            ).trim();
+            const motivo = String(rejectReason || "").trim();
+            const titulo = `Evento rechazado: ${nombreEvento}`;
+            const cuerpo = `<p><strong>Motivo de rechazo:</strong> ${motivo.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
+            await sendGenericEmail({ to, titulo, cuerpo });
+          }
+        } catch (mailErr) {
+          console.warn("[ValidateEvent] Error enviando mail de rechazo:", (mailErr as any)?.message || mailErr);
+          // No interrumpimos el flujo de rechazo si el mail falla
+        }
+
+        Alert.alert("Evento rechazado", "El evento fue marcado como rechazado.");
+        // navegar a listado
+        nav.replace(router, { pathname: ROUTES.ADMIN.EVENTS_VALIDATE.LIST, params: { refresh: Date.now() } });
       } catch (e: any) {
         console.error("Error rechazando evento:", e);
         Alert.alert("Error", e?.message || "No se pudo rechazar el evento.");

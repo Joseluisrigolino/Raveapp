@@ -34,7 +34,36 @@ const toTitleCase = (s?: string | null) => {
 const createEmptyDayTickets = (): TicketDay => ({ genQty: '', genPrice: '', ebGenQty: '', ebGenPrice: '', vipQty: '', vipPrice: '', ebVipQty: '', ebVipPrice: '' });
 const createEmptySchedule = (): { start: Date; end: Date } => ({ start: new Date(), end: new Date() });
 const createEmptySaleConfig = (): SaleCfgDay => ({ saleStart: new Date(), sellUntil: new Date() });
-const formatBackendIso = (d?: Date | null) => (d ? new Date(d).toISOString() : undefined);
+// Igual que en CreateEvent: serialización local sin zona
+const formatBackendIso = (d?: Date | null) => {
+  if (!d) return undefined;
+  const dt = new Date(d);
+  if (!isFinite(dt.getTime())) return undefined;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const YYYY = dt.getFullYear();
+  const MM = pad(dt.getMonth() + 1);
+  const DD = pad(dt.getDate());
+  const hh = pad(dt.getHours());
+  const mm = pad(dt.getMinutes());
+  const ss = pad(dt.getSeconds());
+  return `${YYYY}-${MM}-${DD}T${hh}:${mm}:${ss}`;
+};
+// Compensación para venta: restar offset local para evitar corrimiento en backend
+const formatBackendIsoVenta = (d?: Date | null) => {
+  if (!d) return undefined;
+  const dt = new Date(d);
+  if (!isFinite(dt.getTime())) return undefined;
+  const offsetMs = dt.getTimezoneOffset() * 60 * 1000;
+  const adj = new Date(dt.getTime() - offsetMs);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const YYYY = adj.getFullYear();
+  const MM = pad(adj.getMonth() + 1);
+  const DD = pad(adj.getDate());
+  const hh = pad(adj.getHours());
+  const mm = pad(adj.getMinutes());
+  const ss = pad(adj.getSeconds());
+  return `${YYYY}-${MM}-${DD}T${hh}:${mm}:${ss}`;
+};
 
 export default function OwnerEventModifyScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -221,10 +250,13 @@ export default function OwnerEventModifyScreen() {
     if (!eventName.trim()) { Alert.alert('Faltan datos', 'Ingresá el nombre del evento.'); return; }
     try {
       setSaving(true);
-      const fechas = daySchedules.map((d,i) => ({ idFecha: remoteFechaIds[i], inicio: formatBackendIso(d.start), fin: formatBackendIso(d.end), inicioVenta: formatBackendIso(daySaleConfigs[i]?.saleStart), finVenta: formatBackendIso(daySaleConfigs[i]?.sellUntil) }));
+      const fechas = daySchedules.map((d,i) => ({ idFecha: remoteFechaIds[i], inicio: formatBackendIso(d.start), fin: formatBackendIso(d.end), inicioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart), finVenta: formatBackendIsoVenta(daySaleConfigs[i]?.sellUntil) }));
       const domicilio: any = { provincia: provinceName || undefined, provinciaId: provinceId || undefined, municipio: municipalityName || undefined, municipioId: municipalityId || undefined, localidad: localityName || undefined, localidadId: localityId || undefined, direccion: street || undefined };
       const idArtistas = selectedArtists.map(a => (a as any).idArtista).filter(Boolean) as string[];
-  const body: any = { nombre: eventName, descripcion: eventDescription, genero: selectedGenres, domicilio, isAfter, isLGBT: isLGBT, inicioEvento: formatBackendIso(daySchedules[0]?.start), finEvento: formatBackendIso(daySchedules[0]?.end), fechas, idArtistas, video: videoLink || undefined, musica: musicLink || undefined, soundCloud: musicLink || undefined };
+  const body: any = { nombre: eventName, descripcion: eventDescription, genero: selectedGenres, domicilio, isAfter, isLGBT: isLGBT, inicioEvento: formatBackendIso(daySchedules[0]?.start), finEvento: formatBackendIso(daySchedules[0]?.end),
+        inicioVenta: formatBackendIsoVenta(daySaleConfigs[0]?.saleStart),
+        finVenta: formatBackendIsoVenta(daySaleConfigs[0]?.sellUntil),
+        fechas, idArtistas, video: videoLink || undefined, musica: musicLink || undefined, soundCloud: musicLink || undefined };
       await updateEvent(eventId, body);
       Alert.alert('Listo', 'Cambios guardados correctamente.');
     } catch (e: any) { Alert.alert('Error', e?.message || 'No se pudo guardar el evento.'); }

@@ -31,6 +31,8 @@ import {
 } from "@/app/events/apis/eventApi";
 import { EventItem } from "@/interfaces/EventItem";
 import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
+import { mediaApi } from "@/app/apis/mediaApi";
+import { getUsuarioById, getProfile } from "@/app/auth/userHelpers";
 
 // helpers
 // Comentario: imagen por defecto si no hay imagen del evento
@@ -60,6 +62,8 @@ export default function AdminEventsToValidateScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchText, setSearchText] = useState<string>("");
   const [genreMap, setGenreMap] = useState<Map<number, string>>(new Map());
+  const [ownerAvatars, setOwnerAvatars] = useState<Record<string, string>>({});
+  const [ownerEmails, setOwnerEmails] = useState<Record<string, string>>({});
 
   // Comentario: tabs según rutas (UI en español se mantiene)
   const currentScreen = path?.split("/").pop() || "";
@@ -119,6 +123,56 @@ export default function AdminEventsToValidateScreen() {
     };
   }, [refresh]);
 
+  // Enriquecer info de propietarios: avatar + email (si falta)
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!Array.isArray(events) || events.length === 0) return;
+        const ids = Array.from(
+          new Set(
+            events
+              .map((ev: any) => String(
+                ev?.ownerId || ev?.propietario?.idUsuario || ev?.__raw?.propietario?.idUsuario || ev?.__raw?.usuario?.idUsuario || ""
+              ).trim())
+              .filter(Boolean)
+          )
+        );
+        if (ids.length === 0) return;
+
+        // Avatares
+        const avatarPairs = await Promise.all(
+          ids.map(async (id) => {
+            try {
+              const url = await mediaApi.getFirstImage(id);
+              return url ? ([id, url] as [string, string]) : null;
+            } catch { return null; }
+          })
+        );
+        const avatarMap: Record<string, string> = { ...ownerAvatars };
+        for (const p of avatarPairs) { if (p) avatarMap[p[0]] = p[1]; }
+        if (Object.keys(avatarMap).length) setOwnerAvatars(avatarMap);
+
+        // Emails faltantes
+        const emailMap: Record<string, string> = { ...ownerEmails };
+        await Promise.all(ids.map(async (id) => {
+          // si ya tenemos email cacheado, saltar
+          if (emailMap[id]) return;
+          // buscar en los eventos por si alguno ya lo trae
+          const existing = (events as any[]).find((e) => String((e as any)?.ownerId || "") === id);
+          const fromEvent = existing && ((existing as any).ownerEmail || (existing as any).__raw?.propietario?.correo || (existing as any).__raw?.usuario?.correo);
+          if (fromEvent) { emailMap[id] = String(fromEvent); return; }
+          try {
+            const profile = await getUsuarioById(id);
+            if (profile?.correo) emailMap[id] = String(profile.correo);
+          } catch {
+            // fallback opcional: si tuviéramos un mail aproximado podríamos usar getProfile(mail)
+          }
+        }));
+        if (Object.keys(emailMap).length) setOwnerEmails(emailMap);
+      } catch {}
+    })();
+  }, [events]);
+
   // Comentario: filtrar por texto en título, dirección o datos básicos del propietario
   const filteredEvents = useMemo(() => {
     const q = searchText.toLowerCase();
@@ -164,11 +218,15 @@ export default function AdminEventsToValidateScreen() {
       raw.propietario?.nombre ||
       raw.ownerDisplayName ||
       "N/D";
+    const ownerIdStr = String(
+      raw.ownerId || raw.owner?.id || raw.propietario?.idUsuario || raw.__raw?.propietario?.idUsuario || raw.__raw?.usuario?.idUsuario || ""
+    ).trim();
     const ownerEmail =
       raw.ownerEmail ||
       raw.owner?.email ||
       raw.propietario?.correo ||
       raw.email ||
+      (ownerIdStr ? ownerEmails[ownerIdStr] : null) ||
       null;
 
     return (
@@ -209,13 +267,17 @@ export default function AdminEventsToValidateScreen() {
           </Text>
 
           <View style={styles.ownerRow}>
-            <View style={styles.avatarCircle}>
-              <MaterialCommunityIcons
-                name="account-outline"
-                size={18}
-                color={COLORS.textPrimary}
-              />
-            </View>
+            {ownerIdStr && ownerAvatars[ownerIdStr] ? (
+              <Image source={getSafeImageSource(ownerAvatars[ownerIdStr])} style={styles.ownerAvatar} />
+            ) : (
+              <View style={styles.avatarCircle}>
+                <MaterialCommunityIcons
+                  name="account-outline"
+                  size={18}
+                  color={COLORS.textPrimary}
+                />
+              </View>
+            )}
             <View style={{ flex: 1 }}>
               <Text style={styles.ownerName} numberOfLines={1}>
                 {ownerName}
@@ -356,6 +418,14 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderInput,
     alignItems: "center",
     justifyContent: "center",
+  },
+  ownerAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.backgroundLight,
+    borderWidth: 1,
+    borderColor: COLORS.borderInput,
   },
   ownerName: {
     color: COLORS.textPrimary,
