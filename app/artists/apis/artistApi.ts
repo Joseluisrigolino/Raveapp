@@ -2,7 +2,7 @@
 import { apiClient, login } from "@/app/apis/apiConfig";
 import { mediaApi } from "@/app/apis/mediaApi";
 import { Artist } from "@/app/artists/types/Artist";
-import { ApiArtistResponse } from "@/app/artists/types/api/ApiArtist";
+import { ApiArtistResponse } from "@/app/artists/types/api-types/ApiArtist";
 
 // =====================
 // Helpers

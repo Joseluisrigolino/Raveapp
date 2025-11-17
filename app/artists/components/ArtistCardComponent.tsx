@@ -4,10 +4,10 @@ import React from "react";
 import {
   View,
   Text,
-  Image,
   StyleSheet,
   TouchableOpacity,
 } from "react-native";
+import ArtistImage from "@/app/artists/components/ArtistImageComponent";
 import { Artist } from "@/app/artists/types/Artist";
 
 type Props = {
@@ -18,17 +18,7 @@ type Props = {
 export default function ArtistCardComponent({ artist, onPress }: Props) {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress}>
-      {artist.image ? (
-        <Image
-          source={{ uri: artist.image }}
-          style={styles.image}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={[styles.image, styles.placeholder]}>
-          {/* Aquí podrías poner un icono de “sin foto” si querés */}
-        </View>
-      )}
+      <ArtistImage imageUrl={artist.image} size={100} style={styles.image} />
       <Text style={styles.name}>{artist.name}</Text>
     </TouchableOpacity>
   );

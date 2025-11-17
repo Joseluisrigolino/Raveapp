@@ -1,36 +1,48 @@
 // src/screens/admin/ManageArtistsScreen.tsx
 
+// Import de React y hooks principales
 import React, { useState, useEffect, useCallback } from "react";
+// Componentes y utilidades de React Native
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   Alert,
-  TouchableOpacity,
-  Image,
   ActivityIndicator,
 } from "react-native";
+// SafeArea para evitar zonas no seguras en iOS/Android
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+// Router y helpers de navegación de Expo
 import { useRouter, usePathname } from "expo-router";
 import * as nav from "@/utils/navigation";
 import { ROUTES } from "../../../routes";
 import { useFocusEffect } from "@react-navigation/native";
 
+// Componentes comunes de la app (header, footer, búsqueda, etc.)
 import Header from "@/components/layout/HeaderComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import Footer from "@/components/layout/FooterComponent";
 import SearchBarComponent from "@/components/common/SearchBarComponent";
-import {
-  fetchArtistsFromApi,
-  deleteArtistFromApi,
-} from "@/app/artists/apis/artistApi";
-import { mediaApi } from "@/app/apis/mediaApi";
+// API para obtener artistas
+import useGetArtists from "@/app/artists/services/useGetArtists";
+// Tipo Artist
 import { Artist } from "@/app/artists/types/Artist";
+// Contexto de autenticación (para saber roles)
 import { useAuth } from "@/app/auth/AuthContext";
-import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
+// Constantes de estilo global
+import { COLORS, FONT_SIZES, FONTS } from "@/styles/globalStyles";
+// Componentes específicos del listado admin de artistas
+import AdminCardComponent from "@/app/artists/components/admin/card-admin-artist/AdminCardComponent";
+import AdminNewArtistBtn from "@/app/artists/components/admin/AdminNewArtistBtn";
+// Popups: confirmación y error
+import AdminCardPopupEliminate from "@/app/artists/components/admin/card-admin-artist/AdminCardPopupEliminate";
+import AdminCardPopupEliminateError from "@/app/artists/components/admin/card-admin-artist/AdminCardPopupEliminateError";
+// Hook que centraliza la lógica de borrado
+import { useArtistDelete } from "@/app/artists/services/useArtistDelete";
 
+// Componente principal de la pantalla de administración de artistas
+// Muestra la lista de artistas (con acciones de admin) y permite buscar/editar/eliminar
 export default function AdminArtistScreen() {
   // router y path para tabs y navegación
   const router = useRouter();
@@ -39,101 +51,70 @@ export default function AdminArtistScreen() {
   const { hasRole } = useAuth();
   const isAdmin = hasRole("admin");
 
-  // estados simples para lista, búsqueda y carga
-  const [artistList, setArtistList] = useState<Artist[]>([]);
+  // estados locales:
+  // - `search`: texto del buscador
+  // - `artistsData`: datos traídos por el hook `useGetArtists` (proviene de la API)
+  // - `artistList`: copia local sincronizada con `artistsData` para permitir
+  //   operaciones locales (ej. useArtistDelete modifica esta lista)
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
+  const { data: artistsData, isLoading, error, refresh } = useGetArtists();
+  const [artistList, setArtistList] = useState<Artist[]>([]);
 
-  // helper para formatear fecha en español
-  const formatDate = (iso?: string) => {
-    if (!iso) return "";
-    try {
-      const d = new Date(iso);
-      const day = String(d.getDate()).padStart(2, "0");
-      const month = d.toLocaleString("es-ES", { month: "long" });
-      const monthCap = month.charAt(0).toUpperCase() + month.slice(1);
-      return `${day} ${monthCap} ${d.getFullYear()}`;
-    } catch {
-      return iso;
-    }
-  };
+  // hook que centraliza la lógica de eliminación de artistas.
+  // Devuelve estado de visibilidad de popups, handlers y flags de borrado.
+  const {
+    deleteVisible,
+    deleteTarget,
+    deleting,
+    errorVisible,
+    errorArtistName,
+    onDelete,
+    confirmDelete,
+    closePopup,
+    closeError,
+  } = useArtistDelete(artistList, setArtistList);
 
-  // carga inicial y cada vez que la pantalla recupera foco
-  const load = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchArtistsFromApi();
-      // ordenar alfabéticamente, forma simple
-      data.sort((a, b) =>
-        a.name.localeCompare(b.name, "es", { sensitivity: "base" })
-      );
-      setArtistList(data);
-    } catch (e) {
-      console.log("Error loading artists", e);
-      Alert.alert("Error", "No se pudo cargar la lista de artistas");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // sincronizar la lista local con los datos que trae el hook
+  // además ordenamos alfabéticamente para mostrar siempre orden correcto
   useEffect(() => {
-    load();
-  }, []);
+    // hacemos una copia y la ordenamos por nombre usando locale 'es'
+    const list = (artistsData || []).slice();
+    list.sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
+    setArtistList(list);
+  }, [artistsData]);
 
+  // Cuando la pantalla recibe foco (vuelve a primer plano), forzamos
+  // una recarga de datos para mantener la lista sincronizada.
   useFocusEffect(
     useCallback(() => {
-      load();
-    }, [])
+      refresh();
+    }, [refresh])
   );
 
-  // navegar a crear artista
+  // Navegación: ir a crear nuevo artista
   const onAdd = () => {
+    // usamos el helper `nav.push` con la ruta definida en `ROUTES`
     nav.push(router, { pathname: ROUTES.ADMIN.ARTISTS.NEW });
   };
 
-  // navegar a editar artista
+  // Navegación: ir a editar artista existente (recibe id)
   const onEdit = (id: string) => {
+    // redirige a la pantalla de edición pasando el id como parámetro
     nav.push(router, { pathname: ROUTES.ADMIN.ARTISTS.EDIT, params: { id } });
   };
 
-  // eliminar artista y su media
-  const onDelete = (id: string) => {
-    Alert.alert("Eliminar", "¿Seguro que querés borrar este artista?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Borrar",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const media = await mediaApi.getByEntidad(id);
-            if (media?.media?.length) {
-              for (const m of media.media) {
-                await mediaApi.delete(m.idMedia);
-              }
-            }
-            await deleteArtistFromApi(id);
-            setArtistList((prev) => prev.filter((a) => a.idArtista !== id));
-            Alert.alert("Listo", "Se borró el artista");
-          } catch (e) {
-            console.log("Error deleting artist", e);
-            Alert.alert("Error", "No se pudo borrar el artista");
-          }
-        },
-      },
-    ]);
-  };
-
-  // filtrar artistas según búsqueda (simple)
+  // Filtrado local según texto de búsqueda (filtro simple por nombre)
+  // Mantenerlo ligero: filtramos sobre `artistList` ya ordenada
   const filtered = artistList.filter((a) =>
     a.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  // tabs para navegación superior
+  // Definición de tabs que se muestran en la parte superior
   const tabs = [
     ...(isAdmin
       ? [
           {
-            label: "Adm Artistas",
+            label: "Administrar Artistas",
             route: ROUTES.ADMIN.ARTISTS.MANAGE,
             isActive: pathname === ROUTES.ADMIN.ARTISTS.MANAGE,
           },
@@ -146,46 +127,15 @@ export default function AdminArtistScreen() {
     },
   ];
 
-  // componente para cada artista en la lista
-  const renderItem = ({ item }: { item: Artist }) => {
-    return (
-      <View style={styles.card}>
-        <View style={styles.row}>
-          <Image source={{ uri: item.image }} style={styles.avatar} />
-          <View style={styles.info}>
-            <Text style={styles.name}>{item.name}</Text>
-            <View style={styles.metaRow}>
-              <MaterialCommunityIcons
-                name="calendar-blank"
-                size={16}
-                color={COLORS.textSecondary}
-              />
-              <Text style={styles.metaText}>
-                {formatDate(item.creationDate)}
-              </Text>
-            </View>
-          </View>
-        </View>
-        <View style={styles.btnRow}>
-          <TouchableOpacity
-            style={[styles.btn, styles.btnEdit]}
-            onPress={() => onEdit(item.idArtista)}
-          >
-            <Text style={styles.btnEditText}>Editar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.btn, styles.btnDelete]}
-            onPress={() => onDelete(item.idArtista)}
-          >
-            <Text style={styles.btnDeleteText}>Eliminar</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
+  // renderItem para el FlatList: renderiza la tarjeta administrativa del artista
+  // - cada tarjeta recibe los callbacks `onEdit` y `onDelete` para acciones
+  const renderItem = ({ item }: { item: Artist }) => (
+    <AdminCardComponent artist={item} onEdit={onEdit} onDelete={onDelete} />
+  );
 
-  // early return mientras carga
-  const content = loading ? (
+  // Contenido principal: mostramos un spinner si `isLoading` está activo;
+  // de lo contrario renderizamos la lista con `FlatList`.
+  const content = isLoading ? (
     <ActivityIndicator
       size="large"
       color={COLORS.primary}
@@ -200,53 +150,75 @@ export default function AdminArtistScreen() {
     />
   );
 
+  // Render principal de la pantalla (estructura SafeArea + header + contenido)
+  // ProtectedRoute asegura roles permitidos antes de mostrar la pantalla
   return (
-    <SafeAreaView style={styles.container}>
-      <Header />
-      <TabMenuComponent tabs={tabs} />
-      <View style={styles.content}>
-        <TouchableOpacity style={styles.addBtn} onPress={onAdd}>
-          <MaterialCommunityIcons
-            name="music-note-outline"
-            size={16}
-            color={COLORS.cardBg}
-            style={{ marginRight: 6 }}
+    <>
+      <SafeAreaView style={styles.container}>
+        {/* Header y menú de tabs */}
+        <Header />
+        <TabMenuComponent tabs={tabs} />
+
+        {/* Contenido principal: botón nuevo, título, buscador y lista */}
+        <View style={styles.content}>
+          <AdminNewArtistBtn
+            label="Nuevo artista"
+            iconName="music-note-outline"
+            onPress={onAdd}
           />
-          <Text style={styles.addBtnText}>Nuevo artista</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Administrar Artistas</Text>
-        <SearchBarComponent
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Buscar artista"
-        />
-        {content}
-      </View>
-      <Footer />
-    </SafeAreaView>
+          <Text style={styles.title}>Administrar Artistas</Text>
+          {/* Wrapper para separar visualmente el SearchBar de las cards */}
+          <View style={styles.searchWrapper}>
+            <SearchBarComponent
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Buscar artista"
+              // remover margen horizontal interno para ocupar todo el ancho
+              containerStyle={{ marginHorizontal: 0 }}
+            />
+          </View>
+          {content}
+        </View>
+
+        {/* Footer fijo */}
+        <Footer />
+      </SafeAreaView>
+
+      {/* Popup de confirmación para eliminar artista */}
+      <AdminCardPopupEliminate
+        visible={deleteVisible}
+        artistName={deleteTarget?.name}
+        loading={deleting}
+        onCancel={closePopup}
+        onConfirm={confirmDelete}
+      />
+
+      {/* Popup de error al eliminar (si ocurre un fallo) */}
+      <AdminCardPopupEliminateError
+        visible={errorVisible}
+        artistName={errorArtistName}
+        onClose={closeError}
+      />
+    </>
   );
 }
 
+// Estilos locales de la pantalla
 const styles = StyleSheet.create({
   // contenedor principal
   container: { flex: 1, backgroundColor: COLORS.backgroundLight },
   // contenido scroll
   content: { flex: 1, padding: 16 },
-  // botón para agregar artista
-  addBtn: {
-    backgroundColor: "#0F172A",
-    borderRadius: 14,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-    flexDirection: "row",
-  },
-  addBtnText: {
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.button,
-    color: COLORS.backgroundLight,
-  },
+    // SearchBar a lo largo de las cards (igual que en ArtistsScreen)
+    searchWrapper: {
+      paddingHorizontal: 0,
+      paddingTop: 12,
+      paddingBottom: 8,
+      backgroundColor: COLORS.cardBg,
+      width: "100%",
+      alignSelf: "stretch",
+      marginBottom: 18,
+    },
   // título de la pantalla
   title: {
     fontFamily: FONTS.subTitleMedium,
@@ -254,55 +226,6 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 12,
   },
-  // lista
+  // padding final para la lista
   list: { paddingBottom: 32 },
-  // tarjeta de artista
-  card: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: RADIUS.card,
-    padding: 12,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  // fila superior
-  row: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  // avatar
-  avatar: { width: 72, height: 72, borderRadius: 36 },
-  // info del artista (separado de la imagen)
-  info: { flex: 1, marginLeft: 12 },
-  name: {
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textPrimary,
-  },
-  metaRow: { flexDirection: "row", alignItems: "center", marginTop: 4, gap: 6 },
-  metaText: { color: COLORS.textSecondary, fontSize: FONT_SIZES.smallText },
-  // fila de botones
-  btnRow: { flexDirection: "row", gap: 8, marginTop: 8 },
-  // botón base
-  btn: {
-    flex: 1,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  // editar
-  btnEdit: { backgroundColor: "#F1F5F9" },
-  btnEditText: {
-    color: COLORS.textPrimary,
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.button,
-  },
-  // borrar
-  btnDelete: { backgroundColor: "#374151" },
-  btnDeleteText: {
-    color: COLORS.backgroundLight,
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.button,
-  },
 });

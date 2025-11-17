@@ -12,9 +12,10 @@ const SearchBar: React.FC<SearchBarProps> = ({
   value,
   onChangeText,
   placeholder = "Buscar eventos...",
+  containerStyle,
 }) => {
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, containerStyle]}>
       <TextInput
         mode="outlined"
         value={value}
