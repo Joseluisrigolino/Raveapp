@@ -1,7 +1,24 @@
-Este proyecto es una aplicación mobile desarrollada con Expo y React Native, enfocada en la gestión completa de eventos y fiestas electrónicas.
-La app funciona como una ticketera digital, permitiendo a los usuarios consultar eventos, comprar entradas, acceder a noticias, ver perfiles de artistas y mucho más.
+🎧 Ticketera Mobile para Fiestas Electrónicas
+Proyecto desarrollado con Expo + React Native
+📱 Descripción
 
-El desarrollo está organizado con buenas prácticas modernas, utilizando TypeScript, servicios desacoplados, componentes reutilizables y una navegación basada en Expo Router.
+Este proyecto es una aplicación mobile desarrollada con Expo y React Native, enfocada en la gestión completa de eventos y fiestas electrónicas.
+
+La app funciona como una ticketera digital, permitiendo a los usuarios:
+
+Consultar eventos
+
+Comprar entradas
+
+Acceder a noticias
+
+Ver perfiles de artistas
+
+Visualizar tickets y códigos QR
+
+Acceder a funcionalidades especiales según su rol
+
+El desarrollo utiliza TypeScript, servicios desacoplados, componentes reutilizables y una navegación construida con Expo Router siguiendo buenas prácticas modernas.
 
 ✨ Funcionalidades principales
 ✔ Sistema de roles
@@ -10,45 +27,53 @@ Administrador: crea eventos, gestiona artistas, controla ventas, publica noticia
 
 Usuario: visualiza eventos, compra entradas, sigue artistas, recibe notificaciones.
 
-✔ Tickets durante todo el flujo del usuario
+✔ Tickets
 
-Compra de entradas.
+Compra de entradas
 
-Código QR para validar en puerta.
+Generación de código QR
 
-Historial de compras.
+Validación en acceso
 
-Información detallada de cada evento.
+Historial de compras
+
+Información completa del evento
 
 ✔ Artistas
 
-Perfiles completos (bio, fotos, redes, gustos musicales).
+Perfiles completos (bio, fotos, redes, géneros)
 
-Listado por orden alfabético.
+Listado ordenado
 
-Likes y seguimiento.
+Likes y seguimiento
 
 ✔ Noticias y comunicados
 
-Feed de noticias actualizado.
+Feed actualizado
 
-Publicación de novedades, cambios de horario, anuncios de line-up.
+Novedades del evento
+
+Cambios de horario
+
+Anuncios de line-up
 
 ✔ Eventos
 
-Visualización de fiestas electrónicas activas y futuras.
+Fiestas activas y próximas
 
-Fechas, locaciones, line-up, precios, disponibilidad.
+Fechas, locaciones, line-up
 
-Integración con compra de entradas.
+Precios y disponibilidad
+
+Integración directa con compra de tickets
 
 ✔ Compras
 
-Proceso intuitivo y rápido.
+Proceso de compra simple e intuitivo
 
-Confirmación y almacenamiento seguro del ticket.
+Confirmación en tiempo real
 
-Acceso desde la pantalla principal.
+Ticket accesible desde el home
 
 🚀 Tecnologías principales
 
@@ -60,36 +85,32 @@ TypeScript
 
 Expo Router
 
-Axios para comunicación con la API
+Axios (comunicación con API)
 
-EAS Build para generar APK/IPA
+EAS Build (APK / IPA)
 
-React Hooks para lógica y estado
+React Hooks (estado y lógica)
 
 ⚙️ Requisitos previos
 
-Antes de correr el proyecto se necesita:
+Antes de ejecutar el proyecto necesitás tener instalado:
 
-Node.js (versión LTS)
+Node.js (LTS)
 
-Expo CLI:
+Expo CLI
 
 npm install -g expo-cli
 
 
 Git
 
-(Opcional) Android Studio o Xcode para emuladores
+Android Studio o Xcode (opcional, para emuladores)
 
 ▶️ Cómo ejecutar el proyecto
-
-Clonar el repositorio:
-
+1️⃣ Clonar el proyecto
 git clone [URL_DEL_REPO]
 
-
-Instalar dependencias:
-
+2️⃣ Instalar dependencias
 npm install
 
 
@@ -97,29 +118,31 @@ o
 
 yarn
 
-
-Iniciar Expo:
-
+3️⃣ Iniciar Expo
 npx expo start
 
+4️⃣ Ejecutar la app
 
-Escanear el QR con Expo Go o arrancar el emulador.
-Objetivo académico
+Escanear el QR con Expo Go
 
-Este proyecto fue desarrollado para aplicar conceptos de desarrollo mobile modernos, integrando:
+O iniciar un emulador desde Android Studio / Xcode
 
-Diseño de pantallas y navegación.
+🎯 Objetivo académico
 
-Componentización.
+Este proyecto se desarrolló para aplicar conceptos clave de desarrollo mobile:
 
-Consumo y manejo de APIs.
+Diseño y navegación de pantallas
 
-Manejo de estado con hooks.
+Componentización
 
-Lógica de negocio organizada mediante servicios.
+Manejo de estado con hooks
 
-Buenas prácticas de Expo.
+Consumo y gestión de APIs
 
-Implementación de flujos reales como compras, roles, noticias y gestión de artistas.
+Organización de lógica basada en servicios
 
-La app representa un caso funcional de una ticketera real orientada al mundo de las fiestas electrónicas, integrando múltiples módulos dentro de una misma plataforma.
+Buenas prácticas de Expo
+
+Implementación real de flujos como compras, roles, noticias y gestión de artistas
+
+La aplicación representa un ejemplo completo y funcional de una ticketera para fiestas electrónicas, integrando múltiples módulos dentro de una plataforma moderna y escalable.
