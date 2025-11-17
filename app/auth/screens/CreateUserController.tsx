@@ -1,76 +1,116 @@
-import React from "react";
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Pressable, Alert } from "react-native";
-import { Text, TextInput, Button, Divider } from "react-native-paper";
+import React, { useEffect, useState, useCallback } from "react";
+import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from "react-native";
+import { Text } from "react-native-paper";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
-import UCInfoAlert from "@/app/auth/components/user-controller/UCInfoAlert";
-import UCUserRow from "@/app/auth/components/user-controller/UCUserRow";
+import CreateUserControllerRememberComponent from "@/app/auth/components/user-controller/create-user-controller/CreateUserControllerRememberComponent";
+import CreateUserControllerInfoComponent from "@/app/auth/components/user-controller/create-user-controller/CreateUserControllerInfoComponent";
+import CreateUserControllerAlreadyExistingComponent from "@/app/auth/components/user-controller/create-user-controller/CreateUserControllerAlreadyExistingComponent";
+import CreateUserControllerUserComponent from "@/app/auth/components/user-controller/create-user-controller/CreateUserControllerUserComponent";
 import { useAuth } from "@/app/auth/AuthContext";
 import { getProfile } from "@/app/auth/userHelpers";
-import { createControllerUser, getControllerUsers } from "../apis/user-controller/controllerApi";
-import { ControllerUser } from "@/app/auth/types/ControllerUser";
+import useGetUsersControllers from "@/app/auth/services/user-controllers/useGetUsersControllers";
+import useCreateUserControllers from "@/app/auth/services/user-controllers/useCreateUserControllers";
+import useDeleteUserControllers from "@/app/auth/services/user-controllers/useDeleteUserControllers";
+import CreateUserControllerPopupEliminateUserComponent from "@/app/auth/components/user-controller/create-user-controller/CreateUserControllerPopupEliminateUserComponent";
+import CreateUserControllerPopupEliminateUserOk from "@/app/auth/components/user-controller/create-user-controller/CreateUserControllerPopupEliminateUserOk";
 
+// --- Componente principal ---
 export default function CreateUserController() {
 	const { user } = useAuth() as any;
-	const [login, setLogin] = React.useState("");
-	const [password, setPassword] = React.useState("");
-	const [secure, setSecure] = React.useState(true);
-	const [users, setUsers] = React.useState<ControllerUser[]>([]);
-	const [orgId, setOrgId] = React.useState<string | null>(null);
-	const [loading, setLoading] = React.useState<boolean>(false);
-	const [submitting, setSubmitting] = React.useState<boolean>(false);
 
-	React.useEffect(() => {
-		(async () => {
+	// estados simples y con nombres en inglés
+	const [username, setUsername] = useState("");
+	const [password, setPassword] = useState("");
+	const [secureEntry, setSecureEntry] = useState(true);
+	// controllers state removed; users come from hook
+	const [orgId, setOrgId] = useState<string | null>(null);
+	const [submitting, setSubmitting] = useState(false);
+	const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+	const [selectedToDeleteId, setSelectedToDeleteId] = useState<string | null>(null);
+	const [selectedToDeleteName, setSelectedToDeleteName] = useState<string | null>(null);
+	const [deletedOkVisible, setDeletedOkVisible] = useState(false);
+	const [lastDeletedUsername, setLastDeletedUsername] = useState<string | null>(null);
+
+	// hooks para separar lógica de API
+	const { users, refresh } = useGetUsersControllers(orgId);
+	const { createUser, loading: creating } = useCreateUserControllers();
+	const { deleteUser, loading: deleting } = useDeleteUserControllers();
+
+	// efecto para cargar organización y usuarios
+	useEffect(() => {
+		async function load() {
 			try {
 				if (!user?.username) return;
 				const profile = await getProfile(user.username);
-				const idUsuario = String(profile?.idUsuario ?? "");
-				if (idUsuario) {
-					setOrgId(idUsuario);
-					setLoading(true);
-						try {
-							const apiUsers = await getControllerUsers(idUsuario);
-							setUsers(apiUsers);
-						} finally {
-						setLoading(false);
-					}
-				}
+				const id = String(profile?.idUsuario ?? "");
+				if (!id) return;
+				setOrgId(id);
 			} catch (e) {
-				// fallback: lista vacía
+				// si falla, no hacemos nada (la carga de users la maneja el hook)
 			}
-		})();
+		}
+		load();
 	}, [user?.username]);
 
-	const canCreate = login.trim().length > 0 && password.length >= 4 && !submitting;
+	const canCreate = username.trim().length > 0 && password.length >= 4 && !submitting && !creating;
 
-		const handleCreate = async () => {
-			const u = login.trim();
-			if (!u) return;
-			if (!orgId) {
-				Alert.alert("Sin organización", "No se pudo determinar el ID de organizador.");
-				return;
-			}
-			try {
-				setSubmitting(true);
-				await createControllerUser({ idUsuarioOrg: orgId, nombreUsuario: u, password });
-				// refrescar lista
-				const apiUsers = await getControllerUsers(orgId);
-				setUsers(apiUsers);
-				setLogin("");
-				setPassword("");
-			} catch (e: any) {
-				Alert.alert("Error", "No se pudo crear el usuario controlador.");
-			} finally {
-				setSubmitting(false);
-			}
-		};
+	// crear usuario controlador
+	const handleCreateController = useCallback(async () => {
+		const name = username.trim();
+		if (!name) return;
+		if (!orgId) {
+			Alert.alert("Sin organización", "No se pudo determinar el ID de organizador.");
+			return;
+		}
+		try {
+			setSubmitting(true);
+			await createUser({ idUsuarioOrg: orgId!, nombreUsuario: name, password });
+			// refrescar lista usando el hook
+			refresh();
+			setUsername("");
+			setPassword("");
+		} catch (e) {
+			Alert.alert("Error", "No se pudo crear el usuario controlador.");
+		} finally {
+			setSubmitting(false);
+		}
+	}, [username, password, orgId, createUser, refresh]);
 
-	const handleDelete = (u: string) => {
-		Alert.alert("Eliminar", `¿Eliminar ${u}?`, [
-			{ text: "Cancelar", style: "cancel" },
-			{ text: "Eliminar", style: "destructive", onPress: () => setUsers((prev) => prev.filter((x) => x.username !== u)) },
-		]);
-	};
+	// borrar localmente (la lista) — comportamiento igual que antes
+	const openDeleteModal = useCallback((id: string | null, name?: string) => {
+		setSelectedToDeleteId(id ?? null);
+		setSelectedToDeleteName(name ?? null);
+		setDeleteModalVisible(true);
+	}, []);
+
+	const closeDeleteModal = useCallback(() => {
+		setSelectedToDeleteId(null);
+		setSelectedToDeleteName(null);
+		setDeleteModalVisible(false);
+	}, []);
+
+	const handleConfirmDelete = useCallback(async () => {
+		if (!selectedToDeleteId && !selectedToDeleteName) return;
+		try {
+			if (selectedToDeleteId && orgId) {
+				// si tenemos id y orgId, llamamos al endpoint específico por IDs
+				await deleteUser({ idUsuarioOrg: orgId, idUsuarioControl: selectedToDeleteId });
+			} else if (selectedToDeleteName) {
+				// fallback cuando sólo tenemos nombre
+				await deleteUser(selectedToDeleteName);
+			} else {
+				throw new Error("No hay identificador para eliminar");
+			}
+			refresh();
+			// guardar el username eliminado para mostrar en el popup de éxito
+			setLastDeletedUsername(selectedToDeleteName ?? null);
+			setDeletedOkVisible(true);
+		} catch (e) {
+			Alert.alert("Error", "No se pudo eliminar el usuario");
+		} finally {
+			closeDeleteModal();
+		}
+	}, [selectedToDeleteId, selectedToDeleteName, deleteUser, refresh, closeDeleteModal, orgId]);
 
 	return (
 		<KeyboardAvoidingView behavior={Platform.select({ ios: "padding", android: undefined })} style={{ flex: 1 }}>
@@ -86,86 +126,52 @@ export default function CreateUserController() {
 					</Text>
 				</View>
 
-				{/* Crear Nuevo Usuario */}
-				<View style={styles.card}>
-					<Text style={styles.cardTitle}>Crear Nuevo Usuario</Text>
+				{/* Crear Nuevo Usuario (extraído) */}
+				<CreateUserControllerInfoComponent
+					username={username}
+					setUsername={setUsername}
+					password={password}
+					setPassword={setPassword}
+					secureEntry={secureEntry}
+					setSecureEntry={setSecureEntry}
+					canCreate={canCreate}
+					onCreate={handleCreateController}
+				/>
 
-					<Text style={styles.label}>Nombre de Usuario (Login)</Text>
-					<TextInput
-						mode="outlined"
-						placeholder="controlador.01"
-						placeholderTextColor="rgba(107,114,128,0.4)"
-						value={login}
-						onChangeText={setLogin}
-						left={<TextInput.Icon icon="account-outline" color="#6b7280" />}
-						style={styles.input}
-						outlineStyle={{ borderRadius: 14 }}
-					/>
+				{/* Info (extraído) */}
+				<CreateUserControllerRememberComponent />
 
-					<Text style={styles.label}>Contraseña</Text>
-					<TextInput
-						mode="outlined"
-						placeholder="••••••••"
-						placeholderTextColor="rgba(107,114,128,0.4)"
-						secureTextEntry={secure}
-						value={password}
-						onChangeText={setPassword}
-						left={<TextInput.Icon icon="lock-outline" color="#6b7280" />}
-						right={<TextInput.Icon icon={secure ? "eye" : "eye-off"} color="#6b7280" onPress={() => setSecure((s) => !s)} />}
-						style={styles.input}
-						outlineStyle={{ borderRadius: 14 }}
-					/>
-
-					<Button
-						mode="contained"
-						onPress={handleCreate}
-						disabled={!canCreate}
-						style={styles.primaryBtn}
-						contentStyle={{ height: 50 }}
-						labelStyle={{ fontWeight: "700", color: "#ffffff" }}
-						icon={({ size, color }) => <Icon name="person-add" size={size} color={color} />}
-					>
-						Crear Usuario Controlador
-					</Button>
-				</View>
-
-				{/* Info */}
-				<UCInfoAlert>
-					Recordá: si alguien olvida la contraseña, tenés que eliminar ese usuario y crear uno nuevo. No existe recuperación de contraseña.
-				</UCInfoAlert>
-
-				{/* Lista de usuarios */}
-				<View style={styles.cardList}>
-					<Text style={styles.cardTitle}>Usuarios Creados</Text>
-					<Divider style={styles.divider} />
-								{users.map((u) => (
-									<UCUserRow key={u.username} username={u.username} onDelete={() => handleDelete(u.username)} />
+				{/* Lista de usuarios (extraída a componentes) */}
+				<CreateUserControllerAlreadyExistingComponent>
+					{users.map((u) => (
+						<CreateUserControllerUserComponent key={u.username} username={u.username} onDelete={() => openDeleteModal(u.id ?? null, u.username)} />
 					))}
+				</CreateUserControllerAlreadyExistingComponent>
 
-					<View style={styles.tipRow}>
-						<View style={styles.tipIcon}><Icon name="info" size={16} color="#0f172a" /></View>
-						<Text style={styles.tipText}>Si alguien se queda sin acceso, simplemente eliminálo y crea otro usuario nuevo con otra contraseña</Text>
-					</View>
-				</View>
+				{/* Popup de confirmación de eliminación */}
+				<CreateUserControllerPopupEliminateUserComponent
+					visible={deleteModalVisible}
+					username={selectedToDeleteName || undefined}
+					loading={deleting}
+					onCancel={closeDeleteModal}
+					onConfirm={handleConfirmDelete}
+				/>
 
-				{/* Footer */}
-				<View style={styles.footer}>
-					<Text style={styles.footerMuted}>Sistema de Gestión de Controladores v2.1.5</Text>
-					<View style={styles.footerLinksRow}>
-						<Pressable onPress={() => Alert.alert("Manual de Usuario", "Próximamente.")}>
-							<Text style={styles.footerLink}>Manual de Usuario</Text>
-						</Pressable>
-						<Text style={styles.footerDivider}>  •  </Text>
-						<Pressable onPress={() => Alert.alert("Soporte Técnico", "+1-800-RAVE-HELP")}>
-							<Text style={styles.footerLink}>Soporte Técnico</Text>
-						</Pressable>
-					</View>
-				</View>
+				{/* Popup que confirma que la eliminación fue exitosa */}
+				<CreateUserControllerPopupEliminateUserOk
+					visible={deletedOkVisible}
+					username={lastDeletedUsername || undefined}
+					onClose={() => {
+					setLastDeletedUsername(null);
+					setDeletedOkVisible(false);
+					}}
+				/>
 			</ScrollView>
 		</KeyboardAvoidingView>
 	);
 }
 
+// --- Estilos simples al final ---
 const styles = StyleSheet.create({
 	container: { flexGrow: 1, padding: 16, backgroundColor: "#f5f6fa" },
 	header: { marginBottom: 10 },
@@ -184,55 +190,5 @@ const styles = StyleSheet.create({
 	headerTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
 	headerDesc: { color: "#6b7280" },
 
-	card: {
-		backgroundColor: "#fff",
-		borderRadius: 14,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: "#e6e9ef",
-		shadowColor: "#000",
-		shadowOpacity: 0.06,
-		shadowOffset: { width: 0, height: 6 },
-		shadowRadius: 12,
-		elevation: 4,
-		marginBottom: 12,
-	},
-	cardList: {
-		backgroundColor: "#fff",
-		borderRadius: 14,
-		padding: 16,
-		borderWidth: 1,
-		borderColor: "#e6e9ef",
-		shadowColor: "#000",
-		shadowOpacity: 0.06,
-		shadowOffset: { width: 0, height: 6 },
-		shadowRadius: 12,
-		elevation: 4,
-		marginTop: 12,
-	},
-	cardTitle: { fontWeight: "700", color: "#111827", marginBottom: 10 },
-	label: { color: "#6b7280", marginBottom: 6, marginTop: 8 },
-	input: { marginBottom: 8, backgroundColor: "#fff" },
-	primaryBtn: { borderRadius: 12, backgroundColor: "#0f172a", marginTop: 8 },
-	divider: { marginVertical: 10, backgroundColor: "#e6e9ef" },
-
-	tipRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
-	tipIcon: {
-		width: 24,
-		height: 24,
-		borderRadius: 12,
-		backgroundColor: "#eef2ff",
-		alignItems: "center",
-		justifyContent: "center",
-		marginRight: 8,
-		borderWidth: 1,
-		borderColor: "#e6e9ef",
-	},
-	tipText: { color: "#6b7280", flex: 1 },
-
-	footer: { alignItems: "center", marginTop: 16, marginBottom: 8 },
-	footerMuted: { color: "#9ca3af", fontSize: 12, marginBottom: 8 },
-	footerLinksRow: { flexDirection: "row", alignItems: "center" },
-	footerLink: { color: "#0f172a", fontWeight: "600", fontSize: 12 },
-	footerDivider: { color: "#9ca3af", fontSize: 12 },
+	// footer styles removed — footer UI deleted
 });

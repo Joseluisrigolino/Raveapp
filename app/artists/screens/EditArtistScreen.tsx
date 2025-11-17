@@ -17,16 +17,14 @@ import * as FileSystem from "expo-file-system/legacy"; // usado para tamaño de 
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import {
-  fetchOneArtistFromApi,
-  updateArtistOnApi,
-} from "@/app/artists/apis/artistApi";
+import { fetchOneArtistFromApi } from "@/app/artists/apis/artistApi";
+import useUpdateArtist from "@/app/artists/services/useUpdateArtist";
 import { mediaApi } from "@/app/apis/mediaApi";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import InputText from "@/components/common/inputText"; // reutilizo componente compartido
 import InputDesc from "@/components/common/inputDesc"; // para descripción multi‑línea
 import eventBus from "@/utils/eventBus"; // para emitir evento de activación
-import { capitalizeFirst } from '@/utils/CapitalizeFirstLetter';
+import { capitalizeFirst } from "@/utils/CapitalizeFirstLetter";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import SelectImageArtistComponent from "@/app/artists/components/SelectImageArtistComponent";
 
@@ -52,6 +50,9 @@ export default function EditArtistScreen() {
   const [newImageLocal, setNewImageLocal] = useState<string | null>(null); // imagen local temporal
   const activationFlow = String(activate || "0") === "1"; // true si venimos a activar
   // helper moved to utils
+
+  // hook para actualizar artista
+  const { updateArtist, loading: updating } = useUpdateArtist();
 
   // Cargar datos del artista
   useEffect(() => {
@@ -141,7 +142,7 @@ export default function EditArtistScreen() {
         setNewImageLocal(null);
       }
       // Actualizar artista en API
-      await updateArtistOnApi({
+      await updateArtist({
         idArtista: id,
         name: name,
         description: description,
@@ -197,7 +198,7 @@ export default function EditArtistScreen() {
           // forzar primera letra mayúscula mientras se escribe
           onChangeText={(t) => setName(capitalizeFirst(t))}
           placeholder="Ingresa el nombre del artista..."
-          containerStyle={{ width: '100%' }}
+          containerStyle={{ width: "100%" }}
         />
 
         {/* Descripción del artista */}

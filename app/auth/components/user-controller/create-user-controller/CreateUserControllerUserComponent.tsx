@@ -8,7 +8,9 @@ interface Props {
   onDelete?: () => void;
 }
 
-export default function UCUserRow({ username, onDelete }: Props) {
+// Fila que representa un usuario creado
+// Comentarios en español, internals en inglés
+export default function CreateUserControllerUserComponent({ username, onDelete }: Props) {
   return (
     <View style={styles.row}>
       <View style={styles.left}>

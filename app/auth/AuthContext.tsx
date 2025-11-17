@@ -3,7 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import Constants from "expo-constants";
 import { loginUser, AuthUser as ApiAuthUser } from "@/app/auth/authHelpers";
 import { fbLoginWithGoogleIdToken, fbLogout, AuthUser as FbAuthUser, fbLoginWithGooglePopup } from "@/app/auth/firebaseAuthHelpers";
-import jwtDecode from "jwt-decode";
+import * as jwtDecode from "jwt-decode";
 import { apiClient, login as apiLogin } from "@/app/apis/apiConfig";
 import { getProfile, createUsuario } from "@/app/auth/userHelpers";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -171,7 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Comentario: decodifica id_token para extraer email/nombre y delega en el helper anterior.
   async function loginOrCreateWithGoogleIdToken(idToken: string): Promise<ApiAuthUser | null> {
     try {
-      const payload: any = jwtDecode(idToken);
+      const payload: any = (jwtDecode as any)(idToken);
       const email = payload?.email || payload?.upn || '';
       const givenName = payload?.given_name || payload?.givenName || '';
       const familyName = payload?.family_name || payload?.familyName || '';
