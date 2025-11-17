@@ -1,50 +1,125 @@
-# Welcome to your Expo app 👋
+Este proyecto es una aplicación mobile desarrollada con Expo y React Native, enfocada en la gestión completa de eventos y fiestas electrónicas.
+La app funciona como una ticketera digital, permitiendo a los usuarios consultar eventos, comprar entradas, acceder a noticias, ver perfiles de artistas y mucho más.
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+El desarrollo está organizado con buenas prácticas modernas, utilizando TypeScript, servicios desacoplados, componentes reutilizables y una navegación basada en Expo Router.
 
-## Get started
+✨ Funcionalidades principales
+✔ Sistema de roles
 
-1. Install dependencies
+Administrador: crea eventos, gestiona artistas, controla ventas, publica noticias.
 
-   ```bash
-   npm install
-   ```
+Usuario: visualiza eventos, compra entradas, sigue artistas, recibe notificaciones.
 
-2. Start the app
+✔ Tickets durante todo el flujo del usuario
 
-   ```bash
-    npx expo start
-   ```
+Compra de entradas.
 
-In the output, you'll find options to open the app in a
+Código QR para validar en puerta.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Historial de compras.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Información detallada de cada evento.
 
-## Get a fresh project
+✔ Artistas
 
-When you're ready, run:
+Perfiles completos (bio, fotos, redes, gustos musicales).
 
-```bash
-npm run reset-project
-```
+Listado por orden alfabético.
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Likes y seguimiento.
 
-## Learn more
+✔ Noticias y comunicados
 
-To learn more about developing your project with Expo, look at the following resources:
+Feed de noticias actualizado.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Publicación de novedades, cambios de horario, anuncios de line-up.
 
-## Join the community
+✔ Eventos
 
-Join our community of developers creating universal apps.
+Visualización de fiestas electrónicas activas y futuras.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Fechas, locaciones, line-up, precios, disponibilidad.
+
+Integración con compra de entradas.
+
+✔ Compras
+
+Proceso intuitivo y rápido.
+
+Confirmación y almacenamiento seguro del ticket.
+
+Acceso desde la pantalla principal.
+
+🚀 Tecnologías principales
+
+Expo
+
+React Native
+
+TypeScript
+
+Expo Router
+
+Axios para comunicación con la API
+
+EAS Build para generar APK/IPA
+
+React Hooks para lógica y estado
+
+⚙️ Requisitos previos
+
+Antes de correr el proyecto se necesita:
+
+Node.js (versión LTS)
+
+Expo CLI:
+
+npm install -g expo-cli
+
+
+Git
+
+(Opcional) Android Studio o Xcode para emuladores
+
+▶️ Cómo ejecutar el proyecto
+
+Clonar el repositorio:
+
+git clone [URL_DEL_REPO]
+
+
+Instalar dependencias:
+
+npm install
+
+
+o
+
+yarn
+
+
+Iniciar Expo:
+
+npx expo start
+
+
+Escanear el QR con Expo Go o arrancar el emulador.
+Objetivo académico
+
+Este proyecto fue desarrollado para aplicar conceptos de desarrollo mobile modernos, integrando:
+
+Diseño de pantallas y navegación.
+
+Componentización.
+
+Consumo y manejo de APIs.
+
+Manejo de estado con hooks.
+
+Lógica de negocio organizada mediante servicios.
+
+Buenas prácticas de Expo.
+
+Implementación de flujos reales como compras, roles, noticias y gestión de artistas.
+
+La app representa un caso funcional de una ticketera real orientada al mundo de las fiestas electrónicas, integrando múltiples módulos dentro de una misma plataforma.
