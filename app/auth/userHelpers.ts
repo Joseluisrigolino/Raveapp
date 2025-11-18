@@ -231,33 +231,19 @@ export async function updateUsuario(payload: UpdateUsuarioPayload): Promise<void
 
   console.log("updateUsuario - Payload final (merge):", JSON.stringify(finalPayload, null, 2));
 
-  // Intento 1: enviar plano (sin wrapper)
-  const tryRequests: Array<{ label: string; body: any }> = [
-    { label: "plain", body: finalPayload },
-    { label: "wrapped", body: { request: finalPayload } },
-  ];
-
-  let lastError: any = null;
-  for (const variant of tryRequests) {
-    try {
-      console.log("updateUsuario - Intento", variant.label);
-      const response = await apiClient.put(
-        "/v1/Usuario/UpdateUsuario",
-        variant.body,
-        { headers: { "Content-Type": "application/json" } }
-      );
-      console.log("updateUsuario - OK con variante", variant.label, response.status);
-      return;
-    } catch (error: any) {
-      lastError = error;
-      console.error("updateUsuario - Variante", variant.label, "falló:", error?.response?.status, error?.response?.data);
-      // Si es 400 por validación, probamos la siguiente variante
-      continue;
-    }
+  try {
+    console.log("updateUsuario - Intento plain");
+    const response = await apiClient.put(
+      "/v1/Usuario/UpdateUsuario",
+      finalPayload,
+      { headers: { "Content-Type": "application/json" } }
+    );
+    console.log("updateUsuario - OK plain", response.status);
+    return;
+  } catch (error: any) {
+    console.error("updateUsuario - plain falló:", error?.response?.status, error?.response?.data);
+    throw error;
   }
-
-  // Si todas fallaron, re-lanzar el último error
-  throw lastError ?? new Error("UpdateUsuario falló en todos los intentos");
 }
 
 // 3) Crear usuario

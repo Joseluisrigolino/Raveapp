@@ -33,6 +33,7 @@ import globalStyles from "@/styles/globalStyles";
 import { apiClient, login as apiLogin } from "@/app/apis/apiConfig";
 import { useAuth } from "@/app/auth/AuthContext";
 import { mailsApi } from "@/app/apis/mailsApi";
+import InfoTyc from "@/components/infoTyc";
 
 // helpers (simples y en español para claridad)
 // valida email básico
@@ -634,15 +635,7 @@ export default function RegisterUserScreen() {
               {/* aviso debajo del botón removido a pedido */}
             </View>
 
-            <View style={styles.termsRow}>
-              <Text style={styles.termsText}>Al continuar, aceptas nuestros </Text>
-              <Text
-                onPress={() => Alert.alert("Terminos y condiciones", "Próximamente.")}
-                style={styles.termsLink}
-              >
-                Terminos y condiciones
-              </Text>
-            </View>
+            <InfoTyc />
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>

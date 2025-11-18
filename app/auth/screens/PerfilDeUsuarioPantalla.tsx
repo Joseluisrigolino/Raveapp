@@ -1,8 +1,18 @@
-// src/screens/UserProfileEditScreen.tsx
-import React, { useState, useEffect, useMemo, useRef } from "react";
-import { ScrollView, View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert, Image, Modal } from "react-native";
+// Simplified JR-style user profile screen
+import React, { useEffect, useState } from "react";
+import {
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Menu } from "react-native-paper";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -12,1621 +22,551 @@ import ROUTES from "@/routes";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
-import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { useAuth } from "@/app/auth/AuthContext";
-import { getProfile, updateUsuario } from "@/app/auth/userHelpers";
+import { getProfile } from "@/app/auth/userHelpers";
+import useUpdateUserProfile from "@/app/auth/services/user/useUpdateUserProfile";
 import { mediaApi } from "@/app/apis/mediaApi";
 import { apiClient } from "@/app/apis/apiConfig";
-import { sendConfirmEmail } from "@/app/apis/mailsApi";
-// InputText ya no se usa en esta pantalla; se replica UI deshabilitada por sección
+import useDeleteAccountProfile from "@/app/auth/services/user/useDeleteAccountProfile";
+import useVerifyEmail from "@/app/auth/services/user/useVerifyEmail";
+import ProfileUserPopupUpdateOk from "@/app/auth/components/user/profile-user/ProfileUserPopupUpdateOk";
+import { fetchProvinces } from "@/app/apis/georefHelpers";
+import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
+import { formatDateForUI } from "@/utils/formatDate";
 
-// Georef
-import {
-  fetchProvinces,
-  fetchMunicipalities,
-  fetchLocalities,
-  fetchLocalitiesByProvince,
-} from "@/app/apis/georefHelpers";
+// ==================================================
+// Main (código en inglés, textos UI en español, comentarios en español)
+// ==================================================
 
-export default function UserProfileEditScreen() {
-  // ...existing code...
+export default function UserProfileScreen() {
+  // usar auth para logout y username
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  // Perfil
-  const [apiUser, setApiUser] = useState<any>(null);
+  // estados simples
+  const [profile, setProfile] = useState<any>(null); // data from API
   const [loading, setLoading] = useState(true);
 
-  // Imagen actual y media
-  const [profileImage, setProfileImage] = useState<string>("");
-  const [profileMediaId, setProfileMediaId] = useState<string | null>(null);
-
-  // Selección pendiente de foto
-  const [pendingPhotoUri, setPendingPhotoUri] = useState<string | null>(null);
-  const [previousProfileImage, setPreviousProfileImage] = useState<string>("");
-  const [savingPhoto, setSavingPhoto] = useState(false);
-  // Verificación de correo
-  const [sendingVerification, setSendingVerification] = useState(false);
-  // Modal de verificación enviada
-  const [showVerifyModal, setShowVerifyModal] = useState(false);
-
-  // Editar sección completa "Tus datos"
-  const [editDatos, setEditDatos] = useState(false);
-  // Editar sección completa "Tu domicilio"
-  const [editDomicilio, setEditDomicilio] = useState(false);
-
-  // Edit modes
-  const [editMode, setEditMode] = useState<Record<string, boolean>>({
-    firstName: false,
-    lastName: false,
-    dni: false,
-    phone: false,
-    email: false,
-    birthdate: false,
-    "address.province": false,
-    "address.municipality": false,
-    "address.locality": false,
-    "address.street": false,
-  });
-
-  // Datos del usuario
-  const [userData, setUserData] = useState({
+  const [form, setForm] = useState<any>({
     firstName: "",
     lastName: "",
+    email: "",
     dni: "",
     phone: "",
     cbu: "",
-    email: "",
     birthdate: "",
-    address: {
-      province: "",
-      municipality: "",
-      locality: "",
-      street: "",
-      number: "",
-      floorDept: "",
-    },
+    addressProvince: "",
+    addressLocality: "",
+    addressStreet: "",
   });
 
-  // Georef lists
-  const [provinces, setProvinces] = useState<{ id: string; nombre: string }[]>(
-    []
-  );
-  const [municipalities, setMunicipalities] = useState<
-    { id: string; nombre: string }[]
-  >([]);
-  const [localities, setLocalities] = useState<
-    { id: string; nombre: string }[]
-  >([]);
+  const [isEditing, setIsEditing] = useState(false);
 
-  // Dropdowns visibles
-  const [showProvinces, setShowProvinces] = useState(false);
-  const [showMunicipalities, setShowMunicipalities] = useState(false);
-  const [showLocalities, setShowLocalities] = useState(false);
+  // image states
+  const [photo, setPhoto] = useState<string | null>(null);
 
-  // Errores visuales para la sección de domicilio
-  const [addressErrors, setAddressErrors] = useState<{
-    province: boolean;
-    municipality: boolean;
-    locality: boolean;
-    street: boolean;
-  }>({ province: false, municipality: false, locality: false, street: false });
+  // simple georef lists
+  const [provinces, setProvinces] = useState<any[]>([]);
 
-  // Selecciones actuales (IDs)
-  const [provinceId, setProvinceId] = useState("");
-  const [municipalityId, setMunicipalityId] = useState("");
-  const [localityId, setLocalityId] = useState("");
-
-  // Estados para los selectores de fecha de nacimiento
-  const [dateSelectors, setDateSelectors] = useState({
-    day: "",
-    month: "",
-    year: "",
-  });
-  
-  // Estados para controlar la visibilidad de los menús de fecha
-  const [menuVisible, setMenuVisible] = useState({
-    day: false,
-    month: false,
-    year: false,
-  });
-
-  // Foto fallback
-  const randomProfileImage = useMemo(
-    () => `https://picsum.photos/seed/${Math.floor(Math.random() * 10000)}/100`,
-    []
-  );
-
-  // Generar opciones para los selectores de fecha
-  const days = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, '0'));
-  const months = [
-    { value: '01', label: 'Enero' },
-    { value: '02', label: 'Febrero' },
-    { value: '03', label: 'Marzo' },
-    { value: '04', label: 'Abril' },
-    { value: '05', label: 'Mayo' },
-    { value: '06', label: 'Junio' },
-    { value: '07', label: 'Julio' },
-    { value: '08', label: 'Agosto' },
-    { value: '09', label: 'Septiembre' },
-    { value: '10', label: 'Octubre' },
-    { value: '11', label: 'Noviembre' },
-    { value: '12', label: 'Diciembre' },
-  ];
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 100 }, (_, i) => (currentYear - i).toString());
-
-  // ====== MODAL CAMBIO DE CONTRASEÑA ======
-  const [showPwdModal, setShowPwdModal] = useState(false);
-  const [pwdCurrent, setPwdCurrent] = useState("");
-  const [pwdNew, setPwdNew] = useState("");
-  const [pwdConfirm, setPwdConfirm] = useState("");
-  const [pwdError, setPwdError] = useState<string | null>(null);
-  const [pwdLoading, setPwdLoading] = useState(false);
-
-  // ====== MODAL ELIMINAR CUENTA ======
+  // modals
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const { sending: sendingVerify, sendVerifyEmail } = useVerifyEmail();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const { updating: updatingProfile, updateUserProfile } = useUpdateUserProfile();
+  const { deleting: deletingAccount, deleteAccount } = useDeleteAccountProfile();
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
 
-  // Carga inicial
+  // load profile on mount
   useEffect(() => {
-    if (!user) return;
+    let mounted = true;
     (async () => {
+      if (!user) return;
+      const username = user.username;
       try {
-        // 1) Perfil
-        const u = await getProfile(user.username);
-        setApiUser(u);
-
-        const rawDireccion = u.domicilio?.direccion ?? "";
-        setUserData({
-          firstName: u.nombre,
-          lastName: u.apellido,
-          dni: u.dni,
-          phone: u.telefono,
+        setLoading(true);
+        const u = await getProfile(username);
+        if (!mounted) return;
+        setProfile(u);
+        setForm({
+          firstName: u.nombre || "",
+          lastName: u.apellido || "",
+          email: u.correo || "",
+          dni: u.dni || "",
+          phone: u.telefono || "",
           cbu: u.cbu || "",
-          email: u.correo,
-          birthdate: u.dtNacimiento?.split?.("T")?.[0] ?? "",
-          address: {
-            province: u.domicilio?.provincia?.nombre ?? "",
-            municipality: u.domicilio?.municipio?.nombre ?? "",
-            locality: u.domicilio?.localidad?.nombre ?? "",
-            street: rawDireccion,
-            number: "",
-            floorDept: "",
-          },
+          birthdate: u.dtNacimiento ? u.dtNacimiento.split("T")[0] : "",
+          addressProvince: u.domicilio?.provincia?.nombre || "",
+          addressLocality: u.domicilio?.localidad?.nombre || "",
+          addressStreet: u.domicilio?.direccion || "",
         });
 
-        // Inicializar selectores de fecha si hay fecha de nacimiento
-        const birthDateStr = u.dtNacimiento?.split?.("T")?.[0] ?? "";
-        if (birthDateStr && /^\d{4}-\d{2}-\d{2}$/.test(birthDateStr)) {
-          const [year, month, day] = birthDateStr.split('-');
-          setDateSelectors({ day, month, year });
-        }
-
-        // Set IDs if available from API
-        setProvinceId(u.domicilio?.provincia?.codigo || "");
-        setMunicipalityId(u.domicilio?.municipio?.codigo || "");
-        setLocalityId(u.domicilio?.localidad?.codigo || "");
-
-        // Cargar provincias para selects
-        try {
-          const provs = await fetchProvinces();
-          setProvinces(provs);
-        } catch {}
-
-        // Intentar cargar media de perfil si existe
+        // image
         try {
           const media = await mediaApi.getByEntidad(u.idUsuario);
           const m = media?.media?.[0];
           let finalUrl = m?.url ?? m?.imagen ?? "";
           if (finalUrl && m?.imagen && !/^https?:\/\//.test(finalUrl)) {
-            finalUrl = `${apiClient.defaults.baseURL}${finalUrl.startsWith("/") ? "" : "/"}${finalUrl}`;
+            finalUrl = `${apiClient.defaults.baseURL}${
+              finalUrl.startsWith("/") ? "" : "/"
+            }${finalUrl}`;
           }
-          setProfileImage(finalUrl || randomProfileImage);
-          setProfileMediaId(m?.idMedia ?? null);
+          setPhoto(finalUrl || null);
         } catch {
-          setProfileImage(randomProfileImage);
+          setPhoto(null);
         }
+
+        // load provinces simple
+        try {
+          const provs = await fetchProvinces();
+          setProvinces(provs || []);
+        } catch {}
+      } catch (e) {
+        console.warn("load profile error", e);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     })();
+    return () => {
+      mounted = false;
+    };
   }, [user]);
 
-  // Helpers
-  const onChange = (field: string, value: string) =>
-    setUserData((d) => ({ ...d, [field]: value }));
-  const onAddressChange = (field: string, value: string) => {
-    // limpiar el error visual correspondiente cuando el usuario edita
-    setAddressErrors((e) => ({ ...e, [field]: false } as any));
-    setUserData((d) => ({ ...d, address: { ...d.address, [field]: value } }));
-  };
+  // helpers para actualizar form
+  function setField(key: string, value: any) {
+    setForm((f: any) => ({ ...f, [key]: value }));
+  }
 
-  const toggle = (key: string) => {
-    // Especial: al editar la provincia, desplegar todos los campos de domicilio
-    if (key === "address.province") {
-      setEditMode((m) => ({
-        ...m,
-        ["address.province"]: true,
-        // mostrar municipio sólo si la provincia actual NO es CABA (02)
-        ["address.municipality"]: provinceId !== '02',
-        ["address.locality"]: true,
-        ["address.street"]: true,
-      }));
-      // limpiar errores visuales cuando el usuario decide editar
-      setAddressErrors({ province: false, municipality: false, locality: false, street: false });
-      return;
-    }
-
-    setEditMode((m) => ({ ...m, [key]: !m[key] }));
-
-    // Si se está activando el modo de edición de birthdate, inicializar selectores
-    if (key === "birthdate" && !editMode[key] && userData.birthdate) {
-      const birthDateStr = userData.birthdate;
-      if (birthDateStr && /^\d{4}-\d{2}-\d{2}$/.test(birthDateStr)) {
-        const [year, month, day] = birthDateStr.split('-');
-        setDateSelectors({
-          day: day,
-          month: month,
-          year: year,
-        });
-      }
-    }
-  };
-
-  // Función para actualizar la fecha completa cuando cambian los selectores
-  const updateBirthDate = (day: string, month: string, year: string) => {
-    if (day && month && year) {
-      const formattedDate = `${year}-${month}-${day}`;
-      onChange("birthdate", formattedDate);
-    }
-  };
-
-  // Funciones para manejar los cambios en los selectores de fecha
-  const handleDateSelectorChange = (type: 'day' | 'month' | 'year', value: string) => {
-    const newSelectors = { ...dateSelectors, [type]: value };
-    setDateSelectors(newSelectors);
-    setMenuVisible(prev => ({ ...prev, [type]: false }));
-    updateBirthDate(newSelectors.day, newSelectors.month, newSelectors.year);
-  };
-
-  // Georef handlers
-  const handleSelectProvince = async (id: string, nombre: string) => {
-    setProvinceId(id);
-    onAddressChange("province", nombre);
-    setShowProvinces(false);
-    setMunicipalityId("");
-    setLocalityId("");
-    setMunicipalities([]);
-    setLocalities([]);
-    onAddressChange("municipality", "");
-    onAddressChange("locality", "");
-    
-    // Lógica especial para Ciudad Autónoma de Buenos Aires (CABA)
-    if (id === '02') {
-      // Para CABA, el municipio es la misma CABA
-      setMunicipalityId('02');
-      onAddressChange("municipality", "Ciudad Autónoma de Buenos Aires");
-      try {
-        // Cargar localidades de CABA directamente (sin municipio específico)
-        setLocalities(await fetchLocalitiesByProvince(id));
-      } catch {}
-    } else {
-      // Para otras provincias, cargar municipios normalmente
-      try {
-        setMunicipalities(await fetchMunicipalities(id));
-      } catch {}
-    }
-  };
-  const handleSelectMunicipality = async (id: string, nombre: string) => {
-    setMunicipalityId(id);
-    onAddressChange("municipality", nombre);
-    setShowMunicipalities(false);
-    setLocalityId("");
-    setLocalities([]);
-    onAddressChange("locality", "");
+  // select image (simple, con tamaño check)
+  async function pickImage() {
     try {
-      setLocalities(await fetchLocalities(provinceId, id));
-    } catch {}
-  };
-  const handleSelectLocality = (id: string, nombre: string) => {
-    setLocalityId(id);
-    onAddressChange("locality", nombre);
-    setShowLocalities(false);
-  };
-
-  // ===== IMAGEN DE PERFIL =====
-  const handleSelectPhoto = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: "images",
-        quality: 0.9,
+      const res: any = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
       });
-      if (result.canceled || !result.assets?.length) return;
-
-      const asset = result.assets[0];
-      const fileInfo: any = await FileSystem.getInfoAsync(asset.uri);
-      if (fileInfo?.size && fileInfo.size > 2 * 1024 * 1024) {
+      if (res.canceled || !res.assets?.length) return;
+      const asset = res.assets[0];
+      const info: any = await FileSystem.getInfoAsync(asset.uri);
+      if (info?.size && info.size > 2 * 1024 * 1024) {
         Alert.alert(
           "Imagen demasiado grande",
           "La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana."
         );
         return;
       }
-      setPreviousProfileImage(profileImage);
-      setPendingPhotoUri(asset.uri);
-      setProfileImage(asset.uri);
-    } catch (err: any) {
-      // Si el error tiene información sobre el tamaño, mostrar alerta específica
-      const msg = typeof err === "object" && err !== null && "message" in err ? String((err as any).message) : "";
-      if (msg.toLowerCase().includes("size") || msg.toLowerCase().includes("too large") || msg.includes("2MB")) {
-        Alert.alert(
-          "Imagen demasiado grande",
-          "La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana."
-        );
-      } else {
-        Alert.alert("Error", "No se pudo seleccionar la imagen.");
-      }
-    }
-  };
-  const handleCancelPhoto = () => {
-    if (previousProfileImage) setProfileImage(previousProfileImage);
-    setPendingPhotoUri(null);
-  };
-  const handleAcceptPhoto = async () => {
-    if (!apiUser || !pendingPhotoUri) return;
-    setSavingPhoto(true);
-    try {
-      if (profileMediaId) {
-        try {
-          await mediaApi.delete(profileMediaId);
-        } catch {}
-      }
-      const fileName = pendingPhotoUri.split("/").pop() ?? "profile.jpg";
-      const file: any = {
-        uri: pendingPhotoUri,
-        name: fileName,
-        type: "image/jpeg",
-      };
-  await mediaApi.upload(apiUser.idUsuario, file, undefined, { compress: true });
-
-      const media = await mediaApi.getByEntidad(apiUser.idUsuario);
-      const m = media?.media?.[0];
-      let finalUrl = m?.url ?? m?.imagen ?? "";
-      if (finalUrl && m?.imagen && !/^https?:\/\//.test(finalUrl)) {
-        finalUrl = `${apiClient.defaults.baseURL}${
-          finalUrl.startsWith("/") ? "" : "/"
-        }${finalUrl}`;
-      }
-      setProfileImage(finalUrl || pendingPhotoUri);
-      setProfileMediaId(m?.idMedia ?? null);
-      setPendingPhotoUri(null);
-      Alert.alert("Listo", "Tu foto de perfil fue actualizada.");
-    } catch {
-      Alert.alert("Error", "No pudimos actualizar tu foto. Intenta de nuevo.");
-    } finally {
-      setSavingPhoto(false);
-    }
-  };
-
-  // ===== CONTRASEÑA =====
-  async function verifyCurrentPassword(email: string, currentPassword: string) {
-    try {
-      const { data } = await apiClient.get<boolean>("/v1/Usuario/Login", {
-        params: { Correo: email, Password: currentPassword },
-      });
-      return !!data;
-    } catch {
-      return false;
+      setPhoto(asset.uri);
+    } catch (e) {
+      Alert.alert("Error", "No se pudo seleccionar la imagen.");
     }
   }
-  async function updatePasswordRemote(
-    email: string,
-    currentPassword: string,
-    newPassword: string
-  ) {
-    await apiClient.put("/v1/Usuario/ResetPass", null, {
-      params: { Correo: email, Pass: currentPassword, NewPass: newPassword },
-    });
-  }
-  const openPwdModal = () => {
-    setPwdCurrent("");
-    setPwdNew("");
-    setPwdConfirm("");
-    setPwdError(null);
-    setShowPwdModal(true);
-  };
-  const handleConfirmPasswordChange = async () => {
-    if (!apiUser) return;
-    setPwdError(null);
-    if (!pwdCurrent || !pwdNew || !pwdConfirm)
-      return setPwdError("Completá todos los campos.");
-    if (pwdNew.length < 6)
-      return setPwdError(
-        "La nueva contraseña debe tener al menos 6 caracteres."
-      );
-    if (pwdNew !== pwdConfirm)
-      return setPwdError("La confirmación no coincide.");
-    setPwdLoading(true);
-    try {
-      const ok = await verifyCurrentPassword(userData.email, pwdCurrent);
-      if (!ok) return setPwdError("La contraseña actual no es correcta.");
-      await updatePasswordRemote(userData.email, pwdCurrent, pwdNew);
-      setShowPwdModal(false);
-      Alert.alert("Éxito", "Tu contraseña fue actualizada.");
-    } catch (e: any) {
-      setPwdError(
-        e?.response?.data?.title || "No se pudo actualizar la contraseña."
-      );
-    } finally {
-      setPwdLoading(false);
-    }
-  };
 
-  // ===== GUARDAR PERFIL =====
-  const handleConfirm = async () => {
-    if (!apiUser) return;
-    
-    // Validar datos antes de enviar
-    if (!userData.firstName?.trim() || !userData.lastName?.trim()) {
+  // save profile simple
+  async function handleSave() {
+    if (!profile) return;
+    if (!form.firstName.trim() || !form.lastName.trim()) {
       Alert.alert("Error", "El nombre y apellido son obligatorios.");
       return;
     }
-    
-    if (!userData.email?.trim() || !userData.dni?.trim()) {
+    if (!form.email.trim() || !form.dni.trim()) {
       Alert.alert("Error", "El correo y DNI son obligatorios.");
       return;
     }
 
-    // Si el usuario abrió la sección de domicilio (o seleccionó provincia), validar que esté completa
-    const addressEdited = editMode["address.province"] || editMode["address.locality"] || editMode["address.municipality"] || editMode["address.street"];
-    if (addressEdited) {
-      const missingProvince = !userData.address.province?.trim();
-      const missingStreet = !userData.address.street?.trim();
-      // Si no es CABA, es necesario municipio y localidad; si es CABA (02) no pedir municipio
-      const missingLocality = !userData.address.locality?.trim();
-      const missingMunicipality = provinceId !== '02' && !userData.address.municipality?.trim();
-
-      if (missingProvince || missingStreet || missingLocality || missingMunicipality) {
-        setAddressErrors({ province: missingProvince, municipality: missingMunicipality, locality: missingLocality, street: missingStreet });
-        Alert.alert("Error", "Si editás el domicilio, por favor completá todos los campos requeridos de la sección.");
-        return;
-      }
-    }
-    
-    // Construir el domicilio actualizado
-    const updatedDomicilio = {
-      provincia: {
-        nombre: userData.address.province || apiUser.domicilio?.provincia?.nombre || "",
-        codigo: provinceId || apiUser.domicilio?.provincia?.codigo || ""
-      },
-      municipio: {
-        nombre: userData.address.municipality || apiUser.domicilio?.municipio?.nombre || "",
-        codigo: municipalityId || apiUser.domicilio?.municipio?.codigo || ""
-      },
-      localidad: {
-        nombre: userData.address.locality || apiUser.domicilio?.localidad?.nombre || "",
-        codigo: localityId || apiUser.domicilio?.localidad?.codigo || ""
-      },
-      direccion: userData.address.street?.trim() || "",
-      latitud: apiUser.domicilio?.latitud || 0,
-      longitud: apiUser.domicilio?.longitud || 0,
-    };
-    
-    // Formatear fecha de nacimiento correctamente
-    let formattedBirthdate = apiUser.dtNacimiento;
-    if (userData.birthdate) {
-      try {
-        const date = new Date(userData.birthdate + 'T00:00:00.000Z');
-        if (!isNaN(date.getTime())) {
-          formattedBirthdate = date.toISOString();
-        }
-      } catch (dateErr) {
-        console.warn("Error formateando fecha:", dateErr);
-      }
-    }
-    
-    const payload = {
-      idUsuario: apiUser.idUsuario,
-      nombre: userData.firstName.trim(),
-      apellido: userData.lastName.trim(),
-      correo: userData.email.trim(),
-      dni: userData.dni.trim(),
-      telefono: userData.phone?.trim() || "",
-      cbu: userData.cbu?.trim() || "",
-      nombreFantasia: apiUser.nombreFantasia || "",
-      bio: apiUser.bio || "",
-      dtNacimiento: formattedBirthdate,
-      domicilio: updatedDomicilio,
-      cdRoles: apiUser.cdRoles || [], // Incluir roles existentes
-      socials: {
-        idSocial: (apiUser.socials?.idSocial && apiUser.socials.idSocial !== null) ? apiUser.socials.idSocial : "",
-        mdInstagram: (apiUser.socials?.mdInstagram && apiUser.socials.mdInstagram !== null) ? apiUser.socials.mdInstagram : "",
-        mdSpotify: (apiUser.socials?.mdSpotify && apiUser.socials.mdSpotify !== null) ? apiUser.socials.mdSpotify : "",
-        mdSoundcloud: (apiUser.socials?.mdSoundcloud && apiUser.socials.mdSoundcloud !== null) ? apiUser.socials.mdSoundcloud : ""
-      }
-    };
-    
-    console.log("Payload a enviar:", JSON.stringify(payload, null, 2));
-    
     try {
-      await updateUsuario(payload);
-      Alert.alert("Éxito", "Perfil actualizado correctamente.");
-      setEditMode(
-        Object.fromEntries(Object.keys(editMode).map((k) => [k, false]))
-      );
-      
-      // Recargar el perfil para mostrar los datos actualizados
-      if (user) {
-        try {
-          const updatedProfile = await getProfile(user.username);
-          setApiUser(updatedProfile);
-        } catch (refreshErr) {
-          console.warn("No se pudo refrescar el perfil:", refreshErr);
-        }
-      }
+      // build payload minimal, keeping same contract names
+      const payload: any = {
+        idUsuario: profile.idUsuario,
+        nombre: form.firstName.trim(),
+        apellido: form.lastName.trim(),
+        correo: form.email.trim(),
+        dni: form.dni.trim(),
+        telefono: form.phone?.trim() || "",
+        cbu: form.cbu?.trim() || "",
+        dtNacimiento: form.birthdate
+          ? new Date(form.birthdate + "T00:00:00Z").toISOString()
+          : profile.dtNacimiento,
+        domicilio: {
+          provincia: {
+            nombre: form.addressProvince || "",
+            codigo: profile.domicilio?.provincia?.codigo || "",
+          },
+          municipio: { nombre: "", codigo: "" },
+          localidad: {
+            nombre: form.addressLocality || "",
+            codigo: profile.domicilio?.localidad?.codigo || "",
+          },
+          direccion: form.addressStreet || "",
+          latitud: profile.domicilio?.latitud || 0,
+          longitud: profile.domicilio?.longitud || 0,
+        },
+        cdRoles: profile.cdRoles || [],
+        nombreFantasia: profile.nombreFantasia || "",
+        bio: profile.bio || "",
+        socials: profile.socials || {},
+      };
+
+      const updated = await updateUserProfile(payload);
+      // mostrar popup de éxito en lugar de alert
+      setProfile(updated);
+      setIsEditing(false);
+      setShowUpdateModal(true);
     } catch (err: any) {
-      console.error("Error actualizando usuario:", err);
-      console.error("Response data:", err?.response?.data);
-      console.error("Response status:", err?.response?.status);
-      console.error("Response headers:", err?.response?.headers);
-      
-      let errorMessage = "Hubo un problema actualizando tus datos.";
-      if (err?.response?.data) {
-        const data = err.response.data;
-        if (data.message) {
-          errorMessage = data.message;
-        } else if (data.title) {
-          errorMessage = data.title;
-        } else if (data.errors) {
-          const errors = Object.entries(data.errors)
-            .map(([field, messages]: [string, any]) => {
-              const messageList = Array.isArray(messages) ? messages : [messages];
-              return `${field}: ${messageList.join(', ')}`;
-            })
-            .join('\n');
-          errorMessage = `Errores de validación:\n${errors}`;
-        } else if (typeof data === 'string') {
-          errorMessage = data;
-        }
-      }
-      
-      Alert.alert("Error", errorMessage);
+      console.error(err);
+      Alert.alert(
+        "Error",
+        err?.response?.data?.title || "Hubo un problema actualizando tus datos."
+      );
     }
-  };
+  }
 
-  // ===== ELIMINAR CUENTA =====
-  const openDeleteModal = () => setShowDeleteModal(true);
-
-  const handleConfirmDeleteAccount = async () => {
-    if (!apiUser?.idUsuario) return;
+  // send verification email
+  async function handleSendVerify() {
+    if (!form.email?.trim()) {
+      Alert.alert("Error", "El correo está vacío.");
+      return;
+    }
     try {
-      setDeleteLoading(true);
-
-      // limpiar media
-      try {
-        const media = await mediaApi.getByEntidad(apiUser.idUsuario);
-        const items: any[] = Array.isArray(media?.media) ? media.media : [];
-        if (items.length) {
-          await Promise.allSettled(
-            items.map((m: any) => mediaApi.delete(m.idMedia))
-          );
-        }
-      } catch {}
-
-      await apiClient.delete(`/v1/Usuario/DeleteUsuario/${apiUser.idUsuario}`);
-      setShowDeleteModal(false);
-  logout();
-  nav.replace(router, ROUTES.LOGIN.LOGIN);
+      await sendVerifyEmail({
+        to: form.email.trim(),
+        name: `${form.firstName} ${form.lastName}`.trim() || "Usuario",
+      });
+      setShowVerifyModal(true);
     } catch (e: any) {
       Alert.alert(
         "Error",
-        e?.response?.data?.title || "No pudimos eliminar tu cuenta."
+        e?.response?.data?.title ||
+          e?.message ||
+          "No se pudo enviar el correo de verificación."
       );
-    } finally {
-      setDeleteLoading(false);
     }
-  };
+  }
+
+  // delete account
+  async function handleDelete() {
+    if (!profile?.idUsuario) return;
+    try {
+      await deleteAccount();
+      // deleteAccount handles logout & redirect
+    } catch (e: any) {
+      Alert.alert("Error", e?.response?.data?.title || e?.message || "No pudimos eliminar tu cuenta.");
+    }
+  }
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.loaderContainer}>
+      <SafeAreaView style={styles.centered}>
         <ActivityIndicator size="large" color={COLORS.primary} />
       </SafeAreaView>
     );
   }
 
-  // Render auxiliar movido a componente InputText
-
   return (
     <SafeAreaView style={styles.container}>
       <Header />
-  <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        <Text style={styles.mainTitle}>Mi Perfil</Text>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.title}>Mi Perfil</Text>
 
-        {/* Foto (tap en imagen o lápiz abre selector) */}
-        <View style={styles.photoContainer}>
-          <TouchableOpacity activeOpacity={0.8} onPress={handleSelectPhoto}>
-            <Image source={{ uri: profileImage }} style={styles.profileImage} />
+        <View style={styles.photoRow}>
+          <TouchableOpacity onPress={pickImage}>
+            <Image source={{ uri: photo || undefined }} style={styles.avatar} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.photoEditButton}
-            onPress={handleSelectPhoto}
-          >
-            <MaterialIcons name="edit" size={18} color="#fff" />
+          <TouchableOpacity style={styles.photoBtn} onPress={pickImage}>
+            <MaterialIcons name="edit" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
 
-        {/* Botones Aceptar / Cancelar cuando hay selección pendiente */}
-        {pendingPhotoUri && (
-          <View style={styles.photoActionsRow}>
+        <View style={styles.card}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.cardTitle}>Tus datos</Text>
+            <TouchableOpacity onPress={() => setIsEditing((v) => !v)}>
+              <MaterialIcons name={isEditing ? "check" : "edit"} size={18} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.label}>Nombre</Text>
+          <TextInput
+            style={[styles.input, !isEditing && styles.inputDisabled]}
+            editable={isEditing}
+            value={form.firstName}
+            onChangeText={(t) => setField("firstName", t)}
+            placeholder="Nombre"
+          />
+
+          <Text style={styles.label}>Apellido</Text>
+          <TextInput
+            style={[styles.input, !isEditing && styles.inputDisabled]}
+            editable={isEditing}
+            value={form.lastName}
+            onChangeText={(t) => setField("lastName", t)}
+            placeholder="Apellido"
+          />
+
+          <Text style={styles.label}>Correo electrónico</Text>
+          <View style={styles.rowWithButton}>
+            <TextInput
+              style={[
+                styles.input,
+                { flex: 1 },
+                !isEditing && styles.inputDisabled,
+              ]}
+              editable={isEditing}
+              value={form.email}
+              onChangeText={(t) => setField("email", t)}
+              placeholder="Correo"
+            />
             <TouchableOpacity
-              style={[styles.photoActionBtn, styles.acceptBtn]}
-              disabled={savingPhoto}
-              onPress={handleAcceptPhoto}
+              style={styles.verifyBtn}
+              onPress={handleSendVerify}
+              disabled={sendingVerify}
             >
-              <Text style={styles.photoActionText}>
-                {savingPhoto ? "Guardando..." : "Aceptar"}
+              <Text style={styles.verifyText}>
+                {sendingVerify ? "Enviando..." : "Verificar"}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.photoActionBtn, styles.cancelBtn]}
-              disabled={savingPhoto}
-              onPress={handleCancelPhoto}
-            >
-              <Text style={styles.photoActionText}>Cancelar</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Nombre completo debajo del avatar */}
-        <Text style={styles.profileName}>
-          {`${userData.firstName || ''} ${userData.lastName || ''}`.trim() || ' '}
-        </Text>
-
-        <Text style={styles.smallNote}>
-          Formatos permitidos: JPG, JPEG o PNG. Máx. 2MB.
-        </Text>
-
-        {/* Card: Tus datos */}
-        <View style={styles.sectionCard}>
-          <View style={[styles.sectionTitleRow, { justifyContent: 'space-between' }]}>
-            <Text style={styles.sectionCardTitle}>Tus datos</Text>
-            <TouchableOpacity onPress={() => setEditDatos((v) => !v)} accessibilityLabel="Editar tus datos">
-              <MaterialIcons name={editDatos ? "check" : "edit"} size={20} color={COLORS.textPrimary} />
-            </TouchableOpacity>
           </View>
 
-        {/* Nombre */}
-        <Text style={styles.addressSubtitle}>Nombre</Text>
-        <TextInput
-          style={[styles.inputFull, !editDatos && styles.inputDisabled]}
-          editable={editDatos}
-          value={userData.firstName}
-          onChangeText={(t) => onChange("firstName", t)}
-          placeholder="Nombre"
-        />
-        {/* Apellido */}
-        <Text style={styles.addressSubtitle}>Apellido</Text>
-        <TextInput
-          style={[styles.inputFull, !editDatos && styles.inputDisabled]}
-          editable={editDatos}
-          value={userData.lastName}
-          onChangeText={(t) => onChange("lastName", t)}
-          placeholder="Apellido"
-        />
-        {/* DNI */}
-        <Text style={styles.addressSubtitle}>DNI</Text>
-        <TextInput
-          style={[styles.inputFull, !editDatos && styles.inputDisabled]}
-          editable={editDatos}
-          keyboardType="numeric"
-          value={userData.dni}
-          onChangeText={(t) => onChange("dni", t)}
-          placeholder="DNI"
-        />
-        {/* Teléfono */}
-        <Text style={styles.addressSubtitle}>Teléfono</Text>
-        <TextInput
-          style={[styles.inputFull, !editDatos && styles.inputDisabled]}
-          editable={editDatos}
-          keyboardType="phone-pad"
-          value={userData.phone}
-          onChangeText={(t) => onChange("phone", t)}
-          placeholder="Teléfono"
-        />
-        {/* Correo con botón Verificar cuando bio === "0" */}
-        <Text style={styles.addressSubtitle}>Correo electrónico</Text>
-        <View style={styles.rowInputWithButton}>
+          <Text style={styles.label}>Fecha de nacimiento</Text>
           <TextInput
-            style={[styles.inputFull, { flex: 1, marginBottom: 0 }, !editDatos && styles.inputDisabled]}
-            editable={editDatos}
-            keyboardType="email-address"
-            value={userData.email}
-            onChangeText={(t) => onChange("email", t)}
-            placeholder="Correo"
-          />
-          {apiUser?.bio === "0" ? (
-            <TouchableOpacity
-              style={[styles.verifyBtn, sendingVerification && { opacity: 0.6 }]}
-              disabled={sendingVerification}
-              onPress={async () => {
-                if (!userData.email?.trim()) {
-                  Alert.alert("Error", "El correo está vacío.");
-                  return;
-                }
-                const fullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.firstName || 'Usuario';
-                setSendingVerification(true);
-                try {
-                  await sendConfirmEmail({
-                    to: userData.email.trim(),
-                    name: fullName,
-                    confirmationUrl: "https://raveapp.com.ar/confirmacion-mail",
-                  });
-                  // Mostrar popup de confirmación
-                  setShowVerifyModal(true);
-                } catch (e: any) {
-                  console.error("Error enviando verificación:", e?.response?.data || e);
-                  Alert.alert("Error", e?.response?.data?.title || "No se pudo enviar el correo de verificación.");
-                } finally {
-                  setSendingVerification(false);
-                }
-              }}
-            >
-              <Text style={styles.verifyBtnText}>{sendingVerification ? "Enviando..." : "Verificar"}</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-        {apiUser?.bio === "0" ? (
-          <View style={[styles.verifyHintRow, { width: '100%' }]}>
-            <MaterialIcons name="error-outline" size={14} color={COLORS.textSecondary} />
-            <Text style={styles.verifyHint}>Correo no verificado</Text>
-          </View>
-        ) : null}
-        
-        {/* Fecha de nacimiento con selectores */}
-        <Text style={styles.addressSubtitle}>Fecha de nacimiento</Text>
-        {editDatos ? (
-          <>
-            <View style={styles.dateContainer}>
-              {/* Selector de Día */}
-              <View style={styles.selectorContainer}>
-                <Menu
-                  visible={menuVisible.day}
-                  onDismiss={() => setMenuVisible(prev => ({ ...prev, day: false }))}
-                  anchor={
-                    <TouchableOpacity
-                      style={styles.dateSelector}
-                      onPress={() => setMenuVisible(prev => ({ ...prev, day: true }))}
-                    >
-                      <Text style={styles.dateSelectorText}>
-                        {dateSelectors.day || "Día"}
-                      </Text>
-                    </TouchableOpacity>
-                  }
-                  contentStyle={styles.menuContent}
-                >
-                  <ScrollView style={styles.menuScrollView}>
-                    {days.map((day) => (
-                      <Menu.Item
-                        key={day}
-                        onPress={() => handleDateSelectorChange('day', day)}
-                        title={day}
-                        titleStyle={styles.menuItemTitle}
-                      />
-                    ))}
-                  </ScrollView>
-                </Menu>
-              </View>
-
-              {/* Selector de Mes */}
-              <View style={styles.selectorContainer}>
-                <Menu
-                  visible={menuVisible.month}
-                  onDismiss={() => setMenuVisible(prev => ({ ...prev, month: false }))}
-                  anchor={
-                    <TouchableOpacity
-                      style={styles.dateSelector}
-                      onPress={() => setMenuVisible(prev => ({ ...prev, month: true }))}
-                    >
-                      <Text style={styles.dateSelectorText}>
-                        {months.find(m => m.value === dateSelectors.month)?.label || "Mes"}
-                      </Text>
-                    </TouchableOpacity>
-                  }
-                  contentStyle={styles.menuContent}
-                >
-                  <ScrollView style={styles.menuScrollView}>
-                    {months.map((month) => (
-                      <Menu.Item
-                        key={month.value}
-                        onPress={() => handleDateSelectorChange('month', month.value)}
-                        title={month.label}
-                        titleStyle={styles.menuItemTitle}
-                      />
-                    ))}
-                  </ScrollView>
-                </Menu>
-              </View>
-
-              {/* Selector de Año */}
-              <View style={styles.selectorContainer}>
-                <Menu
-                  visible={menuVisible.year}
-                  onDismiss={() => setMenuVisible(prev => ({ ...prev, year: false }))}
-                  anchor={
-                    <TouchableOpacity
-                      style={styles.dateSelector}
-                      onPress={() => setMenuVisible(prev => ({ ...prev, year: true }))}
-                    >
-                      <Text style={styles.dateSelectorText}>
-                        {dateSelectors.year || "Año"}
-                      </Text>
-                    </TouchableOpacity>
-                  }
-                  contentStyle={styles.menuContent}
-                >
-                  <ScrollView style={styles.menuScrollView}>
-                    {years.map((year) => (
-                      <Menu.Item
-                        key={year}
-                        onPress={() => handleDateSelectorChange('year', year)}
-                        title={year}
-                        titleStyle={styles.menuItemTitle}
-                      />
-                    ))}
-                  </ScrollView>
-                </Menu>
-              </View>
-            </View>
-          </>
-        ) : (
-          <TextInput
-            style={[styles.inputFull, styles.inputDisabled]}
+            style={[styles.input, styles.inputDisabled]}
             editable={false}
-            value={(() => {
-              if (!userData.birthdate) return "";
-              const date = new Date(userData.birthdate + 'T00:00:00');
-              return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            })()}
+            value={formatDateForUI(form.birthdate)}
             placeholder="dd/mm/aaaa"
           />
-        )}
 
-        {/* CBU (movido debajo de fecha de nacimiento) */}
-        <Text style={styles.addressSubtitle}>CBU</Text>
-        <TextInput
-          style={[styles.inputFull, !editDatos && styles.inputDisabled]}
-          editable={editDatos}
-          keyboardType="numeric"
-          value={userData.cbu}
-          onChangeText={(t) => onChange("cbu", t)}
-          placeholder="CBU"
-        />
-
-          {/* Cambiar contraseña (gris dentro de la card) */}
-          <TouchableOpacity style={styles.resetContainerCard} onPress={openPwdModal}>
-            <MaterialIcons name="lock-reset" size={20} color={COLORS.textPrimary} />
-            <Text style={styles.resetTextCard}>Cambiar contraseña</Text>
-          </TouchableOpacity>
+          <Text style={styles.label}>CBU</Text>
+          <TextInput
+            style={[styles.input, !isEditing && styles.inputDisabled]}
+            editable={isEditing}
+            value={form.cbu}
+            onChangeText={(t) => setField("cbu", t)}
+            placeholder="CBU"
+          />
         </View>
 
-        {/* Card: Tu domicilio */}
-        <View style={styles.sectionCard}>
-          <View style={[styles.sectionTitleRow, { justifyContent: 'space-between' }]}>
-            <Text style={styles.sectionCardTitle}>Tu domicilio</Text>
-            <TouchableOpacity
-              onPress={() => setEditDomicilio((prev) => {
-                const nv = !prev;
-                setEditMode((m) => ({
-                  ...m,
-                  ["address.province"]: nv,
-                  ["address.municipality"]: nv && provinceId !== '02',
-                  ["address.locality"]: nv,
-                  ["address.street"]: nv,
-                }));
-                return nv;
-              })}
-              accessibilityLabel="Editar domicilio"
-            >
-              <MaterialIcons name={editDomicilio ? "check" : "edit"} size={20} color={COLORS.textPrimary} />
-            </TouchableOpacity>
-          </View>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Tu domicilio</Text>
+          <Text style={styles.label}>Provincia</Text>
+          <TouchableOpacity
+            style={styles.input}
+            onPress={() => {
+              /* simple: show first province if any */ setField(
+                "addressProvince",
+                provinces[0]?.nombre || form.addressProvince
+              );
+            }}
+          >
+            <Text>{form.addressProvince || "Seleccione provincia"}</Text>
+          </TouchableOpacity>
 
-        {/* Provincia */}
-        <Text style={styles.addressSubtitle}>Provincia</Text>
-        {editDomicilio ? (
-          <>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => {
-                setShowProvinces(!showProvinces);
-                setShowMunicipalities(false);
-                setShowLocalities(false);
-              }}
-            >
-              <Text style={styles.dropdownText}>
-                {userData.address.province || "Seleccione provincia"}
-              </Text>
-            </TouchableOpacity>
-                {showProvinces && (
-              <ScrollView nestedScrollEnabled={true} keyboardShouldPersistTaps="handled" style={[styles.dropdownContainer, { maxHeight: 180 }]}>
-                {provinces.map((p) => (
-                  <TouchableOpacity
-                    key={p.id}
-                    style={styles.dropdownItem}
-                    onPress={() => handleSelectProvince(p.id, p.nombre)}
-                  >
-                    <Text style={styles.dropdownItemText}>{p.nombre}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-          </>
-        ) : (
-          <View style={[styles.dropdownButton, styles.inputDisabled]}>
-            <Text style={[styles.dropdownText, { opacity: 0.8 }]}>{userData.address.province || "–"}</Text>
-          </View>
-  )}
-
-        {/* Municipio: ocultar por completo si la provincia seleccionada es CABA (02) */}
-        {provinceId !== '02' && (
-          <>
-            <Text style={styles.addressSubtitle}>Municipio</Text>
-            {editDomicilio ? (
-              <>
-                <TouchableOpacity
-                  style={[styles.dropdownButton, (!provinceId) && { opacity: 0.5 }, addressErrors.municipality && styles.errorBorder]}
-                  disabled={!provinceId}
-                  onPress={() => {
-                    setShowMunicipalities(!showMunicipalities);
-                    setShowProvinces(false);
-                    setShowLocalities(false);
-                  }}
-                >
-                  <Text
-                    style={[styles.dropdownText, (!provinceId) && { opacity: 0.5 }]}
-                  >
-                    {userData.address.municipality || "Seleccione municipio"}
-                  </Text>
-                </TouchableOpacity>
-                {showMunicipalities && (
-                  <ScrollView nestedScrollEnabled={true} keyboardShouldPersistTaps="handled" style={[styles.dropdownContainer, { maxHeight: 180 }]}>
-                    {municipalities.map((m) => (
-                      <TouchableOpacity
-                        key={m.id}
-                        style={styles.dropdownItem}
-                        onPress={() => handleSelectMunicipality(m.id, m.nombre)}
-                      >
-                        <Text style={styles.dropdownItemText}>{m.nombre}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                )}
-              </>
-            ) : (
-              <View style={[styles.dropdownButton, styles.inputDisabled]}>
-                <Text style={[styles.dropdownText, { opacity: 0.8 }]}>{userData.address.municipality || "–"}</Text>
-              </View>
-            )}
-          </>
-        )}
-
-        {/* Localidad */}
-        <Text style={styles.addressSubtitle}>Localidad</Text>
-        {editDomicilio ? (
-          <>
-            <TouchableOpacity
-              style={[styles.dropdownButton, (!municipalityId && provinceId !== '02') && { opacity: 0.5 }]}
-              disabled={!municipalityId && provinceId !== '02'}
-              onPress={() => {
-                setShowLocalities(!showLocalities);
-                setShowProvinces(false);
-                setShowMunicipalities(false);
-              }}
-            >
-              <Text
-                style={[
-                  styles.dropdownText,
-                  (!municipalityId && provinceId !== '02') && { opacity: 0.5 },
-                ]}
-              >
-                {userData.address.locality || "Seleccione localidad"}
-              </Text>
-            </TouchableOpacity>
-            {showLocalities && (
-              <ScrollView nestedScrollEnabled={true} keyboardShouldPersistTaps="handled" style={[styles.dropdownContainer, { maxHeight: 180 }]}>
-                {localities.map((l) => (
-                  <TouchableOpacity
-                    key={l.id}
-                    style={styles.dropdownItem}
-                    onPress={() => handleSelectLocality(l.id, l.nombre)}
-                  >
-                    <Text style={styles.dropdownItemText}>{l.nombre}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-          </>
-        ) : (
-          <View style={[styles.dropdownButton, styles.inputDisabled]}>
-            <Text style={[styles.dropdownText, { opacity: 0.8 }]}>{userData.address.locality || "–"}</Text>
-          </View>
-        )}
-
-        {/* Dirección */}
-        <Text style={styles.addressSubtitle}>Dirección</Text>
-        {editDomicilio ? (
+          <Text style={styles.label}>Localidad</Text>
           <TextInput
-            style={[styles.inputFull, addressErrors.street && styles.errorBorder]}
-            placeholder="Ej: Av. Rivadavia 1234 5°B"
-            value={userData.address.street}
-            onChangeText={(v) => onAddressChange("street", v)}
+            style={[styles.input, !isEditing && styles.inputDisabled]}
+            editable={isEditing}
+            value={form.addressLocality}
+            onChangeText={(t) => setField("addressLocality", t)}
+            placeholder="Localidad"
           />
-        ) : (
+
+          <Text style={styles.label}>Dirección</Text>
           <TextInput
-            style={[styles.inputFull, styles.inputDisabled]}
-            editable={false}
-            value={userData.address.street?.trim() || ""}
+            style={[styles.input, !isEditing && styles.inputDisabled]}
+            editable={isEditing}
+            value={form.addressStreet}
+            onChangeText={(t) => setField("addressStreet", t)}
             placeholder="Dirección"
           />
-        )}
+        </View>
 
-  </View>
-
-  {/* Acciones (vertical) */}
-        <View style={styles.actionsColumn}>
+        <View style={styles.actions}>
           <TouchableOpacity
-            style={[styles.fullButton, styles.fullButtonPrimary]}
-            onPress={handleConfirm}
+            style={styles.saveBtn}
+            onPress={handleSave}
+            disabled={!!updatingProfile}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <MaterialIcons name="check" size={18} color={COLORS.cardBg} />
-              <Text style={styles.fullButtonPrimaryText}>Confirmar cambios</Text>
-            </View>
+            <Text style={styles.saveText}>
+              {updatingProfile ? "Guardando..." : "Confirmar cambios"}
+            </Text>
           </TouchableOpacity>
+
           <TouchableOpacity
-            style={[styles.fullButton, styles.fullButtonSecondary]}
+            style={styles.logoutBtn}
             onPress={async () => {
               await logout();
               nav.replace(router, ROUTES.LOGIN.LOGIN);
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <MaterialIcons name="logout" size={18} color={COLORS.primary} />
-              <Text style={styles.fullButtonSecondaryText}>Cerrar sesión</Text>
-            </View>
+            <Text style={styles.logoutText}>Cerrar sesión</Text>
           </TouchableOpacity>
+
           <TouchableOpacity
-            style={[styles.fullButton, styles.fullButtonDangerOutline]}
-            onPress={openDeleteModal}
+            style={styles.deleteBtn}
+            onPress={() => setShowDeleteModal(true)}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <MaterialIcons name="delete-outline" size={18} color={'#ef4444'} />
-              <Text style={styles.fullButtonDangerText}>Eliminar cuenta</Text>
-            </View>
+            <Text style={styles.deleteText}>Eliminar cuenta</Text>
           </TouchableOpacity>
         </View>
-        {/* Hacer administrador eliminado por solicitud */}
+
+        {/* verify modal simple */}
+        <Modal visible={showVerifyModal} transparent animationType="fade">
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Correo enviado</Text>
+              <Text style={styles.modalMsg}>
+                Te enviamos un correo electrónico para que puedas verificar tu
+                dirección.
+              </Text>
+              <TouchableOpacity
+                style={styles.modalOk}
+                onPress={() => setShowVerifyModal(false)}
+              >
+                <Text style={styles.modalOkText}>Aceptar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* delete modal */}
+        <Modal visible={showDeleteModal} transparent animationType="fade">
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>¿Estás seguro?</Text>
+              <Text style={styles.modalMsg}>
+                Esta acción eliminará tu cuenta permanentemente.
+              </Text>
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, { backgroundColor: "#b0b0b0" }]}
+                  onPress={() => setShowDeleteModal(false)}
+                >
+                  <Text>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalBtn,
+                    { backgroundColor: COLORS.negative },
+                  ]}
+                  onPress={handleDelete}
+                >
+                  <Text style={{ color: "#fff" }}>
+                    {deletingAccount ? "Eliminando..." : "Confirmo eliminar cuenta"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+        {/* update success popup */}
+        <ProfileUserPopupUpdateOk
+          visible={showUpdateModal}
+          userName={`${form.firstName} ${form.lastName}`.trim()}
+          loading={!!updatingProfile}
+          onClose={() => setShowUpdateModal(false)}
+        />
       </ScrollView>
-
-      {/* ===== MODAL VERIFICACIÓN DE CORREO ENVIADA ===== */}
-      <Modal
-        transparent
-        animationType="fade"
-        visible={showVerifyModal}
-        onRequestClose={() => setShowVerifyModal(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, styles.verifyModalCard]}>
-            <Text style={styles.verifyModalTitle}>Correo enviado</Text>
-            <Text style={styles.verifyModalMessage}>
-              Te enviamos un correo electrónico para que puedas verificar tu dirección.
-            </Text>
-            <TouchableOpacity
-              style={styles.verifyModalBtn}
-              onPress={() => setShowVerifyModal(false)}
-            >
-              <Text style={styles.verifyModalBtnText}>Aceptar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ===== MODAL CAMBIO DE CONTRASEÑA ===== */}
-      <Modal
-        transparent
-        animationType="fade"
-        visible={showPwdModal}
-        onRequestClose={() => setShowPwdModal(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Cambiar contraseña</Text>
-
-            <Text style={styles.modalLabel}>Contraseña actual</Text>
-            <TextInput
-              style={styles.inputFull}
-              value={pwdCurrent}
-              onChangeText={setPwdCurrent}
-              secureTextEntry
-              placeholder="••••••"
-              blurOnSubmit={false}
-              autoCorrect={false}
-              selectionColor={COLORS.primary}
-              returnKeyType="done"
-            />
-
-            <Text style={styles.modalLabel}>Nueva contraseña</Text>
-            <TextInput
-              style={styles.inputFull}
-              value={pwdNew}
-              onChangeText={setPwdNew}
-              secureTextEntry
-              placeholder="Mín. 6 caracteres"
-              blurOnSubmit={false}
-              autoCorrect={false}
-              selectionColor={COLORS.primary}
-              returnKeyType="done"
-            />
-
-            <Text style={styles.modalLabel}>Confirmar nueva contraseña</Text>
-            <TextInput
-              style={styles.inputFull}
-              value={pwdConfirm}
-              onChangeText={setPwdConfirm}
-              secureTextEntry
-              placeholder="Repetir contraseña"
-              blurOnSubmit={false}
-              autoCorrect={false}
-              selectionColor={COLORS.primary}
-              returnKeyType="done"
-            />
-
-            {pwdError ? (
-              <Text style={styles.modalError}>{pwdError}</Text>
-            ) : null}
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalCancel]}
-                disabled={pwdLoading}
-                onPress={() => setShowPwdModal(false)}
-              >
-                <Text style={styles.modalBtnText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalConfirm]}
-                disabled={pwdLoading}
-                onPress={handleConfirmPasswordChange}
-              >
-                <Text style={styles.modalBtnText}>
-                  {pwdLoading ? "Guardando..." : "Confirmar"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ===== MODAL ELIMINAR CUENTA ===== */}
-      <Modal
-        transparent
-        animationType="fade"
-        visible={showDeleteModal}
-        onRequestClose={() => setShowDeleteModal(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.deleteTitle}>¿Estás seguro?</Text>
-            <Text style={styles.deleteText}>
-              Esta acción eliminará tu cuenta permanentemente.
-            </Text>
-            <Text style={styles.deleteWarning}>No se puede revertir.</Text>
-
-            <View style={styles.deleteActions}>
-              <TouchableOpacity
-                style={[styles.deleteBtn, styles.deleteConfirm]}
-                disabled={deleteLoading}
-                onPress={handleConfirmDeleteAccount}
-              >
-                <Text style={styles.deleteConfirmText}>
-                  {deleteLoading ? "Eliminando..." : "Confirmo eliminar cuenta"}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.deleteBtn, styles.deleteCancel]}
-                disabled={deleteLoading}
-                onPress={() => setShowDeleteModal(false)}
-              >
-                <Text style={styles.deleteCancelText}>Cancelar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
       <Footer />
     </SafeAreaView>
   );
 }
 
+// ==================================================
+// Styles (simple, human-friendly)
+// ==================================================
 const styles = StyleSheet.create({
-  loaderContainer: {
-    flex: 1,
-    justifyContent: "center",
-    backgroundColor: COLORS.backgroundLight,
-  },
   container: { flex: 1, backgroundColor: COLORS.backgroundLight },
-  scroll: { padding: 16, alignItems: "center" },
-
-  mainTitle: {
+  content: { padding: 16, alignItems: "center" },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
+  title: {
     fontSize: FONT_SIZES.titleMain,
     fontFamily: FONTS.titleBold,
     color: COLORS.textPrimary,
     marginBottom: 12,
   },
-
-  photoContainer: { position: "relative", marginBottom: 8 },
-  profileImage: {
+  photoRow: { position: "relative", marginBottom: 8 },
+  avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
     backgroundColor: "#eee",
   },
-  photoEditButton: {
+  photoBtn: {
     position: "absolute",
-    bottom: 0,
     right: 0,
+    bottom: 0,
     backgroundColor: COLORS.primary,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: "center",
-  },
-
-  photoActionsRow: {
-    flexDirection: "row",
-    marginTop: 10,
-    marginBottom: 6,
-    gap: 10,
-  },
-  photoActionBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: RADIUS.card,
-  },
-  acceptBtn: { backgroundColor: "#2ecc71" },
-  cancelBtn: { backgroundColor: "#b0b0b0" },
-  photoActionText: { color: "#fff", fontFamily: FONTS.subTitleMedium },
-
-  smallNote: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 16 },
-  profileName: {
-    fontSize: FONT_SIZES.subTitle,
-    fontFamily: FONTS.subTitleMedium,
-    color: COLORS.textPrimary,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-
-  rowNoLabel: {
-    flexDirection: "row",
     alignItems: "center",
-    width: "90%",
-    marginBottom: 12,
   },
-  valueText: {
-    flex: 1,
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textSecondary,
-    marginRight: 8,
-  },
-  icon: { padding: 4 },
-
-  inputFull: {
-    width: "100%",
-    marginBottom: 14,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    overflow: 'hidden',
-    height: 56,
-    paddingHorizontal: 16,
-    paddingRight: 12,
-    borderWidth: 1,
-    borderColor: "#e6e9ef",
-    color: "#111827",
-    // Shadow para iOS
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    // Elevation para Android
-    elevation: 2,
-  },
-  inputDisabled: {
-    backgroundColor: "#f3f4f6",
-    color: "#6b7280",
-  },
-
-  rowInputWithButton: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-
-  errorBorder: {
-    borderColor: COLORS.negative,
-    borderWidth: 1.5,
-  },
-
-  // resetContainer/resetText defined later not needed here
-
-  divider: {
-    width: "90%",
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderInput,
-    marginVertical: 16,
-  },
-  sectionCard: {
+  card: {
     width: "90%",
     backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.card,
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
     padding: 12,
-    marginBottom: 16,
-  },
-  sectionCardTitle: {
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.subTitle,
-    color: COLORS.textPrimary,
-    marginBottom: 8,
-    textAlign: 'left',
-  },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    width: "90%",
-    fontSize: FONT_SIZES.subTitle,
-    fontFamily: FONTS.subTitleMedium,
-    color: COLORS.textPrimary,
     marginBottom: 12,
-    textAlign: "left",
   },
-  addressSubtitle: {
-    width: "90%",
-    fontSize: FONT_SIZES.body + 2,
-    fontFamily: FONTS.subTitleMedium,
-    color: COLORS.textPrimary,
-    textAlign: "left",
-    marginBottom: 4,
-  },
-
-  // Verificación de correo
-  verifyRow: {
-    width: '90%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: -8,
-    marginBottom: 8,
-  },
-  verifyHintRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: -4,
-    marginBottom: 8,
-  },
-  verifyHint: { color: COLORS.textSecondary },
-  verifyBtn: {
-    backgroundColor: '#E9E5FF',
-    paddingHorizontal: 16,
-    height: 56,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e6e9ef',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  verifyBtnText: { color: COLORS.primary, fontWeight: '700' },
-
-  dropdownButton: {
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderColor: "#d1d5db",
-    borderWidth: 1,
-    minHeight: 48,
-    padding: 12,
-    marginBottom: 4,
-    justifyContent: 'center',
-    // Shadow para iOS
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    // Elevation para Android
-    elevation: 1,
-  },
-  dropdownText: { 
-    color: "#374151",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  dropdownContainer: {
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    maxHeight: 200,
-    marginBottom: 8,
-    // Shadow para iOS
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    // Elevation para Android
-    elevation: 4,
-  },
-  dropdownItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-  },
-  dropdownItemText: {
-    fontSize: 14,
-    color: "#374151",
-  },
-
-  // Estilos para selectores de fecha
-  dateContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    gap: 8,
-    width: "100%",
-  },
-  selectorContainer: {
-    flex: 1,
-  },
-  dateSelector: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderColor: '#d1d5db',
-    borderWidth: 1,
-    minHeight: 48,
-    paddingHorizontal: 12,
-    justifyContent: 'center',
-    // Shadow para iOS
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    // Elevation para Android
-    elevation: 1,
-  },
-  resetContainerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#eef2f7',
-    paddingVertical: 12,
-    borderRadius: RADIUS.card,
-    marginTop: 12,
-  },
-  resetTextCard: {
-    color: COLORS.textPrimary,
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.body,
-    marginLeft: 6,
-  },
-  
-  dateSelectorText: {
-    color: "#374151",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  menuContent: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    maxHeight: 200,
-    // Shadow para iOS
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    // Elevation para Android
-    elevation: 4,
-  },
-  menuScrollView: {
-    maxHeight: 180,
-  },
-  menuItemTitle: {
-    fontSize: 14,
-    color: "#374151",
-  },
-
-  buttonContainer: {
+  rowBetween: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    width: "100%",
-    marginTop: 16,
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  button: {
-    borderRadius: RADIUS.card,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    minWidth: 140,
-  },
-  confirm: { backgroundColor: COLORS.primary },
-  logout: { backgroundColor: COLORS.secondary },
-  buttonText: {
+  cardTitle: {
+    fontSize: FONT_SIZES.subTitle,
     fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.button,
-    color: COLORS.cardBg,
-    textAlign: "center",
+    color: COLORS.textPrimary,
   },
-  actionsColumn: {
-    width: '90%',
-    marginTop: 8,
-  },
-  fullButton: {
-    width: '100%',
-    borderRadius: RADIUS.card,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  fullButtonPrimary: {
-    backgroundColor: COLORS.primary,
-  },
-  fullButtonSecondary: {
-    backgroundColor: '#E9E5FF',
-  },
-  fullButtonPrimaryText: {
-    color: COLORS.cardBg,
+  label: {
+    marginTop: 10,
+    color: COLORS.textPrimary,
     fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.button,
   },
-  fullButtonSecondaryText: {
-    color: COLORS.primary,
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.button,
-  },
-  fullButtonDangerOutline: {
-    backgroundColor: '#fff',
+  input: {
+    marginTop: 6,
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#ef4444',
+    borderColor: "#e6e9ef",
   },
-  fullButtonDangerText: {
-    color: '#ef4444',
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.button,
+  inputDisabled: { backgroundColor: "#f3f4f6", color: "#6b7280" },
+  rowWithButton: { flexDirection: "row", alignItems: "center", gap: 8 },
+  verifyBtn: {
+    marginLeft: 8,
+    backgroundColor: "#E9E5FF",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
-
-  deleteLink: {
-    marginTop: 16,
-    marginBottom: 24,
-    color: COLORS.negative,
-    textDecorationLine: "underline",
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.body,
-    textAlign: "center",
+  verifyText: { color: COLORS.primary, fontWeight: "700" },
+  actions: { width: "90%", marginTop: 8 },
+  saveBtn: {
+    backgroundColor: COLORS.primary,
+    padding: 14,
+    borderRadius: RADIUS.card,
+    alignItems: "center",
+    marginBottom: 8,
   },
-
-  // MODALES
+  saveText: { color: COLORS.cardBg, fontFamily: FONTS.subTitleMedium },
+  logoutBtn: {
+    backgroundColor: "#E9E5FF",
+    padding: 12,
+    borderRadius: RADIUS.card,
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  logoutText: { color: COLORS.primary, fontFamily: FONTS.subTitleMedium },
+  deleteBtn: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ef4444",
+    padding: 12,
+    borderRadius: RADIUS.card,
+    alignItems: "center",
+  },
+  deleteText: { color: "#ef4444" },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",
@@ -1639,110 +579,21 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.card,
     padding: 16,
+    alignItems: "center",
   },
-
   modalTitle: {
-    fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.subTitle,
     color: COLORS.textPrimary,
     marginBottom: 8,
-    textAlign: "center",
   },
-  modalLabel: {
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textPrimary,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
-    borderRadius: RADIUS.card,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: COLORS.backgroundLight,
-    color: COLORS.textPrimary,
-  },
-  modalError: { color: COLORS.negative, marginTop: 8, textAlign: "center" },
-  modalActions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 14,
-  },
-  modalBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: RADIUS.card,
-    alignItems: "center",
-  },
-  modalCancel: { backgroundColor: "#b0b0b0", marginRight: 8 },
-  modalConfirm: { backgroundColor: COLORS.primary, marginLeft: 8 },
-  modalBtnText: { color: COLORS.cardBg, fontFamily: FONTS.subTitleMedium },
-
-  // Modal eliminar cuenta
-  deleteTitle: {
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.subTitle,
-    color: COLORS.negative,
-    textAlign: "center",
-    marginBottom: 6,
-  },
-  deleteText: {
-    textAlign: "center",
-    color: COLORS.textPrimary,
-    marginBottom: 4,
-  },
-  deleteWarning: {
-    textAlign: "center",
-    color: COLORS.negative,
-    fontFamily: FONTS.subTitleMedium,
-    marginBottom: 12,
-  },
-  deleteActions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 6,
-  },
-  deleteBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: RADIUS.card,
-    alignItems: "center",
-  },
-  deleteConfirm: { backgroundColor: COLORS.negative, marginRight: 8 },
-  deleteCancel: { backgroundColor: "#E9E5FF", marginLeft: 8 },
-  deleteConfirmText: { color: "#fff", fontFamily: FONTS.subTitleMedium },
-  deleteCancelText: { color: COLORS.primary, fontFamily: FONTS.subTitleMedium },
-  // Popup verificación correo
-  verifyModalCard: {
-    alignItems: 'center',
-  },
-  verifyModalTitle: {
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.subTitle,
-    color: COLORS.primary,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  verifyModalMessage: {
-    fontFamily: FONTS.bodyRegular,
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-    marginBottom: 18,
-  },
-  verifyModalBtn: {
+  modalMsg: { textAlign: "center", color: COLORS.textPrimary },
+  modalOk: {
+    marginTop: 12,
     backgroundColor: COLORS.primary,
-    paddingVertical: 12,
-    paddingHorizontal: 28,
-    borderRadius: RADIUS.card,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
-  verifyModalBtnText: {
-    color: '#fff',
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: FONT_SIZES.button,
-  },
+  modalOkText: { color: "#fff" },
+  modalBtn: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8 },
 });

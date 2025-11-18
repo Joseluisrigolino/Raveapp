@@ -7,6 +7,7 @@ import DateTimePicker, {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import { formatDate } from "@/utils/formatDate";
 
 interface DateTimeInputProps {
   label: string;
@@ -54,12 +55,6 @@ export default function DateTimeInputComponent({
   };
 
   // Helpers para formatear
-  function formatDate(date: Date): string {
-    const dd = String(date.getDate()).padStart(2, "0");
-    const mm = String(date.getMonth() + 1).padStart(2, "0");
-    const yyyy = date.getFullYear();
-    return `${dd}/${mm}/${yyyy}`;
-  }
   function formatTime(date: Date): string {
     const hh = String(date.getHours()).padStart(2, "0");
     const min = String(date.getMinutes()).padStart(2, "0");

@@ -21,6 +21,7 @@ import LoginUserWhyRaveAppComponent from "@/app/auth/components/user/login-user/
 import LoginUserStaffComponent from "@/app/auth/components/user/login-user/LoginUserStaffComponent";
 import * as nav from "@/utils/navigation";
 import ROUTES from "@/routes";
+import InfoTyc from "@/components/infoTyc";
 // imports cleaned: removed unused `globalStyles`
 import { useAuth } from "@/app/auth/AuthContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -233,23 +234,8 @@ export default function LoginScreen() {
         <LoginUserWhyRaveAppComponent />
         <LoginUserStaffComponent />
 
-        {/* Términos y privacidad */}
-        <View style={styles.termsRow}>
-          <Text style={styles.termsText}>Al continuar, aceptas nuestros </Text>
-          <Pressable
-            onPress={() => Alert.alert("Términos de Servicio", "Próximamente.")}
-          >
-            <Text style={styles.termsLink}>Términos de Servicio</Text>
-          </Pressable>
-          <Text style={styles.termsText}> </Text>
-          <Pressable
-            onPress={() =>
-              Alert.alert("Política de Privacidad", "Próximamente.")
-            }
-          >
-            <Text style={styles.termsLink}>Política de Privacidad</Text>
-          </Pressable>
-        </View>
+        {/* Términos y privacidad (componente reutilizable) */}
+        <InfoTyc />
       </KeyboardAwareScrollView>
     </KeyboardAvoidingView>
   );

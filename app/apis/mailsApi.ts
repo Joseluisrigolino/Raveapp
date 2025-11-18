@@ -21,14 +21,48 @@ export interface GenericEmailRequest {
 // Helper genérico para POST
 async function postEmail<T = any>(endpoint: string, body: any): Promise<T> {
   const token = await login().catch(() => null);
-  const { data } = await apiClient.post(endpoint, body, {
-    headers: {
+  try {
+    const url = `${apiClient.defaults.baseURL?.replace(/\/$/, "") || ""}${endpoint}`;
+    const headers = {
       "Content-Type": "application/json",
       Accept: "*/*",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-  return data;
+    } as Record<string, string>;
+    // Log request for easier debugging when backend returns 404
+    try {
+      // Mask token for logs
+      const maskedToken = token ? `***(${String(token).length} chars)` : null;
+      // eslint-disable-next-line no-console
+      console.debug("POST email ->", url, body, token ? `(with token ${maskedToken})` : "(no token)");
+      // eslint-disable-next-line no-console
+      console.debug("Request headers ->", Object.keys(headers));
+    } catch {}
+
+    const { data } = await apiClient.post(endpoint, body, { headers });
+    return data;
+  } catch (err: any) {
+    // Enriquecer el error con detalles de respuesta para debugging
+    try {
+      // eslint-disable-next-line no-console
+      console.error("postEmail error status:", err?.response?.status);
+      // eslint-disable-next-line no-console
+      console.error("postEmail response data:", err?.response?.data);
+      // eslint-disable-next-line no-console
+      console.error("failed request config:", err?.config && { url: err.config.url, method: err.config.method, data: err.config.data });
+    } catch {}
+    if (err?.response) {
+      const status = err.response.status;
+      const respData = err.response.data;
+      const message = `postEmail failed ${status}: ${JSON.stringify(respData)}`;
+      const e = new Error(message);
+      // @ts-ignore attach details
+      e.status = status;
+      // @ts-ignore
+      e.responseData = respData;
+      throw e;
+    }
+    throw err;
+  }
 }
 
 // Confirmación de email

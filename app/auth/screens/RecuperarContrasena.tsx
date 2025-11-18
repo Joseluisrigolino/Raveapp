@@ -13,41 +13,32 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view
 import { Text, TextInput, Button } from "react-native-paper";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
-import globalStyles from "@/styles/globalStyles";
+import { COLORS } from "@/styles/globalStyles";
 import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
-import { sendPasswordRecoveryEmail } from "@/app/apis/mailsApi";
-import { getProfile } from "@/app/auth/userHelpers";
+import useSendRecoveryPass from "@/app/auth/services/user/useSendRecoveryPass";
+import InfoTyc from "@/components/infoTyc";
 
-export default function RecuperarContrasenaScreen() {
+// Comentarios en español: pantalla simple para recuperar contraseña
+
+export default function RecoverPasswordScreen() {
   const router = useRouter();
+  // estado del input
   const [email, setEmail] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  // hook que maneja envío de recuperación
+  const { sending, sendRecovery } = useSendRecoveryPass();
 
-  const handleSendRecovery = async () => {
+  // Comentario en español: envía el email de recuperación
+  const handleSend = async () => {
     if (!email.trim()) {
       Alert.alert("Error", "Por favor ingresa tu email");
       return;
     }
 
     try {
-      setSubmitting(true);
-      
-      // Intentar obtener el perfil del usuario para conseguir el nombre
-      let userName = "Usuario";
-      try {
-        const profile = await getProfile(email.trim());
-        userName = profile.nombre || "Usuario";
-      } catch {
-        // Si no se encuentra el usuario, seguimos con "Usuario" por defecto
-      }
+      await sendRecovery(email.trim());
 
-      // Enviar email de recuperación
-      await sendPasswordRecoveryEmail({
-        to: email.trim(),
-        name: userName,
-      });
-
+      // alerta con redirección al login
       Alert.alert(
         "Enlace enviado",
         "Hemos enviado un enlace de recuperación a tu correo electrónico. Revisa tu bandeja de entrada.",
@@ -58,11 +49,12 @@ export default function RecuperarContrasenaScreen() {
           },
         ]
       );
-    } catch (error) {
-      console.error("Error sending recovery email:", error);
-      Alert.alert("Error", "No se pudo enviar el enlace de recuperación. Intenta de nuevo.");
-    } finally {
-      setSubmitting(false);
+    } catch (err) {
+      console.error("send recovery error", err);
+      Alert.alert(
+        "Error",
+        "No se pudo enviar el enlace de recuperación. Intenta de nuevo."
+      );
     }
   };
 
@@ -73,51 +65,44 @@ export default function RecuperarContrasenaScreen() {
       style={{ flex: 1 }}
     >
       <KeyboardAwareScrollView
-        enableOnAndroid
-        extraScrollHeight={160}
-        keyboardOpeningTime={0}
-        enableAutomaticScroll
-        contentContainerStyle={styles.containerScroll}
-        style={{ flex: 1, backgroundColor: globalStyles.COLORS.backgroundLight }}
-        keyboardShouldPersistTaps="always"
-      >
-        {/* Header con logo y tagline */}
-        <View style={styles.headerBox}>
-          <View style={styles.logoCircle}>
+          enableOnAndroid
+          extraScrollHeight={120}
+          contentContainerStyle={styles.container}
+          style={{ flex: 1, backgroundColor: COLORS.backgroundLight }}
+          keyboardShouldPersistTaps="always"
+        >
+        {/* Header con logo y subtítulo */}
+        <View style={styles.header}>
+          <View style={styles.logoBox}>
             <Image
-              source={require("../../../assets/images/raveapplogo/logo1.jpeg")}
-              style={styles.logoImage}
-              resizeMode="cover"
+              source={require("../../../assets/images/raveapplogo/logo3.jpeg")}
+              style={styles.logo}
             />
           </View>
-          <Text style={styles.brandTitle}>RaveApp</Text>
-          <Text style={styles.brandSubtitle}>Tu pase al mejor ritmo</Text>
+          <Text style={styles.title}>RaveApp</Text>
+          <Text style={styles.subtitle}>Tu pase al mejor ritmo</Text>
         </View>
 
-        {/* Botón volver */}
-        <Pressable 
-          style={styles.backButton}
-          onPress={() => nav.back(router)}
-        >
-          <Icon name="arrow-back" size={24} color="#374151" />
+        {/* volver atrás */}
+        <Pressable style={styles.back} onPress={() => nav.back(router)}>
+          <Icon name="arrow-back" size={22} color="#374151" />
           <Text style={styles.backText}>Volver</Text>
         </Pressable>
 
-        {/* Card principal */}
+        {/* tarjeta principal */}
         <View style={styles.card}>
-          {/* Icono de candado */}
-          <View style={styles.lockIconContainer}>
-            <View style={styles.lockIconCircle}>
-              <Icon name="lock" size={32} color="#6b7280" />
+          <View style={styles.iconRow}>
+            <View style={styles.lockCircle}>
+              <Icon name="lock" size={30} color="#6b7280" />
             </View>
           </View>
 
-          <Text style={styles.formTitle}>¿Olvidaste tu contraseña?</Text>
-          <Text style={styles.subtitle}>
+          <Text style={styles.heading}>¿Olvidaste tu contraseña?</Text>
+          <Text style={styles.lead}>
             Ingresa tu correo y te enviaremos un enlace para restablecerla
           </Text>
 
-          <Text style={styles.inputLabel}>Email</Text>
+          <Text style={styles.label}>Email</Text>
           <TextInput
             mode="outlined"
             placeholder="tu@email.com"
@@ -127,201 +112,110 @@ export default function RecuperarContrasenaScreen() {
             value={email}
             onChangeText={setEmail}
             style={styles.input}
-            textColor={"#0f172a"}
-            placeholderTextColor={"#4b5563"}
-            selectionColor={"#0f172a"}
-            outlineColor={"#e6e9ef"}
+            textColor="#0f172a"
+            placeholderTextColor="#4b5563"
+            outlineColor="#e6e9ef"
             activeOutlineColor="#0f172a"
-            outlineStyle={{ borderRadius: 16 }}
             left={<TextInput.Icon icon="email-outline" color="#6b7280" />}
           />
 
           <Button
             mode="contained"
-            onPress={handleSendRecovery}
+            onPress={handleSend}
             contentStyle={styles.buttonContent}
-            style={styles.sendButton}
+            style={styles.button}
             labelStyle={{ fontWeight: "700", color: "#ffffff" }}
-            disabled={submitting}
-            loading={submitting}
+            disabled={sending}
+            loading={sending}
           >
             Enviar Enlace
           </Button>
 
-          {/* Link de recordaste contraseña */}
-          <View style={styles.rememberRow}>
-            <Text style={styles.rememberText}>¿Recordaste tu contraseña? </Text>
-            <Link href={ROUTES.LOGIN.LOGIN as any} style={styles.loginLink}>
+          <View style={styles.rowCenter}>
+            <Text style={styles.smallText}>¿Recordaste tu contraseña? </Text>
+            <Link href={ROUTES.LOGIN.LOGIN as any} style={styles.link}>
               Iniciar Sesión
             </Link>
           </View>
         </View>
 
-        {/* (Sección de ayuda removida a pedido) */}
-
-        {/* Términos y privacidad */}
-        <View style={styles.termsRow}>
-          <Text style={styles.termsText}>Al continuar, aceptas nuestros </Text>
-          <Pressable onPress={() => Alert.alert('Términos de Servicio', 'Próximamente.')}>
-            <Text style={styles.termsLink}>Términos de Servicio</Text>
-          </Pressable>
-          <Text style={styles.termsText}> y </Text>
-          <Pressable onPress={() => Alert.alert('Política de Privacidad', 'Próximamente.')}>
-            <Text style={styles.termsLink}>Política de Privacidad</Text>
-          </Pressable>
-        </View>
+        {/* términos (componente reutilizable) */}
+        <InfoTyc />
       </KeyboardAwareScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  containerScroll: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  headerBox: {
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 20,
-  },
-  logoCircle: {
+  container: { flexGrow: 1, paddingHorizontal: 20, paddingBottom: 40 },
+  header: { alignItems: "center", marginTop: 24, marginBottom: 16 },
+  logoBox: {
     width: 72,
     height: 72,
-    borderRadius: 16,
-    backgroundColor: '#0f172a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
+    borderRadius: 12,
+    overflow: "hidden",
+    marginBottom: 10,
   },
-  logoImage: {
-    width: 72,
-    height: 72,
-    borderRadius: 16,
-  },
-  brandTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  brandSubtitle: {
-    color: '#6b7280',
-    marginBottom: 12,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 4,
-  },
-  backText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: '#374151',
-    fontWeight: '500',
-  },
+  logo: { width: 72, height: 72 },
+  title: { fontSize: 26, fontWeight: "700", color: "#111827" },
+  subtitle: { color: "#6b7280", marginTop: 4 },
+  back: { flexDirection: "row", alignItems: "center", marginVertical: 12 },
+  backText: { marginLeft: 8, fontSize: 16, color: "#374151" },
   card: {
-    marginHorizontal: 12,
+    marginHorizontal: 8,
     backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 12,
-    elevation: 4,
+    borderRadius: 12,
+    padding: 18,
     borderWidth: 1,
     borderColor: "#e6e9ef",
-    marginBottom: 32,
-  },
-  lockIconContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  lockIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#f3f4f6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  formTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    textAlign: "center",
-    color: "#6b7280",
     marginBottom: 24,
-    lineHeight: 20,
   },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  input: {
-    marginBottom: 20,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    overflow: "hidden",
-    height: 56,
-    paddingHorizontal: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  sendButton: {
-    borderRadius: 25,
-    height: 50,
+  iconRow: { alignItems: "center", marginBottom: 12 },
+  lockCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: "#f3f4f6",
+    alignItems: "center",
     justifyContent: "center",
-    backgroundColor: '#0f172a',
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 12,
-    elevation: 6,
+  },
+  heading: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#111827",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  lead: { textAlign: "center", color: "#6b7280", marginBottom: 14 },
+  label: { fontSize: 15, fontWeight: "600", color: "#111827", marginBottom: 8 },
+  input: {
     marginBottom: 16,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    height: 52,
+    overflow: "hidden",
   },
-  buttonContent: { height: 50 },
-  rememberRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+  button: {
+    borderRadius: 22,
+    height: 48,
+    justifyContent: "center",
+    backgroundColor: "#0f172a",
   },
-  rememberText: {
-    color: '#6b7280',
-    fontSize: 14,
+  buttonContent: { height: 48 },
+  rowCenter: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 10,
   },
-  loginLink: {
-    color: '#0f172a',
-    fontWeight: '600',
-    fontSize: 14,
-  },
+  smallText: { color: "#6b7280" },
+  link: { color: "#0f172a", fontWeight: "600" },
   termsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    paddingHorizontal: 20,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    flexWrap: "wrap",
   },
-  termsText: {
-    color: '#6b7280',
-    fontSize: 12,
-  },
-  termsLink: {
-    color: '#0f172a',
-    fontWeight: '600',
-    fontSize: 12,
-  },
+  termsText: { color: "#6b7280", fontSize: 12 },
+  termsLink: { color: "#0f172a", fontWeight: "600", fontSize: 12 },
 });
