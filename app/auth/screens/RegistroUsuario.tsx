@@ -25,15 +25,16 @@ import {
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import * as WebBrowser from "expo-web-browser";
-import * as Google from "expo-auth-session/providers/google";
 import * as nav from "@/utils/navigation";
 import ROUTES from "@/routes";
+import GoogleSignInButton from "@/app/auth/components/GoogleSignInButtonComponent";
 
 import globalStyles from "@/styles/globalStyles";
-import { apiClient, login as apiLogin } from "@/app/apis/apiConfig";
 import { useAuth } from "@/app/auth/AuthContext";
-import { mailsApi } from "@/app/apis/mailsApi";
+import useVerifyEmail from "@/app/auth/services/user/useVerifyEmail";
+import useCreateUser from "@/app/auth/services/user/useCreateUser";
 import InfoTyc from "@/components/infoTyc";
+import { parseBirthDateToISO } from "@/utils/formatDate";
 
 // helpers (simples y en español para claridad)
 // valida email básico
@@ -41,17 +42,6 @@ const isEmailValid = (value: string) => /\S+@\S+\.\S+/.test(value);
 // valida contraseña con requisitos mínimos
 const isPasswordValid = (value: string) =>
   value.length >= 8 && /[A-Za-z]/.test(value) && /\d/.test(value);
-// parsea la fecha a ISO, acepta YYYY-MM-DD o DD/MM/YYYY
-const parseBirthDateToISO = (input: string) => {
-  if (!input) return new Date().toISOString();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return new Date(input).toISOString();
-  const parts = input.includes("/") ? input.split("/") : input.split("-");
-  if (parts.length === 3) {
-    const [d, m, y] = parts;
-    return new Date(`${y}-${m}-${d}`).toISOString();
-  }
-  return new Date(input).toISOString();
-};
 // opciones fijas para día/mes/año
 const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) =>
   (i + 1).toString().padStart(2, "0")
@@ -121,10 +111,16 @@ export default function RegisterUserScreen() {
   });
 
   // partes de fecha de nacimiento (simple)
-  const [birthParts, setBirthParts] = useState({ day: "", month: "", year: "" });
+  const [birthParts, setBirthParts] = useState({
+    day: "",
+    month: "",
+    year: "",
+  });
 
   // menú abierto (un solo menú a la vez)
-  const [openMenu, setOpenMenu] = useState<null | "day" | "month" | "year">(null);
+  const [openMenu, setOpenMenu] = useState<null | "day" | "month" | "year">(
+    null
+  );
 
   // otros estados
   const [loading, setLoading] = useState(false);
@@ -209,14 +205,15 @@ export default function RegisterUserScreen() {
     return true;
   };
 
-  // registro (mantiene endpoints/contratos)
+  // hooks para crear usuario y enviar verificacion
+  const { creating, error: createError, createUser } = useCreateUser();
+  const { sending, error: sendError, sendVerifyEmail } = useVerifyEmail();
+
+  // registro (ahora delega en hooks)
   const onRegister = async () => {
     if (!validateForm()) return;
     setLoading(true);
     try {
-      const rootToken = await apiLogin();
-      apiClient.defaults.headers.common.Authorization = `Bearer ${rootToken}`;
-
       const payload = {
         domicilio: {
           localidad: { nombre: "", codigo: "" },
@@ -244,14 +241,13 @@ export default function RegisterUserScreen() {
         dtNacimiento: parseBirthDateToISO(form.birthDate),
       };
 
-      await apiClient.post("/v1/Usuario/CreateUsuario", payload, {
-        headers: { "Content-Type": "application/json" },
-      });
+      // crear usuario usando hook
+      await createUser(payload);
 
-      // email de confirmación (best-effort)
+      // enviar email de confirmación (best-effort) usando hook
       let mailOk = false;
       try {
-        await mailsApi.sendConfirmEmail({
+        await sendVerifyEmail({
           to: form.email.trim(),
           name: form.firstName.trim(),
           confirmationUrl: "https://raveapp.com.ar/confirmacion-mail",
@@ -259,15 +255,16 @@ export default function RegisterUserScreen() {
         mailOk = true;
       } catch {}
 
-      // auto login
+      // auto login (best-effort)
       try {
         await login(form.email.trim(), form.password);
       } catch {}
 
-      const email = form.email.trim();
+      const emailStr = form.email.trim();
       const msg = mailOk
-        ? `Tu registro se realizó con éxito. Te enviamos un correo a ${email} para confirmar tu email. Si no lo ves, revisa la carpeta de spam/promociones.`
+        ? `Tu registro se realizó con éxito. Te enviamos un correo a ${emailStr} para confirmar tu email. Si no lo ves, revisa la carpeta de spam/promociones.`
         : "Tu cuenta se ha registrado correctamente.";
+
       setSuccessMessage(msg);
       setSuccessVisible(true);
     } catch (err: any) {
@@ -279,7 +276,12 @@ export default function RegisterUserScreen() {
           .join("\n");
         Alert.alert("Validación", msgs);
       } else {
-        Alert.alert("Error", "No se pudo crear la cuenta. Intenta de nuevo.");
+        const msg =
+          createError ||
+          sendError ||
+          err?.message ||
+          "No se pudo crear la cuenta. Intenta de nuevo.";
+        Alert.alert("Error", String(msg));
       }
     } finally {
       setLoading(false);
@@ -382,15 +384,17 @@ export default function RegisterUserScreen() {
                   Registrarse con Google
                 </Button>
               ) : hasAnyClientId ? (
-                <GoogleMobileButton
+                <GoogleSignInButton
                   expoClientId={expoClientId}
                   iosClientId={iosClientId}
                   androidClientId={androidClientId}
                   webClientId={webClientId}
-                  isExpoGo={isExpoGo}
+                  useProxy={isExpoGo}
                   onLogin={loginOrCreateWithGoogleIdToken}
                   onSuccess={() => nav.replace(router, ROUTES.MAIN.EVENTS.MENU)}
-                />
+                >
+                  Registrarse con Google
+                </GoogleSignInButton>
               ) : (
                 <Button
                   mode="outlined"
@@ -407,6 +411,13 @@ export default function RegisterUserScreen() {
                   Registrarse con Google
                 </Button>
               )}
+
+              {/* separador visual debajo del botón Google */}
+              <View style={styles.socialSeparatorContainer}>
+                <View style={styles.socialLine} />
+                <Text style={styles.socialSeparatorText}>o regístrate debajo</Text>
+                <View style={styles.socialLine} />
+              </View>
 
               <Text
                 variant="headlineMedium"
@@ -452,12 +463,14 @@ export default function RegisterUserScreen() {
                 {/* Día */}
                 <View style={styles.selectorContainer} collapsable={false}>
                   <Menu
-                    visible={openMenu === 'day'}
+                    visible={openMenu === "day"}
                     onDismiss={() => setOpenMenu(null)}
                     anchor={
                       <Button
                         mode="outlined"
-                        onPress={() => setOpenMenu(openMenu === 'day' ? null : 'day')}
+                        onPress={() =>
+                          setOpenMenu(openMenu === "day" ? null : "day")
+                        }
                         style={styles.dateSelector}
                         contentStyle={styles.dateSelectorContent}
                         labelStyle={styles.dateSelectorLabel}
@@ -469,7 +482,11 @@ export default function RegisterUserScreen() {
                   >
                     <ScrollView style={styles.menuScroll}>
                       {dayOptions.map((d) => (
-                        <Menu.Item key={d} onPress={() => onSelectDay(d)} title={d} />
+                        <Menu.Item
+                          key={d}
+                          onPress={() => onSelectDay(d)}
+                          title={d}
+                        />
                       ))}
                     </ScrollView>
                   </Menu>
@@ -478,24 +495,31 @@ export default function RegisterUserScreen() {
                 {/* Mes */}
                 <View style={styles.selectorContainer} collapsable={false}>
                   <Menu
-                    visible={openMenu === 'month'}
+                    visible={openMenu === "month"}
                     onDismiss={() => setOpenMenu(null)}
                     anchor={
                       <Button
                         mode="outlined"
-                        onPress={() => setOpenMenu(openMenu === 'month' ? null : 'month')}
+                        onPress={() =>
+                          setOpenMenu(openMenu === "month" ? null : "month")
+                        }
                         style={styles.dateSelector}
                         contentStyle={styles.dateSelectorContent}
                         labelStyle={styles.dateSelectorLabel}
                       >
-                        {monthOptions.find((m) => m.value === birthParts.month)?.label || "Mes"}
+                        {monthOptions.find((m) => m.value === birthParts.month)
+                          ?.label || "Mes"}
                       </Button>
                     }
                     contentStyle={styles.menuContent}
                   >
                     <ScrollView style={styles.menuScroll}>
                       {monthOptions.map((m) => (
-                        <Menu.Item key={m.value} onPress={() => onSelectMonth(m.value)} title={m.label} />
+                        <Menu.Item
+                          key={m.value}
+                          onPress={() => onSelectMonth(m.value)}
+                          title={m.label}
+                        />
                       ))}
                     </ScrollView>
                   </Menu>
@@ -504,12 +528,14 @@ export default function RegisterUserScreen() {
                 {/* Año */}
                 <View style={styles.selectorContainer} collapsable={false}>
                   <Menu
-                    visible={openMenu === 'year'}
+                    visible={openMenu === "year"}
                     onDismiss={() => setOpenMenu(null)}
                     anchor={
                       <Button
                         mode="outlined"
-                        onPress={() => setOpenMenu(openMenu === 'year' ? null : 'year')}
+                        onPress={() =>
+                          setOpenMenu(openMenu === "year" ? null : "year")
+                        }
                         style={styles.dateSelector}
                         contentStyle={styles.dateSelectorContent}
                         labelStyle={styles.dateSelectorLabel}
@@ -521,7 +547,11 @@ export default function RegisterUserScreen() {
                   >
                     <ScrollView style={styles.menuScroll}>
                       {yearOptions.map((y) => (
-                        <Menu.Item key={y} onPress={() => onSelectYear(y)} title={y} />
+                        <Menu.Item
+                          key={y}
+                          onPress={() => onSelectYear(y)}
+                          title={y}
+                        />
                       ))}
                     </ScrollView>
                   </Menu>
@@ -643,66 +673,6 @@ export default function RegisterUserScreen() {
   );
 }
 
-// componente auxiliar: botón Google móvil (simple)
-function GoogleMobileButton({
-  expoClientId,
-  iosClientId,
-  androidClientId,
-  webClientId,
-  isExpoGo,
-  onLogin,
-  onSuccess,
-}: any) {
-  // comentarios en español: este hook crea la request
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    expoClientId,
-    iosClientId,
-    androidClientId,
-    webClientId,
-    scopes: ["openid", "profile", "email"],
-    responseType: "id_token",
-  } as any);
-
-  return (
-    <Button
-      mode="outlined"
-      icon="google"
-      style={styles.googleButton}
-      contentStyle={styles.googleButtonContent}
-      onPress={async () => {
-        try {
-          if (!request) {
-            Alert.alert(
-              "Cargando",
-              "Preparando Google Sign-In, intenta de nuevo en unos segundos."
-            );
-            return;
-          }
-          const res = await (promptAsync as any)({ useProxy: isExpoGo });
-          if (res?.type !== "success") return;
-          const idToken =
-            res?.authentication?.idToken ||
-            (res?.params?.id_token as string | undefined);
-          if (!idToken) {
-            Alert.alert("Error", "No se recibió id_token de Google");
-            return;
-          }
-          const ok = await onLogin?.(idToken);
-          if (!ok) {
-            Alert.alert("Error", "No se pudo registrar/iniciar con Google");
-            return;
-          }
-          onSuccess?.();
-        } catch {
-          Alert.alert("Error", "No se pudo completar el registro con Google");
-        }
-      }}
-    >
-      Registrarse con Google
-    </Button>
-  );
-}
-
 const COLORS = {
   // colores simples
   primary: "#7c3aed",
@@ -796,7 +766,7 @@ const styles = StyleSheet.create({
   googleButton: {
     borderRadius: 25,
     borderColor: "#d1d5db",
-    marginBottom: 12,
+    marginBottom: 20,
     height: 50,
     justifyContent: "center",
     backgroundColor: "#fff",
@@ -914,5 +884,21 @@ const styles = StyleSheet.create({
   },
   menuScroll: {
     maxHeight: 200,
+  },
+  socialSeparatorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    marginTop: 6,
+  },
+  socialLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#e6e9ef",
+  },
+  socialSeparatorText: {
+    marginHorizontal: 12,
+    color: "#6b7280",
+    fontSize: 12,
   },
 });

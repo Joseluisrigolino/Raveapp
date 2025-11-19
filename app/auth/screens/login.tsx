@@ -12,7 +12,6 @@ import { Text, Button } from "react-native-paper";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
-import * as Google from "expo-auth-session/providers/google";
 import { GOOGLE_CONFIG } from "@/app/auth/googleConfig";
 import LoginUserWelcomeComponent from "@/app/auth/components/user/login-user/LoginUserWelcomeComponent";
 import LoginUserImageAppComponent from "@/app/auth/components/user/login-user/LoginUserImageAppComponent";
@@ -25,6 +24,7 @@ import InfoTyc from "@/components/infoTyc";
 // imports cleaned: removed unused `globalStyles`
 import { useAuth } from "@/app/auth/AuthContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import GoogleSignInButton from "@/app/auth/components/GoogleSignInButtonComponent";
 
 // ==================================================
 // helpers
@@ -120,59 +120,7 @@ export default function LoginScreen() {
     }
   }
 
-  // Botón Google para móvil usando expo-auth-session (se pasa como socialNode)
-  function GoogleMobileButton() {
-    const [request, response, promptAsync] =
-      Google.useAuthRequest(googleConfig);
-
-    async function handlePress() {
-      try {
-        setLoading(true);
-        if (!request) {
-          Alert.alert(
-            "Cargando",
-            "Preparando Google Sign-In, intenta de nuevo en unos segundos."
-          );
-          return;
-        }
-        const res = await (promptAsync as any)({ useProxy: true });
-        if (res?.type !== "success") return;
-        const idToken = res?.params?.id_token as string | undefined;
-        if (!idToken) {
-          Alert.alert("Error", "No se recibió id_token de Google");
-          return;
-        }
-        // Firebase/social login handling removed — notify the user
-        Alert.alert(
-          "Info",
-          "Google Sign-In no está configurado en esta aplicación."
-        );
-      } catch (e) {
-        Alert.alert("Error", "No se pudo iniciar sesión con Google");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    return (
-      <Button
-        mode="outlined"
-        onPress={handlePress}
-        icon="google"
-        contentStyle={{ height: 50 }}
-        style={{
-          borderRadius: 25,
-          height: 50,
-          justifyContent: "center",
-          width: "100%",
-        }}
-        labelStyle={{ color: "#111827", fontWeight: "700" }}
-        disabled={loading}
-      >
-        Ingresar con Google
-      </Button>
-    );
-  }
+  // usamos componente reutilizable GoogleSignInButton
 
   return (
     <KeyboardAvoidingView
@@ -200,35 +148,43 @@ export default function LoginScreen() {
           rememberFlag={rememberFlag}
           setRememberFlag={setRememberFlag}
           onLogin={handleLogin}
-          socialNode={
-            googleConfig.androidClientId ||
-            googleConfig.iosClientId ||
-            googleConfig.expoClientId ||
-            googleConfig.webClientId ? (
-              <GoogleMobileButton />
-            ) : (
-              <Button
-                mode="outlined"
-                onPress={() =>
-                  Alert.alert(
-                    "Configuración requerida",
-                    "Faltan Client IDs de Google en app.json (extra). Define EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID y/o EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID."
-                  )
-                }
-                icon="google"
-                disabled={loading}
-                contentStyle={{ height: 50 }}
-                style={{
-                  borderRadius: 25,
-                  height: 50,
-                  justifyContent: "center",
-                  width: "100%",
-                }}
-              >
-                Ingresar con Google
-              </Button>
-            )
-          }
+              socialNode={
+                googleConfig.androidClientId ||
+                googleConfig.iosClientId ||
+                googleConfig.expoClientId ||
+                googleConfig.webClientId ? (
+                  <GoogleSignInButton
+                    expoClientId={googleConfig.expoClientId}
+                    iosClientId={googleConfig.iosClientId}
+                    androidClientId={googleConfig.androidClientId}
+                    webClientId={googleConfig.webClientId}
+                    useProxy={true}
+                  >
+                    Ingresar con Google
+                  </GoogleSignInButton>
+                ) : (
+                  <Button
+                    mode="outlined"
+                    onPress={() =>
+                      Alert.alert(
+                        "Configuración requerida",
+                        "Faltan Client IDs de Google en app.json (extra). Define EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID y/o EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID."
+                      )
+                    }
+                    icon="google"
+                    disabled={loading}
+                    contentStyle={{ height: 50 }}
+                    style={{
+                      borderRadius: 25,
+                      height: 50,
+                      justifyContent: "center",
+                      width: "100%",
+                    }}
+                  >
+                    Ingresar con Google
+                  </Button>
+                )
+              }
         />
 
         <LoginUserWhyRaveAppComponent />

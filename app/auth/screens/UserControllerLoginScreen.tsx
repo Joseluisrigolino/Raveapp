@@ -1,39 +1,28 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable, Alert } from "react-native";
 import { Text, TextInput, Button } from "react-native-paper";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import ROUTES from "@/routes";
-import { loginControllerUser } from "@/app/auth/apis/user-controller/controllerApi";
+import useLoginUserController from "@/app/auth/services/user-controllers/useLoginUserController";
 
-export default function UserControllerLogin() {
-	const [username, setUsername] = React.useState("");
-	const [password, setPassword] = React.useState("");
-	const [secure, setSecure] = React.useState(true);
-	// Eliminado 'Recordar mis credenciales'
+// helper: revisa si una cadena no está vacía
+const isNotEmpty = (value: string) => value.trim().length > 0;
 
-	const canSubmitBase = username.trim().length > 0 && password.length > 0;
-	const [submitting, setSubmitting] = React.useState(false);
-	const canSubmit = canSubmitBase && !submitting;
+// Pantalla principal: versión simplificada con nombres en inglés
+export default function ControllerLoginScreen() {
+	// estados simples
+	const [user, setUser] = useState("");
+	const [password, setPassword] = useState("");
+	const [showPassword, setShowPassword] = useState(true);
 
-	const router = useRouter();
+	// usamos el hook que encapsula el login
+	const { login, loading } = useLoginUserController();
 
-		const handleSubmit = async () => {
-			if (!canSubmitBase) return;
-			try {
-				setSubmitting(true);
-				const ok = await loginControllerUser(username.trim(), password);
-				if (!ok) {
-					Alert.alert("Acceso denegado", "Usuario o contraseña inválidos para controlador.");
-					return;
-				}
-				router.replace({ pathname: ROUTES.CONTROLLER.SCANNER, params: { user: username.trim() } });
-			} catch (e: any) {
-				Alert.alert("Error", "No se pudo validar las credenciales del controlador.");
-			} finally {
-				setSubmitting(false);
-			}
-		};
+	const canSubmit = user.trim().length > 0 && password.length > 0 && !loading;
+
+	// al presionar el botón pedimos al hook que haga el login
+	const onPressLogin = () => {
+		login(user, password);
+	};
 
 	return (
 		<KeyboardAvoidingView
@@ -41,11 +30,11 @@ export default function UserControllerLogin() {
 			style={{ flex: 1 }}
 		>
 			<ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-				{/* Card principal */}
+				{/* tarjeta principal */}
 				<View style={styles.card}>
 					<Text style={styles.title}>Acceso de Controlador</Text>
 
-					{/* Badge */}
+					{/* badge que indica personal autorizado */}
 					<View style={styles.badgeRow}>
 						<View style={styles.badge}>
 							<Icon name="verified-user" size={18} color="#0f172a" />
@@ -53,58 +42,52 @@ export default function UserControllerLogin() {
 						</View>
 					</View>
 
-					{/* Usuario */}
+					{/* campo de usuario */}
 					<Text style={styles.label}>Nombre de Usuario</Text>
 					<TextInput
 						mode="outlined"
 						placeholder="usuario.controlador"
 						placeholderTextColor="rgba(107, 114, 128, 0.4)"
-						value={username}
-						onChangeText={setUsername}
+						value={user}
+						onChangeText={setUser}
 						left={<TextInput.Icon icon="account-outline" color="#6b7280" />}
 						style={styles.input}
-						outlineStyle={{ borderRadius: 14 }}
 					/>
 
-					{/* Password */}
+					{/* campo de contraseña */}
 					<Text style={styles.label}>Contraseña</Text>
 					<TextInput
 						mode="outlined"
 						placeholder="••••••••"
 						placeholderTextColor="rgba(107, 114, 128, 0.4)"
-						secureTextEntry={secure}
+						secureTextEntry={showPassword}
 						value={password}
 						onChangeText={setPassword}
 						left={<TextInput.Icon icon="lock-outline" color="#6b7280" />}
-						right={<TextInput.Icon icon={secure ? "eye" : "eye-off"} color="#6b7280" onPress={() => setSecure((s) => !s)} />}
+						right={<TextInput.Icon icon={showPassword ? "eye" : "eye-off"} color="#6b7280" onPress={() => setShowPassword(!showPassword)} />}
 						style={styles.input}
-						outlineStyle={{ borderRadius: 14 }}
 					/>
 
-								{/* (Recordar mis credenciales) Quitado */}
-
-					{/* Botón */}
-								<Button
+					{/* botón de envío simple */}
+					<Button
 						mode="contained"
-						onPress={handleSubmit}
+						onPress={onPressLogin}
 						disabled={!canSubmit}
 						style={styles.submitButton}
-									contentStyle={{ height: 50 }}
-												labelStyle={{ fontWeight: "700", color: "#ffffff" }}
-												loading={submitting}
+						contentStyle={{ height: 50 }}
+						labelStyle={{ fontWeight: "700", color: "#ffffff" }}
+						loading={loading}
 					>
 						Acceder como Controlador
 					</Button>
 
-					{/* ¿Olvidaste tu contraseña? (mensaje informativo) */}
-					<Pressable onPress={() => { /* Recuperación no disponible: solicitar al organizador */ }}> 
+					{/* mensaje para recuperación de contraseña */}
+					<Pressable onPress={() => { /* recuperación no disponible aquí */ }}>
 						<Text style={styles.forgot}>Si olvidaste tu contraseña, solicítala al usuario organizador.</Text>
 					</Pressable>
 				</View>
 
-				{/* Información de Seguridad eliminada */}
-
-				{/* Footer */}
+				{/* footer simple */}
 				<View style={styles.footer}>
 					<Text style={styles.footerMuted}>Sistema de Control Autorizado v2.1.5</Text>
 					<View style={styles.footerLinksRow}>
@@ -155,8 +138,6 @@ const styles = StyleSheet.create({
 	badgeText: { color: "#111827", fontWeight: "600" },
 	label: { color: "#6b7280", marginBottom: 6, marginTop: 8 },
 	input: { marginBottom: 8, backgroundColor: "#fff" },
-	rememberRow: { flexDirection: "row", alignItems: "center", marginVertical: 8 },
-	rememberText: { color: "#374151" },
 	submitButton: {
 		borderRadius: 12,
 		backgroundColor: "#0f172a",
@@ -164,9 +145,6 @@ const styles = StyleSheet.create({
 		marginBottom: 10,
 	},
 	forgot: { color: "#9ca3af", textAlign: "center" },
-
-	// Estilos de Información de Seguridad eliminados
-
 	footer: { alignItems: "center", marginTop: 16, marginBottom: 8 },
 	footerMuted: { color: "#9ca3af", fontSize: 12, marginBottom: 8 },
 	footerLinksRow: { flexDirection: "row", alignItems: "center" },
