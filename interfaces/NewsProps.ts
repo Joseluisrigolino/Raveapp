@@ -1,1 +1,1 @@
-export type { NewsItem } from "@/app/news/types/NewsProps";
+export type { NewsItem } from "@/app/news/types/NewsInterface";

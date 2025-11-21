@@ -1,68 +1,45 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { ScrollView, View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl, Share } from "react-native";
+// src/screens/NewsScreens/NewsScreen.tsx
+import React, { useMemo, useCallback, useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
+  TouchableOpacity,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, usePathname } from "expo-router";
-import { useAuth } from "@/app/auth/AuthContext";
-import ROUTES from "@/routes";
-import * as nav from "@/utils/navigation";
-import ProtectedRoute from "@/app/auth/ProtectedRoute";
 
+import ProtectedRoute from "@/app/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
-import { getNews } from "@/app/news/apis/newsApi";
-import { NewsItem } from "@/interfaces/NewsProps";
-import { COLORS, FONT_SIZES, FONTS } from "@/styles/globalStyles";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import SearchBarComponent from "@/components/common/SearchBarComponent";
-import { getSafeImageSource } from "@/utils/image";
 
-const PLACEHOLDER_IMAGE = "https://via.placeholder.com/400x200?text=Sin+imagen";
+import ROUTES from "@/routes";
+import * as nav from "@/utils/navigation";
+import { useAuth } from "@/app/auth/AuthContext";
+import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
+
+import { NewsItem } from "@/interfaces/NewsProps";
+import useNewsList from "../services/useNewsList";
+import NewsListCardComponent from "../components/new/NewsListCardComponent";
+import NewsEmptyPlaceholderComponent from "../components/new/NewsEmptyPlaceholderComponent";
 
 export default function NewsScreen() {
   const router = useRouter();
   const path = usePathname();
-  // Usar helpers del contexto para roles y autenticación
-  const { user, isAuthenticated, hasRole } = useAuth();
+  const { hasRole } = useAuth();
   const isAdmin = hasRole("admin");
 
-  const [newsList, setNewsList] = useState<NewsItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  // Autor oculto en UI (se elimina resolución de autor)
 
-  const loadNews = useCallback(async (opts: { refresh?: boolean } = {}) => {
-    if (opts.refresh) setRefreshing(true);
-    else setLoading(true);
-    setError(null);
-    try {
-      const data = await getNews();
-      setNewsList(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("[NewsScreen] Error fetching news:", err);
-      setError("Error al cargar las noticias");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadNews();
-  }, [loadNews]);
-
-  // Helpers to derive author info from a news item
-  // Eliminados helpers de autor (no se muestra el creador en la UI)
-
-  // Resolve authors for the current news list and cache results (replicates NewScreen fallbacks)
-  // Eliminada la resolución de autor en lista (no se muestra)
+  const { news, loading, refreshing, error, reload } = useNewsList();
 
   const currentScreen = path?.split("/").pop() || "";
 
-  // Tabs: si es administrador mostrar "Administrar Noticias" seguido de "Noticias";
-  // si no es administrador mostrar "Noticias" y opcionalmente "Artistas".
   const tabs = useMemo(() => {
     if (isAdmin) {
       return [
@@ -87,49 +64,40 @@ export default function NewsScreen() {
       },
     ];
 
-    // Mostrar "Artistas" sólo si NO es administrador
-    if (!isAdmin) {
-      baseTabs.push({
-        label: "Artistas",
-        route: ROUTES.MAIN.ARTISTS.LIST,
-        isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split("/").pop(),
-      });
-    }
+    baseTabs.push({
+      label: "Artistas",
+      route: ROUTES.MAIN.ARTISTS.LIST,
+      isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split("/").pop(),
+    });
 
     return baseTabs;
   }, [currentScreen, isAdmin]);
 
   const goToDetail = useCallback(
-    (item: NewsItem) => nav.push(router, { pathname: ROUTES.MAIN.NEWS.ITEM, params: { id: item.idNoticia } }),
+    (item: NewsItem) =>
+      nav.push(router, {
+        pathname: ROUTES.MAIN.NEWS.ITEM,
+        params: { id: item.idNoticia },
+      }),
     [router]
   );
 
   const filteredList = useMemo(() => {
-    if (!searchText.trim()) return newsList;
+    if (!searchText.trim()) return news;
     const q = searchText.toLowerCase();
-    return newsList.filter((n) =>
-      n.titulo.toLowerCase().includes(q) || (n.contenido || "").toLowerCase().includes(q)
+    return news.filter(
+      (n) =>
+        n.titulo.toLowerCase().includes(q) ||
+        (n.contenido || "").toLowerCase().includes(q)
     );
-  }, [newsList, searchText]);
-
-  // Eliminado: cálculo de minutos de lectura
-
-  const getCategory = (title: string, content?: string) => {
-    const t = (title + " " + (content || "")).toLowerCase();
-    if (/seguridad/.test(t)) return "SEGURIDAD";
-    if (/música|musica/.test(t)) return "MÚSICA";
-    if (/tendencia|tendencias/.test(t)) return "TENDENCIAS";
-    if (/tecnolog/.test(t)) return "TECNOLOGÍA";
-    return "NOTICIA";
-  };
+  }, [news, searchText]);
 
   return (
     <ProtectedRoute allowedRoles={["admin", "owner", "user"]}>
       <SafeAreaView style={styles.mainContainer}>
-  <Header />
+        <Header />
         <TabMenuComponent tabs={tabs} />
 
-        {/* Search */}
         <SearchBarComponent
           value={searchText}
           onChangeText={setSearchText}
@@ -143,73 +111,42 @@ export default function NewsScreen() {
         ) : error ? (
           <View style={styles.centered}>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity onPress={() => loadNews({ refresh: true })} style={styles.retryButton}>
+            <TouchableOpacity
+              onPress={() => reload({ refresh: true })}
+              style={styles.retryButton}
+              activeOpacity={0.85}
+            >
               <Text style={styles.retryText}>Reintentar</Text>
             </TouchableOpacity>
           </View>
-        ) : newsList.length === 0 ? (
-          <View style={styles.centered}>
-            <View style={styles.placeholderCard}>
-              <View style={styles.placeholderIconBox}>
-                <MaterialCommunityIcons name="newspaper-variant-outline" size={34} color={COLORS.textSecondary} />
-              </View>
-              <Text style={styles.placeholderTitle}>No hay noticias por ahora</Text>
-              <Text style={styles.placeholderSubtitle}>Por el momento, no hay noticias para mostrar. Próximamente estaremos subiendo las últimas novedades.</Text>
-            </View>
-          </View>
+        ) : news.length === 0 ? (
+          <NewsEmptyPlaceholderComponent />
         ) : (
           <ScrollView
             contentContainerStyle={styles.scrollContent}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadNews({ refresh: true })} />}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => reload({ refresh: true })}
+              />
+            }
           >
             <View style={styles.containerCards}>
-              {filteredList.map((item) => (
-                <TouchableOpacity
-                  key={item.idNoticia}
-                  style={styles.newsCard}
-                  onPress={() => goToDetail(item)}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.imageWrapper}>
-                    <Image
-                      source={getSafeImageSource(item.imagen || PLACEHOLDER_IMAGE)}
-                      style={styles.newsImage}
-                      resizeMode="cover"
-                    />
-                  </View>
-
-                  <View style={styles.cardContent}>
-                    <View style={styles.metaRow}>
-                      <MaterialCommunityIcons name="clock-time-three-outline" size={16} color={COLORS.textSecondary} />
-                      <Text style={styles.metaText}>
-                        {new Date(item.dtPublicado).toLocaleDateString()}
-                      </Text>
-                    </View>
-
-                    <Text style={styles.newsTitle} numberOfLines={2}>{item.titulo}</Text>
-                    <Text style={styles.newsExcerpt} numberOfLines={2}>{String(item.contenido || "").replace(/\n+/g, " ").trim()}</Text>
-
-                    <View style={styles.footerRow}>
-                      <View style={styles.actionsRow}>
-                        <TouchableOpacity
-                          style={styles.iconBtn}
-                          onPress={() => {
-                            const excerpt = String(item.contenido || "").replace(/\n+/g, " ").trim();
-                            const short = excerpt.length > 140 ? excerpt.slice(0, 137) + "..." : excerpt;
-                            Share.share({
-                              title: `RaveApp - ${item.titulo}`,
-                              message: `RaveApp - ${item.titulo}\n\n${short}`,
-                            }).catch(() => {});
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <MaterialCommunityIcons name="share-variant" size={18} color={COLORS.textSecondary} />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
+              {filteredList.length === 0 ? (
+                <View style={styles.centered}>
+                  <Text style={styles.emptySearchText}>
+                    No se encontraron noticias para tu búsqueda.
+                  </Text>
+                </View>
+              ) : (
+                filteredList.map((item) => (
+                  <NewsListCardComponent
+                    key={item.idNoticia}
+                    item={item}
+                    onPress={() => goToDetail(item)}
+                  />
+                ))
+              )}
             </View>
           </ScrollView>
         )}
@@ -238,74 +175,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingHorizontal: 12,
   },
-  newsCard: {
-    backgroundColor: COLORS.backgroundLight,
-    borderRadius: 14,
-    overflow: "hidden",
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
-  },
-  imageWrapper: {
-    position: "relative",
-  },
-  newsImage: {
-    width: "100%",
-    height: 180,
-  },
-  categoryPill: {
-    position: "absolute",
-    top: 10,
-    left: 10,
-    backgroundColor: "#ECEFF4",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  categoryText: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    fontFamily: FONTS.subTitleMedium,
-  },
-  cardContent: {
-    padding: 12,
-    backgroundColor: COLORS.backgroundLight,
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  metaText: {
-    color: COLORS.textSecondary,
-    fontSize: 13,
-  },
-  newsTitle: {
-    fontFamily: FONTS.subTitleMedium,
-    fontSize: 16,
-    color: COLORS.textPrimary,
-    marginTop: 6,
-  },
-  newsExcerpt: {
-    marginTop: 6,
-    color: COLORS.textSecondary,
-    fontSize: 13,
-  },
-  footerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    marginTop: 10,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  iconBtn: {
-    padding: 6,
-    borderRadius: 8,
-  },
   errorText: {
     fontFamily: FONTS.bodyRegular,
     fontSize: FONT_SIZES.body,
@@ -323,35 +192,11 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "700",
   },
-  /* Placeholder styles for empty news list */
-  placeholderCard: {
-    width: 320,
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 14,
-    paddingVertical: 24,
-    paddingHorizontal: 18,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
-  },
-  placeholderIconBox: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: COLORS.backgroundLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  placeholderTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: 8,
-  },
-  placeholderSubtitle: {
+  emptySearchText: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.body,
     color: COLORS.textSecondary,
-    textAlign: 'center',
-    lineHeight: 18,
+    textAlign: "center",
+    marginTop: 16,
   },
 });

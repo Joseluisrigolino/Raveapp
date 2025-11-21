@@ -1,49 +1,42 @@
+// src/app/scanner/apis/ScannerApi.ts
 import { apiClient, login } from "@/app/apis/apiConfig";
-import { formatAxiosError } from "@/utils/httpError";
 
-// Request payload for PUT /v1/Entrada/ControlarEntrada
-export interface ControlarEntradaRequest {
+export type ControlarEntradaPayload = {
   idEntrada: string;
   mdQr: string;
-}
+};
 
-// Raw API response is not yet defined in Swagger for this project.
-// Keep it flexible but provide a small normalized helper below if needed.
-export type ControlarEntradaResponse = any;
+export type ControlarEntradaResult = {
+  valido: boolean;
+  mensaje: string;
+  raw: any;
+};
 
 /**
  * PUT /v1/Entrada/ControlarEntrada
- * Body: { idEntrada: string, mdQr: string }
- * Returns: raw API response (typed as unknown/any until contract stabilizes)
+ * Body: { idEntrada, mdQr }
  */
 export async function controlarEntrada(
-  payload: ControlarEntradaRequest
-): Promise<ControlarEntradaResponse> {
+  payload: ControlarEntradaPayload
+): Promise<ControlarEntradaResult> {
   const token = await login();
-  try {
-    const resp = await apiClient.put("/v1/Entrada/ControlarEntrada", payload, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        accept: "*/*",
-      },
-    });
-    return resp.data;
-  } catch (err) {
-    // Log enriched error for easier troubleshooting and rethrow
-    try {
-      console.error(
-        "[ScannerApi] ControlarEntrada error:\n" + formatAxiosError(err)
-      );
-    } catch {}
-    throw err;
-  }
-}
 
-// --- Expo Router: este módulo NO es una pantalla/ruta ---
-// Agregamos un export default inofensivo para evitar el warning de expo-router.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function ExpoRouterNoRoute() {
-  return null;
+  const resp = await apiClient.put("/v1/Entrada/ControlarEntrada", payload, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  const data = resp.data ?? {};
+
+  return {
+    valido: Boolean(data.valido ?? data.isValid ?? data.ok),
+    mensaje:
+      data.mensaje ??
+      data.message ??
+      data.status ??
+      (data.valido ? "Entrada válida" : "Entrada inválida"),
+    raw: data,
+  };
 }
-export default ExpoRouterNoRoute;
