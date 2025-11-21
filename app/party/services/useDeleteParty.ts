@@ -1,3 +1,4 @@
+// app/party/services/useDeleteParty.ts
 import { useState } from "react";
 import { deleteParty } from "@/app/party/apis/partysApi";
 
@@ -7,8 +8,7 @@ export default function useDeleteParty() {
   async function doDelete(id: string) {
     setLoading(true);
     try {
-      const res = await deleteParty(id);
-      return res;
+      await deleteParty(id);
     } finally {
       setLoading(false);
     }

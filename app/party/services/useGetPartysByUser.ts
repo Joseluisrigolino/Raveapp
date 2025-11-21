@@ -1,8 +1,9 @@
+// app/party/services/useGetPartysByUser.ts
 import { useCallback, useEffect, useState } from "react";
-import { getPartiesByUser } from "@/app/party/apis/partysApi";
+import { getPartiesByUser, Party } from "@/app/party/apis/partysApi";
 
 export default function useGetPartysByUser(userId?: string | null) {
-  const [parties, setParties] = useState<any[]>([]);
+  const [parties, setParties] = useState<Party[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -10,10 +11,12 @@ export default function useGetPartysByUser(userId?: string | null) {
     try {
       setLoading(true);
       setError(null);
+
       if (!userId) {
         setParties([]);
         return;
       }
+
       const data = await getPartiesByUser(String(userId));
       setParties(Array.isArray(data) ? data : []);
     } catch (e) {

@@ -1,9 +1,16 @@
-// Popup de confirmación para eliminar una fiesta
-// Comentarios en español, código en inglés donde aplica
+// components/party/EliminatePartyPopupComponent.tsx
+// Popup de confirmación para eliminar fiesta (mismo estilo que el de artista)
 
 import React from "react";
-import { Modal, View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
-import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+import {
+  Modal,
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+} from "react-native";
+import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 type Props = {
   visible: boolean;
@@ -13,14 +20,25 @@ type Props = {
   onConfirm: () => void;
 };
 
-export default function EliminatePartyPopupComponent({ visible, partyName, loading = false, onCancel, onConfirm }: Props) {
+export default function EliminatePartyPopupComponent({
+  visible,
+  partyName,
+  loading = false,
+  onCancel,
+  onConfirm,
+}: Props) {
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <Text style={styles.title}>Eliminar fiesta</Text>
+    <Modal
+      transparent
+      animationType="fade"
+      visible={visible}
+      onRequestClose={onCancel}
+    >
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>Eliminar fiesta</Text>
 
-          <Text style={styles.subtitle}>
+          <Text style={styles.modalSubtitle}>
             {partyName ? (
               <>
                 Vas a eliminar "
@@ -33,12 +51,25 @@ export default function EliminatePartyPopupComponent({ visible, partyName, loadi
             {"\n"}Esta acción no se puede deshacer.
           </Text>
 
-          <View style={styles.actions}>
-            <TouchableOpacity disabled={loading} style={styles.btnGhost} onPress={onCancel}>
+          <View style={styles.modalActions}>
+            <TouchableOpacity
+              disabled={loading}
+              style={styles.btnGhost}
+              onPress={onCancel}
+            >
               <Text style={styles.btnGhostText}>Cancelar</Text>
             </TouchableOpacity>
-            <TouchableOpacity disabled={loading} style={styles.btnPrimary} onPress={onConfirm}>
-              {loading ? <ActivityIndicator color={COLORS.backgroundLight} /> : <Text style={styles.btnPrimaryText}>Eliminar</Text>}
+
+            <TouchableOpacity
+              disabled={loading}
+              style={styles.btnPrimary}
+              onPress={onConfirm}
+            >
+              {loading ? (
+                <ActivityIndicator color={COLORS.backgroundLight} />
+              ) : (
+                <Text style={styles.btnPrimaryText}>Eliminar</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -48,38 +79,39 @@ export default function EliminatePartyPopupComponent({ visible, partyName, loadi
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "center",
     alignItems: "center",
     padding: 16,
   },
-  card: {
+  modalCard: {
     width: "100%",
     maxWidth: 380,
     backgroundColor: COLORS.cardBg,
     borderRadius: RADIUS.card,
     padding: 16,
   },
-  title: {
-    fontSize: FONT_SIZES.subTitle ?? 18,
+  modalTitle: {
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.subTitle,
     color: COLORS.textPrimary,
-    fontWeight: "700",
     marginBottom: 6,
   },
-  subtitle: {
-    fontSize: FONT_SIZES.smallText ?? 14,
+  modalSubtitle: {
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
     color: COLORS.textSecondary,
     marginBottom: 12,
   },
-  actions: {
+  modalActions: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     width: "100%",
     marginTop: 12,
-    gap: 10,
+    columnGap: 10,
   },
   btnGhost: {
     paddingVertical: 10,
@@ -93,7 +125,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   btnGhostText: {
-    fontSize: FONT_SIZES.button ?? 14,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
     color: COLORS.textPrimary,
   },
   btnPrimary: {
@@ -107,9 +140,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   btnPrimaryText: {
-    fontSize: FONT_SIZES.button ?? 14,
+    fontFamily: FONTS.subTitleMedium,
+    fontSize: FONT_SIZES.button,
     color: COLORS.backgroundLight,
+  },
+  bold: {
     fontWeight: "700",
   },
-  bold: { fontWeight: "700" },
 });

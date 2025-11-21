@@ -1,82 +1,86 @@
-// utils/partysApi.ts
+// app/party/apis/partysApi.ts
 import { apiClient, login } from "@/app/apis/apiConfig";
 
 export type Party = {
   idFiesta: string;
   nombre: string;
   isActivo: boolean;
+  ratingAvg?: number | null;
+  reviewsCount?: number | null;
 };
 
-/* -------- helpers -------- */
-function lowerize(obj: any): Record<string, any> {
-  const out: Record<string, any> = {};
-  if (!obj || typeof obj !== "object") return out;
-  for (const k of Object.keys(obj)) out[k.toLowerCase()] = (obj as any)[k];
-  return out;
-}
+// Mapea un item crudo de la API al modelo Party que usamos en el front
+function mapParty(raw: any): Party {
+  const id = raw.idFiesta ?? raw.id ?? "";
 
-function extractArray(data: any): any[] {
-  if (!data) return [];
-  if (Array.isArray((data as any).fiestas)) return (data as any).fiestas;
-  if (Array.isArray((data as any).Fiestas)) return (data as any).Fiestas;
-
-  for (const k of Object.keys(data)) {
-    const v = (data as any)[k];
-    if (Array.isArray(v)) return v;
-  }
-  return Array.isArray(data) ? data : [];
-}
-
-function normalizeParty(raw: any): Party {
-  const base = lowerize(raw);
-  const nested =
-    base.fiesta && typeof base.fiesta === "object" ? lowerize(base.fiesta) : {};
-  const m = { ...base, ...nested };
-
-  const id =
-    m.idfiesta ?? m.id ?? m.fiestaid ?? m.id_evento ?? m.idevento ?? "";
-
-  const nameRaw =
-    m.nombre ??
-    m.dsnombre ?? // dsNombre
-    m.ds_nombre ??
-    m.titulo ??
-    m.descripcion ??
-    m.dsfiesta ??
-    m.name ??
+  const nameSource =
+    raw.nombre ??
+    raw.dsNombre ??
+    raw.ds_nombre ??
+    raw.titulo ??
+    raw.descripcion ??
+    raw.dsfiesta ??
     "";
 
   const nombre =
-    typeof nameRaw === "string"
-      ? nameRaw.trim()
-      : nameRaw != null
-      ? String(nameRaw)
+    typeof nameSource === "string"
+      ? nameSource.trim()
+      : nameSource != null
+      ? String(nameSource)
       : "";
 
   const isActivo =
-    m.isactivo === true ||
-    m.isactivo === 1 ||
-    m.activo === true ||
-    m.activo === 1 ||
+    raw.isActivo === true ||
+    raw.isActivo === 1 ||
+    raw.activo === true ||
+    raw.activo === 1 ||
     false;
+
+  const ratingAvg =
+    raw.ratingAvg != null
+      ? Number(raw.ratingAvg)
+      : raw.promedio != null
+      ? Number(raw.promedio)
+      : null;
+
+  const reviewsCount =
+    raw.reviewsCount != null
+      ? Number(raw.reviewsCount)
+      : raw.cantidad != null
+      ? Number(raw.cantidad)
+      : null;
 
   return {
     idFiesta: String(id),
     nombre,
     isActivo,
+    ratingAvg,
+    reviewsCount,
   };
 }
 
-/* -------- API -------- */
+// Obtiene el array de fiestas desde el shape de la API
+function getPartyArray(data: any): any[] {
+  if (!data) return [];
+  if (Array.isArray(data.fiestas)) return data.fiestas;
+  if (Array.isArray(data.Fiestas)) return data.Fiestas;
+  if (Array.isArray(data)) return data;
+  return [];
+}
+
+/* ========= API ========= */
+
 export async function getPartiesByUser(idUsuario: string): Promise<Party[]> {
   const token = await login();
+
   try {
     const resp = await apiClient.get("/v1/Fiesta/GetFiestas", {
       headers: { Authorization: `Bearer ${token}` },
       params: { IdUsuario: idUsuario },
     });
-    const list = extractArray(resp.data).map(normalizeParty);
-    return list.filter((x) => x.idFiesta);
+
+    const rawList = getPartyArray(resp.data);
+    return rawList.map(mapParty).filter((p) => p.idFiesta);
   } catch (e) {
     console.warn("[getPartiesByUser] error -> []", e);
     return [];
@@ -85,13 +89,16 @@ export async function getPartiesByUser(idUsuario: string): Promise<Party[]> {
 
 export async function getPartyById(idFiesta: string): Promise<Party | null> {
   const token = await login();
+
   try {
     const resp = await apiClient.get("/v1/Fiesta/GetFiestas", {
       headers: { Authorization: `Bearer ${token}` },
       params: { IdFiesta: idFiesta },
     });
-    const arr = extractArray(resp.data).map(normalizeParty);
-    return arr[0] ?? null;
+
+    const rawList = getPartyArray(resp.data);
+    const mapped = rawList.map(mapParty);
+    return mapped[0] ?? null;
   } catch (e) {
     console.warn("[getPartyById] error -> null", e);
     return null;
@@ -104,23 +111,32 @@ export async function createParty(args: {
   isActivo?: boolean;
 }): Promise<string | null> {
   const token = await login();
-  const body: any = {
-    idUsuario: args.idUsuario,
-    nombre: args.nombre,
-  };
-  if (typeof args.isActivo !== 'undefined') body.isActivo = !!args.isActivo;
-  const resp = await apiClient.post("/v1/Fiesta/CrearFiesta", body, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-  });
-  const data = resp?.data;
-  const id = (data && (data.idFiesta ?? data.id ?? data.IdFiesta ?? data.Id)) || null;
-  if (!id) {
-    try { console.warn('[createParty] no id returned by API for payload:', JSON.stringify(body)); } catch {}
+
+  try {
+    const resp = await apiClient.post(
+      "/v1/Fiesta/CrearFiesta",
+      {
+        idUsuario: args.idUsuario,
+        nombre: args.nombre,
+        isActivo: args.isActivo ?? true,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = resp?.data ?? {};
+    const id =
+      data.idFiesta ?? data.id ?? data.IdFiesta ?? data.Id ?? null;
+
+    return id ? String(id) : null;
+  } catch (e) {
+    console.warn("[createParty] error", e);
+    return null;
   }
-  return id ? String(id) : null;
 }
 
 export async function updateParty(args: {
@@ -129,19 +145,26 @@ export async function updateParty(args: {
   isActivo?: boolean;
 }): Promise<void> {
   const token = await login();
-  const body: any = { idFiesta: args.idFiesta };
-  if (typeof args.nombre !== 'undefined') body.nombre = args.nombre;
-  if (typeof args.isActivo !== 'undefined') body.isActivo = !!args.isActivo;
-  await apiClient.put("/v1/Fiesta/UpdateFiesta", body, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
+
+  await apiClient.put(
+    "/v1/Fiesta/UpdateFiesta",
+    {
+      idFiesta: args.idFiesta,
+      nombre: args.nombre,
+      isActivo: args.isActivo,
     },
-  });
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
 }
 
 export async function deleteParty(idFiesta: string): Promise<void> {
   const token = await login();
+
   await apiClient.delete("/v1/Fiesta/DeleteFiesta", {
     headers: { Authorization: `Bearer ${token}` },
     params: { id: idFiesta },
