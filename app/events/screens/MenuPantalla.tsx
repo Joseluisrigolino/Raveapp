@@ -22,7 +22,7 @@ import FiltersSection from "@/components/filters/FiltersSection";
 
 import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
 import { EventItem } from "@/interfaces/EventItem";
-import { fetchEventsByEstados, ESTADO_CODES } from "@/app/events/apis/eventApi";
+import { fetchEventsByEstados, ESTADO_CODES, getEventFlags } from "@/app/events/apis/eventApi";
 import {
   fetchProvinces,
   fetchMunicipalities,
@@ -49,6 +49,51 @@ function parseDateToTs(dateStr?: string) {
   if (!dateStr) return NaN;
   const [d, m, y] = dateStr.split("/").map(Number);
   return new Date(y, (m || 1) - 1, d || 1).getTime();
+}
+
+function normalizeText(s?: string | null) {
+  if (!s) return "";
+  try {
+    return String(s)
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLowerCase()
+      .trim();
+  } catch {
+    // Fallback for environments without Unicode property escapes
+    return String(s)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  }
+}
+
+function provinceMatchesAddress(prov?: string, address?: string) {
+  const p = normalizeText(prov);
+  const a = normalizeText(address);
+  if (!p) return false;
+  if (a.includes(p)) return true;
+  // special-case common synonyms for Ciudad Autónoma de Buenos Aires
+  const isProvCaba = p.includes("caba") || p.includes("ciudad") || p.includes("autonom") || p.includes("buenos");
+  const hasCabaInAddr = a.includes("caba") || a.includes("ciudad") || a.includes("capital");
+  if (isProvCaba && hasCabaInAddr) return true;
+  return false;
+}
+
+function getEventLocationString(ev: any) {
+  // Build a searchable location string from multiple posible fuentes
+  // (ev.address for legacy, or domicilio.{provincia,municipio,localidad,direccion}).
+  const parts: Array<string> = [];
+  if (ev?.address) parts.push(String(ev.address));
+  const dom = ev?.domicilio;
+  if (dom) {
+    if (dom.provincia?.nombre) parts.push(String(dom.provincia.nombre));
+    if (dom.municipio?.nombre) parts.push(String(dom.municipio.nombre));
+    if (dom.localidad?.nombre) parts.push(String(dom.localidad.nombre));
+    if (dom.direccion) parts.push(String(dom.direccion));
+  }
+  return parts.join(" ").trim();
 }
 
 export default function MenuPantalla() {
@@ -251,19 +296,15 @@ export default function MenuPantalla() {
       });
     }
     if (provinceText) {
-      results = results.filter((ev) =>
-        ev.address.toLowerCase().includes(provinceText.toLowerCase())
-      );
+      results = results.filter((ev) => provinceMatchesAddress(provinceText, getEventLocationString(ev)));
     }
     if (municipalityText) {
-      results = results.filter((ev) =>
-        ev.address.toLowerCase().includes(municipalityText.toLowerCase())
-      );
+      const mNorm = normalizeText(municipalityText);
+      results = results.filter((ev) => normalizeText(getEventLocationString(ev)).includes(mNorm));
     }
     if (localityText) {
-      results = results.filter((ev) =>
-        ev.address.toLowerCase().includes(localityText.toLowerCase())
-      );
+      const lNorm = normalizeText(localityText);
+      results = results.filter((ev) => normalizeText(getEventLocationString(ev)).includes(lNorm));
     }
     if (weekActive) {
       const { startOfWeek, endOfWeek } = getWeekRange();
@@ -274,8 +315,8 @@ export default function MenuPantalla() {
         return t >= s && t < e;
       });
     }
-    if (afterActive) results = results.filter((ev) => (ev as any).isAfter);
-    if (lgbtActive) results = results.filter((ev) => (ev as any).isLgbt);
+    if (afterActive) results = results.filter((ev) => getEventFlags(ev).isAfter);
+    if (lgbtActive) results = results.filter((ev) => getEventFlags(ev).isLGBT);
     if (selectedGenres.length) {
       results = results.filter((ev) =>
         selectedGenres.includes((ev as any).type)
@@ -373,7 +414,7 @@ export default function MenuPantalla() {
   if (loading) {
     return (
       <SafeAreaView style={styles.mainContainer}>
-        <Header title="EventApp" />
+        <Header />
         <View style={{ flex: 1, justifyContent: "center" }}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
@@ -385,7 +426,7 @@ export default function MenuPantalla() {
   if (error) {
     return (
       <SafeAreaView style={styles.mainContainer}>
-        <Header title="EventApp" />
+        <Header />
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
@@ -428,8 +469,8 @@ export default function MenuPantalla() {
             showEndPicker={showEndPicker}
             onShowStartPicker={setShowStartPicker}
             onShowEndPicker={setShowEndPicker}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
+            onStartDateChange={(e: any, d?: Date) => setStartDate(d || null)}
+            onEndDateChange={(e: any, d?: Date) => setEndDate(d || null)}
             onClearDates={() => {
               setStartDate(null);
               setEndDate(null);

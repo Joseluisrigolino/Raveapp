@@ -63,7 +63,7 @@ export default function NewScreen() {
   return (
     <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
       <SafeAreaView style={styles.container}>
-        <Header title="EventApp" />
+        <Header />
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.contentContainer}>
             <NewsHeroComponent

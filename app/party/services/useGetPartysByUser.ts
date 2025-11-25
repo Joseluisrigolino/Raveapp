@@ -1,36 +1,31 @@
-// app/party/services/useGetPartysByUser.ts
-import { useCallback, useEffect, useState } from "react";
-import { getPartiesByUser, Party } from "@/app/party/apis/partysApi";
+import { useState, useEffect, useCallback } from "react";
+import { Party, getPartiesByUser } from "@/app/party/apis/partysApi";
 
 export default function useGetPartysByUser(userId?: string | null) {
   const [parties, setParties] = useState<Party[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<any>(null);
 
-  const fetch = useCallback(async () => {
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-
       if (!userId) {
         setParties([]);
         return;
       }
-
       const data = await getPartiesByUser(String(userId));
-      setParties(Array.isArray(data) ? data : []);
+      setParties(data || []);
     } catch (e) {
-      console.error("[useGetPartysByUser] fetch error", e);
-      setError("No pudimos cargar tus fiestas recurrentes.");
-      setParties([]);
+      setError(e);
     } finally {
       setLoading(false);
     }
   }, [userId]);
 
   useEffect(() => {
-    void fetch();
-  }, [fetch]);
+    refresh();
+  }, [refresh]);
 
-  return { parties, loading, error, refresh: fetch } as const;
+  return { parties, loading, error, refresh } as const;
 }

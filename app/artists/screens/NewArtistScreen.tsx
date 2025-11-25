@@ -127,7 +127,7 @@ export default function NewArtistScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="EventApp" />
+      <Header />
       <ScrollView contentContainerStyle={styles.content}>
         {/* Título principal (UI en español) */}
         <Text style={styles.title}>Ingresar nuevo artista</Text>

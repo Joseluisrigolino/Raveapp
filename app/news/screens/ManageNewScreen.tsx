@@ -118,7 +118,7 @@ export default function ManageNewsScreen() {
   return (
     <ProtectedRoute allowedRoles={["admin"]}>
       <SafeAreaView style={styles.container}>
-        <Header title="EventApp" />
+        <Header />
         <TabMenuComponent tabs={tabs} />
 
         <View style={styles.content}>

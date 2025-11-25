@@ -1,6 +1,13 @@
 // app/main/EventsScreens/FavEventScreen.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { ScrollView, View, Text, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import {
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import ROUTES from "@/routes";
@@ -15,10 +22,7 @@ import FiltersSection from "@/components/filters/FiltersSection";
 
 import { useAuth } from "@/app/auth/AuthContext";
 import { fetchEvents } from "@/app/events/apis/eventApi";
-import {
-  getEventosFavoritos,
-  putEventoFavorito,
-} from "@/app/auth/userHelpers";
+import { getEventosFavoritos, putEventoFavorito } from "@/app/auth/userHelpers";
 
 import {
   fetchProvinces,
@@ -26,6 +30,7 @@ import {
   fetchLocalities,
   fetchLocalitiesByName,
 } from "@/app/apis/georefHelpers";
+import { getEventFlags } from "@/app/events/apis/eventApi";
 
 import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
 import { EventItem } from "@/interfaces/EventItem";
@@ -39,6 +44,53 @@ function getWeekRange() {
   const endOfWeek = new Date(startOfWeek);
   endOfWeek.setDate(startOfWeek.getDate() + 7);
   return { startOfWeek, endOfWeek };
+}
+
+function parseDateToTs(dateStr?: string) {
+  if (!dateStr) return NaN;
+  const [d, m, y] = dateStr.split("/").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1).getTime();
+}
+
+function normalizeText(s?: string | null) {
+  if (!s) return "";
+  try {
+    return String(s)
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLowerCase()
+      .trim();
+  } catch {
+    return String(s)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  }
+}
+
+function provinceMatchesAddress(prov?: string, address?: string) {
+  const p = normalizeText(prov);
+  const a = normalizeText(address);
+  if (!p) return false;
+  if (a.includes(p)) return true;
+  const isProvCaba = p.includes("caba") || p.includes("ciudad") || p.includes("autonom") || p.includes("buenos");
+  const hasCabaInAddr = a.includes("caba") || a.includes("ciudad") || a.includes("capital");
+  if (isProvCaba && hasCabaInAddr) return true;
+  return false;
+}
+
+function getEventLocationString(ev: any) {
+  const parts: Array<string> = [];
+  if (ev?.address) parts.push(String(ev.address));
+  const dom = ev?.domicilio;
+  if (dom) {
+    if (dom.provincia?.nombre) parts.push(String(dom.provincia.nombre));
+    if (dom.municipio?.nombre) parts.push(String(dom.municipio.nombre));
+    if (dom.localidad?.nombre) parts.push(String(dom.localidad.nombre));
+    if (dom.direccion) parts.push(String(dom.direccion));
+  }
+  return parts.join(" ").trim();
 }
 
 export default function FavEventScreen() {
@@ -95,7 +147,9 @@ export default function FavEventScreen() {
 
         // Filtrar sólo favoritos
         const favIdSet = new Set(favIds.map(String));
-        const onlyFavs = sortedAll.filter((e) => e.id && favIdSet.has(String(e.id)));
+        const onlyFavs = sortedAll.filter(
+          (e) => e.id && favIdSet.has(String(e.id))
+        );
 
         if (!mounted) return;
         setFavEvents(onlyFavs);
@@ -214,7 +268,7 @@ export default function FavEventScreen() {
     setSelectedGenres([]);
   }
 
-  // Filtrado final (igual que en MenuScreen pero sobre favEvents)
+  // Filtrado final: igual que en MenuPantalla pero aplicado sobre favEvents
   const filteredEvents = useMemo(() => {
     let results = [...favEvents];
 
@@ -223,41 +277,37 @@ export default function FavEventScreen() {
       results = results.filter((ev) => ev.title.toLowerCase().includes(lower));
     }
     if (startDate && endDate) {
+      const s = startDate.getTime();
+      const e = endDate.getTime();
       results = results.filter((ev) => {
-        const [d, m, y] = ev.date.split("/").map(Number);
-        const t = new Date(y, m - 1, d).getTime();
-        return t >= startDate.getTime() && t <= endDate.getTime();
+        const t = parseDateToTs(ev.date);
+        return t >= s && t <= e;
       });
     }
     if (provinceText) {
-      results = results.filter((ev) =>
-        ev.address?.toLowerCase().includes(provinceText.toLowerCase())
-      );
+      results = results.filter((ev) => provinceMatchesAddress(provinceText, getEventLocationString(ev)));
     }
     if (municipalityText) {
-      results = results.filter((ev) =>
-        ev.address?.toLowerCase().includes(municipalityText.toLowerCase())
-      );
+      const mNorm = normalizeText(municipalityText);
+      results = results.filter((ev) => normalizeText(getEventLocationString(ev)).includes(mNorm));
     }
     if (localityText) {
-      results = results.filter((ev) =>
-        ev.address?.toLowerCase().includes(localityText.toLowerCase())
-      );
+      const lNorm = normalizeText(localityText);
+      results = results.filter((ev) => normalizeText(getEventLocationString(ev)).includes(lNorm));
     }
     if (weekActive) {
       const { startOfWeek, endOfWeek } = getWeekRange();
+      const s = startOfWeek.getTime();
+      const e = endOfWeek.getTime();
       results = results.filter((ev) => {
-        const [d, m, y] = ev.date.split("/").map(Number);
-        const t = new Date(y, m - 1, d).getTime();
-        return t >= startOfWeek.getTime() && t < endOfWeek.getTime();
+        const t = parseDateToTs(ev.date);
+        return t >= s && t < e;
       });
     }
-    if (afterActive) results = results.filter((ev) => (ev as any).isAfter);
-    if (lgbtActive) results = results.filter((ev) => (ev as any).isLgbt);
+    if (afterActive) results = results.filter((ev) => getEventFlags(ev).isAfter);
+    if (lgbtActive) results = results.filter((ev) => getEventFlags(ev).isLGBT);
     if (selectedGenres.length) {
-      results = results.filter((ev) =>
-        selectedGenres.includes((ev as any).type)
-      );
+      results = results.filter((ev) => selectedGenres.includes((ev as any).type));
     }
     return results;
   }, [
@@ -276,13 +326,17 @@ export default function FavEventScreen() {
 
   // Navegación card
   function handleCardPress(_title: string, id?: string) {
-    if (id) nav.push(router, { pathname: ROUTES.MAIN.EVENTS.EVENT, params: { id } });
+    if (id)
+      nav.push(router, { pathname: ROUTES.MAIN.EVENTS.EVENT, params: { id } });
   }
 
   // Toggle favorito (optimista). En esta pantalla, si se desmarca, se remueve del listado.
   const handleToggleFavorite = async (eventId: string) => {
     if (!userId) {
-      Alert.alert("Iniciá sesión", "Necesitás estar logueado para gestionar favoritos.");
+      Alert.alert(
+        "Iniciá sesión",
+        "Necesitás estar logueado para gestionar favoritos."
+      );
       return;
     }
     const wasFav = favSet.has(eventId);
@@ -295,7 +349,9 @@ export default function FavEventScreen() {
     const nextFavSet = new Set(favSet);
     if (wasFav) {
       nextFavSet.delete(eventId);
-      setFavEvents((current) => current.filter((e) => String(e.id) !== String(eventId)));
+      setFavEvents((current) =>
+        current.filter((e) => String(e.id) !== String(eventId))
+      );
     } else {
       // En esta pantalla rara vez vas a "agregar", pero contemplado por consistencia
       nextFavSet.add(eventId);
@@ -313,7 +369,10 @@ export default function FavEventScreen() {
       // Revertimos
       setFavSet(prevFavSet);
       setFavEvents(prevFavEvents);
-      Alert.alert("Error", "No se pudo actualizar el favorito. Probá de nuevo.");
+      Alert.alert(
+        "Error",
+        "No se pudo actualizar el favorito. Probá de nuevo."
+      );
     } finally {
       setFavBusy(null);
     }
@@ -326,8 +385,16 @@ export default function FavEventScreen() {
           <Header />
           <TabMenuComponent
             tabs={[
-              { label: "Mis tickets", route: ROUTES.MAIN.TICKETS.MENU, isActive: false },
-              { label: "Eventos favoritos", route: ROUTES.MAIN.EVENTS.FAV, isActive: true },
+              {
+                label: "Mis entradas",
+                route: ROUTES.MAIN.TICKETS.MENU,
+                isActive: false,
+              },
+              {
+                label: "Eventos favoritos",
+                route: ROUTES.MAIN.EVENTS.FAV,
+                isActive: true,
+              },
             ]}
           />
           <View style={{ flex: 1, justifyContent: "center" }}>
@@ -346,11 +413,21 @@ export default function FavEventScreen() {
           <Header />
           <TabMenuComponent
             tabs={[
-              { label: "Mis tickets", route: ROUTES.MAIN.TICKETS.MENU, isActive: false },
-              { label: "Eventos favoritos", route: ROUTES.MAIN.EVENTS.FAV, isActive: true },
+              {
+                label: "Mis entradas",
+                route: ROUTES.MAIN.TICKETS.MENU,
+                isActive: false,
+              },
+              {
+                label: "Eventos favoritos",
+                route: ROUTES.MAIN.EVENTS.FAV,
+                isActive: true,
+              },
             ]}
           />
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <View
+            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+          >
             <Text style={{ color: COLORS.negative }}>{error}</Text>
           </View>
           <Footer />
@@ -366,8 +443,16 @@ export default function FavEventScreen() {
 
         <TabMenuComponent
           tabs={[
-            { label: "Mis tickets", route: ROUTES.MAIN.TICKETS.MENU, isActive: false },
-            { label: "Eventos favoritos", route: ROUTES.MAIN.EVENTS.FAV, isActive: true },
+            {
+              label: "Mis entradas",
+              route: ROUTES.MAIN.TICKETS.MENU,
+              isActive: false,
+            },
+            {
+              label: "Eventos favoritos",
+              route: ROUTES.MAIN.EVENTS.FAV,
+              isActive: true,
+            },
           ]}
         />
 
@@ -378,7 +463,9 @@ export default function FavEventScreen() {
         >
           <FiltersSection
             isDateActive={Boolean(startDate && endDate)}
-            isLocationActive={Boolean(provinceText || municipalityText || localityText)}
+            isLocationActive={Boolean(
+              provinceText || municipalityText || localityText
+            )}
             isGenreActive={selectedGenres.length > 0}
             weekActive={weekActive}
             afterActive={afterActive}
@@ -439,7 +526,9 @@ export default function FavEventScreen() {
 
           <View style={styles.containerCards}>
             {filteredEvents.length === 0 ? (
-              <Text style={styles.noEventsText}>No existen eventos con esos filtros.</Text>
+              <Text style={styles.noEventsText}>
+                No existen eventos con esos filtros.
+              </Text>
             ) : (
               filteredEvents.map((ev) => (
                 <CardComponent
@@ -450,7 +539,11 @@ export default function FavEventScreen() {
                   foto={ev.imageUrl}
                   onPress={() => handleCardPress(ev.title, ev.id)}
                   isFavorite={ev.id ? favSet.has(String(ev.id)) : false}
-                  onToggleFavorite={!isAdmin && ev.id ? () => handleToggleFavorite(String(ev.id)) : undefined}
+                  onToggleFavorite={
+                    !isAdmin && ev.id
+                      ? () => handleToggleFavorite(String(ev.id))
+                      : undefined
+                  }
                   hideFavorite={isAdmin}
                   disableFavorite={favBusy === String(ev.id)}
                 />

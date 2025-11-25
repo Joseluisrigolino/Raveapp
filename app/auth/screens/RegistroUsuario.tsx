@@ -230,7 +230,7 @@ export default function RegisterUserScreen() {
         dni: form.dni.trim(),
         telefono: form.phone.trim(),
         nombreFantasia: "",
-        bio: "0",
+        bio: "",
         password: form.password,
         socials: {
           idSocial: "",

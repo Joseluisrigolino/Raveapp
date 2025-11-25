@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // Base URL de tu API
-const API_BASE_URL = "https://api.raveapp.com.ar";
+const API_BASE_URL = "https://dev.api.raveapp.com.ar";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

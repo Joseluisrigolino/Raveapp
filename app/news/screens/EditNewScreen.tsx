@@ -69,7 +69,7 @@ export default function EditNewScreen() {
     return (
       <ProtectedRoute allowedRoles={["admin"]}>
         <SafeAreaView style={styles.container}>
-          <Header title="EventApp" />
+          <Header />
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={COLORS.primary} />
           </View>
@@ -82,7 +82,7 @@ export default function EditNewScreen() {
   return (
     <ProtectedRoute allowedRoles={["admin"]}>
       <SafeAreaView style={styles.container}>
-        <Header title="EventApp" />
+        <Header />
 
         <TabMenuComponent
           tabs={[

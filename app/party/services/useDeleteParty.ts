@@ -1,18 +1,23 @@
-// app/party/services/useDeleteParty.ts
-import { useState } from "react";
-import { deleteParty } from "@/app/party/apis/partysApi";
+import { useCallback, useState } from "react";
+import { deleteParty as deletePartyApi } from "@/app/party/apis/partysApi";
 
 export default function useDeleteParty() {
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<any>(null);
 
-  async function doDelete(id: string) {
+  const deleteParty = useCallback(async (idFiesta: string) => {
     setLoading(true);
+    setError(null);
     try {
-      await deleteParty(id);
+      await deletePartyApi(idFiesta);
+      return;
+    } catch (e) {
+      setError(e);
+      throw e;
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  return { deleteParty: doDelete, loading } as const;
+  return { deleteParty, loading, error } as const;
 }

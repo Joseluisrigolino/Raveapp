@@ -16,10 +16,9 @@ export const ROUTES = {
     },
     TICKETS: {
       MENU: "/tickets/screens/TicketPurchasedMenu",
-      FINALIZED: "/tickets/screens/TicketFinalizedScreen",
       PURCHASED: "/tickets/screens/TicketPurchasedScreen",
       BUY: "/tickets/screens/BuyTicketScreen",
-      RETURN: "/tickets/screens/VueltaCompraPantalla",
+      RETURN: "/tickets/screens/BackBuyScreen",
     },
     USER: {
       PROFILE_EDIT: "/auth/screens/PerfilDeUsuarioPantalla",
@@ -42,7 +41,7 @@ export const ROUTES = {
       VALIDATE: "/events/screens/ValidateEventScreen",
     },
     REPORT_SALES: {
-      MENU: "/sales/screens/ReporteVentaEntradaMenu",
+      MENU: "/sales/screens/EventTicketSalesMenuScreen",
     },
     TYC: "/tyc/screens/Tyc",
   },
@@ -51,9 +50,9 @@ export const ROUTES = {
     PARTYS: "/party/screens/FiestasPantalla",
     MANAGE_EVENTS: "/events/screens/EventsAdminScreen",
     // Menú de selección de evento para ver reportes
-    TICKET_SOLD: "/sales/screens/ReporteVentaEntradaMenu",
+    TICKET_SOLD: "/sales/screens/TicketSoldScreen",
     // Pantalla de reporte de ventas por evento específico
-    TICKET_SOLD_EVENT: "/sales/screens/ReporteVentaEntradaEvento",
+    TICKET_SOLD_EVENT: "/sales/screens/EventTicketSalesReportScreen",
     MODIFY_EVENT: "/events/screens/OwnerEventModifyScreen",
     CANCEL_EVENT: "/events/screens/CancelarEventoPantalla",
   },

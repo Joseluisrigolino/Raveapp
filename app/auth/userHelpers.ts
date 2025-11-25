@@ -21,6 +21,7 @@ export interface ApiUserFull {
   cbu: string;
   nombreFantasia: string;
   bio: string;
+  isVerificado?: number;
   dtNacimiento: string; // ISO string
   domicilio: DomicilioApi;
   cdRoles: number[];
@@ -43,6 +44,7 @@ export interface UpdateUsuarioPayload {
   cbu: string;
   nombreFantasia: string;
   bio: string;
+  isVerificado?: number;
   dtNacimiento: string; // ISO string
   domicilio: DomicilioApi;
   cdRoles: number[]; // Requerido por la API
@@ -215,6 +217,7 @@ export async function updateUsuario(payload: UpdateUsuarioPayload): Promise<void
       mdSoundcloud:
         safeSocials.mdSoundcloud || (base as any)?.socials?.mdSoundcloud || "",
     },
+    isVerificado: typeof (payload as any).isVerificado === 'number' ? (payload as any).isVerificado : (base as any)?.isVerificado ?? 0,
   };
 
   // Asegurar cdRoles numérico/único por si base aportó valores no numéricos
@@ -272,7 +275,8 @@ export async function createUsuario(
 ): Promise<void> {
   const finalPayload: CreateUsuarioPayload = {
     ...payload,
-    bio: (payload.bio ?? "0") as string,
+    bio: (payload.bio ?? "") as string,
+    // Note: bio is client-editable text; do not use it as verification flag.
   };
   await apiClient.post("/v1/Usuario/CreateUsuario", finalPayload);
 }

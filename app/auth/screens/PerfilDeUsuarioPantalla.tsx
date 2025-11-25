@@ -315,15 +315,17 @@ export default function UserProfileScreen() {
               onChangeText={(t) => setField("email", t)}
               placeholder="Correo"
             />
-            <TouchableOpacity
-              style={styles.verifyBtn}
-              onPress={handleSendVerify}
-              disabled={sendingVerify}
-            >
-              <Text style={styles.verifyText}>
-                {sendingVerify ? "Enviando..." : "Verificar"}
-              </Text>
-            </TouchableOpacity>
+            {profile?.isVerificado !== 1 && (
+              <TouchableOpacity
+                style={styles.verifyBtn}
+                onPress={handleSendVerify}
+                disabled={sendingVerify}
+              >
+                <Text style={styles.verifyText}>
+                  {sendingVerify ? "Enviando..." : "Verificar"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <Text style={styles.label}>Fecha de nacimiento</Text>

@@ -18,7 +18,7 @@ export default function useVerifyEmail() {
       await sendConfirmEmail({
         to,
         name: name || "Usuario",
-        confirmationUrl: confirmationUrl ?? "https://raveapp.com.ar/confirmacion-mail",
+        confirmationUrl: confirmationUrl ?? "https://dev.raveapp.com.ar/confirmacion-mail",
       });
       return true;
     } catch (e: any) {

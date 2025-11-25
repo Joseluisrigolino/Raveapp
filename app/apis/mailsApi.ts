@@ -90,10 +90,10 @@ export async function sendPasswordRecoveryEmail(params: {
   const {
     to,
     name,
-    recoveryUrl = "https://raveapp.com.ar/restablecer-contrasena",
+    recoveryUrl = "https://dev.raveapp.com.ar/restablecer-contrasena",
   } = params || {};
   if (!to || !name) throw new Error("Faltan datos: to, name");
-  return postEmail("/v1/Email/EnviarRecuperarContrasena", {
+  return postEmail("/v1/Email/EnviarPassRecoveryEmail", {
     to,
     templateData: { name, recoveryUrl },
   });

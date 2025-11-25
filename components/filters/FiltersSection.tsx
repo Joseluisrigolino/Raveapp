@@ -13,6 +13,11 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import SearchBarComponent from "@/components/common/SearchBarComponent";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { fetchGenres, ApiGenero } from "@/app/events/apis/eventApi";
+import {
+  fetchProvinces,
+  fetchMunicipalities,
+  fetchLocalities,
+} from "@/app/apis/georefHelpers";
 
 interface FiltersSectionProps {
   // Chips horizontales
@@ -134,6 +139,76 @@ export default function FiltersSection(props: FiltersSectionProps) {
 
   // ------- Géneros desde API -------
   const [genres, setGenres] = useState<ApiGenero[]>([]);
+
+  // local dropdown state for location selectors (province / municipality / locality)
+  const [showProvinceList, setShowProvinceList] = useState(false);
+  const [showMunicipalityList, setShowMunicipalityList] = useState(false);
+  const [showLocalityList, setShowLocalityList] = useState(false);
+  // fallback local lists when parent doesn't provide suggestions
+  const [localProvinceList, setLocalProvinceList] = useState<{ id: string; nombre: string }[]>([]);
+  const [localMunicipalityList, setLocalMunicipalityList] = useState<{ id: string; nombre: string }[]>([]);
+  const [localLocalityList, setLocalLocalityList] = useState<{ id: string; nombre: string }[]>([]);
+  const [selectedProvinceId, setSelectedProvinceId] = useState<string | null>(null);
+  const [selectedMunicipalityId, setSelectedMunicipalityId] = useState<string | null>(null);
+  const [isProvinceCABA, setIsProvinceCABA] = useState(false);
+  // load provinces locally when parent doesn't provide suggestions (fallback)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        // Only fetch if parent did not provide province suggestions
+        if ((!provinceSuggestions || provinceSuggestions.length === 0) && mounted) {
+          const provs = await fetchProvinces().catch(() => [] as any[]);
+          if (mounted) setLocalProvinceList(provs || []);
+        }
+      } catch (e) {
+        if (mounted) setLocalProvinceList([]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [provinceSuggestions]);
+
+  // If a province id is selected programmatically (provinceText may come from parent),
+  // and parent didn't supply municipality suggestions, prefetch municipalities as fallback.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const provId = selectedProvinceId;
+          if (provId && mounted) {
+            // Special-case: CABA (id '02') doesn't use municipios; load localidades by province
+            if ((String(provId) === "02")) {
+              setIsProvinceCABA(true);
+              // For CABA we hide municipio and localidad controls; clear local lists
+              if (mounted) {
+                setLocalLocalityList([]);
+                setLocalMunicipalityList([]);
+              }
+            } else {
+              setIsProvinceCABA(false);
+              if ((!municipalitySuggestions || municipalitySuggestions.length === 0)) {
+                const munis = await fetchMunicipalities(String(provId)).catch(() => [] as any[]);
+                if (mounted) setLocalMunicipalityList(munis || []);
+              }
+            }
+        }
+      } catch (e) {
+        if (mounted) setLocalMunicipalityList([]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [selectedProvinceId, municipalitySuggestions]);
+  // if parent clears provinceText or it changes to empty, reset related local state
+  useEffect(() => {
+    if (!provinceText) {
+      setSelectedProvinceId(null);
+      setIsProvinceCABA(false);
+      setLocalProvinceList([]);
+      setLocalMunicipalityList([]);
+      setLocalLocalityList([]);
+      setSelectedMunicipalityId(null);
+    }
+  }, [provinceText]);
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -255,7 +330,14 @@ export default function FiltersSection(props: FiltersSectionProps) {
               value={startDate || new Date()}
               mode="date"
               display="default"
-              onChange={onStartDateChange}
+              onChange={(event, selectedDate) => {
+                try {
+                  onStartDateChange(event, selectedDate);
+                } catch {}
+                try {
+                  onShowStartPicker(false);
+                } catch {}
+              }}
             />
           )}
 
@@ -272,7 +354,14 @@ export default function FiltersSection(props: FiltersSectionProps) {
               value={endDate || new Date()}
               mode="date"
               display="default"
-              onChange={onEndDateChange}
+              onChange={(event, selectedDate) => {
+                try {
+                  onEndDateChange(event, selectedDate);
+                } catch {}
+                try {
+                  onShowEndPicker(false);
+                } catch {}
+              }}
             />
           )}
 
@@ -288,24 +377,57 @@ export default function FiltersSection(props: FiltersSectionProps) {
           <Text style={styles.dateFilterLabel}>Filtrar por ubicación:</Text>
 
           {/* Provincia */}
-          <TextInput
-            style={styles.locationInput}
-            placeholder="Provincia"
-            placeholderTextColor={COLORS.textSecondary}
-            value={provinceText}
-            onChangeText={onProvinceTextChange}
-          />
-          {provinceSuggestions.length > 0 && (
+          <TouchableOpacity
+            style={[
+              styles.locationInput,
+              { justifyContent: "center" },
+            ]}
+            onPress={() => setShowProvinceList((s) => !s)}
+            activeOpacity={0.8}
+          >
+            <Text style={{ color: provinceText ? COLORS.textPrimary : COLORS.textSecondary }}>
+              {provinceText || "Provincia"}
+            </Text>
+          </TouchableOpacity>
+          {showProvinceList && (
             <View style={styles.suggestionsContainer}>
               <ScrollView
                 nestedScrollEnabled={nestedScrollEnabled}
                 keyboardShouldPersistTaps="handled"
               >
-                {provinceSuggestions.map((prov) => (
+                {(provinceSuggestions.length > 0 ? provinceSuggestions : localProvinceList).map((prov) => (
                   <TouchableOpacity
                     key={prov.id}
                     style={styles.suggestionItem}
-                    onPress={() => onPickProvince(prov.nombre)}
+                    onPress={async () => {
+                          onPickProvince(prov.nombre);
+                          onProvinceTextChange(prov.nombre);
+                          setSelectedProvinceId(prov.id);
+                          setSelectedProvinceId(prov.id);
+                          setShowProvinceList(false);
+                          setShowMunicipalityList(false);
+                          setShowLocalityList(false);
+                          // When a province is selected, fetch municipalities or localidades as fallback
+                          try {
+                            if (String(prov.id) === "02") {
+                              setIsProvinceCABA(true);
+                              // hide municipio and localidad for CABA
+                              setLocalLocalityList([]);
+                              setLocalMunicipalityList([]);
+                              setShowMunicipalityList(false);
+                              setShowLocalityList(false);
+                            } else {
+                              setIsProvinceCABA(false);
+                              const munis = await fetchMunicipalities(String(prov.id)).catch(() => [] as any[]);
+                              setLocalMunicipalityList(munis || []);
+                            }
+                            // reset downstream selection
+                            setLocalLocalityList((prev) => prev || []);
+                            setSelectedMunicipalityId(null);
+                            onMunicipalityTextChange("");
+                            onLocalityTextChange("");
+                          } catch {}
+                    }}
                   >
                     <Text style={styles.suggestionItemText}>{prov.nombre}</Text>
                   </TouchableOpacity>
@@ -315,24 +437,44 @@ export default function FiltersSection(props: FiltersSectionProps) {
           )}
 
           {/* Municipio */}
-          <TextInput
-            style={styles.locationInput}
-            placeholder="Municipio"
-            placeholderTextColor={COLORS.textSecondary}
-            value={municipalityText}
-            onChangeText={onMunicipalityTextChange}
-          />
-          {municipalitySuggestions.length > 0 && (
+          { !isProvinceCABA && (
+            <TouchableOpacity
+              style={[
+                styles.locationInput,
+                { justifyContent: "center" },
+                !provinceText && { opacity: 0.5 },
+              ]}
+              onPress={() => provinceText && setShowMunicipalityList((s) => !s)}
+              activeOpacity={provinceText ? 0.8 : 1}
+              disabled={!provinceText}
+            >
+              <Text style={{ color: municipalityText ? COLORS.textPrimary : COLORS.textSecondary }}>
+                {municipalityText || "Municipio"}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {showMunicipalityList && (
             <View style={styles.suggestionsContainer}>
               <ScrollView
                 nestedScrollEnabled={nestedScrollEnabled}
                 keyboardShouldPersistTaps="handled"
               >
-                {municipalitySuggestions.map((mun) => (
+                {(municipalitySuggestions.length > 0 ? municipalitySuggestions : localMunicipalityList).map((mun) => (
                   <TouchableOpacity
                     key={mun.id}
                     style={styles.suggestionItem}
-                    onPress={() => onPickMunicipality(mun.nombre)}
+                    onPress={async () => {
+                      onPickMunicipality(mun.nombre);
+                      onMunicipalityTextChange(mun.nombre);
+                      setSelectedMunicipalityId(mun.id);
+                      setShowMunicipalityList(false);
+                      // fetch localities as fallback
+                      try {
+                        const locs = await fetchLocalities(String(selectedProvinceId || ""), String(mun.id)).catch(() => [] as any[]);
+                        setLocalLocalityList(locs || []);
+                        onLocalityTextChange("");
+                      } catch {}
+                    }}
                   >
                     <Text style={styles.suggestionItemText}>{mun.nombre}</Text>
                   </TouchableOpacity>
@@ -341,31 +483,46 @@ export default function FiltersSection(props: FiltersSectionProps) {
             </View>
           )}
 
-          {/* Localidad */}
-          <TextInput
-            style={styles.locationInput}
-            placeholder="Localidad"
-            placeholderTextColor={COLORS.textSecondary}
-            value={localityText}
-            onChangeText={onLocalityTextChange}
-          />
-          {localitySuggestions.length > 0 && (
-            <View style={styles.suggestionsContainer}>
-              <ScrollView
-                nestedScrollEnabled={nestedScrollEnabled}
-                keyboardShouldPersistTaps="handled"
+          {/* Localidad (oculto en CABA) */}
+          { !isProvinceCABA && (
+            <>
+              <TouchableOpacity
+                style={[
+                  styles.locationInput,
+                  { justifyContent: "center" },
+                  !municipalityText && { opacity: 0.5 },
+                ]}
+                onPress={() => municipalityText && setShowLocalityList((s) => !s)}
+                activeOpacity={municipalityText ? 0.8 : 1}
+                disabled={!municipalityText}
               >
-                {localitySuggestions.map((loc) => (
-                  <TouchableOpacity
-                    key={loc.id}
-                    style={styles.suggestionItem}
-                    onPress={() => onPickLocality(loc.nombre)}
+                <Text style={{ color: localityText ? COLORS.textPrimary : COLORS.textSecondary }}>
+                  {localityText || "Localidad"}
+                </Text>
+              </TouchableOpacity>
+              {showLocalityList && (
+                <View style={styles.suggestionsContainer}>
+                  <ScrollView
+                    nestedScrollEnabled={nestedScrollEnabled}
+                    keyboardShouldPersistTaps="handled"
                   >
-                    <Text style={styles.suggestionItemText}>{loc.nombre}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
+                    {(localitySuggestions.length > 0 ? localitySuggestions : localLocalityList).map((loc) => (
+                      <TouchableOpacity
+                        key={loc.id}
+                        style={styles.suggestionItem}
+                        onPress={() => {
+                          onPickLocality(loc.nombre);
+                          onLocalityTextChange(loc.nombre);
+                          setShowLocalityList(false);
+                        }}
+                      >
+                        <Text style={styles.suggestionItemText}>{loc.nombre}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </>
           )}
 
           <TouchableOpacity style={styles.clearButton} onPress={onClearLocation}>

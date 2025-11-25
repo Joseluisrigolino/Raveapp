@@ -68,6 +68,11 @@ export default function ArtistsScreen() {
         ]
       : []),
     {
+      label: "Noticias",
+      route: ROUTES.MAIN.NEWS.LIST,
+      isActive: currentScreen === ROUTES.MAIN.NEWS.LIST.split("/").pop(),
+    },
+    {
       label: "Artistas",
       route: ROUTES.MAIN.ARTISTS.LIST,
       isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split("/").pop(),

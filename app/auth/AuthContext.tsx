@@ -153,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         dni: "",
         telefono: "",
         nombreFantasia: "",
-        bio: "0",
+        bio: "",
         password: randomPass,
         socials: { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
         dtNacimiento: new Date('2000-01-01').toISOString(),
