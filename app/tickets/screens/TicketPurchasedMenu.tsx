@@ -41,15 +41,10 @@ function TicketsPurchasedMenuContent() {
     const estadoCd =
       typeof anyItem?.estadoCd === "number" ? String(anyItem.estadoCd) : undefined;
 
-    const route = item.isFinished
-      ? {
-          pathname: ROUTES.MAIN.TICKETS.FINALIZED,
-          params: { id: item.id, eventId, count: ticketsCount, idCompra, estadoCd },
-        }
-      : {
-          pathname: ROUTES.MAIN.TICKETS.PURCHASED,
-          params: { id: item.id, eventId, count: ticketsCount, idCompra, estadoCd },
-        };
+    const route = {
+      pathname: ROUTES.MAIN.TICKETS.PURCHASED,
+      params: { id: item.id, eventId, count: ticketsCount, idCompra, estadoCd },
+    };
 
     nav.push(router, route);
   };

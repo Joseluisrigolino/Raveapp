@@ -835,6 +835,16 @@ function TicketPurchasedScreenContent() {
     []
   );
 
+  // Detectar entradas pagas: simplificado — sólo validar exactamente 'paga'
+  const isPaidEntry = useMemo(
+    () => (ds?: string) => {
+      if (!ds) return false;
+      const t = String(ds).trim().toLowerCase();
+      return t === 'paga';
+    },
+    []
+  );
+
   const allCanceledForSelection = useMemo(() => {
     const selected = Array.isArray(entries)
       ? entries.filter((e) => (idCompra ? e.compraId === String(idCompra) : true))
@@ -842,6 +852,15 @@ function TicketPurchasedScreenContent() {
     if (selected.length === 0) return false;
     return selected.every((e) => isCanceledEntry(e?.estadoDs, e?.estadoCd));
   }, [entries, idCompra, isCanceledEntry]);
+
+  // Determina si todas las entradas relevantes están en estado "pagado"
+  const allPaidForSelection = useMemo(() => {
+    const selected = Array.isArray(entries)
+      ? entries.filter((e) => (idCompra ? e.compraId === String(idCompra) : true))
+      : [];
+    if (selected.length === 0) return false;
+    return selected.every((e) => isPaidEntry(e?.estadoDs));
+  }, [entries, idCompra, isPaidEntry]);
 
   if (loading) {
     return (
@@ -891,10 +910,10 @@ function TicketPurchasedScreenContent() {
             </View>
           )}
           {addressDisplay ? (
-            <TouchableOpacity style={styles.infoRow} onPress={openMapsDirections} activeOpacity={0.8}>
+            <View style={styles.infoRow}>
               <MaterialCommunityIcons name="map-marker-outline" size={16} color={COLORS.textSecondary} />
-              <Text style={[styles.infoText, styles.linkText]}>{addressDisplay}</Text>
-            </TouchableOpacity>
+              <Text style={styles.infoText}>{addressDisplay}</Text>
+            </View>
           ) : null}
         </View>
 
@@ -1072,8 +1091,8 @@ function TicketPurchasedScreenContent() {
           </TouchableOpacity>
         )}
 
-        {/* Botón de arrepentimiento */}
-        {!allControlled && (
+        {/* Botón de arrepentimiento (solo si las entradas están pagas) */}
+        {!allControlled && allPaidForSelection && (
           <TouchableOpacity
             style={styles.secondaryButton}
             onPress={() => {
