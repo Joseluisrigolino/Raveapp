@@ -562,8 +562,8 @@ export default function EventScreen() {
 const HERO_RATIO = 16 / 9;
 
 const styles = StyleSheet.create({
-  heroContainer: { position: "relative", marginBottom: 12 },
-  badgesRow: { paddingHorizontal: 16, marginBottom: 8, flexDirection: 'row', justifyContent: 'flex-start' },
+  heroContainer: { position: "relative", marginBottom: 6 },
+  badgesRow: { paddingHorizontal: 16, marginBottom: 4, flexDirection: 'row', justifyContent: 'flex-start' },
   container: { flex: 1, backgroundColor: COLORS.backgroundLight },
   loaderWrapper: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContent: { paddingBottom: 32 },

@@ -285,9 +285,16 @@ function TicketPurchasedScreenContent() {
     if (typeof v === "string") return v;
     if (typeof v === "number") return String(v);
     if (typeof v === "object") {
+      // Intentar campos específicos de dirección (calle + número) antes que nombres genéricos
+      const calle = getText(v?.direccion) || getText(v?.calle) || getText(v?.street) || getText(v?.nombre) || getText(v?.dsNombre) || "";
+      const numero = (v?.numero ?? v?.nro ?? v?.altura ?? v?.streetNumber ?? v?.numeroCalle ?? "") ? String(v?.numero ?? v?.nro ?? v?.altura ?? v?.streetNumber ?? v?.numeroCalle) : "";
+      // Si tenemos calle y número separados, combinarlos
+      if (calle && numero) return `${calle} ${numero}`;
+      // Si solo uno existe, retornar lo que haya
+      if (calle) return calle;
+      if (numero) return numero;
+      // Fallback a otros campos geográficos
       return (
-        getText(v?.nombre) ||
-        getText(v?.dsNombre) ||
         getText(v?.localidad) ||
         getText(v?.municipio) ||
         getText(v?.provincia) ||
@@ -297,9 +304,26 @@ function TicketPurchasedScreenContent() {
     return "";
   };
 
+  // Helper específico para consolidar una dirección completa (calle + número si están separados)
+  const getAddressString = (addr: any): string => {
+    if (!addr) return "";
+    if (typeof addr === 'string') return addr;
+    if (typeof addr === 'number') return String(addr);
+    // Buscar campos comunes donde podría residir la dirección completa o partes
+    const full = getText(addr?.direccionCompleta) || getText(addr?.direccionTexto) || getText(addr?.direccion) || getText(addr?.direccion_full);
+    if (full) return full;
+    const street = getText(addr?.calle) || getText(addr?.street) || getText(addr?.nombre) || getText(addr?.dsNombre) || getText(addr?.direccion);
+    const number = (addr?.numero ?? addr?.nro ?? addr?.altura ?? addr?.streetNumber ?? addr?.numeroCalle ?? '') ? String(addr?.numero ?? addr?.nro ?? addr?.altura ?? addr?.streetNumber ?? addr?.numeroCalle) : '';
+    if (street && number) return `${street} ${number}`;
+    if (street) return street;
+    if (number) return number;
+    // último recurso
+    return getText(addr?.localidad) || getText(addr?.municipio) || getText(addr?.provincia) || '';
+  };
+
   const addressDisplay = (() => {
     const parts = [
-      getText(eventData?.address),
+      getAddressString(eventData?.address),
       getText((eventData as any)?.localidad),
       getText((eventData as any)?.municipio),
       getText((eventData as any)?.provincia),
@@ -314,7 +338,7 @@ function TicketPurchasedScreenContent() {
 
   const openMapsDirections = () => {
     const pieces = [
-      getText(eventData?.address),
+      getAddressString(eventData?.address),
       getText((eventData as any)?.localidad),
       getText((eventData as any)?.municipio),
       getText((eventData as any)?.provincia),
@@ -835,6 +859,16 @@ function TicketPurchasedScreenContent() {
     []
   );
 
+  // Detectar entradas marcadas como "No utilizada" (estado textual exacto simplificado)
+  const isNotUsedEntry = useMemo(
+    () => (ds?: string) => {
+      if (!ds) return false;
+      const t = String(ds).trim().toLowerCase();
+      return t === 'no utilizada';
+    },
+    []
+  );
+
   // Detectar entradas pagas: simplificado — sólo validar exactamente 'paga'
   const isPaidEntry = useMemo(
     () => (ds?: string) => {
@@ -852,6 +886,15 @@ function TicketPurchasedScreenContent() {
     if (selected.length === 0) return false;
     return selected.every((e) => isCanceledEntry(e?.estadoDs, e?.estadoCd));
   }, [entries, idCompra, isCanceledEntry]);
+
+  // Determina si existe alguna entrada "No utilizada" dentro de la selección
+  const hasNotUsedForSelection = useMemo(() => {
+    const selected = Array.isArray(entries)
+      ? entries.filter((e) => (idCompra ? e.compraId === String(idCompra) : true))
+      : [];
+    if (selected.length === 0) return false;
+    return selected.some((e) => isNotUsedEntry(e?.estadoDs));
+  }, [entries, idCompra, isNotUsedEntry]);
 
   // Determina si todas las entradas relevantes están en estado "pagado"
   const allPaidForSelection = useMemo(() => {
@@ -1032,17 +1075,27 @@ function TicketPurchasedScreenContent() {
                       const price = typeof en.precio === 'number' ? `$${en.precio}` : '';
                       const valido = formatDateEs(eventData.date);
                       const canceled = isCanceledEntry(en.estadoDs, en.estadoCd);
+                      const notUsed = isNotUsedEntry(en.estadoDs);
                       return (
                         <View key={`${en.idEntrada}-${idx}`} style={styles.entryCard}>
-                          <View style={styles.entryHeaderRow}>
-                            <Text style={styles.entryHeaderLeft}>{String(tipo)}</Text>
-                            <Text style={styles.entryHeaderRight}>{code}</Text>
-                          </View>
-                          <Text style={styles.entryPriceLine}>{price}</Text>
+                          {!notUsed && (
+                            <>
+                              <View style={styles.entryHeaderRow}>
+                                <Text style={styles.entryHeaderLeft}>{String(tipo)}</Text>
+                                <Text style={styles.entryHeaderRight}>{code}</Text>
+                              </View>
+                              <Text style={styles.entryPriceLine}>{price}</Text>
+                            </>
+                          )}
                           {canceled ? (
                             <View style={styles.canceledBox}>
                               <MaterialCommunityIcons name="close-circle-outline" size={16} color={COLORS.textSecondary} style={{ marginRight: 6 }} />
                               <Text style={styles.canceledText}>Entrada anulada</Text>
+                            </View>
+                          ) : notUsed ? (
+                            <View style={styles.notUsedBox}>
+                              <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#92400e" style={{ marginRight: 6 }} />
+                              <Text style={styles.notUsedText}>Entrada no utilizada</Text>
                             </View>
                           ) : (
                             <View style={{ alignItems: 'center', marginTop: 6 }}>
@@ -1073,7 +1126,7 @@ function TicketPurchasedScreenContent() {
               </View>
 
               {/* Botón principal Descargar PDF (todas las entradas) */}
-              {entries.length > 0 && !allPendingForSelection && !allCanceledForSelection && (
+              {entries.length > 0 && !allPendingForSelection && !allCanceledForSelection && !hasNotUsedForSelection && (
                 <TouchableOpacity style={styles.primaryButton} onPress={handleDownloadAll} activeOpacity={0.85}>
                   <MaterialCommunityIcons name="download" size={18} color={COLORS.backgroundLight} style={{ marginRight: 8 }} />
                   <Text style={styles.primaryButtonText}>Descargar PDF</Text>
@@ -1173,7 +1226,7 @@ function TicketPurchasedScreenContent() {
         )}
 
         {/* Nota para reseña - ocultar si todas controladas */}
-        {!allControlled && (
+        {!allControlled && !hasNotUsedForSelection && (
           <Text style={styles.reviewNote}>
             * Una vez finalizado el evento, podrás dejar tu reseña...
           </Text>
@@ -1879,6 +1932,24 @@ const styles = StyleSheet.create({
     borderColor: '#fecaca',
     borderRadius: RADIUS.card,
     padding: 10,
+  },
+  notUsedBox: {
+    marginTop: 4,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fff7ed',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: RADIUS.card,
+    padding: 10,
+  },
+  notUsedText: {
+    flex: 1,
+    color: '#92400e',
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
+    fontWeight: '600',
   },
   canceledText: {
     flex: 1,

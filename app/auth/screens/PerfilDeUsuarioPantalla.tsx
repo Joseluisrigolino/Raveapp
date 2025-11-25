@@ -22,6 +22,7 @@ import ROUTES from "@/routes";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
+import SelectField from "@/components/common/selectField";
 import { useAuth } from "@/app/auth/AuthContext";
 import { getProfile } from "@/app/auth/userHelpers";
 import useUpdateUserProfile from "@/app/auth/services/user/useUpdateUserProfile";
@@ -30,7 +31,7 @@ import { apiClient } from "@/app/apis/apiConfig";
 import useDeleteAccountProfile from "@/app/auth/services/user/useDeleteAccountProfile";
 import useVerifyEmail from "@/app/auth/services/user/useVerifyEmail";
 import ProfileUserPopupUpdateOk from "@/app/auth/components/user/profile-user/ProfileUserPopupUpdateOk";
-import { fetchProvinces } from "@/app/apis/georefHelpers";
+import { fetchProvinces, fetchMunicipalities, fetchLocalitiesByProvince, fetchLocalities } from "@/app/apis/georefHelpers";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 import { formatDateForUI } from "@/utils/formatDate";
 
@@ -62,11 +63,51 @@ export default function UserProfileScreen() {
 
   const [isEditing, setIsEditing] = useState(false);
 
+  // editar domicilio por separado
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+
   // image states
   const [photo, setPhoto] = useState<string | null>(null);
 
   // simple georef lists
   const [provinces, setProvinces] = useState<any[]>([]);
+  const [showProvincePicker, setShowProvincePicker] = useState(false);
+  const [municipalities, setMunicipalities] = useState<any[]>([]);
+  const [localities, setLocalities] = useState<any[]>([]);
+  const [showMunicipalityPicker, setShowMunicipalityPicker] = useState(false);
+  const [showLocalityPicker, setShowLocalityPicker] = useState(false);
+  const [provinceId, setProvinceId] = useState<string>("");
+  const [municipalityId, setMunicipalityId] = useState<string>("");
+  const [localityId, setLocalityId] = useState<string>("");
+  const [isCABA, setIsCABA] = useState<boolean>(false);
+
+  // Fallback de provincias en caso de que la API falle o devuelva vacío
+  const FALLBACK_PROVINCES = [
+    "Ciudad Autónoma de Buenos Aires",
+    "Buenos Aires",
+    "Catamarca",
+    "Chaco",
+    "Chubut",
+    "Córdoba",
+    "Corrientes",
+    "Entre Ríos",
+    "Formosa",
+    "Jujuy",
+    "La Pampa",
+    "La Rioja",
+    "Mendoza",
+    "Misiones",
+    "Neuquén",
+    "Río Negro",
+    "Salta",
+    "San Juan",
+    "San Luis",
+    "Santa Cruz",
+    "Santa Fe",
+    "Santiago del Estero",
+    "Tierra del Fuego",
+    "Tucumán",
+  ];
 
   // modals
   const [showVerifyModal, setShowVerifyModal] = useState(false);
@@ -75,6 +116,19 @@ export default function UserProfileScreen() {
   const { updating: updatingProfile, updateUserProfile } = useUpdateUserProfile();
   const { deleting: deletingAccount, deleteAccount } = useDeleteAccountProfile();
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  // change password states
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [showChangeModal, setShowChangeModal] = useState(false);
+  const [showChangeResultModal, setShowChangeResultModal] = useState(false);
+  const [changeResultMsg, setChangeResultMsg] = useState<string | null>(null);
+  // toggles visibility for password inputs
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [currentPasswordError, setCurrentPasswordError] = useState<string | null>(null);
 
   // load profile on mount
   useEffect(() => {
@@ -119,6 +173,33 @@ export default function UserProfileScreen() {
         try {
           const provs = await fetchProvinces();
           setProvinces(provs || []);
+
+          // try to resolve province id from profile (codigo) or by matching name
+          const profileProvCode = u.domicilio?.provincia?.codigo;
+          const profileProvName = u.domicilio?.provincia?.nombre;
+          const pid = profileProvCode || (provs || []).find((p: any) => String(p?.nombre || "").toLowerCase() === String(profileProvName || "").toLowerCase())?.id;
+          if (pid) {
+            const spid = String(pid);
+            setProvinceId(spid);
+
+            const provName = (provs || []).find((p: any) => String(p?.id) === String(spid))?.nombre || profileProvName || "";
+            const caba = String(provName).toLowerCase().includes('buenos') && String(provName).toLowerCase().includes('aires') && String(provName).toLowerCase().includes('ciudad');
+            setIsCABA(caba);
+
+            try {
+              const mun = await fetchMunicipalities(spid);
+              setMunicipalities(mun || []);
+            } catch (e) {
+              setMunicipalities([]);
+            }
+
+            try {
+              const locs = await fetchLocalitiesByProvince(spid);
+              setLocalities(locs || []);
+            } catch (e) {
+              setLocalities([]);
+            }
+          }
         } catch {}
       } catch (e) {
         console.warn("load profile error", e);
@@ -172,7 +253,7 @@ export default function UserProfileScreen() {
     }
 
     try {
-      // build payload minimal, keeping same contract names
+      // build payload including required/expected fields by backend
       const payload: any = {
         idUsuario: profile.idUsuario,
         nombre: form.firstName.trim(),
@@ -181,27 +262,40 @@ export default function UserProfileScreen() {
         dni: form.dni.trim(),
         telefono: form.phone?.trim() || "",
         cbu: form.cbu?.trim() || "",
+        // dtNacimiento expected as ISO
         dtNacimiento: form.birthdate
           ? new Date(form.birthdate + "T00:00:00Z").toISOString()
           : profile.dtNacimiento,
+        // fallback fields backend expects
+        nombreFantasia: profile?.nombreFantasia || "",
+        bio: profile?.bio || "",
+        // cdRoles is required by the API (array of numbers)
+        cdRoles: Array.isArray(profile?.cdRoles) && profile.cdRoles.length ? profile.cdRoles : [0],
+        // isVerificado: API sometimes expects number; normalize to 0/1
+        isVerificado: typeof profile?.isVerificado === 'number' ? profile.isVerificado : (profile?.isVerificado ? 1 : 0),
         domicilio: {
           provincia: {
             nombre: form.addressProvince || "",
-            codigo: profile.domicilio?.provincia?.codigo || "",
+            codigo: provinceId || profile.domicilio?.provincia?.codigo || "",
           },
-          municipio: { nombre: "", codigo: "" },
+          municipio: {
+            nombre: (municipalities.find((m: any) => String(m.id) === String(municipalityId))?.nombre) || profile.domicilio?.municipio?.nombre || "",
+            codigo: municipalityId || profile.domicilio?.municipio?.codigo || "",
+          },
           localidad: {
-            nombre: form.addressLocality || "",
-            codigo: profile.domicilio?.localidad?.codigo || "",
+            nombre: form.addressLocality || profile.domicilio?.localidad?.nombre || "",
+            codigo: localityId || profile.domicilio?.localidad?.codigo || "",
           },
-          direccion: form.addressStreet || "",
-          latitud: profile.domicilio?.latitud || 0,
-          longitud: profile.domicilio?.longitud || 0,
+          direccion: form.addressStreet || profile.domicilio?.direccion || "",
+          latitud: typeof profile?.domicilio?.latitud === 'number' ? profile.domicilio.latitud : 0,
+          longitud: typeof profile?.domicilio?.longitud === 'number' ? profile.domicilio.longitud : 0,
         },
-        cdRoles: profile.cdRoles || [],
-        nombreFantasia: profile.nombreFantasia || "",
-        bio: profile.bio || "",
-        socials: profile.socials || {},
+        socials: {
+          idSocial: profile?.socials?.idSocial || "",
+          mdInstagram: profile?.socials?.mdInstagram || "",
+          mdSpotify: profile?.socials?.mdSpotify || "",
+          mdSoundcloud: profile?.socials?.mdSoundcloud || "",
+        },
       };
 
       const updated = await updateUserProfile(payload);
@@ -346,34 +440,292 @@ export default function UserProfileScreen() {
           />
         </View>
 
+        {/* Botón: Cambiar contraseña abre modal */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Tu domicilio</Text>
-          <Text style={styles.label}>Provincia</Text>
+          <Text style={styles.cardTitle}>Seguridad</Text>
+          <Text style={[styles.label, { marginTop: 8, fontWeight: '400' }]}>Administrá el acceso a tu cuenta.</Text>
           <TouchableOpacity
-            style={styles.input}
-            onPress={() => {
-              /* simple: show first province if any */ setField(
-                "addressProvince",
-                provinces[0]?.nombre || form.addressProvince
-              );
-            }}
+            style={[styles.saveBtn, { marginTop: 12 }]}
+            onPress={() => setShowChangeModal(true)}
           >
-            <Text>{form.addressProvince || "Seleccione provincia"}</Text>
+            <Text style={styles.saveText}>Cambiar contraseña</Text>
           </TouchableOpacity>
+        </View>
 
-          <Text style={styles.label}>Localidad</Text>
-          <TextInput
-            style={[styles.input, !isEditing && styles.inputDisabled]}
-            editable={isEditing}
-            value={form.addressLocality}
-            onChangeText={(t) => setField("addressLocality", t)}
-            placeholder="Localidad"
+        {/* Modal: Cambiar contraseña (diseño actualizado) */}
+        <Modal visible={showChangeModal} transparent animationType="fade" onRequestClose={() => setShowChangeModal(false)}>
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCardCompact}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Cambiar contraseña</Text>
+                <TouchableOpacity onPress={() => setShowChangeModal(false)} style={styles.closeBtn}>
+                  <MaterialIcons name="close" size={20} color={COLORS.textPrimary} />
+                </TouchableOpacity>
+              </View>
+              <Text style={[styles.modalMsg, { marginBottom: 12 }]}>Ingresá tu contraseña actual y la nueva contraseña.</Text>
+
+              <View style={styles.inputWithIcon}>
+                <TextInput
+                  style={[styles.input, { flex: 1, marginTop: 0 }]}
+                  secureTextEntry={!showCurrentPassword}
+                  value={currentPassword}
+                  onChangeText={(t) => { setCurrentPassword(t); setCurrentPasswordError(null); }}
+                  placeholder="Contraseña actual"
+                />
+                <TouchableOpacity onPress={() => setShowCurrentPassword((v) => !v)} style={styles.eyeBtn}>
+                  <MaterialIcons name={showCurrentPassword ? 'visibility' : 'visibility-off'} size={20} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+              {currentPasswordError ? (
+                <Text style={styles.inputError}>{currentPasswordError}</Text>
+              ) : null}
+
+              <View style={styles.inputWithIcon}>
+                <TextInput
+                  style={[styles.input, { flex: 1, marginTop: 0 }]}
+                  secureTextEntry={!showNewPassword}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder="Nueva contraseña"
+                />
+                <TouchableOpacity onPress={() => setShowNewPassword((v) => !v)} style={styles.eyeBtn}>
+                  <MaterialIcons name={showNewPassword ? 'visibility' : 'visibility-off'} size={20} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputWithIcon}>
+                <TextInput
+                  style={[styles.input, { flex: 1, marginTop: 0 }]}
+                  secureTextEntry={!showConfirmPassword}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Repetir nueva contraseña"
+                />
+                <TouchableOpacity onPress={() => setShowConfirmPassword((v) => !v)} style={styles.eyeBtn}>
+                  <MaterialIcons name={showConfirmPassword ? 'visibility' : 'visibility-off'} size={20} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowChangeModal(false)} disabled={changingPassword}>
+                  <Text>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.confirmBtn, changingPassword && { opacity: 0.7 }]}
+                  onPress={async () => {
+                    if (!currentPassword) { Alert.alert('Error', 'Ingresá tu contraseña actual.'); return; }
+                    if (!newPassword || newPassword.length < 8) { Alert.alert('Error', 'La nueva contraseña debe tener al menos 8 caracteres.'); return; }
+                    if (newPassword !== confirmPassword) { Alert.alert('Error', 'Las contraseñas no coinciden.'); return; }
+                    try {
+                      setChangingPassword(true);
+                      setCurrentPasswordError(null);
+                      // API: PUT /v1/Usuario/ResetPass?Correo={correo}&Pass={old}&NewPass={new}
+                      await apiClient.put(
+                        "/v1/Usuario/ResetPass",
+                        null,
+                        {
+                          params: {
+                            Correo: form.email || profile?.correo,
+                            Pass: currentPassword,
+                            NewPass: newPassword,
+                          },
+                        }
+                      );
+                      setChangeResultMsg('Contraseña actualizada correctamente.');
+                      setShowChangeResultModal(true);
+                      setShowChangeModal(false);
+                      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+                    } catch (e: any) {
+                      // Evitar mostrar el redbox/overlay en desarrollo.
+                      // Logueamos en console.log para debugging sin abrir el red error overlay.
+                      console.log('change password error', e?.message || e);
+                      const status = e?.response?.status;
+                      const data = e?.response?.data;
+                      const text = String((data?.title || data?.message || '')).toLowerCase();
+                      const looksLikeBadCurrent = /contraseñ|password|pass|actual/.test(text);
+                      // Si el backend devuelve 401 o 403 tratamos como contraseña original incorrecta
+                      if (status === 401 || status === 403 || looksLikeBadCurrent) {
+                        // Mostrar popup claro al usuario
+                        setChangeResultMsg('La contraseña original no es correcta.');
+                        setShowChangeResultModal(true);
+                        setShowChangeModal(false);
+                      } else {
+                        const msg = data?.title || data?.message || e?.message || 'No se pudo actualizar la contraseña.';
+                        setChangeResultMsg(msg);
+                        setShowChangeResultModal(true);
+                        setShowChangeModal(false);
+                      }
+                    } finally {
+                      setChangingPassword(false);
+                    }
+                  }}
+                  disabled={changingPassword}
+                >
+                  <Text style={{ color: '#fff' }}>{changingPassword ? 'Procesando...' : 'Confirmar'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        <View style={styles.card}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.cardTitle}>Tu domicilio</Text>
+            <TouchableOpacity onPress={() => setIsEditingAddress((v) => !v)}>
+              <MaterialIcons name={isEditingAddress ? "check" : "edit"} size={18} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+          </View>
+          <SelectField
+            label="Provincia"
+            value={form.addressProvince}
+            placeholder="Seleccione provincia"
+            onPress={() => {
+              if (!isEditingAddress) return;
+              setShowProvincePicker((v) => !v);
+            }}
+            disabled={!isEditingAddress}
+            isOpen={showProvincePicker}
           />
+
+          {showProvincePicker && (
+            <View style={styles.dropdownContainer}>
+              <ScrollView
+                style={styles.menuScrollView}
+                contentContainerStyle={{ paddingVertical: 4 }}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+              >
+                {(provinces && provinces.length
+                  ? provinces.map((p: any) => ({ id: String(p?.id ?? p), nombre: p?.nombre ?? String(p) }))
+                  : FALLBACK_PROVINCES.map((n, i) => ({ id: String(i), nombre: n })))
+                  .map((item: any) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.dropdownItem}
+                      onPress={async () => {
+                        // actualizar province en el form y estado de selección en cascada
+                        setField("addressProvince", item.nombre);
+                        const pid = String(item.id);
+                        setProvinceId(pid);
+                        // detectar CABA por nombre
+                        const isCabaSelected = String(item.nombre || '').toLowerCase().includes('ciudad') && String(item.nombre || '').toLowerCase().includes('buenos') && String(item.nombre || '').toLowerCase().includes('aires');
+                        setIsCABA(isCabaSelected);
+                        // reset dependientes
+                        setMunicipalityId("");
+                        setLocalityId("");
+                        setMunicipalities([]);
+                        setLocalities([]);
+                        setField('addressLocality', '');
+                        setShowProvincePicker(false);
+
+                        // traer municipios para la provincia seleccionada
+                        try {
+                          const mun = await fetchMunicipalities(pid);
+                          setMunicipalities(mun || []);
+                        } catch (e) {
+                          setMunicipalities([]);
+                        }
+
+                        // intentar traer localidades por provincia (casos como CABA)
+                        try {
+                          const locs = await fetchLocalitiesByProvince(pid);
+                          setLocalities(locs || []);
+                        } catch (e) {
+                          // ignore
+                        }
+                      }}
+                    >
+                      <Text>{item.nombre}</Text>
+                    </TouchableOpacity>
+                  ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Municipio */}
+          <SelectField
+            label="Municipio"
+            value={isCABA ? (form.addressProvince || 'Ciudad Autónoma de Buenos Aires') : (municipalityId ? (municipalities.find((m: any) => String(m.id) === municipalityId)?.nombre || '') : '')}
+            placeholder={isCABA ? 'Ciudad Autónoma de Buenos Aires' : 'Seleccione un municipio'}
+            onPress={() => {
+              if (!isEditingAddress) return;
+              if (isCABA) return; // no abrir para CABA
+              setShowMunicipalityPicker((v) => !v);
+              setShowProvincePicker(false);
+              setShowLocalityPicker(false);
+            }}
+            disabled={!isEditingAddress || !provinceId || isCABA || municipalities.length === 0}
+            isOpen={showMunicipalityPicker}
+          />
+
+          {showMunicipalityPicker && (
+            <View style={styles.dropdownContainer}>
+              <ScrollView style={styles.menuScrollView} contentContainerStyle={{ paddingVertical: 4 }} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+                {municipalities.map((m: any) => (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={styles.dropdownItem}
+                    onPress={async () => {
+                      const mid = String(m.id);
+                      setMunicipalityId(mid);
+                      // limpiar/localidad dependiente
+                      setLocalityId("");
+                      setField('addressLocality', '');
+                      setLocalities([]);
+                      setShowMunicipalityPicker(false);
+                      setShowLocalityPicker(false);
+                      // load localities for this municipality
+                      try {
+                        const locs = await fetchLocalities(String(provinceId), mid);
+                        setLocalities(locs || []);
+                      } catch (e) {
+                        setLocalities([]);
+                      }
+                    }}
+                  >
+                    <Text>{m.nombre}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Localidad */}
+          <SelectField
+            label="Localidad"
+            value={form.addressLocality}
+            placeholder="Seleccione una localidad"
+            onPress={() => {
+              if (!isEditingAddress) return;
+              if (isCABA) return; // mantener localidad grisada para CABA
+              setShowLocalityPicker((v) => !v);
+              setShowProvincePicker(false);
+              setShowMunicipalityPicker(false);
+            }}
+            disabled={!isEditingAddress || isCABA || !provinceId || (!municipalityId && !localities.length)}
+            isOpen={showLocalityPicker}
+          />
+
+          {showLocalityPicker && (
+            <View style={styles.dropdownContainer}>
+              <ScrollView style={styles.menuScrollView} contentContainerStyle={{ paddingVertical: 4 }} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+                {localities.map((l: any) => (
+                  <TouchableOpacity key={l.id} style={styles.dropdownItem} onPress={() => {
+                    setLocalityId(String(l.id));
+                    setField('addressLocality', String(l.nombre));
+                    setShowLocalityPicker(false);
+                  }}>
+                    <Text>{l.nombre}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           <Text style={styles.label}>Dirección</Text>
           <TextInput
-            style={[styles.input, !isEditing && styles.inputDisabled]}
-            editable={isEditing}
+            style={[styles.input, !isEditingAddress && styles.inputDisabled]}
+            editable={isEditingAddress}
             value={form.addressStreet}
             onChangeText={(t) => setField("addressStreet", t)}
             placeholder="Dirección"
@@ -422,6 +774,19 @@ export default function UserProfileScreen() {
                 style={styles.modalOk}
                 onPress={() => setShowVerifyModal(false)}
               >
+                <Text style={styles.modalOkText}>Aceptar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* change password result modal */}
+        <Modal visible={showChangeResultModal} transparent animationType="fade" onRequestClose={() => setShowChangeResultModal(false)}>
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Cambio de contraseña</Text>
+              <Text style={styles.modalMsg}>{changeResultMsg || ''}</Text>
+              <TouchableOpacity style={styles.modalOk} onPress={() => setShowChangeResultModal(false)}>
                 <Text style={styles.modalOkText}>Aceptar</Text>
               </TouchableOpacity>
             </View>
@@ -598,4 +963,56 @@ const styles = StyleSheet.create({
   },
   modalOkText: { color: "#fff" },
   modalBtn: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8 },
+  modalCardCompact: {
+    width: 360,
+    maxWidth: "95%",
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    padding: 18,
+    alignItems: "stretch",
+  },
+  modalHeader: { width: "100%", flexDirection: "row", justifyContent: "center", alignItems: "center" },
+  closeBtn: { position: "absolute", right: 8, top: 6, padding: 6 },
+  inputWithIcon: { width: "100%", flexDirection: "row", alignItems: "center", marginTop: 8 },
+  eyeBtn: { padding: 8 },
+  modalActions: { width: "100%", flexDirection: "row", justifyContent: "space-between", marginTop: 16 },
+  cancelBtn: { flex: 1, backgroundColor: "#f3f4f6", padding: 12, borderRadius: 8, alignItems: "center", marginRight: 8 },
+  confirmBtn: { flex: 1, backgroundColor: COLORS.primary, padding: 12, borderRadius: 8, alignItems: "center" },
+  inputError: { color: "#ef4444", marginTop: 6, alignSelf: "flex-start" },
+  provinceModalCard: {
+    width: 360,
+    maxWidth: "95%",
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    padding: 12,
+    alignItems: "stretch",
+  },
+  provinceItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  dropdownContainer: {
+    width: "90%",
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    maxHeight: 200,
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 4,
+    alignSelf: 'center',
+    overflow: 'hidden',
+  },
+  menuScrollView: {
+    maxHeight: 180,
+  },
+  dropdownItem: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+  },
 });
