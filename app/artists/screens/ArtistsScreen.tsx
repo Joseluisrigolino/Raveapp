@@ -56,28 +56,23 @@ export default function ArtistsScreen() {
   };
 
   const currentScreen = path.split("/").pop() || "";
-  const tabs = [
-    ...(isAdmin
-      ? [
-          {
-            label: "Administrar artistas",
-            route: ROUTES.ADMIN.ARTISTS.MANAGE,
-            isActive:
-              currentScreen === ROUTES.ADMIN.ARTISTS.MANAGE.split("/").pop(),
-          },
-        ]
-      : []),
-    {
-      label: "Noticias",
-      route: ROUTES.MAIN.NEWS.LIST,
-      isActive: currentScreen === ROUTES.MAIN.NEWS.LIST.split("/").pop(),
-    },
-    {
-      label: "Artistas",
-      route: ROUTES.MAIN.ARTISTS.LIST,
-      isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split("/").pop(),
-    },
-  ];
+  const adminTab = {
+    label: "Administrar artistas",
+    route: ROUTES.ADMIN.ARTISTS.MANAGE,
+    isActive: currentScreen === ROUTES.ADMIN.ARTISTS.MANAGE.split("/").pop(),
+  };
+  const newsTab = {
+    label: "Noticias",
+    route: ROUTES.MAIN.NEWS.LIST,
+    isActive: currentScreen === ROUTES.MAIN.NEWS.LIST.split("/").pop(),
+  };
+  const artistsTab = {
+    label: "Artistas",
+    route: ROUTES.MAIN.ARTISTS.LIST,
+    isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split("/").pop(),
+  };
+
+  const tabs = isAdmin ? [adminTab, artistsTab] : [newsTab, artistsTab];
 
   return (
     <ProtectedRoute allowedRoles={["admin", "owner", "user"]}>

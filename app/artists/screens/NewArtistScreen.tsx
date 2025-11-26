@@ -87,9 +87,13 @@ export default function NewArtistScreen() {
 
   // guardar artista y opcionalmente subir imagen
   const saveArtist = async () => {
-    // validación mínima
-    if (!name.trim()) {
-      Alert.alert("Error", "El nombre del artista es obligatorio.");
+    // validación acumulada: listar todos los campos obligatorios que falten
+    const missing: string[] = [];
+    if (!name.trim()) missing.push("Nombre del artista");
+    if (!description.trim()) missing.push("Descripción del artista");
+
+    if (missing.length) {
+      Alert.alert("Faltan datos", `Por favor completá los siguientes campos: ${missing.join(", ")}.`);
       return;
     }
 

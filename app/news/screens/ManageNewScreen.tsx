@@ -28,6 +28,7 @@ import ManageNewsHeaderComponent from "../components/manage/ManageNewsHeaderComp
 import ManageNewsCardComponent from "../components/manage/ManageNewsCardComponent";
 import ManageNewsEmptyStateComponent from "../components/manage/ManageNewsEmptyStateComponent";
 import NewsDeletePopupComponent from "../components/manage/NewsDeletePopupComponent";
+import NewsSuccessPopupComponent from "../components/create/NewsSuccessPopupComponent";
 
 export default function ManageNewsScreen() {
   const router = useRouter();
@@ -44,6 +45,7 @@ export default function ManageNewsScreen() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [selectedNewsId, setSelectedNewsId] = useState<string | null>(null);
   const [selectedNewsTitle, setSelectedNewsTitle] = useState<string>("");
+  const [successVisible, setSuccessVisible] = useState(false);
 
   const tabs = useMemo(
     () =>
@@ -100,6 +102,8 @@ export default function ManageNewsScreen() {
       setDeleteVisible(false);
       setSelectedNewsId(null);
       setSelectedNewsTitle("");
+      // mostrar modal de éxito
+      setSuccessVisible(true);
     } catch {
       Alert.alert("Error", "No se pudo eliminar la noticia.");
     } finally {
@@ -155,6 +159,13 @@ export default function ManageNewsScreen() {
             setSelectedNewsTitle("");
           }}
           onConfirm={handleConfirmDelete}
+        />
+
+        <NewsSuccessPopupComponent
+          visible={successVisible}
+          title="Éxito"
+          message="La noticia ha sido eliminada exitosamente."
+          onClose={() => setSuccessVisible(false)}
         />
       </SafeAreaView>
     </ProtectedRoute>

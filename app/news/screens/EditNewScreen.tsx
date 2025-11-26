@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, usePathname, useRouter } from "expo-router";
@@ -54,6 +55,17 @@ export default function EditNewScreen() {
   const [successVisible, setSuccessVisible] = useState(false);
 
   async function handleSave() {
+    // Validación acumulada similar a CreateNewScreen: título, contenido e imagen son obligatorios
+    const missing: string[] = [];
+    if (!title || !title.trim()) missing.push("Título");
+    if (!body || !body.trim()) missing.push("Contenido");
+    if (!selectedImage) missing.push("Imagen");
+
+    if (missing.length) {
+      Alert.alert("Faltan datos", `Por favor completá los siguientes campos: ${missing.join(", ")}.`);
+      return;
+    }
+
     const result = await save();
     if (result.ok) {
       setSuccessVisible(true);

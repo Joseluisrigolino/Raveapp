@@ -125,8 +125,18 @@ export default function EditArtistScreen() {
   // Guardar cambios / activar
   // Guardar cambios / activar
   const saveArtist = async () => {
-    if (!id || id === "undefined" || !name.trim()) {
-      Alert.alert("Error", "El nombre es obligatorio");
+    if (!id || id === "undefined") {
+      Alert.alert("Error", "ID inválido");
+      return;
+    }
+
+    // validación acumulada: listar los campos obligatorios que falten
+    const missing: string[] = [];
+    if (!name.trim()) missing.push("Nombre del artista");
+    if (!description.trim()) missing.push("Descripción del artista");
+
+    if (missing.length) {
+      Alert.alert("Faltan datos", `Por favor completá los siguientes campos: ${missing.join(", ")}.`);
       return;
     }
     try {

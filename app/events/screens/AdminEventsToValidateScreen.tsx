@@ -64,6 +64,7 @@ export default function AdminEventsToValidateScreen() {
   const [genreMap, setGenreMap] = useState<Map<number, string>>(new Map());
   const [ownerAvatars, setOwnerAvatars] = useState<Record<string, string>>({});
   const [ownerEmails, setOwnerEmails] = useState<Record<string, string>>({});
+  const [ownerNames, setOwnerNames] = useState<Record<string, string>>({});
 
   // Comentario: tabs según rutas (UI en español se mantiene)
   const currentScreen = path?.split("/").pop() || "";
@@ -152,23 +153,29 @@ export default function AdminEventsToValidateScreen() {
         for (const p of avatarPairs) { if (p) avatarMap[p[0]] = p[1]; }
         if (Object.keys(avatarMap).length) setOwnerAvatars(avatarMap);
 
-        // Emails faltantes
+        // Emails y nombres faltantes
         const emailMap: Record<string, string> = { ...ownerEmails };
+        const nameMap: Record<string, string> = { ...ownerNames };
         await Promise.all(ids.map(async (id) => {
           // si ya tenemos email cacheado, saltar
-          if (emailMap[id]) return;
+          if (emailMap[id] && nameMap[id]) return;
           // buscar en los eventos por si alguno ya lo trae
           const existing = (events as any[]).find((e) => String((e as any)?.ownerId || "") === id);
-          const fromEvent = existing && ((existing as any).ownerEmail || (existing as any).__raw?.propietario?.correo || (existing as any).__raw?.usuario?.correo);
-          if (fromEvent) { emailMap[id] = String(fromEvent); return; }
+          const fromEventEmail = existing && ((existing as any).ownerEmail || (existing as any).__raw?.propietario?.correo || (existing as any).__raw?.usuario?.correo);
+          const fromEventName = existing && ((existing as any).ownerName || (existing as any).__raw?.propietario?.nombre || (existing as any).__raw?.usuario?.nombre);
+          if (fromEventEmail) emailMap[id] = String(fromEventEmail);
+          if (fromEventName) nameMap[id] = String(fromEventName);
+          if (emailMap[id] && nameMap[id]) return;
           try {
             const profile = await getUsuarioById(id);
             if (profile?.correo) emailMap[id] = String(profile.correo);
+            if (profile?.nombre || profile?.apellido) nameMap[id] = `${String(profile?.nombre || "").trim()} ${String(profile?.apellido || "").trim()}`.trim();
           } catch {
             // fallback opcional: si tuviéramos un mail aproximado podríamos usar getProfile(mail)
           }
         }));
         if (Object.keys(emailMap).length) setOwnerEmails(emailMap);
+        if (Object.keys(nameMap).length) setOwnerNames(nameMap);
       } catch {}
     })();
   }, [events]);
@@ -212,15 +219,18 @@ export default function AdminEventsToValidateScreen() {
   // Comentario: render de una tarjeta simple de evento
   const renderItem = ({ item }: { item: EventItem }) => {
     const raw: any = item as any;
+    const ownerIdStr = String(
+      raw.ownerId || raw.owner?.id || raw.propietario?.idUsuario || raw.__raw?.propietario?.idUsuario || raw.__raw?.usuario?.idUsuario || ""
+    ).trim();
     const ownerName =
       raw.ownerName ||
       raw.owner?.name ||
       raw.propietario?.nombre ||
+      raw.__raw?.propietario?.nombre ||
+      raw.__raw?.usuario?.nombre ||
+      ownerNames[ownerIdStr] ||
       raw.ownerDisplayName ||
       "N/D";
-    const ownerIdStr = String(
-      raw.ownerId || raw.owner?.id || raw.propietario?.idUsuario || raw.__raw?.propietario?.idUsuario || raw.__raw?.usuario?.idUsuario || ""
-    ).trim();
     const ownerEmail =
       raw.ownerEmail ||
       raw.owner?.email ||
@@ -310,28 +320,32 @@ export default function AdminEventsToValidateScreen() {
         <TabMenuComponent tabs={tabs} />
 
         <View style={styles.content}>
-          <SearchBarComponent
-            value={searchText}
-            onChangeText={setSearchText}
-            placeholder="Buscar eventos..."
+          <FlatList
+            data={filteredEvents}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            contentContainerStyle={{ paddingBottom: 40 }}
+            ListHeaderComponent={() => (
+              <SearchBarComponent
+                value={searchText}
+                onChangeText={setSearchText}
+                placeholder="Buscar eventos..."
+              />
+            )}
+            ListEmptyComponent={() => (
+              loading ? (
+                <View style={{ padding: 24, alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
+              ) : (
+                <View style={styles.emptyWrapper}>
+                  <Text style={styles.emptyText}>
+                    No hay eventos para aprobar en este momento.
+                  </Text>
+                </View>
+              )
+            )}
           />
-
-          {loading ? (
-            <ActivityIndicator size="large" color={COLORS.primary} />
-          ) : filteredEvents.length === 0 ? (
-            <View style={styles.emptyWrapper}>
-              <Text style={styles.emptyText}>
-                No hay eventos para aprobar en este momento.
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={filteredEvents}
-              keyExtractor={(item) => item.id}
-              renderItem={renderItem}
-              contentContainerStyle={{ paddingBottom: 40 }}
-            />
-          )}
         </View>
 
         <Footer />

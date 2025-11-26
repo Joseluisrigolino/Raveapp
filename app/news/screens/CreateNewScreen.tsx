@@ -68,12 +68,19 @@ export default function CreateNewScreen() {
   }
 
   async function handleSubmit() {
-    const result = await createNew({
-      title,
-      body,
-      imageUri,
-      eventId: selectedEventId,
-    });
+    // Validación: título, contenido e imagen son obligatorios. Evento relacionado es opcional.
+    const missing: string[] = [];
+    if (!title || !title.trim()) missing.push("Título");
+    if (!body || !body.trim()) missing.push("Contenido");
+    if (!imageUri) missing.push("Imagen");
+
+    if (missing.length) {
+      const list = missing.join(", ");
+      Alert.alert("Faltan datos", `Por favor completá los siguientes campos: ${list}.`);
+      return;
+    }
+
+    const result = await createNew({ title, body, imageUri, eventId: selectedEventId });
 
     if (result.ok) {
       setSuccessVisible(true);

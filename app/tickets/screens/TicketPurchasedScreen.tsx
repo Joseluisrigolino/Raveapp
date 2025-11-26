@@ -8,6 +8,7 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import CirculoCarga from "@/components/common/CirculoCarga";
+import MapsButton from "@/components/common/MapsButton";
 
 import ProtectedRoute from "@/app/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
@@ -352,6 +353,8 @@ function TicketPurchasedScreenContent() {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination || eventData?.title || "")}`;
     Linking.openURL(url);
   };
+
+  // MapsButton component is used for consistent 'Cómo llegar' UI
 
   // Formateador de fecha legible en español (ej: Jueves, 11 de Diciembre, 2025)
   const formatDateEs = (raw: string | undefined | null): string => {
@@ -1138,10 +1141,7 @@ function TicketPurchasedScreenContent() {
 
         {/* Botón secundario Cómo llegar (outline) - ocultar si todas controladas */}
         {!allControlled && (
-          <TouchableOpacity style={styles.secondaryButton} onPress={openMapsDirections} activeOpacity={0.85}>
-            <MaterialCommunityIcons name="navigation-variant" size={18} color={COLORS.textPrimary} style={{ marginRight: 8 }} />
-            <Text style={styles.secondaryButtonText}>Cómo llegar</Text>
-          </TouchableOpacity>
+          <MapsButton onPress={openMapsDirections} />
         )}
 
         {/* Botón de arrepentimiento (solo si las entradas están pagas) */}
@@ -1543,6 +1543,7 @@ const styles = StyleSheet.create({
     color: COLORS.cardBg,
     textAlign: "center",
   },
+  /* goBtn / goBtnText moved to reusable MapsButton component */
   reviewNote: {
     fontFamily: FONTS.bodyRegular,
     fontSize: FONT_SIZES.smallText,

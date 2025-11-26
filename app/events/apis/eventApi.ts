@@ -605,7 +605,7 @@ export async function updateEvent(
                   fin: f?.fin,
                   inicioVenta: f?.inicioVenta,
                   finVenta: f?.finVenta,
-                  estado: f?.estado,
+                  estado: payload?.estado ?? f?.estado,
                 }))
               : [],
             idFiesta: r?.idFiesta ?? null,
@@ -769,22 +769,68 @@ export async function setEventStatus(
     ...extra,
   };
   try {
-    await updateEvent(idEvento, payload);
-    return;
-  } catch (e: any) {
-    console.warn("[setEventStatus] updateEvent falló, intentando UpdateEvento con body completo:", e?.message || e);
-    // intentar fallback: armar body completo usando el evento tal cual viene (fetchEventById -> __raw)
+    // Adjuntar proactivamente las `fechas` existentes marcadas con el nuevo `estado`
+    // para asegurar que al hacer UpdateEvento las fechas también cambien de estado.
     try {
-      const token = await login().catch(() => null);
-      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-
-      // intentar obtener el raw del evento para construir el body completo
       let raw: any = null;
       try {
         const evt = await fetchEventById(idEvento);
         raw = (evt as any).__raw ?? null;
-      } catch (err) {
-        // no crítico: si no se puede recuperar, seguiremos intentando con campos mínimos
+      } catch {
+        raw = null;
+      }
+      if (raw && Array.isArray(raw.fechas) && (!payload.fechas || !Array.isArray(payload.fechas) || payload.fechas.length === 0)) {
+        const fechasPayload = raw.fechas
+          .map((f: any) => ({
+            idFecha: f?.idFecha ?? f?.id ?? undefined,
+            inicio: f?.inicio,
+            fin: f?.fin,
+            inicioVenta: f?.inicioVenta,
+            finVenta: f?.finVenta,
+            estado: estado,
+          }))
+          .filter((x: any) => typeof x.idFecha !== 'undefined' && x.idFecha !== null && String(x.idFecha).trim() !== '');
+        if (fechasPayload.length) {
+          (payload as any).fechas = fechasPayload;
+        }
+      }
+    } catch {
+      // si falla el fetch, no bloqueamos la actualización del estado
+    }
+
+    await updateEvent(idEvento, payload);
+    return;
+  } catch (e: any) {
+    // updateEvent falló — intentar endpoints alternativos sin logear un warning ruido.
+    // Primero intentar endpoints simples para cambiar estado directamente
+    try {
+      const token = await login().catch(() => null);
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+      const simplePayload = { idEvento, estado, cdEstado: estado, estadoEvento: estado, ...(extra || {}) };
+
+      // Intentar POST /SetEstado
+      try {
+        await apiClient.post("/v1/Evento/SetEstado", simplePayload, { headers });
+        return;
+      } catch (p1Err) {
+        // continuar al siguiente intento
+      }
+
+      // Intentar POST /CambiarEstado
+      try {
+        await apiClient.post("/v1/Evento/CambiarEstado", simplePayload, { headers });
+        return;
+      } catch (p2Err) {
+        // continuar al intento con body completo
+      }
+
+      // Si los endpoints simples fallaron, intentar armar body completo y llamar a UpdateEvento
+      let raw: any = null;
+      try {
+        const evt = await fetchEventById(idEvento);
+        raw = (evt as any).__raw ?? null;
+      } catch {
         raw = null;
       }
 
@@ -818,7 +864,7 @@ export async function setEventStatus(
                 fin: f?.fin,
                 inicioVenta: f?.inicioVenta,
                 finVenta: f?.finVenta,
-                estado: f?.estado,
+                estado: estado,
               }))
             : [],
           idFiesta: r?.idFiesta ?? null,
@@ -827,14 +873,11 @@ export async function setEventStatus(
       };
 
       const fullBody = buildBodyFromRaw(raw);
-      // merge any extra fields provided explicitly
       Object.assign(fullBody, extra || {});
-
-      // Enviar al endpoint UpdateEvento (que según tu doc espera un objeto completo)
       await apiClient.put("/v1/Evento/UpdateEvento", fullBody, { headers });
       return;
     } catch (err2: any) {
-      console.error("[setEventStatus] fallback UpdateEvento falló:", err2);
+      console.error("[setEventStatus] fallback UpdateEvento y endpoints simples fallaron:", err2?.response?.status || err2?.message || err2);
       throw err2;
     }
   }

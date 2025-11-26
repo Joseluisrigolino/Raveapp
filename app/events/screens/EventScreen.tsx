@@ -9,6 +9,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
 import { Linking } from "react-native";
+import MapsButton from "@/components/common/MapsButton";
 
 import ProtectedRoute from "@/app/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
@@ -541,7 +542,17 @@ export default function EventScreen() {
               )}
             </View>
           )}
-          <View style={styles.card}><Text style={styles.cardTitle}>Dirección</Text><TouchableOpacity onPress={openMapsDirections} disabled={!shortAddressDisplay || shortAddressDisplay === "-"} activeOpacity={0.75}><View style={styles.addressRow}><MaterialCommunityIcons name="map-marker-outline" size={18} color={COLORS.info} style={styles.addressIcon} /><View style={styles.addressTextCol}><Text style={styles.addressLinkText}>{shortAddressDisplay}</Text><Text style={styles.addressHintText}>Tocar para ver cómo llegar en Google Maps</Text></View></View></TouchableOpacity></View>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Dirección</Text>
+            <View style={{ marginTop: 10 }}>
+              <View style={styles.miniCard}>
+                <Text style={styles.miniCardTitle}>{shortAddressDisplay && shortAddressDisplay !== "-" ? shortAddressDisplay : 'Dirección no especificada'}</Text>
+              </View>
+              {!!shortAddressDisplay && shortAddressDisplay !== "-" && (
+                <MapsButton onPress={openMapsDirections} />
+              )}
+            </View>
+          </View>
           {(() => { console.log("[EventScreen] multimedia URLs -> soundCloud:", soundCloudUrl, " youtube:", youTubeEmbedUrl); return null; })()}
           <ModalArtistas artistas={eventData.artistas} visible={showArtistsModal} onClose={() => setShowArtistsModal(false)} />
           <SeccionEntradas fechas={fechas} entradasPorFecha={entradasPorFecha} loadingEntradas={loadingEntradas} selectedTickets={selectedTickets} setTicketQty={setTicketQty} subtotal={subtotal} noEntradasAvailable={noEntradasAvailable} onBuy={handleBuyPress} isAdmin={hasRole("admin")} />
@@ -570,6 +581,9 @@ const styles = StyleSheet.create({
   mediaSection: { paddingHorizontal: 16, marginBottom: 24 },
   card: { backgroundColor: COLORS.cardBg, borderRadius: RADIUS.card, padding: 16, marginHorizontal: 16, marginBottom: 14, borderWidth: 1, borderColor: '#e6e9ef' },
   cardTitle: { fontFamily: FONTS.subTitleMedium, fontSize: FONT_SIZES.subTitle, color: COLORS.textPrimary, marginBottom: 10 },
+  miniCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.borderInput, borderRadius: 12, padding: 12 },
+  miniCardTitle: { color: COLORS.textPrimary, fontFamily: FONTS.subTitleMedium },
+  /* goBtn / goBtnText moved to reusable MapsButton component */
   listRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   listText: { fontFamily: FONTS.bodyRegular, fontSize: FONT_SIZES.body, color: COLORS.textPrimary },
   listTextMuted: { fontFamily: FONTS.bodyRegular, fontSize: FONT_SIZES.body, color: '#6b7280' },

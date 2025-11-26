@@ -114,6 +114,27 @@ export async function sendGenericEmail(
   });
 }
 
+// Envío masivo de mails de cancelación para un evento (a todos los compradores)
+export async function sendMassCancellationEmail(payload: {
+  idEvento: string;
+  titulo: string;
+  cuerpo: string;
+  botonUrl?: string;
+  botonTexto?: string;
+}): Promise<any> {
+  if (!payload?.idEvento || !payload?.titulo || !payload?.cuerpo)
+    throw new Error("Faltan datos: idEvento, titulo, cuerpo");
+
+  // Endpoint correcto en backend para envío masivo genérico.
+  return postEmail("/v1/Email/EnvioMailGenericoMasivo", {
+    idEvento: payload.idEvento,
+    titulo: payload.titulo,
+    cuerpo: payload.cuerpo,
+    botonUrl: payload.botonUrl ?? "",
+    botonTexto: payload.botonTexto ?? "",
+  });
+}
+
 // Cuerpo de cancelación
 export function buildCancellationEmailBody(params: {
   nombreUsuario: string;
@@ -171,5 +192,6 @@ export const mailsApi = {
   sendConfirmEmail,
   sendPasswordRecoveryEmail,
   sendGenericEmail,
+  sendMassCancellationEmail,
   buildCancellationEmailBody,
 };
