@@ -52,7 +52,11 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderInput,
     borderRadius: RADIUS.card,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    // Match the add button height so both have same vertical size
+    height: 56,
+    paddingVertical: 0,
+    // Ensure text is vertically centered on Android
+    textAlignVertical: "center",
     color: COLORS.textPrimary,
   },
   addButton: {

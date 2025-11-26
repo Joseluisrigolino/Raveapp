@@ -12,13 +12,14 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import SearchBar from "@/components/common/SearchBarComponent";
+import ManageEventsStatusChipsComponent from "@/app/sales/components/manage/ManageEventsStatusChipsComponent";
 import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
 import { COLORS } from "@/styles/globalStyles";
 
 import useManageSalesEvents from "../services/useManageSalesEvents";
 import ManageEventsHeaderComponent from "@/app/sales/components/manage/ManageEventsHeaderComponent";
-import ManageEventsStatusChipsComponent from "@/app/sales/components/manage/ManageEventsStatusChipsComponent";
+// Visual filter: use the same chips component as TicketPurchasedMenu (FiltroMisTickets)
 import ManageEventsEmptyStateComponent from "@/app/sales/components/manage/ManageEventsEmptyStateComponent";
 import ManageEventsListItemComponent from "@/app/sales/components/manage/ManageEventsListItemComponent";
 

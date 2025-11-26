@@ -15,6 +15,7 @@ import {
   EventItemWithExtras,
   cancelEvent,
 } from "@/app/events/apis/eventApi";
+import { sendMassCancelEmail } from "@/app/events/services/useSendEmailMassiveCancel";
 import { useAuth } from "@/app/auth/AuthContext";
 import { fetchReporteVentasEvento, ReporteVentasEvento } from "@/app/events/apis/entradaApi";
 
@@ -164,6 +165,24 @@ export default function CancelEventScreen() {
               setSubmitting(true);
               // El endpoint solo recibe 'id' como query param
               await cancelEvent(String(id));
+              // Enviar mail masivo a compradores (no bloquear si falla)
+              try {
+                await sendMassCancelEmail({
+                  idEvento: String(id),
+                  eventName: cancelData.eventName,
+                  reason: reason || undefined,
+                });
+              } catch (mailErr) {
+                console.error("sendMassCancelEmail error:", mailErr);
+                // Informar pero no impedir que el usuario continúe
+                Alert.alert(
+                  "Evento cancelado",
+                  "El evento se canceló, pero ocurrió un error al enviar los mails a los compradores."
+                );
+                router.back();
+                return;
+              }
+
               Alert.alert("Evento cancelado", "El evento se canceló correctamente.", [
                 { text: "OK", onPress: () => router.back() },
               ]);

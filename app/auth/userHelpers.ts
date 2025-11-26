@@ -219,6 +219,29 @@ export async function updateUsuario(payload: UpdateUsuarioPayload): Promise<void
     },
     isVerificado: typeof (payload as any).isVerificado === 'number' ? (payload as any).isVerificado : (base as any)?.isVerificado ?? 0,
   };
+  // Si la provincia es Ciudad Autónoma de Buenos Aires, asegurar que
+  // tanto municipio como localidad se completen con ese nombre
+  try {
+    const removeAccents = (s: string | undefined) =>
+      String(s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "");
+
+    const provName = merged?.domicilio?.provincia?.nombre || "";
+    const provNorm = removeAccents(provName);
+    if (provNorm.includes("autonoma") && provNorm.includes("buenos")) {
+      const fillName = "Ciudad Autonoma de Buenos Aires";
+      if (!merged.domicilio.localidad?.nombre || merged.domicilio.localidad.nombre.trim() === "") {
+        merged.domicilio.localidad.nombre = fillName;
+      }
+      if (!merged.domicilio.municipio?.nombre || merged.domicilio.municipio.nombre.trim() === "") {
+        merged.domicilio.municipio.nombre = fillName;
+      }
+    }
+  } catch (e) {
+    // no bloquear si hay problema con normalización
+  }
 
   // Asegurar cdRoles numérico/único por si base aportó valores no numéricos
   const finalPayload: UpdateUsuarioPayload = {
@@ -234,17 +257,140 @@ export async function updateUsuario(payload: UpdateUsuarioPayload): Promise<void
 
   console.log("updateUsuario - Payload final (merge):", JSON.stringify(finalPayload, null, 2));
 
+  // Construir el objeto en el formato que el backend valida para el wrapper
+  // Antes de mapear, traemos el perfil actual por idUsuario y lo fusionamos
+  // con `finalPayload` para garantizar que todos los campos requeridos estén presentes.
+  const ensureString = (v: any) => (v == null ? "" : String(v));
+  const ensureNumberArray = (arr: any) =>
+    Array.isArray(arr) ? arr.map((x) => Number(x)).filter((n) => Number.isFinite(n)) : [];
+
+  let baseProfile: Partial<ApiUserFull> | null = null;
   try {
-    console.log("updateUsuario - Intento plain");
-    const response = await apiClient.put(
-      "/v1/Usuario/UpdateUsuario",
-      finalPayload,
-      { headers: { "Content-Type": "application/json" } }
+    const uid = String(finalPayload.idUsuario || (payload as any)?.idUsuario || "");
+    if (uid) {
+      baseProfile = await getUsuarioById(uid).catch(() => null);
+    }
+  } catch (e) {
+    baseProfile = null;
+  }
+
+  const mergedSource: any = {
+    // preferir valores del payload; caer en baseProfile si falta
+    nombre: finalPayload.nombre || (baseProfile as any)?.nombre || "",
+    apellido: finalPayload.apellido || (baseProfile as any)?.apellido || "",
+    correo: finalPayload.correo || (baseProfile as any)?.correo || "",
+    dni: finalPayload.dni || (baseProfile as any)?.dni || "",
+    telefono: finalPayload.telefono || (baseProfile as any)?.telefono || "",
+    cbu: (finalPayload as any).cbu || (baseProfile as any)?.cbu || "",
+    nombreFantasia: (finalPayload as any).nombreFantasia || (baseProfile as any)?.nombreFantasia || "",
+    bio: (finalPayload as any).bio || (baseProfile as any)?.bio || "",
+    dtNacimiento: (finalPayload as any).dtNacimiento || (baseProfile as any)?.dtNacimiento || "",
+    cdRoles: Array.isArray(finalPayload.cdRoles) && finalPayload.cdRoles.length ? finalPayload.cdRoles : (Array.isArray((baseProfile as any)?.cdRoles) ? (baseProfile as any).cdRoles : []),
+    isVerificado: typeof (finalPayload as any).isVerificado !== 'undefined' ? (finalPayload as any).isVerificado : (baseProfile as any)?.isVerificado ?? 0,
+    domicilio: {
+      direccion: finalPayload.domicilio?.direccion || (baseProfile as any)?.domicilio?.direccion || "",
+      localidad: {
+        nombre: finalPayload.domicilio?.localidad?.nombre || (baseProfile as any)?.domicilio?.localidad?.nombre || "",
+        codigo: finalPayload.domicilio?.localidad?.codigo || (baseProfile as any)?.domicilio?.localidad?.codigo || "",
+      },
+      municipio: {
+        nombre: finalPayload.domicilio?.municipio?.nombre || (baseProfile as any)?.domicilio?.municipio?.nombre || "",
+        codigo: finalPayload.domicilio?.municipio?.codigo || (baseProfile as any)?.domicilio?.municipio?.codigo || "",
+      },
+      provincia: {
+        nombre: finalPayload.domicilio?.provincia?.nombre || (baseProfile as any)?.domicilio?.provincia?.nombre || "",
+        codigo: finalPayload.domicilio?.provincia?.codigo || (baseProfile as any)?.domicilio?.provincia?.codigo || "",
+      },
+      latitud: typeof finalPayload.domicilio?.latitud === "number" ? finalPayload.domicilio.latitud : (baseProfile as any)?.domicilio?.latitud ?? 0,
+      longitud: typeof finalPayload.domicilio?.longitud === "number" ? finalPayload.domicilio.longitud : (baseProfile as any)?.domicilio?.longitud ?? 0,
+    },
+    idUsuario: finalPayload.idUsuario || (baseProfile as any)?.idUsuario || "",
+  };
+
+  // Use camelCase keys inside the wrapper because the API accepted the plain camelCase object.
+  // Asegurar `cdRoles` no venga vacío: usar [0] por defecto
+  let cdRolesArr = ensureNumberArray(mergedSource.cdRoles);
+  if (!cdRolesArr || cdRolesArr.length === 0) cdRolesArr = [0];
+
+  const requestPayload: any = {
+    nombre: ensureString(mergedSource.nombre),
+    apellido: ensureString(mergedSource.apellido),
+    correo: ensureString(mergedSource.correo),
+    dni: ensureString(mergedSource.dni),
+    telefono: ensureString(mergedSource.telefono),
+    cbu: ensureString(mergedSource.cbu || ""),
+    nombreFantasia: ensureString(mergedSource.nombreFantasia || ""),
+    bio: ensureString(mergedSource.bio || ""),
+    dtNacimiento: ensureString(mergedSource.dtNacimiento || ""),
+    cdRoles: cdRolesArr,
+    // Enviar booleano para isVerificado (backend acepta boolean)
+    isVerificado: Boolean(mergedSource.isVerificado),
+    // Garantizar objeto socials con las claves esperadas
+    socials: {
+      idSocial: ensureString(mergedSource.socials?.idSocial || ""),
+      mdInstagram: ensureString(mergedSource.socials?.mdInstagram || ""),
+      mdSpotify: ensureString(mergedSource.socials?.mdSpotify || ""),
+      mdSoundcloud: ensureString(mergedSource.socials?.mdSoundcloud || ""),
+    },
+    domicilio: {
+      direccion: ensureString(mergedSource.domicilio?.direccion),
+      localidad: {
+        nombre: ensureString(mergedSource.domicilio?.localidad?.nombre),
+        codigo: ensureString(mergedSource.domicilio?.localidad?.codigo),
+      },
+      municipio: {
+        nombre: ensureString(mergedSource.domicilio?.municipio?.nombre),
+        codigo: ensureString(mergedSource.domicilio?.municipio?.codigo),
+      },
+      provincia: {
+        nombre: ensureString(mergedSource.domicilio?.provincia?.nombre),
+        codigo: ensureString(mergedSource.domicilio?.provincia?.codigo),
+      },
+      latitud: typeof mergedSource.domicilio?.latitud === "number" ? mergedSource.domicilio.latitud : 0,
+      longitud: typeof mergedSource.domicilio?.longitud === "number" ? mergedSource.domicilio.longitud : 0,
+    },
+    idUsuario: ensureString(mergedSource.idUsuario),
+  };
+
+  // Para máxima compatibilidad con el backend, incluir también las claves en PascalCase
+  // dentro del mismo objeto `request`. De este modo, si el binding espera Nombre/Apellido/etc
+  // los encontrará; si espera camelCase también están presentes.
+  const pascalPayload: any = {
+    Nombre: requestPayload.nombre,
+    Apellido: requestPayload.apellido,
+    Correo: requestPayload.correo,
+    Dni: requestPayload.dni,
+    Telefono: requestPayload.telefono,
+    CBU: requestPayload.cbu,
+    NombreFantasia: requestPayload.nombreFantasia,
+    Bio: requestPayload.bio,
+    DtNacimiento: requestPayload.dtNacimiento,
+    CdRoles: requestPayload.cdRoles,
+    IsVerificado: requestPayload.isVerificado,
+    Domicilio: {
+      Direccion: requestPayload.domicilio.direccion,
+      Localidad: { Nombre: requestPayload.domicilio.localidad.nombre, Codigo: requestPayload.domicilio.localidad.codigo },
+      Municipio: { Nombre: requestPayload.domicilio.municipio.nombre, Codigo: requestPayload.domicilio.municipio.codigo },
+      Provincia: { Nombre: requestPayload.domicilio.provincia.nombre, Codigo: requestPayload.domicilio.provincia.codigo },
+      Latitud: requestPayload.domicilio.latitud,
+      Longitud: requestPayload.domicilio.longitud,
+    },
+    IdUsuario: requestPayload.idUsuario,
+  };
+
+  // Enviar siempre el objeto plano en camelCase: el backend acepta este formato.
+  try {
+    console.log(
+      "updateUsuario - Enviando objeto plano camelCase (requestPayload):",
+      JSON.stringify(requestPayload)
     );
-    console.log("updateUsuario - OK plain", response.status);
+    const response = await apiClient.put("/v1/Usuario/UpdateUsuario", requestPayload, {
+      headers: { "Content-Type": "application/json" },
+    });
+    console.log("updateUsuario - OK", response.status);
     return;
   } catch (error: any) {
-    console.error("updateUsuario - plain falló:", error?.response?.status, error?.response?.data);
+    console.error("updateUsuario - error al enviar objeto plano:", error?.response?.status, error?.response?.data);
     throw error;
   }
 }

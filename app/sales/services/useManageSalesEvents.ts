@@ -6,16 +6,18 @@ import {
   fetchEventsByEstados,
 } from "@/app/events/apis/eventApi";
 
-export type ManageFilterStatus = "en_venta" | "fin_venta" | "finalizado" | "todos";
+export type ManageFilterStatus = "en_venta" | "finalizado" | "fin_venta" | "cancelado" | "todos";
 
 const STATUS_MAP: Record<ManageFilterStatus, number[]> = {
   en_venta: [ESTADO_CODES.EN_VENTA],
-  fin_venta: [ESTADO_CODES.FIN_VENTA],
   finalizado: [ESTADO_CODES.FINALIZADO],
+  fin_venta: [ESTADO_CODES.FIN_VENTA],
+  cancelado: [ESTADO_CODES.CANCELADO],
   todos: [
     ESTADO_CODES.EN_VENTA,
     ESTADO_CODES.FIN_VENTA,
     ESTADO_CODES.FINALIZADO,
+    ESTADO_CODES.CANCELADO,
   ],
 };
 
@@ -41,6 +43,7 @@ export default function useManageSalesEvents(ownerId?: string) {
         ESTADO_CODES.EN_VENTA,
         ESTADO_CODES.FIN_VENTA,
         ESTADO_CODES.FINALIZADO,
+        ESTADO_CODES.CANCELADO,
       ];
 
       let list = await fetchEventsByEstados(estados);

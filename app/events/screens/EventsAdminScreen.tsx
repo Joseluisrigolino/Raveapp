@@ -223,9 +223,9 @@ export default function ManageEventsScreen() {
             <CardsManageEvent
               key={String(item.id)}
               item={item}
-              onTicketsSold={handleTicketsSold}
-              onModify={handleModify}
-              onCancel={handleCancel}
+              onTicketsSold={[2, 3, 4].includes(item.statusCode) ? handleTicketsSold : undefined}
+              onModify={[0, 1, 2, 3].includes(item.statusCode) ? handleModify : undefined}
+              onCancel={[0, 1, 2].includes(item.statusCode) ? handleCancel : undefined}
             />
           ))
         )}

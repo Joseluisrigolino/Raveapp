@@ -20,6 +20,8 @@ interface FiltroMisTicketsProps {
   onClear?: () => void;
   // opcional para scroll anidado (coincidente con FiltersSection)
   nestedScrollEnabled?: boolean;
+  // Optional overrides for the visible label per estado code
+  labelOverrides?: Record<number, string>;
 }
 
 export default function FiltroMisTickets(props: FiltroMisTicketsProps) {
@@ -51,7 +53,7 @@ export default function FiltroMisTickets(props: FiltroMisTicketsProps) {
       >
         {estados.map((e) => {
           const id = Number(e.cdEstado);
-          const label = e.dsEstado ?? `Estado ${id}`;
+          const label = (props.labelOverrides && props.labelOverrides[id]) || e.dsEstado || `Estado ${id}`;
           const active = isSelected(id);
           return (
             <TouchableOpacity

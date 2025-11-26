@@ -165,6 +165,9 @@ export function useBuyerAndBilling({ user }: Params) {
         "municipio",
         "Ciudad Autónoma de Buenos Aires"
       );
+      // Asegurar que la localidad también muestre CABA visualmente
+      setLocalityId("02");
+      handleBillingChange("localidad", "Ciudad Autónoma de Buenos Aires");
       try {
         const locs = await fetchLocalitiesByProvince(id).catch(
           () => [] as any[]

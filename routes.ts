@@ -47,7 +47,7 @@ export const ROUTES = {
   },
   OWNER: {
     PARTY_RATINGS: "/reviews/screens/PartyRatingsScreen",
-    PARTYS: "/party/screens/FiestasPantalla",
+    PARTYS: "/party/screens/PartysScreen",
     MANAGE_EVENTS: "/events/screens/EventsAdminScreen",
     // Menú de selección de evento para ver reportes
     TICKET_SOLD: "/sales/screens/TicketSoldScreen",

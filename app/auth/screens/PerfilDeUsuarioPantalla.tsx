@@ -608,15 +608,28 @@ export default function UserProfileScreen() {
                         const pid = String(item.id);
                         setProvinceId(pid);
                         // detectar CABA por nombre
-                        const isCabaSelected = String(item.nombre || '').toLowerCase().includes('ciudad') && String(item.nombre || '').toLowerCase().includes('buenos') && String(item.nombre || '').toLowerCase().includes('aires');
+                        const isCabaSelected = String(item.nombre || "")
+                          .toLowerCase()
+                          .includes("ciudad") &&
+                          String(item.nombre || "").toLowerCase().includes("buenos") &&
+                          String(item.nombre || "").toLowerCase().includes("aires");
                         setIsCABA(isCabaSelected);
                         // reset dependientes
                         setMunicipalityId("");
                         setLocalityId("");
                         setMunicipalities([]);
                         setLocalities([]);
-                        setField('addressLocality', '');
+                        setField("addressLocality", "");
                         setShowProvincePicker(false);
+
+                        // Si es CABA, auto-completar localidad y municipio con el mismo texto
+                        if (isCabaSelected) {
+                          const cabaText = "Ciudad Autónoma de Buenos Aires";
+                          setMunicipalityId(pid);
+                          setLocalityId(pid);
+                          setField("addressLocality", cabaText);
+                          // también podemos dejar municipalidades/listas vacías o con el propio valor
+                        }
 
                         // traer municipios para la provincia seleccionada
                         try {

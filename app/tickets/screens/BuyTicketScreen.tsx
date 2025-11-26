@@ -64,7 +64,7 @@ function BuyTicketScreenContent() {
     handleConfirmPurchase,
     // timer
     timerLabel,
-    timerProgress,
+    progress,
     isExpired,
     // helpers
     fechaLabel,
@@ -104,11 +104,7 @@ function BuyTicketScreenContent() {
       <Header />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Barra de tiempo / reserva */}
-        <TimerBar
-          timerLabel={timerLabel}
-          progress={timerProgress}
-          isExpired={isExpired}
-        />
+        <TimerBar timerLabel={timerLabel} progress={progress} isExpired={isExpired} />
 
         {/* Resumen de compra (evento + entradas) */}
         <PurchaseSummaryCard

@@ -219,7 +219,7 @@ export default function Footer() {
   { icon: "repeat", label: "Mis fiestas recurrentes", route: { pathname: ROUTES.OWNER.PARTYS } },
   // Pasar el id del owner como param para que la pantalla de reporte traiga
   // solo los eventos de este organizador.
-  { icon: "chart-bar", label: "Entradas vendidas", route: { pathname: ROUTES.OWNER.TICKET_SOLD, params: { id: ownerId ?? (user?.idUsuario ?? (user?.id ?? "")) } } },
+  { icon: "chart-bar", label: "Entradas vendidas", route: { pathname: ROUTES.ADMIN.REPORT_SALES.MENU, params: { id: ownerId ?? (user?.idUsuario ?? (user?.id ?? "")) } } },
   ];
 
   return (

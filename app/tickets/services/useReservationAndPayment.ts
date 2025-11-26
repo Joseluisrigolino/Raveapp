@@ -67,25 +67,24 @@ export function useReservationAndPayment({
   const [acceptedTyc, setAcceptedTyc] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Timer
+  // Timer: compute a fixed target timestamp and close over it so the
+  // remaining seconds decrease properly. Previously the interval used
+  // the stale `expiryTs` state (or a fallback computed on each tick),
+  // which caused the remaining seconds to reset and never decrement.
   useEffect(() => {
-    if (!expiryTs) {
+    // Determine a concrete target timestamp for this effect run
+    let targetTs = expiryTs;
+    if (!targetTs) {
       const now = Date.now();
-      setExpiryTs(now + RESERVATION_SECONDS * 1000);
+      targetTs = now + RESERVATION_SECONDS * 1000;
+      setExpiryTs(targetTs);
       setRemainingSec(RESERVATION_SECONDS);
     }
 
     const interval = setInterval(() => {
-      setRemainingSec((prev) => {
-        const target =
-          expiryTs ?? Date.now() + RESERVATION_SECONDS * 1000;
-        const now = Date.now();
-        const rem = Math.max(
-          0,
-          Math.round((target - now) / 1000)
-        );
-        return rem;
-      });
+      const now = Date.now();
+      const rem = Math.max(0, Math.round((targetTs! - now) / 1000));
+      setRemainingSec(rem);
     }, 1000);
 
     return () => clearInterval(interval);

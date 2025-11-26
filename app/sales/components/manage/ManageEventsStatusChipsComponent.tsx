@@ -1,6 +1,6 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { COLORS } from "@/styles/globalStyles";
+import { ScrollView, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { COLORS, RADIUS, FONT_SIZES } from "@/styles/globalStyles";
 import { ManageFilterStatus } from "../../services/useManageSalesEvents";
 
 type Props = {
@@ -10,8 +10,9 @@ type Props = {
 
 const CHIPS: { key: ManageFilterStatus; label: string }[] = [
   { key: "en_venta", label: "En venta" },
-  { key: "fin_venta", label: "Fin venta" },
-  { key: "finalizado", label: "Finalizado" },
+  { key: "finalizado", label: "Finalizados" },
+  { key: "fin_venta", label: "Venta finalizada" },
+  { key: "cancelado", label: "Cancelados" },
 ];
 
 export default function ManageEventsStatusChipsComponent({
@@ -19,7 +20,11 @@ export default function ManageEventsStatusChipsComponent({
   onChange,
 }: Props) {
   return (
-    <View style={styles.chipsRow}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.chipsRow}
+    >
       {CHIPS.map((chip) => {
         const active = value === chip.key;
         return (
@@ -29,41 +34,45 @@ export default function ManageEventsStatusChipsComponent({
             activeOpacity={0.8}
             onPress={() => onChange(chip.key)}
           >
-            <Text
-              style={[styles.chipText, active && styles.chipTextActive]}
-            >
+            <Text style={[styles.chipText, active && styles.chipTextActive]}>
               {chip.label}
             </Text>
           </TouchableOpacity>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   chipsRow: {
     flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 8,
+    // match FiltroMisTickets spacing
+    marginHorizontal: 12,
+    marginTop: 10,
     marginBottom: 8,
   },
   chip: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 999,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.backgroundLight,
+    borderRadius: RADIUS.chip,
+    marginRight: 10,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderWidth: 1,
     borderColor: COLORS.borderInput,
   },
   chipActive: {
-    backgroundColor: "#111827",
+    backgroundColor: COLORS.cardBg,
+    borderColor: COLORS.textSecondary,
   },
   chipText: {
     color: COLORS.textSecondary,
+    fontSize: FONT_SIZES.body,
+    marginLeft: 0,
   },
   chipTextActive: {
-    color: "#fff",
-    fontWeight: "700",
+    color: COLORS.textPrimary,
   },
 });

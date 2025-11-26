@@ -15,7 +15,9 @@ export default function useGetPartysByUser(userId?: string | null) {
         return;
       }
       const data = await getPartiesByUser(String(userId));
-      setParties(data || []);
+      // Mostrar solo las fiestas activas
+      const active = (data || []).filter((p) => p.isActivo === true);
+      setParties(active);
     } catch (e) {
       setError(e);
     } finally {
