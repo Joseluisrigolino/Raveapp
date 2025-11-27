@@ -18,7 +18,6 @@ export default function ScannerScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const params = useLocalSearchParams<{ user?: string }>();
-  const { logout } = useAuth() as any;
   const loginParam = String(params?.user ?? "");
 
   const {
@@ -36,7 +35,8 @@ export default function ScannerScreen() {
     handleBarCodeScanned,
     handleReScan,
     closeModal,
-  } = useScanner({ loginParam });
+    handleLogout,
+  } = useScanner();
 
   const allowExitRef = useRef(false);
 
@@ -54,18 +54,15 @@ export default function ScannerScreen() {
     };
   }, [navigation]);
 
-  const handleLogout = () => {
-    try {
-      allowExitRef.current = true;
-      logout && logout();
-    } finally {
-      router.replace(ROUTES.LOGIN.LOGIN);
-    }
+  // useScanner ya expone handleLogout que marca allowExitRef y navega
+  const onLogout = () => {
+    allowExitRef.current = true;
+    handleLogout && handleLogout();
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <ScannerHeaderComponent onLogout={handleLogout} />
+      <ScannerHeaderComponent onLogout={onLogout} />
       <ScannerProfileCardComponent controllerName={controllerName} />
       <ScannerStatsCardComponent scanCount={scanCount} />
       <ScannerQrCardComponent
@@ -77,7 +74,7 @@ export default function ScannerScreen() {
 
       <ScannerCameraModalComponent
         visible={modalVisible}
-        permissionLoaded={!!permission}
+        permissionLoading={!permission}
         hasPermission={hasPermission}
         scanning={scanning}
         scanStatus={scanStatus}

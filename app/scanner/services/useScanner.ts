@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Alert, BackHandler } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import { CameraPermissionStatus, useCameraPermissions } from "expo-camera";
+import { useCameraPermissions } from "expo-camera";
 
 import ROUTES from "@/routes";
 import { useAuth } from "@/app/auth/AuthContext";
@@ -17,6 +17,8 @@ export interface LastScanItem {
   subtitle: string;
   valid: boolean;
   status: "OK" | "ERROR";
+  // detalles crudos para debugging (raw QR, parsed payload, API response)
+  details?: any;
 }
 
 export function useScanner() {
@@ -42,6 +44,7 @@ export function useScanner() {
 
   const allowExitRef = useRef(false);
   const processingFlagRef = useRef(false);
+  const lastScanRef = useRef<{ hash?: string; time?: number }>({});
 
   // --- Cargar nombre del controlador ---
   useEffect(() => {
@@ -170,7 +173,9 @@ export function useScanner() {
   // --- Handlers públicos ---
 
   const handleActivateCamera = useCallback(async () => {
-    if (!permission || permission.status === CameraPermissionStatus.UNDETERMINED) {
+    // permission.status can be a string like 'undetermined' | 'granted' | 'denied'
+    const status = permission?.status;
+    if (!permission || status === "undetermined" || status === undefined) {
       const granted = await requestPermission();
       if (!granted?.granted) {
         Alert.alert(
@@ -179,7 +184,7 @@ export function useScanner() {
         );
         return;
       }
-    } else if (permission.status === CameraPermissionStatus.DENIED) {
+    } else if (status === "denied") {
       Alert.alert(
         "Permiso requerido",
         "Tenés que habilitar la cámara desde la configuración del dispositivo."
@@ -194,22 +199,41 @@ export function useScanner() {
   }, [permission, requestPermission]);
 
   const handleBarCodeScanned = async (result: any) => {
+    // prevent re-entrancy
     if (processingFlagRef.current) return;
+
+    const rawValue =
+      typeof result?.data === "string"
+        ? result.data
+        : Array.isArray(result?.data?.barcodes)
+        ? result.data.barcodes[0]?.data
+        : result?.rawValue || "";
+
+    const dataStrCheck = String(rawValue || "");
+    const now = Date.now();
+    // ignore duplicate scans of the same payload within 2.5s
+    if (
+      lastScanRef.current.hash === dataStrCheck &&
+      lastScanRef.current.time &&
+      now - lastScanRef.current.time < 2500
+    ) {
+      // already processing/processed recently -> ignore
+      return;
+    }
+
+    // mark as processing and record last scan
     processingFlagRef.current = true;
+    lastScanRef.current.hash = dataStrCheck;
+    lastScanRef.current.time = now;
 
     setScanning(false);
     setProcessing(true);
 
     try {
-      const rawValue =
-        typeof result?.data === "string"
-          ? result.data
-          : Array.isArray(result?.data?.barcodes)
-          ? result.data.barcodes[0]?.data
-          : result?.rawValue || "";
-
       const dataStr = String(rawValue || "");
+      console.debug("[useScanner] scanned rawValue:", dataStr);
       const parsed = parseQrData(dataStr);
+      console.debug("[useScanner] parsed QR:", parsed);
 
       if (!parsed) {
         setScanStatus("error");
@@ -219,17 +243,22 @@ export function useScanner() {
       }
 
       const apiResp = await controlarEntrada(parsed);
+      console.debug("[useScanner] apiResp:", apiResp);
 
       const valido =
         typeof apiResp === "boolean"
           ? apiResp
           : apiResp?.valido ?? apiResp?.isValid ?? apiResp?.ok ?? false;
 
-      const mensaje =
-        apiResp?.mensaje ??
-        apiResp?.message ??
-        apiResp?.status ??
-        (valido ? "Entrada válida" : "Entrada inválida");
+      const mensaje = apiResp?.mensaje ?? apiResp?.message ?? apiResp?.status ?? (valido ? "Entrada válida" : "Entrada inválida");
+
+      // extraer posible estado de la entrada desde varias formas (raw, estadoEntrada, estado)
+      const estadoEntrada =
+        apiResp?.raw?.estadoEntrada ?? apiResp?.estadoEntrada ?? apiResp?.data?.estadoEntrada ?? apiResp?.estado ?? apiResp?.status ?? undefined;
+
+      // Detect responses that indicate the ticket was already controlled
+      const statusText = String((apiResp?.estado || apiResp?.status || apiResp?.message || apiResp?.mensaje || estadoEntrada) || "").toLowerCase();
+      const alreadyControlled = /controla|controlad|ya fue|already/i.test(statusText);
 
       setScanCount((c) => c + 1);
       setLastScans((prev) => [
@@ -239,6 +268,7 @@ export function useScanner() {
           subtitle: new Date().toLocaleTimeString(),
           valid: !!valido,
           status: valido ? "OK" : "ERROR",
+          details: { raw: dataStr, parsed, apiResp },
         },
         ...prev.slice(0, 19),
       ]);
@@ -246,18 +276,75 @@ export function useScanner() {
       if (valido) {
         setScanStatus("ok");
         setScanMessage(mensaje);
+        // successful -> close modal
         setModalVisible(false);
         setScanning(false);
+        processingFlagRef.current = false;
+        setProcessing(false);
         return;
       }
 
+      // Construir mensaje enriquecido con estado de entrada si existe
+      const displayMessage = estadoEntrada
+        ? `${mensaje} — Estado entrada: ${String(estadoEntrada)}`
+        : mensaje;
+
+      // If the backend reports the entry was already controlled, show that message
+      if (alreadyControlled) {
+        setScanStatus("error");
+        setScanMessage(displayMessage || "Entrada ya controlada");
+        // keep modal open so controller sees the state, but do not attempt to re-control
+        setModalVisible(true);
+        setProcessing(false);
+        setScanning(false);
+        processingFlagRef.current = false;
+        return;
+      }
+
+      // generic invalid case: show enriched message inside modal
       setScanStatus("error");
-      setScanMessage(mensaje);
+      setScanMessage(displayMessage);
+      setModalVisible(true);
+      setProcessing(false);
+      setScanning(false);
+      processingFlagRef.current = false;
     } catch (e: any) {
+      console.error("[useScanner] controlarEntrada error:", e);
+      const statusCode = e?.response?.status;
+      const respData = e?.response?.data;
+
+      const serverMsg =
+        respData?.mensaje ?? respData?.message ?? respData?.status ??
+        (statusCode ? `HTTP ${statusCode}` : e?.message ?? "Error desconocido");
+
+      const estadoEntradaError =
+        respData?.raw?.estadoEntrada ?? respData?.estadoEntrada ?? respData?.data?.estadoEntrada ?? undefined;
+
+      const displayMessageError = estadoEntradaError
+        ? `${serverMsg} — Estado entrada: ${String(estadoEntradaError)}`
+        : serverMsg;
+
+      // ensure lastScans contains an entry for this failed attempt
+      try {
+        const dataStr = lastScanRef.current.hash ?? "";
+        const parsed = dataStr ? parseQrData(String(dataStr)) : null;
+        setLastScans((prev) => [
+          {
+            id: Date.now().toString(),
+            title: parsed?.idEntrada ?? (dataStr || ""),
+            subtitle: new Date().toLocaleTimeString(),
+            valid: false,
+            status: "ERROR",
+            details: { raw: dataStr, parsed, apiError: { statusCode, respData, message: e?.message } },
+          },
+          ...prev.slice(0, 19),
+        ]);
+      } catch (_) {
+        // ignore
+      }
+
       setScanStatus("error");
-      setScanMessage(
-        "Fallo al validar: " + (e?.message || "Error desconocido")
-      );
+      setScanMessage(displayMessageError);
     } finally {
       setProcessing(false);
       processingFlagRef.current = false;

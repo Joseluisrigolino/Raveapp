@@ -6,6 +6,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
+  TouchableOpacity,
 } from "react-native";
 import { Text } from "react-native-paper";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
@@ -20,6 +22,8 @@ import useCreateUserControllers from "@/app/auth/services/user-controllers/useCr
 import useDeleteUserControllers from "@/app/auth/services/user-controllers/useDeleteUserControllers";
 import CreateUserControllerPopupEliminateUserComponent from "@/app/auth/components/user-controller/create-user-controller/CreateUserControllerPopupEliminateUserComponent";
 import CreateUserControllerPopupEliminateUserOk from "@/app/auth/components/user-controller/create-user-controller/CreateUserControllerPopupEliminateUserOk";
+import CreateUserControllerPopupInfoOk from "@/app/auth/components/user-controller/create-user-controller/CreateUserControllerPopupInfoOk";
+import { COLORS, FONT_SIZES, RADIUS, FONTS } from "@/styles/globalStyles";
 
 // --- Componente principal ---
 export default function CreateUserController() {
@@ -43,6 +47,12 @@ export default function CreateUserController() {
   const [lastDeletedUsername, setLastDeletedUsername] = useState<string | null>(
     null
   );
+  const [createdOkVisible, setCreatedOkVisible] = useState(false);
+  const [lastCreatedUsername, setLastCreatedUsername] = useState<string | null>(
+    null
+  );
+  const [existsModalVisible, setExistsModalVisible] = useState(false);
+  const [existingUsername, setExistingUsername] = useState<string | null>(null);
 
   // hooks para separar lógica de API
   const { users, refresh } = useGetUsersControllers(orgId);
@@ -95,18 +105,16 @@ export default function CreateUserController() {
       setUsername("");
       setPassword("");
       // Mostrar confirmación con el id si está disponible
-      const createdId = res?.id ? String(res.id) : undefined;
-      Alert.alert(
-        "Usuario creado",
-        createdId
-          ? `Usuario '${name}' creado (id: ${createdId})`
-          : `Usuario '${name}' creado correctamente.`
-      );
+      // Mostrar popup de éxito con el nombre (sin id)
+      setLastCreatedUsername(name);
+      setCreatedOkVisible(true);
     } catch (e: any) {
       // Delegamos toda la comprobación de disponibilidad al hook.
       // El hook lanzará un error con `code === 'USERNAME_EXISTS'` cuando corresponda.
       if (e?.code === "USERNAME_EXISTS") {
-        Alert.alert("Nombre no disponible", `El nombre '${name}' no está disponible. Por favor elegí otro.`);
+        // Mostrar modal en vez de Alert
+        setExistingUsername(name);
+        setExistsModalVisible(true);
       } else {
         const msg = (e?.message && String(e.message).trim() !== "")
           ? String(e.message)
@@ -231,6 +239,31 @@ export default function CreateUserController() {
             setDeletedOkVisible(false);
           }}
         />
+
+        {/* Popup que confirma que la creación fue exitosa (muestra solo el nombre) */}
+        {/* Popup que avisa que el nombre ya existe (estilo uniforme) */}
+        <CreateUserControllerPopupInfoOk
+          visible={existsModalVisible}
+          title="Nombre no disponible"
+          username={existingUsername ?? undefined}
+          message={`Ya existe un usuario con el nombre "{username}". Por favor elegí otro.`}
+          onClose={() => {
+            setExistingUsername(null);
+            setExistsModalVisible(false);
+          }}
+        />
+
+        {/* Popup que confirma que la creación fue exitosa (mismo estilo) */}
+        <CreateUserControllerPopupInfoOk
+          visible={createdOkVisible}
+          title="Usuario creado"
+          username={lastCreatedUsername ?? undefined}
+          message={`Se creó el usuario "{username}".`}
+          onClose={() => {
+            setLastCreatedUsername(null);
+            setCreatedOkVisible(false);
+          }}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -256,4 +289,55 @@ const styles = StyleSheet.create({
   headerDesc: { color: "#6b7280" },
 
   // footer styles removed — footer UI deleted
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 380,
+    backgroundColor: COLORS.cardBg,
+    borderRadius: RADIUS.card,
+    padding: 16,
+  },
+  modalTitle: {
+    fontFamily: FONTS?.subTitleMedium,
+    fontSize: FONT_SIZES.subTitle,
+    color: COLORS.textPrimary,
+    marginBottom: 6,
+  },
+  modalSubtitle: {
+    fontFamily: FONTS?.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
+    color: COLORS.textSecondary,
+    marginBottom: 12,
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    width: "100%",
+    marginTop: 12,
+  },
+  btnPrimary: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+  },
+  btnPrimaryText: {
+    fontFamily: FONTS?.subTitleMedium,
+    fontSize: FONT_SIZES.button,
+    color: COLORS.backgroundLight,
+  },
+  // estilo para texto en negrita dentro de los subtítulos (nombre del usuario)
+  bold: {
+    fontWeight: "700",
+  },
 });

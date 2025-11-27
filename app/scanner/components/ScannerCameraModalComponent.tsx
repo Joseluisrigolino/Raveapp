@@ -5,6 +5,8 @@ import {
   StyleSheet,
   Modal,
   Pressable,
+  Platform,
+  SafeAreaView,
 } from "react-native";
 import { CameraView } from "expo-camera";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
@@ -40,12 +42,14 @@ export default function ScannerCameraModalComponent({
       onRequestClose={onClose}
     >
       <View style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Escanear QR</Text>
-          <Pressable onPress={onClose} style={styles.closeBtn}>
-            <Icon name="close" size={20} color="#fff" />
-          </Pressable>
-        </View>
+        <SafeAreaView style={styles.safeTop} edges={["top"]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Escanear QR</Text>
+            <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Icon name="close" size={20} color="#fff" />
+            </Pressable>
+          </View>
+        </SafeAreaView>
 
         <View style={styles.scannerWrapper}>
           {permissionLoading && (
@@ -95,21 +99,23 @@ export default function ScannerCameraModalComponent({
 const styles = StyleSheet.create({
   modalContainer: { flex: 1, backgroundColor: "#000" },
   modalHeader: {
-    height: 56,
+    height: 64,
     backgroundColor: "#0f172a",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 12,
+    paddingTop: Platform.OS === "ios" ? 8 : 6,
   },
   modalTitle: { color: "#fff", fontWeight: "700" },
   closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.12)",
     alignItems: "center",
     justifyContent: "center",
+    marginRight: 4,
   },
   scannerWrapper: { flex: 1, alignItems: "center", justifyContent: "center" },
   infoText: { color: "#e5e7eb" },
