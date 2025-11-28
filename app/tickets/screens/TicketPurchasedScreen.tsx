@@ -1103,12 +1103,14 @@ function TicketPurchasedScreenContent() {
                           ) : (
                             <View style={{ alignItems: 'center', marginTop: 6 }}>
                               {en.qrImageUrl ? (
-                                <Image
-                                  source={{ uri: en.qrImageUrl }}
-                                  style={{ width: QR_SIZE, height: QR_SIZE, resizeMode: 'contain' }}
-                                  accessible
-                                  accessibilityLabel={`QR ${code}`}
-                                />
+                                <View style={{ width: QR_SIZE * 2, height: QR_SIZE * 2, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}>
+                                  <Image
+                                    source={{ uri: en.qrImageUrl }}
+                                    style={{ width: '100%', height: '100%', resizeMode: 'contain', borderRadius: 8, backgroundColor: '#fff' }}
+                                    accessible
+                                    accessibilityLabel={`QR ${code}`}
+                                  />
+                                </View>
                               ) : (
                                 <QRCode
                                   value={qrText}
@@ -1118,6 +1120,16 @@ function TicketPurchasedScreenContent() {
                                   getRef={(c: any) => { if (c) { qrRefs.current[en.idEntrada] = c; } }}
                                 />
                               )}
+
+                              {/* Mostrar datos del QR debajo para diagnóstico visual */}
+                              <View style={{ marginTop: 8, alignItems: 'center' }}>
+                                <Text style={{ fontSize: 13, color: '#333', textAlign: 'center' }}>
+                                  <Text style={{ fontWeight: 'bold' }}>idEntrada:</Text> {en.idEntrada}
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#333', textAlign: 'center' }}>
+                                  <Text style={{ fontWeight: 'bold' }}>mdQR:</Text> {en.mdQR}
+                                </Text>
+                              </View>
                             </View>
                           )}
                           {/* Se removieron idEntrada, idMedia y la leyenda de validez por solicitud */}

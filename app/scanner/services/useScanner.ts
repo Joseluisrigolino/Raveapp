@@ -202,6 +202,10 @@ export function useScanner() {
     // prevent re-entrancy
     if (processingFlagRef.current) return;
 
+    // Cerrar la cámara inmediatamente al recibir cualquier escaneo
+    setModalVisible(false);
+    setScanning(false);
+
     const rawValue =
       typeof result?.data === "string"
         ? result.data
@@ -226,7 +230,6 @@ export function useScanner() {
     lastScanRef.current.hash = dataStrCheck;
     lastScanRef.current.time = now;
 
-    setScanning(false);
     setProcessing(true);
 
     try {
@@ -276,9 +279,6 @@ export function useScanner() {
       if (valido) {
         setScanStatus("ok");
         setScanMessage(mensaje);
-        // successful -> close modal
-        setModalVisible(false);
-        setScanning(false);
         processingFlagRef.current = false;
         setProcessing(false);
         return;
@@ -293,21 +293,16 @@ export function useScanner() {
       if (alreadyControlled) {
         setScanStatus("error");
         setScanMessage(displayMessage || "Entrada ya controlada");
-        // keep modal open so controller sees the state, but do not attempt to re-control
-        setModalVisible(true);
-        setProcessing(false);
-        setScanning(false);
         processingFlagRef.current = false;
+        setProcessing(false);
         return;
       }
 
       // generic invalid case: show enriched message inside modal
       setScanStatus("error");
       setScanMessage(displayMessage);
-      setModalVisible(true);
-      setProcessing(false);
-      setScanning(false);
       processingFlagRef.current = false;
+      setProcessing(false);
     } catch (e: any) {
       console.error("[useScanner] controlarEntrada error:", e);
       const statusCode = e?.response?.status;
@@ -348,7 +343,6 @@ export function useScanner() {
     } finally {
       setProcessing(false);
       processingFlagRef.current = false;
-      setScanning(false);
     }
   };
 

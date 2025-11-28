@@ -10,6 +10,38 @@ import TitlePers from '@/components/common/TitleComponent';
 import { COLORS, RADIUS } from '@/styles/globalStyles';
 
 import { ApiGenero, fetchGenres, fetchEventById, updateEvent, updateEventExact } from '@/app/events/apis/eventApi';
+import { mediaApi } from '@/app/apis/mediaApi';
+
+type UpdateEventoRequest = {
+  idEvento: string;
+  idArtistas: string[];
+  domicilio: {
+    localidad: { nombre: string; codigo: string };
+    municipio: { nombre: string; codigo: string };
+    provincia: { nombre: string; codigo: string };
+    direccion: string;
+    latitud: number;
+    longitud: number;
+  };
+  nombre: string;
+  descripcion: string;
+  genero: number[];
+  isAfter: boolean;
+  isLgbt: boolean;
+  inicioEvento: string;
+  finEvento: string;
+  estado: number;
+  fechas: {
+    idFecha: string;
+    inicio: string;
+    fin: string;
+    inicioVenta: string;
+    finVenta: string;
+    estado: number;
+  }[];
+  idFiesta: string | null;
+  soundCloud: string;
+};
 import { fetchArtistsFromApi } from '@/app/artists/apis/artistApi';
 import { Artist } from '@/app/artists/types/Artist';
 import { fetchProvinces, fetchMunicipalities, fetchLocalities, fetchLocalitiesByProvince } from '@/app/apis/georefHelpers';
@@ -66,10 +98,34 @@ const formatBackendIsoVenta = (d?: Date | null) => {
 };
 
 export default function OwnerEventModifyScreen() {
+    // --- Actualizar evento ---
+    async function handleUpdateEvento(updateData: any) {
+      try {
+        const { updateEvent } = await import("@/app/events/apis/eventApi");
+        if (!updateData?.idEvento) throw new Error("Falta idEvento");
+        await updateEvent(updateData.idEvento, updateData);
+        Alert.alert("Éxito", "Evento actualizado correctamente.");
+      } catch (e: any) {
+        Alert.alert("Error actualizando evento", e?.message || "Error desconocido");
+      }
+    }
+    // Ejemplo de uso (puedes llamarlo desde un botón o acción):
+    // handleUpdateEvento({
+    //   idEvento: "a08578df-cc82-11f0-b7c1-0200170026e8",
+    //   nombre: "aa2",
+    //   descripcion: "aa",
+    //   genero: [1],
+    //   domicilio: { ... },
+    //   idArtistas: ["173f4079-1547-11f0-80c4-0200170026e8"],
+    //   fechas: [ ... ],
+    //   ...otrosCampos
+    // })
   const { id } = useLocalSearchParams<{ id?: string }>();
   const eventId = (id ?? '').toString();
   const { user } = useAuth();
   const mustShowLogin = !user || (user as any)?.role === 'guest';
+  const router = require('expo-router').useRouter();
+  const ROUTES = require('@/routes').ROUTES;
 
   const [initialLoading, setInitialLoading] = useState(true);
   const [initialError, setInitialError] = useState<string | null>(null);
@@ -107,6 +163,7 @@ export default function OwnerEventModifyScreen() {
   const [daySaleConfigs, setDaySaleConfigs] = useState<SaleCfgDay[]>([createEmptySaleConfig()]);
 
   const [photoFile, setPhotoFile] = useState<any>(null);
+  const [idEntidadMedia, setIdEntidadMedia] = useState<string | null>(null);
   const [videoLink, setVideoLink] = useState('');
   const [musicLink, setMusicLink] = useState('');
 
@@ -165,6 +222,8 @@ export default function OwnerEventModifyScreen() {
   setIsLGBT(Boolean(ev.isLGBT));
 
         setPhotoFile(ev.imageUrl || null);
+        // Si el evento tiene idEntidadMedia, lo guardamos para el update
+        if (ev?.__raw?.idEntidadMedia) setIdEntidadMedia(ev.__raw.idEntidadMedia);
         setVideoLink((ev as any).video || '');
         setMusicLink((ev as any).musica || (ev as any).soundCloud || '');
 
@@ -248,19 +307,85 @@ export default function OwnerEventModifyScreen() {
 
   const onSubmit = useCallback(async () => {
     if (!eventName.trim()) { Alert.alert('Faltan datos', 'Ingresá el nombre del evento.'); return; }
+    let payload: UpdateEventoRequest & { idEntidadMedia?: string };
     try {
       setSaving(true);
-      const fechas = daySchedules.map((d,i) => ({ idFecha: remoteFechaIds[i], inicio: formatBackendIso(d.start), fin: formatBackendIso(d.end), inicioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart), finVenta: formatBackendIsoVenta(daySaleConfigs[i]?.sellUntil) }));
-      const domicilio: any = { provincia: provinceName || undefined, provinciaId: provinceId || undefined, municipio: municipalityName || undefined, municipioId: municipalityId || undefined, localidad: localityName || undefined, localidadId: localityId || undefined, direccion: street || undefined };
+      let newIdEntidadMedia = idEntidadMedia;
+      let newImageUrl = null;
+      // Si hay una nueva imagen seleccionada (photoFile es un objeto con uri local), la subimos
+      if (photoFile && typeof photoFile === 'object' && photoFile.uri && !photoFile.url) {
+        try {
+          const uploadRes = await mediaApi.upload(eventId, photoFile, undefined, { compress: true, maxBytes: 2 * 1024 * 1024 });
+          // El backend debería devolver el nuevo idEntidadMedia
+          if (uploadRes?.idEntidadMedia && typeof uploadRes.idEntidadMedia === 'string') {
+            newIdEntidadMedia = uploadRes.idEntidadMedia;
+            setIdEntidadMedia(newIdEntidadMedia);
+            // Obtener la nueva URL de imagen subida
+            try {
+              if (newIdEntidadMedia) {
+                const url = await mediaApi.getFirstImage(newIdEntidadMedia);
+                if (url) {
+                  newImageUrl = url;
+                  setPhotoFile({ uri: url });
+                }
+              }
+            } catch {}
+          }
+        } catch (imgErr) {
+          console.error('[UPDATE EVENT] Error subiendo imagen:', imgErr);
+          Alert.alert('Error', 'No se pudo subir la imagen.');
+          setSaving(false);
+          return;
+        }
+      }
+      // Construcción del payload según UpdateEventoRequest
       const idArtistas = selectedArtists.map(a => (a as any).idArtista).filter(Boolean) as string[];
-  const body: any = { nombre: eventName, descripcion: eventDescription, genero: selectedGenres, domicilio, isAfter, isLGBT: isLGBT, inicioEvento: formatBackendIso(daySchedules[0]?.start), finEvento: formatBackendIso(daySchedules[0]?.end),
-        inicioVenta: formatBackendIsoVenta(daySaleConfigs[0]?.saleStart),
-        finVenta: formatBackendIsoVenta(daySaleConfigs[0]?.sellUntil),
-        fechas, idArtistas, video: videoLink || undefined, musica: musicLink || undefined, soundCloud: musicLink || undefined };
-      // Enviar body completo y simple directamente al endpoint UpdateEvento
-      const exactBody = { idEvento: eventId, ...body };
-      await updateEventExact(exactBody);
+      const domicilio: UpdateEventoRequest['domicilio'] = {
+        localidad: { nombre: localityName || '', codigo: localityId || '' },
+        municipio: { nombre: municipalityName || '', codigo: municipalityId || '' },
+        provincia: { nombre: provinceName || '', codigo: provinceId || '' },
+        direccion: street || '',
+        latitud: 0,
+        longitud: 0
+      };
+      const fechas: UpdateEventoRequest['fechas'] = daySchedules.map((d, i) => ({
+        idFecha: remoteFechaIds[i] || '',
+        inicio: formatBackendIso(d.start) || '',
+        fin: formatBackendIso(d.end) || '',
+        inicioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart) || '',
+        finVenta: formatBackendIsoVenta(daySaleConfigs[i]?.sellUntil) || '',
+        estado: 0
+      }));
+      payload = {
+        idEvento: eventId,
+        idArtistas,
+        domicilio,
+        nombre: eventName,
+        descripcion: eventDescription,
+        genero: selectedGenres,
+        isAfter,
+        isLgbt: isLGBT,
+        inicioEvento: formatBackendIso(daySchedules[0]?.start) || '',
+        finEvento: formatBackendIso(daySchedules[0]?.end) || '',
+        estado: 0,
+        fechas,
+        idFiesta: null,
+        soundCloud: ''
+      };
+      if (newIdEntidadMedia) payload.idEntidadMedia = newIdEntidadMedia;
+      // LOG DETALLADO DEL PAYLOAD Y ENDPOINT
+      console.log('[UPDATE EVENT] Endpoint: /v1/Evento/UpdateEvento');
+      console.log('[UPDATE EVENT] Payload:', JSON.stringify(payload, null, 2));
+      await updateEventExact(payload);
+      // Si se subió imagen y se obtuvo nueva URL, refrescar el preview
+      if (newImageUrl) {
+        setPhotoFile({ uri: newImageUrl });
+      }
       Alert.alert('Listo', 'Cambios guardados correctamente.');
+      // Redirigir a la pantalla de administración de eventos
+      setTimeout(() => {
+        router.replace(ROUTES.OWNER.MANAGE_EVENTS);
+      }, 300);
     } catch (e: any) {
       // Mostrar error enriquecido si la API adjuntó status/data
       try {
@@ -271,12 +396,16 @@ export default function OwnerEventModifyScreen() {
         const detail = data && (data?.message || data?.error || (typeof data === 'string' ? data : null));
         if (detail) msg = `${msg}\n\nDetalle: ${String(detail)}`;
         Alert.alert('Error', msg);
+        // LOG DEL ERROR Y PAYLOAD
+        console.error('[UPDATE EVENT ERROR]', msg);
+        console.error('[UPDATE EVENT ERROR] Payload:', JSON.stringify(payload, null, 2));
       } catch (inner) {
         Alert.alert('Error', e?.message || 'No se pudo guardar el evento.');
+        console.error('[UPDATE EVENT ERROR]', e?.message || 'No se pudo guardar el evento.');
       }
     }
     finally { setSaving(false); }
-  }, [eventName, eventDescription, selectedGenres, provinceName, provinceId, municipalityName, municipalityId, localityName, localityId, street, isAfter, isLGBT, daySchedules, daySaleConfigs, remoteFechaIds, selectedArtists, videoLink, musicLink, eventId]);
+  }, [eventName, eventDescription, selectedGenres, provinceName, provinceId, municipalityName, municipalityId, localityName, localityId, street, isAfter, isLGBT, daySchedules, daySaleConfigs, remoteFechaIds, selectedArtists, eventId, idEntidadMedia, photoFile]);
 
   const selectedArtistsUi = useMemo(() => selectedArtists.map(a => ({ ...a })), [selectedArtists]);
 
@@ -381,7 +510,10 @@ export default function OwnerEventModifyScreen() {
         <TicketConfigSection daySaleConfigs={daySaleConfigs} setSaleCfg={setSaleCfg} />
 
         <MediaSection
-          photoFile={photoFile}
+          photoFile={photoFile && photoFile.uri ? photoFile : (typeof photoFile === 'string' ? { uri: photoFile } : photoFile)}
+          onChangePhoto={img => {
+            setPhotoFile(img);
+          }}
           videoLink={videoLink}
           musicLink={musicLink}
           onChangeVideo={setVideoLink}

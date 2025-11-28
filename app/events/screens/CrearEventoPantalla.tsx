@@ -2277,10 +2277,37 @@ export default function CreateEventScreen() {
       if (isUsuario) {
         try {
           const userData = user as any;
+          // Obtener los roles actuales del backend antes de actualizar
+          let backendRoles: number[] = [];
+          let userProfile: any = null;
+          try {
+            const { getUsuarioById } = await import("@/app/auth/userHelpers");
+            userProfile = await getUsuarioById(userData?.idUsuario ?? userData?.id ?? userId);
+            // Extraer roles tanto de cdRoles como del array roles (backend)
+            const cdRolesArr = Array.isArray(userProfile?.cdRoles) ? userProfile.cdRoles.map(Number) : [];
+            const rolesArr = Array.isArray(userProfile?.roles)
+              ? userProfile.roles.map((r: any) => Number(r?.cdRol)).filter((n: number) => Number.isFinite(n))
+              : [];
+            backendRoles = Array.from(new Set([...cdRolesArr, ...rolesArr]));
+          } catch {}
+          // roles actuales del usuario (numéricos)
           const roles = Array.isArray(userData?.roles)
             ? userData.roles.map(Number)
             : [];
-          const cdRoles = roles.includes(2) ? roles : [...roles, 2];
+          // unir ambos y agregar el 2 si no está
+          const allRoles = Array.from(new Set([...roles, ...backendRoles, 2]));
+          const cdRoles = allRoles;
+          // Log visual y en consola antes de actualizar
+          console.log("[CreateEvent] Roles antes de updateUsuario:", {
+            userId: userData?.idUsuario ?? userData?.id ?? userId,
+            roles,
+            backendRoles,
+            fusion: cdRoles,
+          });
+          Alert.alert(
+            "Roles antes de actualizar",
+            `Usuario: ${userData?.idUsuario ?? userData?.id ?? userId}\nRoles locales: ${JSON.stringify(roles)}\nRoles backend: ${JSON.stringify(backendRoles)}\nFusionados: ${JSON.stringify(cdRoles)}`
+          );
           const payload = {
             idUsuario: userData?.idUsuario ?? userData?.id ?? userId,
             nombre: userData?.nombre ?? userData?.name ?? "",
@@ -2320,6 +2347,19 @@ export default function CreateEventScreen() {
               userData?.dtNacimiento ?? userData?.fechaNacimiento ?? "",
           };
           await updateUsuario(payload);
+          // Log visual y en consola después de actualizar
+          try {
+            const { getUsuarioById } = await import("@/app/auth/userHelpers");
+            const updatedProfile = await getUsuarioById(userData?.idUsuario ?? userData?.id ?? userId);
+            console.log("[CreateEvent] Roles después de updateUsuario:", {
+              userId: userData?.idUsuario ?? userData?.id ?? userId,
+              rolesActualizados: updatedProfile?.cdRoles,
+            });
+            Alert.alert(
+              "Roles después de actualizar",
+              `Usuario: ${userData?.idUsuario ?? userData?.id ?? userId}\nRoles actualizados: ${JSON.stringify(updatedProfile?.cdRoles)}`
+            );
+          } catch {}
         } catch (e: any) {
           const backendMsg = extractBackendMessage(e);
           Alert.alert(

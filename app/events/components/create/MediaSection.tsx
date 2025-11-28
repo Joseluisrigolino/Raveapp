@@ -4,7 +4,8 @@ import ImagePickerComponent from "@/components/common/ImagePickerComponent";
 import { COLORS, RADIUS } from "@/styles/globalStyles";
 
 interface Props {
-  photoFile: string | null;
+  photoFile: string | { uri: string } | null;
+  onChangePhoto?: (img: string | { uri: string } | null) => void;
   videoLink: string;
   musicLink: string;
   onSelectPhoto?: () => void; // legacy prop kept for compat
@@ -20,6 +21,7 @@ interface Props {
 export default function MediaSection(props: Props) {
   const {
     photoFile,
+    onChangePhoto,
     onChangeVideo,
     onChangeMusic,
     maxImageBytes = 1 * 1024 * 1024,
@@ -30,11 +32,16 @@ export default function MediaSection(props: Props) {
   return (
     <View style={styles.card}>
       <ImagePickerComponent
-        value={photoFile}
+        value={typeof photoFile === 'object' && photoFile?.uri ? photoFile.uri : photoFile}
         onChange={(uri) => {
-          // parent components expect to control photoFile via handlers; they can still update state
+          if (onChangePhoto) {
+            if (uri) {
+              onChangePhoto({ uri });
+            } else {
+              onChangePhoto(null);
+            }
+          }
           if (uri === null && props.onDeletePhoto) props.onDeletePhoto();
-          // if onSelectPhoto was provided (legacy), call when selecting a value
           if (uri && props.onSelectPhoto) props.onSelectPhoto();
         }}
         maxBytes={maxImageBytes}
