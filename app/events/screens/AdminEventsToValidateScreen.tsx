@@ -320,18 +320,17 @@ export default function AdminEventsToValidateScreen() {
         <TabMenuComponent tabs={tabs} />
 
         <View style={styles.content}>
+          <SearchBarComponent
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholder="Buscar eventos..."
+          />
+
           <FlatList
             data={filteredEvents}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
             contentContainerStyle={{ paddingBottom: 40 }}
-            ListHeaderComponent={() => (
-              <SearchBarComponent
-                value={searchText}
-                onChangeText={setSearchText}
-                placeholder="Buscar eventos..."
-              />
-            )}
             ListEmptyComponent={() => (
               loading ? (
                 <View style={{ padding: 24, alignItems: 'center' }}>

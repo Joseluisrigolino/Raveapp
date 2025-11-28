@@ -127,12 +127,25 @@ export async function createParty(args: {
         },
       }
     );
-
     const data = resp?.data ?? {};
-    const id =
-      data.idFiesta ?? data.id ?? data.IdFiesta ?? data.Id ?? null;
 
-    return id ? String(id) : null;
+    // Prefer the common simple shapes
+    if (data && (data.idFiesta || data.IdFiesta)) return String(data.idFiesta ?? data.IdFiesta);
+    if (data && (data.id || data.Id)) return String(data.id ?? data.Id);
+    // Sometimes nested under data
+    if (data?.data && (data.data.idFiesta || data.data.IdFiesta)) return String(data.data.idFiesta ?? data.data.IdFiesta);
+    if (data?.data && (data.data.id || data.data.Id)) return String(data.data.id ?? data.data.Id);
+
+    // If the API returned an array/object with the created party, map and return its id
+    try {
+      const arr = getPartyArray(data);
+      if (arr && arr.length) {
+        const mapped = mapParty(arr[0]);
+        if (mapped && mapped.idFiesta) return mapped.idFiesta;
+      }
+    } catch {}
+
+    return null;
   } catch (e) {
     console.warn("[createParty] error", e);
     return null;

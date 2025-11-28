@@ -740,9 +740,16 @@ export async function updateEvent(
       continue;
     }
   }
-  // Lanzar un error simple con el último mensaje disponible
+  // Lanzar un error enriquecido con el último mensaje y detalles de la respuesta
   const baseMsg = (lastErr?.response?.data && (lastErr?.response?.data?.message || lastErr?.response?.data)) || lastErr?.message || "No se pudo actualizar el evento.";
-  throw new Error(String(baseMsg));
+  const err = new Error(String(baseMsg));
+  try {
+    (err as any).status = lastErr?.response?.status;
+    (err as any).data = lastErr?.response?.data;
+  } catch {
+    // ignore
+  }
+  throw err;
 }
 
 /**

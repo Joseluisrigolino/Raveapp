@@ -53,6 +53,7 @@ export default function SeccionEntradas({ fechas, entradasPorFecha, loadingEntra
 
   return (
     <View>
+      {/* admin banner removed: keep only buy-button alert for admins */}
       {loadingEntradas && (
         <View style={{ paddingVertical: 8, alignItems: 'center' }}>
           <Text>Cargando entradas...</Text>
@@ -65,8 +66,8 @@ export default function SeccionEntradas({ fechas, entradasPorFecha, loadingEntra
         </View>
       ) : (
         !loadingEntradas && fechas.map((f, idx) => {
-          const entradas = entradasPorFecha[f.idFecha] || [];
-          const disabledDay = activeDayId !== null && activeDayId !== f.idFecha;
+              const entradas = entradasPorFecha[f.idFecha] || [];
+              const disabledDay = activeDayId !== null && activeDayId !== f.idFecha;
           const meta = formatDay(f);
           return (
             <View key={f.idFecha} style={styles.ticketSection}>
@@ -124,8 +125,7 @@ export default function SeccionEntradas({ fechas, entradasPorFecha, loadingEntra
               onBuy();
             }
           }}
-          // NOTE: no deshabilitamos el touch en admins porque `disabled` evita ejecutar onPress,
-          // queremos que al tocar muestre la alerta. Mantener solo las condiciones funcionales.
+          // NOTE: no deshabilitamos el touch en admins porque queremos mostrar la alerta al tocar
           disabled={noEntradasAvailable || subtotal <= 0}
         >
           <Text style={styles.buyButtonText}>Comprar Entradas</Text>

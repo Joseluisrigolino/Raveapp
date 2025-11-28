@@ -1,7 +1,17 @@
 import * as ImagePicker from "expo-image-picker";
 import { getInfoAsync } from "expo-file-system/legacy";
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Linking, Platform } from "react-native";
+import {
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  Linking,
+  Platform,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -46,7 +56,10 @@ import {
 import { getPartiesByUser, createParty, Party } from "@/app/party/apis/partysApi";
 
 /** Entradas */
-import { resolveTipoCodes, CreateEntradaBody } from "@/app/events/apis/entradaApi";
+import {
+  resolveTipoCodes,
+  CreateEntradaBody,
+} from "@/app/events/apis/entradaApi";
 
 /** Media */
 // mediaApi is imported dynamically when needed
@@ -171,25 +184,27 @@ function extractBackendMessage(e: any): string {
 }
 
 // =============== Helpers comunes ===============
-const getLocalTuple = (d: Date) => [
-  d.getFullYear(),
-  d.getMonth(),
-  d.getDate(),
-] as const;
+const getLocalTuple = (d: Date) =>
+  [d.getFullYear(), d.getMonth(), d.getDate()] as const;
 
-const getUtcTuple = (d: Date) => [
-  d.getUTCFullYear(),
-  d.getUTCMonth(),
-  d.getUTCDate(),
-] as const;
+const getUtcTuple = (d: Date) =>
+  [d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()] as const;
 
 const isBeforeTuple = (
   a: readonly [number, number, number],
   b: readonly [number, number, number]
-) => a[0] < b[0] || (a[0] === b[0] && (a[1] < b[1] || (a[1] === b[1] && a[2] < b[2])));
+) =>
+  a[0] < b[0] ||
+  (a[0] === b[0] && (a[1] < b[1] || (a[1] === b[1] && a[2] < b[2])));
 
-function ensureArrayWithPrev<T>(prev: T[] | undefined, length: number, creator: () => T): T[] {
-  const out: T[] = Array.from({ length }, (_, i) => (prev && prev[i] ? prev[i] : creator()));
+function ensureArrayWithPrev<T>(
+  prev: T[] | undefined,
+  length: number,
+  creator: () => T
+): T[] {
+  const out: T[] = Array.from({ length }, (_, i) =>
+    prev && prev[i] ? prev[i] : creator()
+  );
   return out;
 }
 
@@ -289,7 +304,8 @@ export default function CreateEventScreen() {
     ? (user as any).roles.includes("user")
     : false;
   const isOrganizador = Array.isArray((user as any)?.roles)
-    ? (user as any).roles.includes("owner") || (user as any).roles.includes("organizer")
+    ? (user as any).roles.includes("owner") ||
+      (user as any).roles.includes("organizer")
     : false;
   const mustShowLogin = !user;
 
@@ -350,6 +366,20 @@ export default function CreateEventScreen() {
   const [tempCreatedPartyName, setTempCreatedPartyName] = useState<
     string | null
   >(null);
+
+  // Cuando el usuario empieza a escribir en "O crear una nueva", debemos
+  // deseleccionar cualquier `selectedPartyId` que hubiera quedado seleccionado.
+  const handleNewPartyNameChange = React.useCallback(
+    (val: string) => {
+      setNewPartyName(val);
+      try {
+        if (val && val.trim().length > 0) {
+          setSelectedPartyId(null);
+        }
+      } catch {}
+    },
+    [setNewPartyName, setSelectedPartyId]
+  );
 
   /* --- Ubicación --- */
   const [provinces, setProvinces] = useState<{ id: string; nombre: string }[]>(
@@ -430,15 +460,21 @@ export default function CreateEventScreen() {
 
   /* ================= Effects ================= */
   useEffect(() => {
-    setDaySchedules((prev) => ensureArrayWithPrev(prev, dayCount, createEmptySchedule));
+    setDaySchedules((prev) =>
+      ensureArrayWithPrev(prev, dayCount, createEmptySchedule)
+    );
   }, [dayCount]);
 
   useEffect(() => {
-    setDaysTickets((prev) => ensureArrayWithPrev(prev, dayCount, createEmptyDayTickets));
+    setDaysTickets((prev) =>
+      ensureArrayWithPrev(prev, dayCount, createEmptyDayTickets)
+    );
   }, [dayCount]);
 
   useEffect(() => {
-    setDaySaleConfigs((prev) => ensureArrayWithPrev(prev, dayCount, createEmptySaleConfig));
+    setDaySaleConfigs((prev) =>
+      ensureArrayWithPrev(prev, dayCount, createEmptySaleConfig)
+    );
   }, [dayCount]);
 
   useEffect(() => {
@@ -668,36 +704,18 @@ export default function CreateEventScreen() {
   const onPressAddNewParty = () => {
     const name = newPartyName.trim();
     if (!name) return;
-    // lock UI immediately and create the party in backend as inactivo (best-effort)
+    // lock UI immediately and mark the new party name as pending.
+    // IMPORTANT: do NOT call the backend here. The actual creation will happen
+    // when the user presses "Crear Evento" (createPendingEntities).
     setNewPartyLocked(true);
-    (async () => {
-      try {
-        const partys = await import("@/app/party/apis/partysApi");
-        if (partys && typeof partys.createParty === "function" && userId) {
-          // create as inactivo by default so admin can approve if needed
-          const id = await partys.createParty({
-            idUsuario: String(userId),
-            nombre: name,
-            isActivo: false,
-          });
-          if (id) {
-            // store temp id/name but DO NOT select it or add it to the visible list
-            // because it's created as inactive and should not appear in selector
-            setTempCreatedPartyId(id);
-            setTempCreatedPartyName(name);
-          }
-        }
-      } catch (e) {
-        try {
-          log.warn(
-            "[onPressAddNewParty] failed creating party:",
-            String((e as any)?.message || e)
-          );
-        } catch {}
-        // unlock to allow retry
-        setNewPartyLocked(false);
-      }
-    })();
+    setTempCreatedPartyName(name);
+    setTempCreatedPartyId(null);
+    try {
+      setShowPartyDropdown(false);
+    } catch {}
+    try {
+      log.info("[onPressAddNewParty] pending party name registered:", name);
+    } catch {}
   };
 
   const setSchedule = useCallback(
@@ -914,7 +932,10 @@ export default function CreateEventScreen() {
         return false;
       }
       // No permitir fechas anteriores al día de hoy (comparamos por fecha en hora local: año/mes/día)
-      const startIsBeforeToday = isBeforeTuple(getLocalTuple(new Date(s)), getLocalTuple(new Date()));
+      const startIsBeforeToday = isBeforeTuple(
+        getLocalTuple(new Date(s)),
+        getLocalTuple(new Date())
+      );
       if (startIsBeforeToday) {
         Alert.alert(
           "Validación",
@@ -1036,7 +1057,10 @@ export default function CreateEventScreen() {
             // La venta no puede empezar después del inicio del evento (comparamos por fecha, no por hora)
             const sd = new Date(ss);
             const ed = new Date(s);
-            const saleIsAfterEvent = isBeforeTuple(getUtcTuple(ed), getUtcTuple(sd));
+            const saleIsAfterEvent = isBeforeTuple(
+              getUtcTuple(ed),
+              getUtcTuple(sd)
+            );
             if (saleIsAfterEvent) {
               Alert.alert(
                 "Validación",
@@ -1165,21 +1189,64 @@ export default function CreateEventScreen() {
         isActivo: true,
       };
       try {
-        await createParty(payload);
-        // createParty no devuelve el objeto creado; intentar recuperar la fiesta recién creada
-        try {
-          const parties = await getPartiesByUser(String(userId));
-          const found = parties.find(
-            (p) => (p.nombre || "").trim() === payload.nombre.trim()
-          );
-          if (found) {
-            result.partyCreated = found;
+        // If a temp party was already created by the user via the "+" button,
+        // prefer activating / reusing it instead of creating a duplicate.
+        if (tempCreatedPartyId) {
+          try {
+            const partys = await import("@/app/party/apis/partysApi");
+            if (partys && typeof partys.updateParty === "function") {
+              await partys.updateParty({
+                idFiesta: tempCreatedPartyId,
+                isActivo: true,
+              });
+            }
+            // Attempt to fetch the party by id
+            try {
+              const byId = await (async () => {
+                try {
+                  const p = await (
+                    await import("@/app/party/apis/partysApi")
+                  ).getPartyById(tempCreatedPartyId!);
+                  return p;
+                } catch {
+                  return null;
+                }
+              })();
+              if (byId) result.partyCreated = byId;
+            } catch {}
+          } catch (e) {
+            // best-effort: if activation fails, fall back to creating a fresh active party
+            try {
+              const id = await createParty(payload);
+              if (id) {
+                const parties = await getPartiesByUser(String(userId));
+                const found = parties.find(
+                  (p) => (p.nombre || "").trim() === payload.nombre.trim()
+                );
+                if (found) result.partyCreated = found;
+              }
+            } catch {
+              // rethrow original error below
+              throw e;
+            }
           }
-        } catch {
-          // best-effort: ignore
+        } else {
+          // No temp party: create as active now
+          const id = await createParty(payload);
+          if (id) {
+            try {
+              const parties = await getPartiesByUser(String(userId));
+              const found = parties.find(
+                (p) => (p.nombre || "").trim() === payload.nombre.trim()
+              );
+              if (found) result.partyCreated = found;
+            } catch {
+              // best-effort
+            }
+          }
         }
       } catch (e: any) {
-        // createParty error is fatal for recurring party creation: rethrow
+        // createParty / activation error is fatal for recurring party creation: rethrow
         throw e;
       }
     }
@@ -1203,7 +1270,10 @@ export default function CreateEventScreen() {
         }
         // Prefer the 'createArtist' helper (CreateArtista endpoint) which exists in many environments.
         // Fallback to createArtistInactive (CrearArtista) only if the first is not available or fails.
-  if (artistApi && typeof (artistApi as any).createArtist === 'function') {
+        if (
+          artistApi &&
+          typeof (artistApi as any).createArtist === "function"
+        ) {
           await Promise.all(
             newOnes.map(async (a) => {
               // ...existing code omitted...
@@ -1410,6 +1480,9 @@ export default function CreateEventScreen() {
     // reset any previous creation error
     setCreationError(null);
 
+    // track a temp-created party id across the whole try/catch so we can cleanup on failure
+    let _tempCreatedToCleanup: string | null = null;
+
     try {
       // Validaciones generales previas
       if (!validateBeforeSubmit()) return;
@@ -1423,10 +1496,9 @@ export default function CreateEventScreen() {
         try {
           const size = await getFileSize(photoFile);
           if (size > MAX_IMAGE_BYTES) {
-            const userMsg =
-              `La imagen seleccionada supera el máximo permitido (${Math.round(
-                MAX_IMAGE_BYTES / 1024
-              )}KB). Por favor, elige una imagen más liviana.`;
+            const userMsg = `La imagen seleccionada supera el máximo permitido (${Math.round(
+              MAX_IMAGE_BYTES / 1024
+            )}KB). Por favor, elige una imagen más liviana.`;
             setCreationError(userMsg);
             Alert.alert("Imagen demasiado grande", userMsg);
             return;
@@ -1448,6 +1520,8 @@ export default function CreateEventScreen() {
       }
 
       // 1) Crear entidades pendientes (fiesta recurrente, etc.)
+      // Capture any temp-created party id now so we can cleanup if the whole flow fails
+      _tempCreatedToCleanup = tempCreatedPartyId;
       const pending = await createPendingEntities(userId).catch((e) => {
         try {
           log.warn(
@@ -1556,7 +1630,9 @@ export default function CreateEventScreen() {
       const body = {
         descripcion: eventDescription || "",
         domicilio: {
-          direccion: street ? street.charAt(0).toUpperCase() + street.slice(1).toLowerCase() : "",
+          direccion: street
+            ? street.charAt(0).toUpperCase() + street.slice(1).toLowerCase()
+            : "",
           latitud: 0,
           longitud: 0,
           provincia: { codigo: provinceId, nombre: provinceName },
@@ -1823,23 +1899,34 @@ export default function CreateEventScreen() {
         fechaIds = mapped.filter(Boolean);
       }
 
-  // If backend returned fechas with default/invalid dates (e.g., 0001-01-01), patch them now via UpdateEvento (exact body, ISO Z)
+      // If backend returned fechas with default/invalid dates (e.g., 0001-01-01), patch them now via UpdateEvento (exact body, ISO Z)
       try {
         const hasInvalidRemoteFechas = (arr: RemoteFecha[]) =>
-          Array.isArray(arr) && arr.some((f) => {
+          Array.isArray(arr) &&
+          arr.some((f) => {
             const y1 = f?.inicio ? new Date(f.inicio).getUTCFullYear() : 0;
             const y2 = f?.fin ? new Date(f.fin).getUTCFullYear() : 0;
             const y3 = f?.inicio ? y1 : 0;
             const y4 = f?.fin ? y2 : 0;
             // consider invalid if missing or year <= 1; venta dates are optional
-            const invalidCore = (!f?.inicio || y1 <= 1) || (!f?.fin || y2 <= 1);
-            const invVenta = (f as any)?.inicioVenta ? (new Date((f as any).inicioVenta).getUTCFullYear() <= 1) : false;
-            const invFinVenta = (f as any)?.finVenta ? (new Date((f as any).finVenta).getUTCFullYear() <= 1) : false;
+            const invalidCore = !f?.inicio || y1 <= 1 || !f?.fin || y2 <= 1;
+            const invVenta = (f as any)?.inicioVenta
+              ? new Date((f as any).inicioVenta).getUTCFullYear() <= 1
+              : false;
+            const invFinVenta = (f as any)?.finVenta
+              ? new Date((f as any).finVenta).getUTCFullYear() <= 1
+              : false;
             return invalidCore || invVenta || invFinVenta;
           });
 
-        if (createdEventId && fechaIds.length && hasInvalidRemoteFechas(remoteFechas as any)) {
-          const { updateEventExact, formatIsoZulu } = await import("@/app/events/apis/eventApi");
+        if (
+          createdEventId &&
+          fechaIds.length &&
+          hasInvalidRemoteFechas(remoteFechas as any)
+        ) {
+          const { updateEventExact, formatIsoZulu } = await import(
+            "@/app/events/apis/eventApi"
+          );
           const fechasUpd = fechaIds.map((id, i) => ({
             idFecha: id,
             inicio: formatIsoZulu(daySchedules[i]?.start),
@@ -1862,7 +1949,7 @@ export default function CreateEventScreen() {
             estado: body.estado,
             fechas: fechasUpd,
             idFiesta: body.idFiesta ?? null,
-            soundCloud: body.soundCloud ?? '',
+            soundCloud: body.soundCloud ?? "",
           };
           await updateEventExact(exactBody);
           // refresh remoteFechas snapshot after patch
@@ -2103,11 +2190,11 @@ export default function CreateEventScreen() {
             return;
           }
           const fn = photoFile.split("/").pop() || "image.jpg";
-          const isPng = fn.toLowerCase().endsWith('.png');
+          const isPng = fn.toLowerCase().endsWith(".png");
           const fileObj = {
             uri: photoFile,
             name: fn,
-            type: isPng ? 'image/png' : 'image/jpeg',
+            type: isPng ? "image/png" : "image/jpeg",
           } as any;
           const mediaApi = (await import("@/app/apis/mediaApi")).mediaApi;
           let uploadTarget = (fechaIds && fechaIds[0]) || null;
@@ -2144,7 +2231,9 @@ export default function CreateEventScreen() {
             );
             return;
           }
-          await mediaApi.upload(String(uploadTarget), fileObj, undefined, { compress: true });
+          await mediaApi.upload(String(uploadTarget), fileObj, undefined, {
+            compress: true,
+          });
         } catch (e: any) {
           const msg =
             typeof e === "object" && e !== null && "message" in e
@@ -2215,7 +2304,9 @@ export default function CreateEventScreen() {
                 nombre: localityName,
                 codigo: localityId,
               },
-              direccion: street ? street.charAt(0).toUpperCase() + street.slice(1).toLowerCase() : "",
+              direccion: street
+                ? street.charAt(0).toUpperCase() + street.slice(1).toLowerCase()
+                : "",
               latitud: 0,
               longitud: 0,
             },
@@ -2240,9 +2331,40 @@ export default function CreateEventScreen() {
       }
 
       Alert.alert("Éxito", "Evento creado correctamente.");
-  router.push(ROUTES.OWNER.MANAGE_EVENTS as any);
+      router.push(ROUTES.OWNER.MANAGE_EVENTS as any);
     } catch (err: any) {
       const msg = err?.message || extractBackendMessage(err);
+      // If we created a temporary party earlier via +, attempt to delete it
+      try {
+        const toDel = (_tempCreatedToCleanup as string | null) || null;
+        if (toDel) {
+          try {
+            const partys = await import("@/app/party/apis/partysApi");
+            if (partys && typeof partys.deleteParty === "function") {
+              await partys.deleteParty(toDel);
+              try {
+                log.info(
+                  "[CreateEvent] temp party cleaned up after failure:",
+                  toDel
+                );
+              } catch {}
+            }
+          } catch (e) {
+            try {
+              log.warn(
+                "[CreateEvent] failed deleting temp party after error:",
+                String((e as any)?.message || e)
+              );
+            } catch {}
+          }
+          // ensure UI state cleared
+          try {
+            setTempCreatedPartyId(null);
+            setTempCreatedPartyName(null);
+          } catch {}
+        }
+      } catch {}
+
       Alert.alert("Error", String(msg));
     }
   }, [
@@ -2317,7 +2439,7 @@ export default function CreateEventScreen() {
       }
 
       const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: 'images',
+        mediaTypes: "images",
         quality: 0.8,
       });
 
@@ -2354,7 +2476,7 @@ export default function CreateEventScreen() {
         setPhotoFile(null);
         setPhotoTooLarge(true);
         setPhotoFileSize(size);
-  Alert.alert("Error", "La imagen supera el 1MB permitido.");
+        Alert.alert("Error", "La imagen supera el 1MB permitido.");
         return; // NO seteamos photoFile
       }
 
@@ -2507,7 +2629,7 @@ export default function CreateEventScreen() {
               showPartyDropdown={showPartyDropdown}
               setShowPartyDropdown={setShowPartyDropdown}
               newPartyName={newPartyName}
-              setNewPartyName={setNewPartyName}
+              setNewPartyName={handleNewPartyNameChange}
               newPartyLocked={newPartyLocked}
               setNewPartyLocked={setNewPartyLocked}
               onPickParty={onPickParty}
@@ -2574,12 +2696,13 @@ export default function CreateEventScreen() {
                     setLocalities(locs || []);
                     // Autoseleccionar la localidad "Ciudad Autónoma de Buenos Aires" si existe
                     const CABA_NAME = "Ciudad Autónoma de Buenos Aires";
-                    const pick = (locs || []).find(
-                      (l: any) => norm(l?.nombre || "") === norm(CABA_NAME)
-                    ) ||
-                    (locs || []).find(
-                      (l: any) => norm(l?.nombre || "").includes("ciudad autonoma")
-                    );
+                    const pick =
+                      (locs || []).find(
+                        (l: any) => norm(l?.nombre || "") === norm(CABA_NAME)
+                      ) ||
+                      (locs || []).find((l: any) =>
+                        norm(l?.nombre || "").includes("ciudad autonoma")
+                      );
                     if (pick) {
                       setLocalityId(String(pick.id));
                       setLocalityName(String(pick.nombre));
@@ -2608,28 +2731,7 @@ export default function CreateEventScreen() {
               onChange={setEventDescription}
             />
             <Text style={styles.h2}>Fecha y hora del evento</Text>
-            <Text
-              style={[styles.link, { marginBottom: 6 }]}
-              onPress={() => {
-                try {
-                  (daySchedules || []).forEach((d, i) => {
-                    const s = d?.start ? new Date(d.start) : null;
-                    const e = d?.end ? new Date(d.end) : null;
-                    const sDay = s ? s.toLocaleDateString() : "-";
-                    const sTime = s ? s.toLocaleTimeString() : "-";
-                    const eDay = e ? e.toLocaleDateString() : "-";
-                    const eTime = e ? e.toLocaleTimeString() : "-";
-                    console.log(
-                      `Dia ${i + 1}, inicio ${sDay} hora: ${sTime}  y finalizacion dia ${eDay} y hora ${eTime}`
-                    );
-                  });
-                } catch (e) {
-                  console.log("[DEBUG] Error creando payload de fechas/horas:", e);
-                }
-              }}
-            >
-              Ver fecha y hora (console)
-            </Text>
+            {/* Debug link removed: Ver fecha y hora (console) */}
             <ScheduleSection
               daySchedules={daySchedules}
               setSchedule={setSchedule}
@@ -2644,28 +2746,7 @@ export default function CreateEventScreen() {
               }
             />
             <Text style={styles.h2}>Configuración de entradas</Text>
-            <Text
-              style={[styles.link, { marginBottom: 6 }]}
-              onPress={() => {
-                try {
-                  (daySaleConfigs || []).forEach((d, i) => {
-                    const s = d?.saleStart ? new Date(d.saleStart) : null;
-                    const e = d?.sellUntil ? new Date(d.sellUntil) : null;
-                    const sDay = s ? s.toLocaleDateString() : "-";
-                    const sTime = s ? s.toLocaleTimeString() : "-";
-                    const eDay = e ? e.toLocaleDateString() : "-";
-                    const eTime = e ? e.toLocaleTimeString() : "-";
-                    console.log(
-                      `Dia ${i + 1}, inicio ${sDay} hora: ${sTime}  y finalizacion dia ${eDay} y hora ${eTime}`
-                    );
-                  });
-                } catch (e) {
-                  console.log("[DEBUG] Error creando payload de venta:", e);
-                }
-              }}
-            >
-              Ver fechas de venta (console)
-            </Text>
+            {/* Debug link removed: Ver fechas de venta (console) */}
             <TicketConfigSection
               daySaleConfigs={daySaleConfigs}
               setSaleCfg={setSaleCfg}
@@ -2686,7 +2767,9 @@ export default function CreateEventScreen() {
             />
 
             <View style={styles.card}>
-              <Text style={[styles.label, { marginBottom: 6 }]}>Enlaces multimedia</Text>
+              <Text style={[styles.label, { marginBottom: 6 }]}>
+                Enlaces multimedia
+              </Text>
               <TextInput
                 style={styles.textInput}
                 value={videoLink}
@@ -2732,13 +2815,17 @@ export default function CreateEventScreen() {
 
               {photoTooLarge && (
                 <Text style={{ color: COLORS.negative, marginBottom: 8 }}>
-                  La imagen seleccionada excede {Math.round(MAX_IMAGE_BYTES/1024)}KB. Seleccioná otra imagen.
+                  La imagen seleccionada excede{" "}
+                  {Math.round(MAX_IMAGE_BYTES / 1024)}KB. Seleccioná otra
+                  imagen.
                 </Text>
               )}
               <TouchableOpacity
                 style={[
                   styles.submitButton,
-                  (!photoFile || photoTooLarge || !acceptedTC) && { opacity: 0.5 },
+                  (!photoFile || photoTooLarge || !acceptedTC) && {
+                    opacity: 0.5,
+                  },
                 ]}
                 onPress={async () => {
                   const ok = validateBeforeSubmit();
@@ -2747,7 +2834,9 @@ export default function CreateEventScreen() {
                   if (!photoFile || photoTooLarge) {
                     Alert.alert(
                       "Foto inválida",
-                      `Debés seleccionar una imagen válida de menos de ${Math.round(MAX_IMAGE_BYTES/1024)}KB.`
+                      `Debés seleccionar una imagen válida de menos de ${Math.round(
+                        MAX_IMAGE_BYTES / 1024
+                      )}KB.`
                     );
                     return;
                   }
@@ -2764,12 +2853,6 @@ export default function CreateEventScreen() {
               </TouchableOpacity>
 
               <CirculoCarga visible={creating} text="Creando evento..." />
-
-              <Text style={[styles.totalLine, { textAlign: "center" }]}>
-                {grandTotal > 0
-                  ? `Total aproximado: $${grandTotal}`
-                  : "Sin entradas configuradas"}
-              </Text>
             </View>
           </View>
         )}
@@ -3167,7 +3250,7 @@ const styles = StyleSheet.create({
   textInput: {
     width: "100%",
     marginTop: 8,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     height: 56,
     paddingHorizontal: 14,

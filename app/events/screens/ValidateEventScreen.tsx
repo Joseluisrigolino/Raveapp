@@ -300,13 +300,27 @@ export default function ValidateEventScreen() {
 
   const handleValidate = () => {
     if (!eventData?.id) return;
+    // prevenir validación si hay artistas inactivos
+    try {
+      const inactive = splitArtistsByActive((eventData as any)?.artistas || []).inactive;
+      if (Array.isArray(inactive) && inactive.length > 0) {
+        Alert.alert(
+          'No se puede validar',
+          `Activá los artistas inactivos antes de validar el evento. Artistas inactivos: ${inactive.slice(0,5).join(', ')}`
+        );
+        return;
+      }
+    } catch (e) {
+      // no bloquear en caso de error inesperado en la comprobación
+    }
+
     (async () => {
       try {
         setLoading(true);
         await setEventStatus(String(eventData.id), ESTADO_CODES.APROBADO);
 
         // Enviar mail genérico de aprobación (best-effort)
-        try {
+            try {
           const raw: any = (eventData as any)?.__raw ?? {};
           const to: string = String(
             (eventData as any)?.ownerEmail ||
@@ -521,6 +535,11 @@ export default function ValidateEventScreen() {
     const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
     Linking.openURL(url).catch(() => {});
   };
+
+  // Detectar localmente artistas inactivos para bloquear validación
+  const _artistsSplit = splitArtistsByActive((eventData as any)?.artistas || []);
+  const hasInactiveArtists = Array.isArray(_artistsSplit.inactive) && _artistsSplit.inactive.length > 0;
+  const inactiveNamesText = (_artistsSplit.inactive || []).slice(0, 5).join(', ');
 
   // Render principal: resumen, multimedia y acciones
   return (
@@ -811,13 +830,13 @@ export default function ValidateEventScreen() {
               placeholderTextColor={COLORS.textSecondary}
             />
             {/* Aviso si hay artistas inactivos */}
-            {((global as any).__hasInactiveArtists) ? (
-              <Text style={styles.validationInfoWarning}>Para validar el evento, activá todos los artistas.</Text>
+            {hasInactiveArtists ? (
+              <Text style={styles.validationInfoWarning}>{`Para validar el evento, activá todos los artistas.${inactiveNamesText ? ` Artistas inactivos: ${inactiveNamesText}` : ''}`}</Text>
             ) : null}
             <TouchableOpacity
-              style={[styles.primaryBtn, ((global as any).__hasInactiveArtists) && styles.primaryBtnDisabled]}
-              onPress={((global as any).__hasInactiveArtists) ? undefined : handleValidate}
-              disabled={Boolean((global as any).__hasInactiveArtists)}
+              style={[styles.primaryBtn, hasInactiveArtists && styles.primaryBtnDisabled]}
+              onPress={hasInactiveArtists ? undefined : handleValidate}
+              disabled={Boolean(hasInactiveArtists)}
             >
               <Text style={styles.primaryBtnText}>Validar Evento</Text>
             </TouchableOpacity>

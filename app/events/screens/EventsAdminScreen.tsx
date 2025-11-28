@@ -192,21 +192,23 @@ export default function ManageEventsScreen() {
     <SafeAreaView style={styles.container}>
       <Header />
 
-      <FiltersAdministrarEventos
-        value={selectedFilter}
-        onChange={setSelectedFilter}
-        onStatesLoaded={setEventStates}
-        searchText={searchText}
-        onSearchTextChange={setSearchText}
-        placeholder="Buscar por nombre..."
-      />
-
       <ScrollView
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        showsVerticalScrollIndicator={true}
+        persistentScrollbar={true}
       >
+        <FiltersAdministrarEventos
+          value={selectedFilter}
+          onChange={setSelectedFilter}
+          onStatesLoaded={setEventStates}
+          searchText={searchText}
+          onSearchTextChange={setSearchText}
+          placeholder="Buscar por nombre..."
+        />
+
         {loading ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator />
@@ -239,7 +241,7 @@ export default function ManageEventsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.backgroundLight },
   searchContainer: { marginHorizontal: 8, marginBottom: 8 },
-  listContent: { paddingBottom: 16, paddingHorizontal: 8 },
+  listContent: { paddingBottom: 16, paddingHorizontal: 12 },
   loadingBox: { paddingTop: 24, alignItems: "center" },
   loadingText: { marginTop: 8, color: COLORS.textSecondary },
   noEventsText: {

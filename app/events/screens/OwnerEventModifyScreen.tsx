@@ -9,7 +9,7 @@ import Footer from '@/components/layout/FooterComponent';
 import TitlePers from '@/components/common/TitleComponent';
 import { COLORS, RADIUS } from '@/styles/globalStyles';
 
-import { ApiGenero, fetchGenres, fetchEventById, updateEvent } from '@/app/events/apis/eventApi';
+import { ApiGenero, fetchGenres, fetchEventById, updateEvent, updateEventExact } from '@/app/events/apis/eventApi';
 import { fetchArtistsFromApi } from '@/app/artists/apis/artistApi';
 import { Artist } from '@/app/artists/types/Artist';
 import { fetchProvinces, fetchMunicipalities, fetchLocalities, fetchLocalitiesByProvince } from '@/app/apis/georefHelpers';
@@ -257,9 +257,24 @@ export default function OwnerEventModifyScreen() {
         inicioVenta: formatBackendIsoVenta(daySaleConfigs[0]?.saleStart),
         finVenta: formatBackendIsoVenta(daySaleConfigs[0]?.sellUntil),
         fechas, idArtistas, video: videoLink || undefined, musica: musicLink || undefined, soundCloud: musicLink || undefined };
-      await updateEvent(eventId, body);
+      // Enviar body completo y simple directamente al endpoint UpdateEvento
+      const exactBody = { idEvento: eventId, ...body };
+      await updateEventExact(exactBody);
       Alert.alert('Listo', 'Cambios guardados correctamente.');
-    } catch (e: any) { Alert.alert('Error', e?.message || 'No se pudo guardar el evento.'); }
+    } catch (e: any) {
+      // Mostrar error enriquecido si la API adjuntó status/data
+      try {
+        const status = (e as any)?.status || (e as any)?.response?.status;
+        const data = (e as any)?.data || (e as any)?.response?.data;
+        let msg = e?.message || 'No se pudo guardar el evento.';
+        if (status) msg = `Error ${status}: ${msg}`;
+        const detail = data && (data?.message || data?.error || (typeof data === 'string' ? data : null));
+        if (detail) msg = `${msg}\n\nDetalle: ${String(detail)}`;
+        Alert.alert('Error', msg);
+      } catch (inner) {
+        Alert.alert('Error', e?.message || 'No se pudo guardar el evento.');
+      }
+    }
     finally { setSaving(false); }
   }, [eventName, eventDescription, selectedGenres, provinceName, provinceId, municipalityName, municipalityId, localityName, localityId, street, isAfter, isLGBT, daySchedules, daySaleConfigs, remoteFechaIds, selectedArtists, videoLink, musicLink, eventId]);
 
@@ -297,6 +312,9 @@ export default function OwnerEventModifyScreen() {
           <Text style={styles.infoText}>Estás editando un evento existente. Las entradas se muestran solo para referencia.</Text>
         </View>
 
+        <View style={styles.warningBox}>
+          <Text style={styles.warningText}>* Alaracion: Si realizas alguna modificacion en los datos del evento, se le enviara un mail automaticamente a los usuarios que hayan adquirido una entrada, para notificarles de los cambios, con la opcion de devolucion/reembolso de la entrada, siempre y cuando lo soliciten dentro de los 5 dias corridos.</Text>
+        </View>
         <InputText
           label="Nombre del evento"
           value={eventName}
@@ -387,4 +405,6 @@ const styles = StyleSheet.create({
   saveBtn: { height:56, borderRadius:16, backgroundColor: COLORS.textPrimary, alignItems:'center', justifyContent:'center', marginBottom:24 },
   saveBtnText: { color:'#fff', fontWeight:'700' },
   hintMuted: { fontSize:12, color:'#6B7280', marginTop:6, marginBottom:10 },
+  warningBox: { width: '100%', backgroundColor: '#FFF1F1', borderWidth: 1, borderColor: '#FFD6D6', borderRadius: RADIUS.card, padding: 12, marginBottom: 14 },
+  warningText: { color: '#7A1F1F', fontSize: 13, lineHeight: 18 },
 });

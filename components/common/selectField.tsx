@@ -37,7 +37,7 @@ export default function SelectField({
 
   return (
     <View style={[styles.wrapper, containerStyle]}>
-      <Text style={[styles.label, labelStyle]}>{label}</Text>
+      <Text style={[styles.label, disabled ? { color: COLORS.textSecondary } : null, labelStyle]}>{label}</Text>
       <TouchableOpacity
         activeOpacity={0.8}
         style={[styles.field, disabled && { opacity: 0.6 }, fieldStyle]}
@@ -47,7 +47,7 @@ export default function SelectField({
         <Text
           style={[
             styles.valueText,
-            showPlaceholder && { color: COLORS.textSecondary },
+            (showPlaceholder || disabled) && { color: COLORS.textSecondary },
             valueStyle,
           ]}
           numberOfLines={1}
@@ -57,7 +57,7 @@ export default function SelectField({
         <MaterialCommunityIcons
           name={isOpen ? "chevron-up" : "chevron-down"}
           size={22}
-          color={COLORS.textPrimary}
+          color={disabled ? COLORS.textSecondary : COLORS.textPrimary}
         />
       </TouchableOpacity>
     </View>
