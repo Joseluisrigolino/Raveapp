@@ -50,7 +50,7 @@ import {
   fetchProvinces,
   fetchMunicipalities,
   fetchLocalities,
-} from "@/app/apis/georefHelpers";
+} from "@/app/apis/georefApi";
 
 /** Recurrentes (parties) */
 import { getPartiesByUser, createParty, Party } from "@/app/party/apis/partysApi";
@@ -1414,7 +1414,7 @@ export default function CreateEventScreen() {
       const url = `/v1/Entrada/GetEntradasFecha?IdFecha=${encodeURIComponent(
         idFecha
       )}`;
-      const { apiClient } = await import("@/app/apis/apiConfig");
+      const { apiClient } = await import("@/app/apis/apiClient");
       const resp = await apiClient.get(url);
       return !!resp;
     } catch {
@@ -2730,7 +2730,7 @@ export default function CreateEventScreen() {
                   setLocalityLoading(true);
                   try {
                     const { fetchLocalitiesByProvince } = await import(
-                      "@/app/apis/georefHelpers"
+                      "@/app/apis/georefApi"
                     );
                     const locs = await fetchLocalitiesByProvince(id);
                     setLocalities(locs || []);

@@ -1,5 +1,5 @@
 // src/utils/auth/authHelpers.ts
-import { apiClient, login as apiLogin } from "@/app/apis/apiConfig";
+import { apiClient, login as apiLogin } from "@/app/apis/apiClient";
 
 interface ApiRole { cdRol: number; dsRol: string }
 interface ApiUser {

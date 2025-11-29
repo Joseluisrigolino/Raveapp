@@ -1,5 +1,5 @@
 // src/app/scanner/apis/ScannerApi.ts
-import { apiClient, login } from "@/app/apis/apiConfig";
+import { apiClient, login } from "@/app/apis/apiClient";
 
 export type ControlarEntradaPayload = {
   idEntrada: string;

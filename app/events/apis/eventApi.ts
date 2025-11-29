@@ -1,5 +1,5 @@
 import { EventItem } from "@/app/events/types/EventItem";
-import { apiClient, login } from "@/app/apis/apiConfig";
+import { apiClient, login } from "@/app/apis/apiClient";
 import { mediaApi } from "@/app/apis/mediaApi";
 
 /**

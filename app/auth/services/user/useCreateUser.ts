@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { apiClient, login as apiLogin } from "@/app/apis/apiConfig";
+import { apiClient, login as apiLogin } from "@/app/apis/apiClient";
 
 type CreatePayload = any;
 

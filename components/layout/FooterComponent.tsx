@@ -23,7 +23,7 @@ import * as nav from "@/utils/navigation";
 import { useAuth } from "@/app/auth/AuthContext";
 import { mediaApi } from "@/app/apis/mediaApi";
 import { getProfile } from "@/app/auth/userHelpers";
-import { apiClient } from "@/app/apis/apiConfig";
+import { apiClient } from "@/app/apis/apiClient";
 import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 import { getSafeImageSource } from "@/utils/image";
 

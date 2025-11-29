@@ -1,5 +1,5 @@
 // app/party/apis/partysApi.ts
-import { apiClient, login } from "@/app/apis/apiConfig";
+import { apiClient, login } from "@/app/apis/apiClient";
 
 export type Party = {
   idFiesta: string;

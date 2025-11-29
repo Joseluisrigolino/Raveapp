@@ -4,7 +4,7 @@ import Constants from "expo-constants";
 import { loginUser, AuthUser as ApiAuthUser } from "@/app/auth/authHelpers";
 import { fbLoginWithGoogleIdToken, fbLogout, AuthUser as FbAuthUser, fbLoginWithGooglePopup } from "@/app/auth/firebaseAuthHelpers";
 import * as jwtDecode from "jwt-decode";
-import { apiClient, login as apiLogin } from "@/app/apis/apiConfig";
+import { apiClient, login as apiLogin } from "@/app/apis/apiClient";
 import { getProfile, createUsuario } from "@/app/auth/userHelpers";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 

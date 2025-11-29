@@ -27,11 +27,11 @@ import { useAuth } from "@/app/auth/AuthContext";
 import { getProfile } from "@/app/auth/userHelpers";
 import useUpdateUserProfile from "@/app/auth/services/user/useUpdateUserProfile";
 import { mediaApi } from "@/app/apis/mediaApi";
-import { apiClient } from "@/app/apis/apiConfig";
+import { apiClient } from "@/app/apis/apiClient";
 import useDeleteAccountProfile from "@/app/auth/services/user/useDeleteAccountProfile";
 import useVerifyEmail from "@/app/auth/services/user/useVerifyEmail";
 import ProfileUserPopupUpdateOk from "@/app/auth/components/user/profile-user/ProfileUserPopupUpdateOk";
-import { fetchProvinces, fetchMunicipalities, fetchLocalitiesByProvince, fetchLocalities } from "@/app/apis/georefHelpers";
+import { fetchProvinces, fetchMunicipalities, fetchLocalitiesByProvince, fetchLocalities } from "@/app/apis/georefApi";
 import { COLORS, FONT_SIZES, FONTS, RADIUS } from "@/styles/globalStyles";
 import { formatDateForUI } from "@/utils/formatDate";
 

@@ -1,4 +1,4 @@
-import { apiClient, login } from "@/app/apis/apiConfig";
+import { apiClient, login } from "@/app/apis/apiClient";
 
 // Tipo base y flexible para una reseña
 export type Review = {

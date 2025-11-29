@@ -1,20 +1,26 @@
-// Componente: Botón configurable (label, ícono, colores)
-// Comentarios en español, código en inglés
+// app/artists/components/admin/AdminNewArtistBtn.tsx
+
+// Botón configurable para "Nuevo artista" (texto + ícono).
 
 import React from "react";
-import { TouchableOpacity, Text, StyleSheet, StyleProp, ViewStyle } from "react-native";
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  StyleProp,
+  ViewStyle,
+} from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 
-// props configurables para poder setear desde la screen
 interface Props {
-  onPress: () => void;
-  label?: string;
-  iconName?: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-  bgColor?: string;
-  textColor?: string;
-  iconColor?: string;
-  style?: StyleProp<ViewStyle>;
+  onPress: () => void; // Acción al presionar el botón
+  label?: string; // Texto del botón
+  iconName?: React.ComponentProps<typeof MaterialCommunityIcons>["name"]; // Nombre del ícono
+  bgColor?: string; // Color de fondo
+  textColor?: string; // Color del texto
+  iconColor?: string; // Color del ícono
+  style?: StyleProp<ViewStyle>; // Estilos extra desde la screen
 }
 
 export default function AdminNewArtistBtn({
@@ -27,7 +33,10 @@ export default function AdminNewArtistBtn({
   style,
 }: Props) {
   return (
-    <TouchableOpacity style={[styles.addBtn, { backgroundColor: bgColor }, style]} onPress={onPress}>
+    <TouchableOpacity
+      style={[styles.addBtn, { backgroundColor: bgColor }, style]}
+      onPress={onPress}
+    >
       {iconName ? (
         <MaterialCommunityIcons
           name={iconName}
@@ -42,7 +51,7 @@ export default function AdminNewArtistBtn({
 }
 
 const styles = StyleSheet.create({
-  // botón base (alineado con estilo previo)
+  // Botón principal
   addBtn: {
     backgroundColor: "#0F172A",
     borderRadius: 14,
@@ -52,6 +61,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     flexDirection: "row",
   },
+  // Texto interno del botón
   addBtnText: {
     fontFamily: FONTS.subTitleMedium,
     fontSize: FONT_SIZES.button,

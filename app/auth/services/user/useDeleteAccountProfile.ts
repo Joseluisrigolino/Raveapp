@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { apiClient } from "@/app/apis/apiConfig";
+import { apiClient } from "@/app/apis/apiClient";
 import { useAuth } from "@/app/auth/AuthContext";
 import { useRouter } from "expo-router";
 import * as nav from "@/utils/navigation";

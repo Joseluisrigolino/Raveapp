@@ -1,15 +1,22 @@
-// Componente simple para mostrar un subtitle / encabezado pequeño
+// app/artists/components/artist/artist-profile/ArtistProfileSubtitleComponent.tsx
+// Subtitle simple para secciones dentro del perfil del artista (ej: "Sobre el artista").
+
 import React from "react";
-import { Text, StyleSheet } from "react-native";
+import { StyleSheet, Text, TextStyle } from "react-native";
 import { COLORS, FONT_SIZES, FONTS } from "@/styles/globalStyles";
 
-type Props = {
-  text?: string | null;
-  style?: any;
+type ArtistProfileSubtitleProps = {
+  text?: string | null;             // texto del subtítulo
+  style?: TextStyle | TextStyle[];  // estilos extra opcionales
 };
 
-export default function Subtitle({ text, style }: Props) {
+export default function ArtistProfileSubtitle({
+  text,
+  style,
+}: ArtistProfileSubtitleProps) {
+  // si no hay texto, no mostramos nada
   if (!text) return null;
+
   return <Text style={[styles.subtitle, style]}>{text}</Text>;
 }
 

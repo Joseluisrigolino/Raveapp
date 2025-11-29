@@ -1,128 +1,172 @@
-// src/screens/ArtistsScreens/ArtistsScreen.tsx
+// Pantalla de listado de artistas: buscador + listado ordenado alfabéticamente en grilla.
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react"; // React + estado local simple
 import {
   View,
   ScrollView,
   Text,
   ActivityIndicator,
   StyleSheet,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, usePathname } from "expo-router";
-import ROUTES from "@/routes";
-import * as nav from "@/utils/navigation";
+} from "react-native"; // Componentes base de React Native
+import { SafeAreaView } from "react-native-safe-area-context"; // Respeta las safe areas (notch, barras, etc.)
+import { useRouter, usePathname } from "expo-router"; // Navegación basada en rutas
 
-import ProtectedRoute from "@/app/auth/ProtectedRoute";
-import Header from "@/components/layout/HeaderComponent";
-import Footer from "@/components/layout/FooterComponent";
-import TabMenuComponent from "@/components/layout/TabMenuComponent";
-import ArtistCard from "@/app/artists/components/ArtistCardComponent";
-import ArtistListLetter from "@/app/artists/components/artist/artist-list/ArtistListLetterComponent";
+import { ROUTES } from "@/routes"; // Mapa centralizado de rutas
+import * as nav from "@/utils/navigation"; // Helper propio para navegación
 
-import { Artist } from "@/app/artists/types/Artist";
-import useGetArtists from "@/app/artists/services/useGetArtists";
-import { useAuth } from "@/app/auth/AuthContext";
-import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
-import SearchBarComponent from "@/components/common/SearchBarComponent";
+import ProtectedRoute from "@/app/auth/ProtectedRoute"; // Protege la pantalla por roles
+import { useAuth } from "@/app/auth/AuthContext"; // Contexto de auth para saber si es admin
 
+import Header from "@/components/layout/HeaderComponent"; // Header general de la app
+import Footer from "@/components/layout/FooterComponent"; // Footer común
+import TabMenuComponent from "@/components/layout/TabMenuComponent"; // Tabs superiores
+import SearchBarComponent from "@/components/common/SearchBarComponent"; // Barra de búsqueda
+
+import ArtistCard from "@/app/artists/components/ArtistCardComponent"; // Card visual de un artista
+import ArtistListLetter from "@/app/artists/components/artist/artist-list/ArtistListLetterComponent"; // Letra separadora (A, B, C...)
+
+import useGetArtists from "@/app/artists/services/useGetArtists"; // Hook que trae la lista de artistas
+import { Artist } from "@/app/artists/types/Artist"; // Tipo de artista
+
+import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles"; // Estilos globales
+
+// Alfabeto que usamos para agrupar artistas por inicial del nombre
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+// Componente principal: listado de artistas con buscador y tabs
 export default function ArtistsScreen() {
-  const router = useRouter();
-  const path = usePathname();
-  // Usar helpers del contexto para roles y autenticación
+  const router = useRouter(); // Para navegar entre pantallas
+  const pathname = usePathname(); // Ruta actual, usada para marcar el tab activo
+
+  // Obtenemos helper para roles desde el contexto de auth
   const { hasRole } = useAuth();
   const isAdmin = hasRole("admin");
 
-  // estados en inglés, comentarios en español
+  // Texto de la barra de búsqueda
   const [search, setSearch] = useState<string>("");
-  const { data: artistsList, isLoading, refresh } = useGetArtists();
 
-  // cargar artistas al montar (hook maneja la carga)
-  useEffect(() => {
-    // refresh está manejado internamente por el hook, pero lo dejamos
-    // disponible si queremos forzar una recarga en el futuro.
-  }, [refresh]);
+  // Lista de artistas desde la API (hook ya maneja la carga inicial)
+  const { data: artistsList, isLoading } = useGetArtists();
 
-  // filtrar artistas activos por búsqueda (lógica simple)
+  // Filtramos:
+  // 1) solo artistas activos
+  // 2) que contengan el texto buscado en el nombre (case-insensitive)
   const filteredArtists = artistsList
-    .filter((a) => a.isActivo)
-    .filter((a) => a.name.toLowerCase().includes(search.toLowerCase()));
+    .filter((artist) => artist.isActivo)
+    .filter((artist) =>
+      artist.name.toLowerCase().includes(search.toLowerCase())
+    );
 
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-
-  // abrir detalle de artista
+  // Navegar al detalle de un artista (pantalla ArtistScreen)
   const openArtist = (artist: Artist) => {
-    nav.push(router, { pathname: ROUTES.MAIN.ARTISTS.ITEM, params: { id: artist.idArtista } });
+    nav.push(router, {
+      pathname: ROUTES.MAIN.ARTISTS.ITEM,
+      params: { id: artist.idArtista },
+    });
   };
 
-  const currentScreen = path.split("/").pop() || "";
+  // Parte final de la ruta (ej: "artists", "news", etc.)
+  const currentScreen = pathname.split("/").pop() || "";
+
+  // Tab de administración de artistas (solo visible para admin)
   const adminTab = {
     label: "Administrar artistas",
     route: ROUTES.ADMIN.ARTISTS.MANAGE,
     isActive: currentScreen === ROUTES.ADMIN.ARTISTS.MANAGE.split("/").pop(),
   };
+
+  // Tab de noticias (cuando el usuario no es admin)
   const newsTab = {
     label: "Noticias",
     route: ROUTES.MAIN.NEWS.LIST,
     isActive: currentScreen === ROUTES.MAIN.NEWS.LIST.split("/").pop(),
   };
+
+  // Tab de lista de artistas (pantalla actual)
   const artistsTab = {
     label: "Artistas",
     route: ROUTES.MAIN.ARTISTS.LIST,
     isActive: currentScreen === ROUTES.MAIN.ARTISTS.LIST.split("/").pop(),
   };
 
+  // Si es admin: Admin + Artistas
+  // Si no: Noticias + Artistas
   const tabs = isAdmin ? [adminTab, artistsTab] : [newsTab, artistsTab];
+
+  // Contenido principal: loader o grilla de artistas
+  const content = isLoading ? (
+    // Estado de carga: solo mostramos un spinner centrado
+    <View style={styles.loaderContainer}>
+      <ActivityIndicator size="large" color={COLORS.primary} />
+    </View>
+  ) : (
+    // Cuando ya tenemos datos, renderizamos el scroll con las letras y las cards
+    <ScrollView contentContainerStyle={styles.scrollContent}>
+      {/* Mensaje de vacío si no hay artistas luego del filtro */}
+      {filteredArtists.length === 0 && (
+        <Text style={styles.emptyText}>No se encontraron artistas.</Text>
+      )}
+
+      {/* Recorremos el alfabeto y group por inicial del nombre */}
+      {ALPHABET.map((letter) => {
+        // Agrupamos artistas cuya primera letra del nombre coincide con letter
+        const group = filteredArtists.filter(
+          (artist) => artist.name.charAt(0).toUpperCase() === letter
+        );
+
+        // Si no hay artistas con esa letra, no renderizamos nada
+        if (!group.length) return null;
+
+        return (
+          <View key={letter} style={styles.letterGroup}>
+            {/* Letra de sección (A, B, C, etc.) */}
+            <ArtistListLetter letter={letter} />
+
+            {/* Fila con cards en grilla (2 columnas) */}
+            <View style={styles.cardsRow}>
+              {group.map((artist) => (
+                <View key={artist.idArtista} style={styles.cardWrapper}>
+                  <ArtistCard artist={artist} onPress={() => openArtist(artist)} />
+                </View>
+              ))}
+            </View>
+          </View>
+        );
+      })}
+    </ScrollView>
+  );
 
   return (
     <ProtectedRoute allowedRoles={["admin", "owner", "user"]}>
       <SafeAreaView style={styles.container}>
+        {/* Header global */}
         <Header />
+
+        {/* Tabs superiores (Admin/Noticias + Artistas) */}
         <TabMenuComponent tabs={tabs} />
 
+        {/* Buscador de artistas */}
         <View style={styles.searchWrapper}>
-          <SearchBarComponent value={search} onChangeText={setSearch} placeholder="Buscar artista..." containerStyle={{ marginHorizontal: 0 }} />
+          <SearchBarComponent
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Buscar artista..."
+            // Ocupa todo el ancho; el wrapper maneja el padding
+            containerStyle={{ marginHorizontal: 0 }}
+          />
         </View>
 
-        {isLoading ? (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-          </View>
-        ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            {filteredArtists.length === 0 && (
-              <Text style={styles.emptyText}>No se encontraron artistas.</Text>
-            )}
-            {alphabet.map((letter) => {
-              const group = filteredArtists.filter(
-                (a) => a.name.charAt(0).toUpperCase() === letter
-              );
-              if (!group.length) return null;
+        {/* Contenido principal (loader o listado) */}
+        {content}
 
-              const rowStyle = styles.rowTwo;
-
-              return (
-                <View key={letter} style={styles.letterGroup}>
-                    <ArtistListLetter letter={letter} />
-                  <View style={[styles.cardsRow, rowStyle]}>
-                    {group.map((artist) => (
-                      <View key={artist.idArtista} style={styles.cardWrapper}>
-                        <ArtistCard artist={artist} onPress={() => openArtist(artist)} />
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              );
-            })}
-          </ScrollView>
-        )}
-
+        {/* Footer global */}
         <Footer />
       </SafeAreaView>
     </ProtectedRoute>
   );
 }
 
+// Estilos específicos de esta pantalla
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -157,13 +201,10 @@ const styles = StyleSheet.create({
   cardsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-  },
-  rowTwo: {
-    justifyContent: "space-between",
+    justifyContent: "space-between", // 2 columnas bien espaciadas
   },
   cardWrapper: {
     width: "48%",
     marginBottom: 16,
-    marginHorizontal: "1%",
   },
 });

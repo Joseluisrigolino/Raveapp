@@ -1,5 +1,5 @@
 // src/utils/auth/userHelpers.ts
-import { apiClient } from "@/app/apis/apiConfig";
+import { apiClient } from "@/app/apis/apiClient";
 
 // Shape de la API
 export interface DomicilioApi {

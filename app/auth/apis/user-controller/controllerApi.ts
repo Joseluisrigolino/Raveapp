@@ -2,7 +2,7 @@
 // Comentarios en español: explicación sencilla de cada función
 
 // imports
-import { apiClient, login } from "@/app/apis/apiConfig";
+import { apiClient, login } from "@/app/apis/apiClient";
 import { ControllerUser } from "@/app/auth/types/ControllerUser";
 
 // helpers

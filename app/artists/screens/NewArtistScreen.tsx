@@ -1,5 +1,5 @@
-// Pantalla para crear un nuevo artista
-// Se simplifica la lógica y se usan nombres en inglés
+// Pantalla para crear un nuevo artista (solo admin).
+// Maneja formulario + imagen + subida de media, y muestra un popup de éxito.
 
 import React, { useState } from "react";
 import {
@@ -8,97 +8,119 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Image,
-  Alert,
   TextInput,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import SelectImageArtistComponent from "@/app/artists/components/SelectImageArtistComponent";
 
-// Layout components
+// Layout comunes de la app
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 
-// API helpers (no changes to endpoints)
-import { fetchArtistsFromApi } from "@/app/artists/apis/artistApi";
-import useCreateArtista from "@/app/artists/services/useCreateArtista";
-import { mediaApi } from "@/app/apis/mediaApi";
+// Componentes específicos de artistas
+import SelectImageArtistComponent from "@/app/artists/components/SelectImageArtistComponent";
 import AdminPopupNewArtist from "@/app/artists/components/admin/new-artist/AdminPopupNewArtist";
 
-// Styles and shared inputs
-import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
+// API / hooks relacionados a artistas y media
+import { mediaApi } from "@/app/apis/mediaApi";
+import { fetchArtistsFromApi } from "@/app/artists/apis/artistApi";
+import useCreateArtista from "@/app/artists/services/useCreateArtista";
+
+// Estilos y componentes compartidos
+import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 import InputText from "@/components/common/inputText";
 import InputDesc from "@/components/common/inputDesc";
 import { capitalizeFirst } from "@/utils/CapitalizeFirstLetter";
 
 // ------------------ HELPERS ------------------
 
-// helper simple: construir objeto file desde uri
-function buildFileObjectFromUri(uri: string) {
-  const fileName = uri.split("/").pop() || "image.jpg";
-  const fileType = fileName.toLowerCase().endsWith(".png")
-    ? "image/png"
-    : "image/jpeg";
-  return { uri, name: fileName, type: fileType } as any;
-}
+// Tipo simple para representar el archivo que espera mediaApi.upload
+type UploadFile = {
+  uri: string;
+  name: string;
+  type: string;
+};
 
-// (helper now moved to utils/CapitalizeFirstLetter.ts)
+// helper: a partir de una URI local del picker, arma el objeto "file" para subir
+function buildFileObjectFromUri(uri: string): UploadFile {
+  // tomamos el último segmento como nombre de archivo
+  const fileName = uri.split("/").pop() || "image.jpg";
+  const lower = fileName.toLowerCase();
+  // si termina en .png, marcamos tipo PNG, si no asumimos JPEG
+  const type = lower.endsWith(".png") ? "image/png" : "image/jpeg";
+  return { uri, name: fileName, type };
+}
 
 // ------------------ MAIN COMPONENT ------------------
 
-// Pantalla para crear un nuevo artista
 export default function NewArtistScreen() {
-  const router = useRouter();
+  const router = useRouter(); // para volver al listado cuando se crea el artista
 
-  // hook para crear artista (estado de carga simple)
+  // hook que encapsula la llamada al endpoint de creación
   const { createArtist, isLoading } = useCreateArtista();
 
-  // estados del formulario (nombres en inglés internamente)
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [instagram, setInstagram] = useState("");
-  const [spotify, setSpotify] = useState("");
-  const [soundcloud, setSoundcloud] = useState("");
-  const [image, setImage] = useState<string | null>(null);
+  // estados del formulario (internamente en inglés, textos visibles en español)
+  const [name, setName] = useState(""); // nombre del artista
+  const [description, setDescription] = useState(""); // bio / info general
+  const [instagram, setInstagram] = useState(""); // URL de Instagram
+  const [spotify, setSpotify] = useState(""); // URL de Spotify
+  const [soundcloud, setSoundcloud] = useState(""); // URL de SoundCloud
+  const [image, setImage] = useState<string | null>(null); // URI local de la imagen
+
+  // estado para el popup de "artista creado"
   const [createdVisible, setCreatedVisible] = useState(false);
   const [createdName, setCreatedName] = useState<string | null>(null);
 
-  // abrir selector de imagen (galería)
-  const pickImage = async () => {
+  // Abrir el selector de imágenes (galería)
+  const handlePickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.9,
       });
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setImage(result.assets[0].uri);
-      }
+
+      // si el usuario cancela, no hacemos nada
+      if (result.canceled || !result.assets?.length) return;
+
+      // nos quedamos con la primera imagen elegida
+      setImage(result.assets[0].uri);
     } catch (e) {
-      // error simple, no crash
-      console.warn("pickImage error", e);
+      // log sencillo para no romper la pantalla
+      console.warn("handlePickImage error", e);
+      Alert.alert("Error", "No se pudo abrir la galería.");
     }
   };
 
-  // quitar imagen seleccionada
-  const removeImage = () => setImage(null);
+  // Quitar la imagen seleccionada (solo limpia el estado local)
+  const handleRemoveImage = () => {
+    setImage(null);
+  };
 
-  // guardar artista y opcionalmente subir imagen
-  const saveArtist = async () => {
-    // validación acumulada: listar todos los campos obligatorios que falten
+  // Guardar artista y, si hay imagen, subirla a media
+  const handleSaveArtist = async () => {
+    // si ya se está enviando, evitamos doble submit
+    if (isLoading) return;
+
+    // validación: juntamos todos los campos obligatorios que falten
     const missing: string[] = [];
     if (!name.trim()) missing.push("Nombre del artista");
     if (!description.trim()) missing.push("Descripción del artista");
 
+    // si falta algo, mostramos alerta y frenamos
     if (missing.length) {
-      Alert.alert("Faltan datos", `Por favor completá los siguientes campos: ${missing.join(", ")}.`);
+      Alert.alert(
+        "Faltan datos",
+        `Por favor completá los siguientes campos: ${missing.join(", ")}.`
+      );
       return;
     }
 
     try {
-      // crear artista usando hook
+      // 1) Crear artista en backend (sin imagen todavía)
       await createArtist({
         name,
         description,
@@ -107,11 +129,13 @@ export default function NewArtistScreen() {
         soundcloudURL: soundcloud,
       });
 
-      // buscar el artista creado (estrategia simple: buscar por nombre)
-      const all = await fetchArtistsFromApi();
-      const created = all.find((a) => a.name === name);
+      // 2) Buscar el artista recién creado
+      //    Estrategia simple: traer lista y matchear por nombre
+      //    (sabemos que acá podría haber colisión si hay dos con el mismo nombre)
+      const allArtists = await fetchArtistsFromApi();
+      const created = allArtists.find((a) => a.name === name);
 
-      // subir imagen si existe
+      // 3) Si encontramos el artista y hay imagen, subimos media asociada
       if (created && image) {
         const file = buildFileObjectFromUri(image);
         await mediaApi.upload(created.idArtista, file, undefined, {
@@ -119,50 +143,58 @@ export default function NewArtistScreen() {
         });
       }
 
-      // mostrar popup de creado (misma apariencia que AdminCardPopupEliminate)
+      // 4) Mostramos popup de confirmación con el nombre (del backend o el ingresado)
       setCreatedName(created?.name ?? name);
       setCreatedVisible(true);
     } catch (err) {
-      // manejo de error simple
       console.error("Error creando artista", err);
-      Alert.alert("Error al crear artista", "Revisá los datos ingresados.");
+      Alert.alert(
+        "Error al crear artista",
+        "Revisá los datos ingresados o intentá nuevamente."
+      );
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header general de la app */}
       <Header />
+
+      {/* Contenido scrollable: formulario completo */}
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Título principal (UI en español) */}
+        {/* Título principal de la pantalla */}
         <Text style={styles.title}>Ingresar nuevo artista</Text>
 
-        {/* Imagen del artista (reusable component) */}
+        {/* Imagen del artista (componente reutilizable) */}
         <SelectImageArtistComponent
           image={image}
-          onPick={pickImage}
-          onRemove={removeImage}
+          onPick={handlePickImage}
+          onRemove={handleRemoveImage}
           label="Foto del artista"
+          showNotice
+          noticeText="JPG / PNG hasta 2MB."
+          deleteLabel="Eliminar vista previa"
         />
 
-        {/* Nombre */}
+        {/* Campo: nombre del artista */}
         <InputText
           label="Nombre del artista"
           value={name}
-          isEditing={true}
+          isEditing
           onBeginEdit={() => {}}
-          // forzar primera letra mayúscula mientras se escribe
-          onChangeText={(t) => setName(capitalizeFirst(t))}
+          // aplicamos capitalización mientras escribe
+          onChangeText={(text) => setName(capitalizeFirst(text))}
           placeholder="Ingresa el nombre del artista..."
           containerStyle={{ width: "100%", alignItems: "stretch" }}
           labelStyle={{ width: "100%", textAlign: "left" }}
           inputStyle={{ width: "100%" }}
         />
 
-        {/* Descripción */}
+        {/* Campo: descripción / bio */}
         <InputDesc
           label="Información del artista"
           value={description}
-          isEditing={true}
+          isEditing
           onBeginEdit={() => {}}
           onChangeText={setDescription}
           autoFocus={false}
@@ -172,7 +204,7 @@ export default function NewArtistScreen() {
           inputStyle={{ width: "100%" }}
         />
 
-        {/* URLs sociales (UI en español) */}
+        {/* Campo: Instagram */}
         <View style={styles.fieldBlock}>
           <Text style={styles.sectionLabel}>URL de Instagram del artista</Text>
           <View style={styles.iconInputRow}>
@@ -195,8 +227,11 @@ export default function NewArtistScreen() {
           </View>
         </View>
 
+        {/* Campo: SoundCloud */}
         <View style={styles.fieldBlock}>
-          <Text style={styles.sectionLabel}>URL de SoundCloud del artista</Text>
+          <Text style={styles.sectionLabel}>
+            URL de SoundCloud del artista
+          </Text>
           <View style={styles.iconInputRow}>
             <MaterialCommunityIcons
               name="soundcloud"
@@ -217,6 +252,7 @@ export default function NewArtistScreen() {
           </View>
         </View>
 
+        {/* Campo: Spotify */}
         <View style={styles.fieldBlock}>
           <Text style={styles.sectionLabel}>URL de Spotify del artista</Text>
           <View style={styles.iconInputRow}>
@@ -239,25 +275,38 @@ export default function NewArtistScreen() {
           </View>
         </View>
 
-        {/* Botón guardar */}
-        <TouchableOpacity style={styles.btn} onPress={saveArtist}>
-          <Text style={styles.btnText}>Crear artista</Text>
+        {/* Botón de envío / creación */}
+        <TouchableOpacity
+          style={styles.btn}
+          onPress={handleSaveArtist}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator color={COLORS.cardBg} />
+          ) : (
+            <Text style={styles.btnText}>Crear artista</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Popup de confirmación cuando el artista se creó correctamente */}
       <AdminPopupNewArtist
         visible={createdVisible}
         artistName={createdName || undefined}
         onClose={() => {
           setCreatedVisible(false);
-          router.back();
+          router.back(); // volvemos a la pantalla anterior (lista de artistas admin)
         }}
       />
+
+      {/* Footer común de la app */}
       <Footer />
     </SafeAreaView>
   );
 }
 
 // ------------------ STYLES ------------------
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -280,56 +329,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 6,
   },
-  imageContainer: {
-    alignItems: "center",
-    marginVertical: 16,
+  fieldBlock: {
+    marginTop: 10,
   },
-  artistImage: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    marginBottom: 12,
-  },
-  previewCircle: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    borderWidth: 2,
-    borderStyle: "dashed",
-    borderColor: "#c8cfd9",
-    backgroundColor: "#dbe2ea",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  previewText: {
-    marginTop: 6,
-    color: COLORS.textSecondary,
-  },
-  deleteButton: {
-    backgroundColor: COLORS.negative,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: RADIUS.card,
-    marginBottom: 12,
-  },
-  deleteButtonText: {
-    color: "#fff",
-    fontFamily: FONTS.bodyRegular,
-  },
-  selectImageButton: {
-    backgroundColor: COLORS.cardBg,
-    borderWidth: 1,
-    borderColor: COLORS.borderInput,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 14,
-  },
-  selectImageButtonText: {
-    color: COLORS.textPrimary,
-    fontFamily: FONTS.subTitleMedium,
-  },
-  fieldBlock: { marginTop: 10 },
   iconInputRow: {
     flexDirection: "row",
     alignItems: "center",

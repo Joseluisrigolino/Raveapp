@@ -29,7 +29,7 @@ import {
   fetchMunicipalities,
   fetchLocalities,
   fetchLocalitiesByName,
-} from "@/app/apis/georefHelpers";
+} from "@/app/apis/georefApi";
 import { getEventFlags } from "@/app/events/apis/eventApi";
 
 import { COLORS, FONT_SIZES } from "@/styles/globalStyles";

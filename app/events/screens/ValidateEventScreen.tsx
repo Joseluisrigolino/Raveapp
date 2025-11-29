@@ -14,7 +14,7 @@ import Footer from "@/components/layout/FooterComponent";
 import ProtectedRoute from "@/app/auth/ProtectedRoute";
 import { fetchEvents, setEventStatus, ESTADO_CODES, getEventFlags, EventItemWithExtras, fetchGenres, ApiGenero } from "@/app/events/apis/eventApi";
 import { fetchEntradasFechaRaw, ApiEntradaFechaRaw, getTipoMap } from "@/app/events/apis/entradaApi";
-import { apiClient, login } from "@/app/apis/apiConfig";
+import { apiClient, login } from "@/app/apis/apiClient";
 import { sendGenericEmail } from "@/app/apis/mailsApi";
 import * as nav from "@/utils/navigation";
 import ROUTES from "@/routes";

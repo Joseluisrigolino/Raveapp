@@ -1,52 +1,40 @@
-// Hook para manejar el estado de like de un artista
-// Mantiene la lógica de toggle y refresco separado de la UI
-import { useState, useRef, useEffect } from "react";
+// app/artists/services/useLikeArtist.ts
+// Hook para manejar el estado de "me gusta" de un artista.
+
+import { useState } from "react";
 import { Alert } from "react-native";
-import {
-  fetchOneArtistFromApi,
-  toggleArtistFavoriteOnApi,
-} from "@/app/artists/apis/artistApi";
+import { toggleArtistFavoriteOnApi } from "@/app/artists/apis/artistApi";
 
 export default function useLikeArtist() {
+  // Estado local del corazón (like / no like) en la UI
   const [isLiked, setIsLiked] = useState(false);
-  const timerRef = useRef<any>(null);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
-
-  // toggleLike realizará la llamada a la API y luego pedirá un refetch simple
-  // Retorna el artista actualizado si pudo obtenerlo, o undefined si hubo error
+  /**
+   * toggleLike:
+   * - recibe userId y artistId
+   * - hace un toggle optimista del estado (cambia el corazón al toque)
+   * - si la API falla, revierte el estado y avisa con un Alert
+   *
+   * El re-fetch de datos completos del artista (likes, avatars, etc.)
+   * lo hace la pantalla que usa este hook (ej: ArtistScreen) llamando a refresh().
+   */
   const toggleLike = async (userId?: string, artistId?: string) => {
-    if (!userId || !artistId) return undefined;
+    if (!userId || !artistId) return;
 
-    // feedback inmediato
-    setIsLiked((v) => !v);
+    // Guardamos el estado anterior por si hay que revertir
+    const prev = isLiked;
+
+    // Toggle optimista para dar feedback rápido en la UI
+    setIsLiked(!prev);
 
     try {
+      // Llamamos a la API para marcar o desmarcar favorito
       await toggleArtistFavoriteOnApi(userId, artistId);
     } catch (err) {
-      // revertir y notificar
-      setIsLiked((v) => !v);
+      // Si algo falla, volvemos al estado anterior y avisamos
+      setIsLiked(prev);
       Alert.alert("Error", "No se pudo actualizar el favorito");
-      return undefined;
     }
-
-    // esperar 1s y pedir datos actualizados
-    if (timerRef.current) clearTimeout(timerRef.current);
-    return new Promise<any>(async (resolve) => {
-      timerRef.current = setTimeout(async () => {
-        try {
-          const updated = await fetchOneArtistFromApi(artistId, userId);
-          if (updated) setIsLiked(!!updated.isLiked);
-          resolve(updated);
-        } catch (e) {
-          resolve(undefined);
-        }
-      }, 1000);
-    });
   };
 
   return { isLiked, setIsLiked, toggleLike };

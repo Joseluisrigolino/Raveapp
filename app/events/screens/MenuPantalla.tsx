@@ -28,7 +28,7 @@ import {
   fetchMunicipalities,
   fetchLocalities,
   fetchLocalitiesByName,
-} from "@/app/apis/georefHelpers";
+} from "@/app/apis/georefApi";
 
 import { useAuth } from "@/app/auth/AuthContext";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";

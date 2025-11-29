@@ -1,4 +1,4 @@
-import { apiClient, login } from "@/app/apis/apiConfig";
+import { apiClient, login } from "@/app/apis/apiClient";
 
 /** =========================================================================
  *                               TIPOS

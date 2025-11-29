@@ -17,7 +17,7 @@ import {
   fetchProvinces,
   fetchMunicipalities,
   fetchLocalities,
-} from "@/app/apis/georefHelpers";
+} from "@/app/apis/georefApi";
 
 interface FiltersSectionProps {
   // Chips horizontales

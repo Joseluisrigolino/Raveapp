@@ -1,9 +1,11 @@
-// Hook sencillo para crear un artista mediante POST
-// Comentarios en español, internals en inglés
-import { useState } from 'react';
-import { createArtistOnApi } from '@/app/artists/apis/artistApi';
+// app/artists/services/useCreateArtista.ts
+// Hook sencillo para crear un artista mediante POST al backend.
 
-type CreatePayload = {
+import { useCallback, useState } from "react";
+import { createArtistOnApi } from "@/app/artists/apis/artistApi";
+
+// Payload mínimo necesario para crear un artista
+type CreateArtistPayload = {
   name: string;
   description?: string;
   instagramURL?: string;
@@ -12,23 +14,29 @@ type CreatePayload = {
 };
 
 export default function useCreateArtista() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false); // flag de carga
+  const [error, setError] = useState<any>(null);     // último error (si hubo)
 
-  // crear artista: recibe payload y ejecuta el endpoint
-  const createArtist = async (payload: CreatePayload) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const res = await createArtistOnApi(payload);
-      setIsLoading(false);
-      return res;
-    } catch (err) {
-      setError(err);
-      setIsLoading(false);
-      throw err;
-    }
-  };
+  // Función que envía el POST al backend
+  const createArtist = useCallback(
+    async (payload: CreateArtistPayload) => {
+      setIsLoading(true);
+      setError(null);
 
-  return { createArtist, isLoading, error };
+      try {
+        const response = await createArtistOnApi(payload);
+        return response;
+      } catch (err) {
+        // guardamos el error para que la UI decida qué hacer
+        setError(err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  // Devolvemos la función y estados para que la pantalla los use
+  return { createArtist, isLoading, error } as const;
 }

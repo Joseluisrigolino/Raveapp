@@ -6,7 +6,7 @@ import {
   fetchLocalities,
   fetchLocalitiesByName,
   fetchLocalitiesByProvince,
-} from "@/app/apis/georefHelpers";
+} from "@/app/apis/georefApi";
 import {
   getUsuarioById,
   updateUsuario,

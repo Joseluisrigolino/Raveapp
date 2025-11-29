@@ -45,7 +45,7 @@ type UpdateEventoRequest = {
 };
 import { fetchArtistsFromApi } from '@/app/artists/apis/artistApi';
 import { Artist } from '@/app/artists/types/Artist';
-import { fetchProvinces, fetchMunicipalities, fetchLocalities, fetchLocalitiesByProvince } from '@/app/apis/georefHelpers';
+import { fetchProvinces, fetchMunicipalities, fetchLocalities, fetchLocalitiesByProvince } from '@/app/apis/georefApi';
 import { useAuth } from '@/app/auth/AuthContext';
 import GenreSelector from '@/app/events/components/create/GenreSelector';
 import ArtistSelector from '@/app/events/components/create/ArtistSelector';

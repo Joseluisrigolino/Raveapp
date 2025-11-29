@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { apiClient, login } from "@/app/apis/apiConfig";
+import { apiClient, login } from "@/app/apis/apiClient";
 import { deleteControllerUser } from "@/app/auth/apis/user-controller/controllerApi";
 
 // Hook para eliminar users controladores.

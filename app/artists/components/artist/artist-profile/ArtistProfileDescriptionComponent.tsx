@@ -1,14 +1,20 @@
-// Componente para mostrar la descripción del artista
+// app/artists/components/artist/artist-profile/ArtistProfileDescriptionComponent.tsx
+// Muestra el texto de descripción / bio del artista.
+
 import React from "react";
-import { Text, StyleSheet } from "react-native";
+import { StyleSheet, Text, TextStyle } from "react-native";
 import { COLORS, FONT_SIZES, FONTS } from "@/styles/globalStyles";
 
-type Props = {
-  text?: string | null;
-  style?: any;
+type ArtistProfileDescriptionProps = {
+  text?: string | null;          // descripción del artista (puede venir null/undefined)
+  style?: TextStyle | TextStyle[]; // estilos extra opcionales
 };
 
-export default function Description({ text, style }: Props) {
+export default function ArtistProfileDescription({
+  text,
+  style,
+}: ArtistProfileDescriptionProps) {
+  // Si no hay texto mandamos string vacío para no romper el layout
   return <Text style={[styles.text, style]}>{text || ""}</Text>;
 }
 

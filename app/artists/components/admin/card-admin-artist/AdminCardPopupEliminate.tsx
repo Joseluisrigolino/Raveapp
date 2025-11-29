@@ -1,27 +1,46 @@
-// Popup de confirmación para eliminar artista
-// Comentarios en español, código en inglés
+// app/artists/components/admin/card-admin-artist/AdminCardPopupEliminate.tsx
+
+// Popup de confirmación para eliminar un artista.
 
 import React from "react";
-import { Modal, View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
+import {
+  Modal,
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+} from "react-native";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 interface Props {
-  visible: boolean;
-  artistName?: string;
-  loading?: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
+  visible: boolean; // Muestra/oculta el modal
+  artistName?: string; // Nombre del artista a mostrar en el mensaje
+  loading?: boolean; // Si está borrando, deshabilita botones y muestra loader
+  onCancel: () => void; // Cerrar sin borrar
+  onConfirm: () => void; // Confirmar borrado
 }
 
-export default function AdminCardPopupEliminate({ visible, artistName, loading = false, onCancel, onConfirm }: Props) {
+export default function AdminCardPopupEliminate({
+  visible,
+  artistName,
+  loading = false,
+  onCancel,
+  onConfirm,
+}: Props) {
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
+    <Modal
+      transparent
+      animationType="fade"
+      visible={visible}
+      onRequestClose={onCancel}
+    >
       <View style={styles.modalBackdrop}>
         <View style={styles.modalCard}>
           <Text style={styles.modalTitle}>Eliminar artista</Text>
+
           <Text style={styles.modalSubtitle}>
             {artistName ? (
-              // Mostrar el nombre del artista en negrita dentro de la frase
               <>
                 Vas a eliminar "
                 <Text style={styles.bold}>{artistName}</Text>
@@ -30,14 +49,24 @@ export default function AdminCardPopupEliminate({ visible, artistName, loading =
             ) : (
               "Vas a eliminar este artista."
             )}
-            {"\n"}Esta acción no se puede deshacer.
+            {"\n"}
+            Esta acción no se puede deshacer.
           </Text>
 
           <View style={styles.modalActions}>
-            <TouchableOpacity disabled={loading} style={styles.btnGhost} onPress={onCancel}>
+            <TouchableOpacity
+              disabled={loading}
+              style={styles.btnGhost}
+              onPress={onCancel}
+            >
               <Text style={styles.btnGhostText}>Cancelar</Text>
             </TouchableOpacity>
-            <TouchableOpacity disabled={loading} style={styles.btnPrimary} onPress={onConfirm}>
+
+            <TouchableOpacity
+              disabled={loading}
+              style={styles.btnPrimary}
+              onPress={onConfirm}
+            >
               {loading ? (
                 <ActivityIndicator color={COLORS.backgroundLight} />
               ) : (
@@ -52,6 +81,7 @@ export default function AdminCardPopupEliminate({ visible, artistName, loading =
 }
 
 const styles = StyleSheet.create({
+  // Fondo semitransparente detrás del modal
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.35)",
@@ -59,6 +89,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
   },
+  // Tarjeta del modal
   modalCard: {
     width: "100%",
     maxWidth: 380,
@@ -78,6 +109,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginBottom: 12,
   },
+  // Fila de botones
   modalActions: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -86,6 +118,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     columnGap: 10,
   },
+  // Botón secundario (cancelar)
   btnGhost: {
     paddingVertical: 10,
     paddingHorizontal: 14,
@@ -102,6 +135,7 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.button,
     color: COLORS.textPrimary,
   },
+  // Botón principal (eliminar)
   btnPrimary: {
     paddingVertical: 10,
     paddingHorizontal: 14,
@@ -117,7 +151,7 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.button,
     color: COLORS.backgroundLight,
   },
-  // estilo para texto en negrita dentro de los subtítulos (nombre del artista)
+  // Estilo para resaltar el nombre del artista
   bold: {
     fontWeight: "700",
   },

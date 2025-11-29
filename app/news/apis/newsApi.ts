@@ -1,5 +1,5 @@
 // src/utils/news/newsApi.ts
-import { apiClient, login } from "@/app/apis/apiConfig";
+import { apiClient, login } from "@/app/apis/apiClient";
 import { NewsItem } from "@/app/news/types/NewsInterface";
 import { mediaApi } from "@/app/apis/mediaApi";
 
