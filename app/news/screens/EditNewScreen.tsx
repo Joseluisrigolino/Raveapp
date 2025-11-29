@@ -32,6 +32,16 @@ import NewsImageMediaComponent from "../components/NewsImageMediaComponent";
 import NewsSuccessPopupComponent from "../components/create/NewsSuccessPopupComponent";
 
 export default function EditNewScreen() {
+    // Popup de alerta unificado
+    const [popupVisible, setPopupVisible] = useState(false);
+    const [popupTitle, setPopupTitle] = useState<string>("");
+    const [popupMessage, setPopupMessage] = useState<string>("");
+
+    const showPopup = (title: string, message: string) => {
+      setPopupTitle(title);
+      setPopupMessage(message);
+      setPopupVisible(true);
+    };
   const { id } = useLocalSearchParams<{ id?: string }>();
   const path = usePathname();
   const router = useRouter();
@@ -62,9 +72,16 @@ export default function EditNewScreen() {
     if (!selectedImage) missing.push("Imagen");
 
     if (missing.length) {
-      Alert.alert("Faltan datos", `Por favor completá los siguientes campos: ${missing.join(", ")}.`);
+      showPopup("Faltan datos", `Por favor completá los siguientes campos: ${missing.join(", ")}.`);
       return;
     }
+      {/* Popup de alerta unificado */}
+      <NewsSuccessPopupComponent
+        visible={popupVisible}
+        title={popupTitle}
+        message={popupMessage}
+        onClose={() => setPopupVisible(false)}
+      />
 
     const result = await save();
     if (result.ok) {

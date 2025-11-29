@@ -158,16 +158,30 @@ function TicketPurchasedScreenContent() {
     return null;
   }, [entries, eventData]);
 
+  // Estado para el popup modal local
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupTitle, setPopupTitle] = useState("");
+  const [popupMessage, setPopupMessage] = useState("");
+  const [popupType, setPopupType] = useState("ok"); // "ok" | "confirm"
+  const [popupOnConfirm, setPopupOnConfirm] = useState<(() => void) | null>(null);
+  const [popupOnCancel, setPopupOnCancel] = useState<(() => void) | null>(null);
+
+  // Helper para mostrar popup tipo NewsSuccessPopupComponent
+  const showPopup = (title: string, message: string, type: "ok" | "confirm" = "ok", onConfirm?: () => void, onCancel?: () => void) => {
+    setPopupTitle(title);
+    setPopupMessage(message);
+    setPopupType(type);
+    setPopupOnConfirm(() => onConfirm || null);
+    setPopupOnCancel(() => onCancel || null);
+    setPopupVisible(true);
+  };
+
   const handleSubmitReview = async () => {
     const trimmed = (comment ?? "").trim();
     if (!userIdForReview) {
-      Alert.alert(
-        "Sesión requerida",
-        "No encontramos tu usuario. Volvé a iniciar sesión."
-      );
+      showPopup("Sesión requerida", "No encontramos tu usuario. Volvé a iniciar sesión.");
       return;
     }
-    // Fallbacks para idFiesta si aún no está disponible (tomar raw y sanitizar al final)
     const rawFiestaCandidate =
       fiestaIdForReview ||
       (entries.find((e) => !!e.idFiesta)?.idFiesta
@@ -183,10 +197,7 @@ function TicketPurchasedScreenContent() {
       (eventId ? String(eventId) : undefined);
     const fiestaIdToSend = sanitizeUuid(rawFiestaCandidate);
     if (!fiestaIdToSend) {
-      Alert.alert(
-        "Datos incompletos",
-        "No encontramos la fiesta de esta entrada. Reabrí la pantalla e intentá nuevamente."
-      );
+      showPopup("Datos incompletos", "No encontramos la fiesta de esta entrada. Reabrí la pantalla e intentá nuevamente.");
       try {
         console.log("[handleSubmitReview] missing fiestaId", {
           fiestaIdForReview,
@@ -199,7 +210,6 @@ function TicketPurchasedScreenContent() {
       } catch {}
       return;
     }
-    // Validación extra: asegurar patrón UUID estándar
     const uuidOk =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
         fiestaIdToSend
@@ -213,14 +223,11 @@ function TicketPurchasedScreenContent() {
       } catch {}
     }
     if (rating <= 0) {
-      Alert.alert(
-        "Calificación requerida",
-        "Por favor seleccioná al menos 1 estrella."
-      );
+      showPopup("Calificación requerida", "Por favor seleccioná al menos 1 estrella.");
       return;
     }
     if (trimmed.length === 0) {
-      Alert.alert("Comentario requerido", "Por favor escribí tu reseña.");
+      showPopup("Comentario requerido", "Por favor escribí tu reseña.");
       return;
     }
     try {
@@ -233,7 +240,6 @@ function TicketPurchasedScreenContent() {
           comentarioLen: trimmed.length,
           hasExisting: !!userReview,
         });
-        // Log en el formato EXACTO solicitado para lo que se intentará mandar (primer intento)
         console.log("[handleSubmitReview] payload (primer intento POST) =>", {
           idUsuario: String(userIdForReview),
           estrellas: rating,
@@ -241,7 +247,6 @@ function TicketPurchasedScreenContent() {
           idFiesta: String(fiestaIdToSend),
         });
       } catch {}
-      // Preflight: si no tenemos userReview (porque fiestaIdForReview fue null) verificamos en backend con fiestaIdToSend para evitar duplicados (POST vs PUT)
       let existing = userReview as Review | null;
       if (!existing) {
         try {
@@ -270,7 +275,7 @@ function TicketPurchasedScreenContent() {
           setUserReview(updated);
         } catch {}
         setShowReview(false);
-        Alert.alert("Listo", "Tu reseña fue actualizada.");
+        showPopup("Listo", "Tu reseña fue actualizada.");
       } else {
         let created: Review | null = null;
         let originalError: any = null;
@@ -283,7 +288,6 @@ function TicketPurchasedScreenContent() {
           });
         } catch (e1) {
           originalError = e1;
-          // Intento de fallback: si eventId existe y es distinto al fiestaIdToSend (quizá confundimos fiesta vs evento)
           const eventGuid = typeof eventId === "string" ? eventId : undefined;
           if (
             eventGuid &&
@@ -320,10 +324,10 @@ function TicketPurchasedScreenContent() {
                   { e1: (e1 as any)?.message, e2: (e2 as any)?.message }
                 );
               } catch {}
-              throw e2; // Propagamos el segundo error
+              throw e2;
             }
           } else {
-            throw e1; // No había alternativa o eran iguales
+            throw e1;
           }
         }
         if (!created)
@@ -332,10 +336,9 @@ function TicketPurchasedScreenContent() {
           setUserReview(created);
         } catch {}
         setShowReview(false);
-        Alert.alert("¡Gracias!", "Tu reseña fue enviada correctamente.");
+        showPopup("¡Gracias!", "Tu reseña fue enviada correctamente.");
       }
     } catch (e: any) {
-      // Log diagnóstico detallado
       try {
         console.log("[handleSubmitReview] error details:", {
           fiestaIdForReview,
@@ -347,10 +350,7 @@ function TicketPurchasedScreenContent() {
           responseData: e?.response?.data,
         });
       } catch {}
-      Alert.alert(
-        "Error",
-        "No pudimos procesar tu reseña. Intenta nuevamente."
-      );
+      showPopup("Error", "No pudimos procesar tu reseña. Intenta nuevamente.");
     } finally {
       setSubmitting(false);
     }
@@ -1873,48 +1873,39 @@ function TicketPurchasedScreenContent() {
                           userReview.idResenia || userReview.id || ""
                         );
                         if (!idRes) return;
-                        Alert.alert(
+                        showPopup(
                           "Eliminar reseña",
                           "¿Seguro que querés eliminar tu reseña?",
-                          [
-                            { text: "Cancelar", style: "cancel" },
-                            {
-                              text: "Eliminar",
-                              style: "destructive",
-                              onPress: async () => {
-                                try {
-                                  setDeleting(true);
-                                  try {
-                                    console.log(
-                                      "[handleDeleteReview] deleting",
-                                      { idResenia: idRes }
-                                    );
-                                  } catch {}
-                                  await deleteResenia(idRes);
-                                  setUserReview(null);
-                                  setShowReview(false);
-                                  Alert.alert(
-                                    "Listo",
-                                    "Tu reseña fue eliminada."
-                                  );
-                                } catch (e: any) {
-                                  try {
-                                    console.log("[handleDeleteReview] error", {
-                                      message: e?.message,
-                                      status: e?.response?.status,
-                                      data: e?.response?.data,
-                                    });
-                                  } catch {}
-                                  Alert.alert(
-                                    "Error",
-                                    "No se pudo eliminar la reseña. Intenta nuevamente."
-                                  );
-                                } finally {
-                                  setDeleting(false);
-                                }
-                              },
-                            },
-                          ]
+                          "confirm",
+                          async () => {
+                            try {
+                              setDeleting(true);
+                              try {
+                                console.log(
+                                  "[handleDeleteReview] deleting",
+                                  { idResenia: idRes }
+                                );
+                              } catch {}
+                              await deleteResenia(idRes);
+                              setUserReview(null);
+                              setShowReview(false);
+                              showPopup("Listo", "Tu reseña fue eliminada.");
+                            } catch (e: any) {
+                              try {
+                                console.log("[handleDeleteReview] error", {
+                                  message: e?.message,
+                                  status: e?.response?.status,
+                                  data: e?.response?.data,
+                                });
+                              } catch {}
+                              showPopup("Error", "No se pudo eliminar la reseña. Intenta nuevamente.");
+                            } finally {
+                              setDeleting(false);
+                            }
+                          },
+                          () => {
+                            setPopupVisible(false);
+                          }
                         );
                       }}
                       disabled={submitting || deleting}
@@ -2015,7 +2006,7 @@ function TicketPurchasedScreenContent() {
                         ? String(entries.find((e) => e.compraId)!.compraId)
                         : null);
                     if (!compraIdFinal) {
-                      Alert.alert(
+                      showPopup(
                         "Error",
                         "No se encontró el identificador de la compra para solicitar el reembolso."
                       );
@@ -2040,7 +2031,7 @@ function TicketPurchasedScreenContent() {
                       }
                       const resp = await solicitarReembolso(compraIdFinal);
                       if (!resp.ok) {
-                        Alert.alert(
+                        showPopup(
                           "Reembolso",
                           resp.mensaje || "No se pudo solicitar el reembolso."
                         );
@@ -2117,13 +2108,58 @@ function TicketPurchasedScreenContent() {
                         } catch {}
                       }
                     } catch (e: any) {
-                      Alert.alert(
+                      showPopup(
                         "Error",
                         e?.message || "Fallo al solicitar el reembolso."
                       );
                     } finally {
                       setRefundSubmitting(false);
                     }
+                    {/* Popup modal local reemplazando Alert.alert */}
+                    <Modal
+                      visible={popupVisible}
+                      transparent
+                      animationType="fade"
+                      onRequestClose={() => setPopupVisible(false)}
+                    >
+                      <View style={styles.modalBackdrop}>
+                        <View style={styles.modalCard}>
+                          <Text style={styles.modalTitle}>{popupTitle}</Text>
+                          <Text style={styles.modalSubtitle}>{popupMessage}</Text>
+                          <View style={styles.modalActions}>
+                            {popupType === "confirm" ? (
+                              <>
+                                <TouchableOpacity
+                                  style={styles.btnGhost}
+                                  onPress={() => {
+                                    setPopupVisible(false);
+                                    if (popupOnCancel) popupOnCancel();
+                                  }}
+                                >
+                                  <Text style={styles.btnGhostText}>Cancelar</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={styles.btnPrimary}
+                                  onPress={async () => {
+                                    setPopupVisible(false);
+                                    if (popupOnConfirm) await popupOnConfirm();
+                                  }}
+                                >
+                                  <Text style={styles.btnPrimaryText}>Confirmar</Text>
+                                </TouchableOpacity>
+                              </>
+                            ) : (
+                              <TouchableOpacity
+                                style={styles.btnPrimary}
+                                onPress={() => setPopupVisible(false)}
+                              >
+                                <Text style={styles.btnPrimaryText}>OK</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                    </Modal>
                   }}
                   disabled={!refundChecked || refundSubmitting}
                 >

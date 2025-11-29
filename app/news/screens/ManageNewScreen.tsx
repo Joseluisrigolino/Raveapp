@@ -31,6 +31,16 @@ import NewsDeletePopupComponent from "../components/manage/NewsDeletePopupCompon
 import NewsSuccessPopupComponent from "../components/create/NewsSuccessPopupComponent";
 
 export default function ManageNewsScreen() {
+    // Popup de alerta unificado
+    const [popupVisible, setPopupVisible] = useState(false);
+    const [popupTitle, setPopupTitle] = useState<string>("");
+    const [popupMessage, setPopupMessage] = useState<string>("");
+
+    const showPopup = (title: string, message: string) => {
+      setPopupTitle(title);
+      setPopupMessage(message);
+      setPopupVisible(true);
+    };
   const router = useRouter();
   const path = usePathname();
 
@@ -105,10 +115,17 @@ export default function ManageNewsScreen() {
       // mostrar modal de éxito
       setSuccessVisible(true);
     } catch {
-      Alert.alert("Error", "No se pudo eliminar la noticia.");
+      showPopup("Error", "No se pudo eliminar la noticia.");
     } finally {
       setDeleteLoading(false);
     }
+        {/* Popup de alerta unificado */}
+        <NewsSuccessPopupComponent
+          visible={popupVisible}
+          title={popupTitle}
+          message={popupMessage}
+          onClose={() => setPopupVisible(false)}
+        />
   }
 
   const renderItem = ({ item }: { item: NewsItem }) => (

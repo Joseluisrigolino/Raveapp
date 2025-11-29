@@ -28,30 +28,38 @@ export default function RecoverPasswordScreen() {
   // hook que maneja envío de recuperación
   const { sending, sendRecovery } = useSendRecoveryPass();
 
+  // Estado para el popup
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupTitle, setPopupTitle] = useState("");
+  const [popupMessage, setPopupMessage] = useState("");
+  const [popupOnClose, setPopupOnClose] = useState<null | (() => void)>(null);
+
+  // Muestra el popup con título, mensaje y acción opcional al cerrar
+  const showPopup = (title: string, message: string, onClose?: () => void) => {
+    setPopupTitle(title);
+    setPopupMessage(message);
+    setPopupOnClose(() => onClose || null);
+    setPopupVisible(true);
+  };
+
   // Comentario en español: envía el email de recuperación
   const handleSend = async () => {
     if (!email.trim()) {
-      Alert.alert("Error", "Por favor ingresa tu email");
+      showPopup("Error", "Por favor ingresa tu email");
       return;
     }
 
     try {
       await sendRecovery(email.trim());
-
-      // alerta con redirección al login
-      Alert.alert(
+      // popup con redirección al login
+      showPopup(
         "Enlace enviado",
         "Hemos enviado un enlace de recuperación a tu correo electrónico. Revisa tu bandeja de entrada.",
-        [
-          {
-            text: "OK",
-            onPress: () => nav.replace(router, ROUTES.LOGIN.LOGIN),
-          },
-        ]
+        () => nav.replace(router, ROUTES.LOGIN.LOGIN)
       );
     } catch (err) {
       console.error("send recovery error", err);
-      Alert.alert(
+      showPopup(
         "Error",
         "No se pudo enviar el enlace de recuperación. Intenta de nuevo."
       );
@@ -64,13 +72,37 @@ export default function RecoverPasswordScreen() {
       keyboardVerticalOffset={Platform.select({ ios: 0, android: 64 })}
       style={{ flex: 1 }}
     >
+      {/* Popup tipo NewsSuccessPopupComponent */}
+      {popupVisible && (
+        <View style={styles.popupOverlay}>
+          <View style={styles.popupModal}>
+            <View style={styles.popupHeaderIcon}>
+              <Text style={styles.popupCheck}>✓</Text>
+            </View>
+            <Text style={styles.popupTitle}>{popupTitle}</Text>
+            <Text style={styles.popupText}>{popupMessage}</Text>
+            <Button
+              mode="contained"
+              style={styles.popupButton}
+              contentStyle={{ height: 48 }}
+              onPress={() => {
+                setPopupVisible(false);
+                if (popupOnClose) popupOnClose();
+              }}
+            >
+              Aceptar
+            </Button>
+          </View>
+        </View>
+      )}
+
       <KeyboardAwareScrollView
-          enableOnAndroid
-          extraScrollHeight={120}
-          contentContainerStyle={styles.container}
-          style={{ flex: 1, backgroundColor: COLORS.backgroundLight }}
-          keyboardShouldPersistTaps="always"
-        >
+        enableOnAndroid
+        extraScrollHeight={120}
+        contentContainerStyle={styles.container}
+        style={{ flex: 1, backgroundColor: COLORS.backgroundLight }}
+        keyboardShouldPersistTaps="always"
+      >
         {/* Header con logo y subtítulo */}
         <View style={styles.header}>
           <View style={styles.logoBox}>
@@ -147,6 +179,63 @@ export default function RecoverPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
+    // estilos para el popup
+    popupOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.18)",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 999,
+    },
+    popupModal: {
+      backgroundColor: "#fff",
+      padding: 22,
+      borderRadius: 14,
+      width: "90%",
+      maxWidth: 400,
+      alignSelf: "center",
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOpacity: 0.15,
+      shadowOffset: { width: 0, height: 6 },
+      shadowRadius: 12,
+      elevation: 6,
+    },
+    popupHeaderIcon: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: "#eaf7ef",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 10,
+    },
+    popupCheck: {
+      color: "#16a34a",
+      fontSize: 24,
+      fontWeight: "700",
+    },
+    popupTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: "#111827",
+      marginBottom: 6,
+      textAlign: "center",
+    },
+    popupText: {
+      color: "#374151",
+      textAlign: "center",
+      marginBottom: 16,
+    },
+    popupButton: {
+      alignSelf: "stretch",
+      borderRadius: 12,
+      backgroundColor: "#0f172a",
+    },
   container: { flexGrow: 1, paddingHorizontal: 20, paddingBottom: 40 },
   header: { alignItems: "center", marginTop: 24, marginBottom: 16 },
   logoBox: {

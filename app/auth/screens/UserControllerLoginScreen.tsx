@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable, Alert } from "react-native";
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable, Modal } from "react-native";
 import { Text, TextInput, Button } from "react-native-paper";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 import useLoginUserController from "@/app/auth/services/user-controllers/useLoginUserController";
@@ -9,6 +9,16 @@ const isNotEmpty = (value: string) => value.trim().length > 0;
 
 // Pantalla principal: versión simplificada con nombres en inglés
 export default function ControllerLoginScreen() {
+		// Popup de alerta unificado
+		const [popupVisible, setPopupVisible] = useState(false);
+		const [popupTitle, setPopupTitle] = useState<string>("");
+		const [popupMessage, setPopupMessage] = useState<string>("");
+
+		const showPopup = (title: string, message: string) => {
+			setPopupTitle(title);
+			setPopupMessage(message);
+			setPopupVisible(true);
+		};
 	// estados simples
 	const [user, setUser] = useState("");
 	const [password, setPassword] = useState("");
@@ -91,11 +101,30 @@ export default function ControllerLoginScreen() {
 				<View style={styles.footer}>
 					<Text style={styles.footerMuted}>Sistema de Control Autorizado v2.1.5</Text>
 					<View style={styles.footerLinksRow}>
-						<Pressable onPress={() => Alert.alert("Manual de Usuario", "Próximamente.")}> 
+						<Pressable onPress={() => showPopup("Manual de Usuario", "Próximamente.")}> 
 							<Text style={styles.footerLink}>Manual de Usuario</Text>
 						</Pressable>
 						<Text style={styles.footerDivider}>  •  </Text>
-						<Pressable onPress={() => Alert.alert("Soporte Técnico", "+1-800-RAVE-HELP")}> 
+						<Pressable onPress={() => showPopup("Soporte Técnico", "+1-800-RAVE-HELP")}> 
+										{/* Popup de alerta unificado */}
+										<Modal
+											transparent
+											animationType="fade"
+											visible={popupVisible}
+											onRequestClose={() => setPopupVisible(false)}
+										>
+											<View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center", padding: 16 }}>
+												<View style={{ width: "100%", maxWidth: 380, backgroundColor: "#fff", borderRadius: 14, padding: 16 }}>
+													<Text style={{ fontWeight: "700", fontSize: 18, color: "#111827", marginBottom: 6 }}>{popupTitle}</Text>
+													<Text style={{ fontSize: 16, color: "#6b7280", marginBottom: 16 }}>{popupMessage}</Text>
+													<View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+														<Pressable style={{ paddingVertical: 10, paddingHorizontal: 20, borderRadius: 14, backgroundColor: "#0f172a", alignItems: "center", justifyContent: "center", minHeight: 44 }} onPress={() => setPopupVisible(false)}>
+															<Text style={{ fontWeight: "700", fontSize: 16, color: "#fff" }}>OK</Text>
+														</Pressable>
+													</View>
+												</View>
+											</View>
+										</Modal>
 							<Text style={styles.footerLink}>Soporte Técnico</Text>
 						</Pressable>
 					</View>

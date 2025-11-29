@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  TouchableOpacity,
 } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -27,6 +28,16 @@ import ROUTES from "@/routes";
 import { COLORS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
 export default function PartyScreenJR() {
+    // Popup de alerta unificado
+    const [popupVisible, setPopupVisible] = useState(false);
+    const [popupTitle, setPopupTitle] = useState<string>("");
+    const [popupMessage, setPopupMessage] = useState<string>("");
+
+    const showPopup = (title: string, message: string) => {
+      setPopupTitle(title);
+      setPopupMessage(message);
+      setPopupVisible(true);
+    };
   const router = useRouter();
   const { user } = useAuth() as any;
   const userId = (user as any)?.id ?? (user as any)?.idUsuario ?? null;
@@ -52,7 +63,7 @@ export default function PartyScreenJR() {
     if (!name) return;
 
     if (!userId) {
-      Alert.alert("Iniciá sesión", "Necesitás estar logueado.");
+      showPopup("Iniciá sesión", "Necesitás estar logueado.");
       return;
     }
 
@@ -63,7 +74,7 @@ export default function PartyScreenJR() {
       await refresh();
     } catch (e) {
       console.error("[PartyScreenJR] create error", e);
-      Alert.alert("Error", "No se pudo crear la fiesta.");
+      showPopup("Error", "No se pudo crear la fiesta.");
     } finally {
       setSavingCreate(false);
     }
@@ -87,7 +98,7 @@ export default function PartyScreenJR() {
       await refresh();
     } catch (e) {
       console.error("[PartyScreenJR] update error", e);
-      Alert.alert("Error", "No se pudo actualizar el nombre.");
+      showPopup("Error", "No se pudo actualizar el nombre.");
     } finally {
       setSavingEdit(false);
     }
@@ -116,10 +127,28 @@ export default function PartyScreenJR() {
       await refresh();
     } catch (e) {
       console.error("[PartyScreenJR] delete error", e);
-      Alert.alert("Error", "No se pudo eliminar la fiesta.");
+      showPopup("Error", "No se pudo eliminar la fiesta.");
     } finally {
       setDeleteLoading(false);
     }
+        {/* Popup de alerta unificado */}
+        <View>
+          {popupVisible && (
+            <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}>
+              <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.35)" }}>
+                <View style={{ width: "90%", maxWidth: 380, backgroundColor: COLORS.cardBg, borderRadius: RADIUS.card, padding: 16 }}>
+                  <Text style={{ fontFamily: "Montserrat-SemiBold", fontSize: 20, color: COLORS.textPrimary, marginBottom: 6 }}>{popupTitle}</Text>
+                  <Text style={{ fontFamily: "Montserrat-Regular", fontSize: 16, color: COLORS.textSecondary, marginBottom: 16 }}>{popupMessage}</Text>
+                  <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+                    <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 20, borderRadius: RADIUS.card, backgroundColor: COLORS.textPrimary, alignItems: "center", justifyContent: "center", minHeight: 44 }} onPress={() => setPopupVisible(false)}>
+                      <Text style={{ fontFamily: "Montserrat-SemiBold", fontSize: 16, color: COLORS.backgroundLight }}>OK</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+        </View>
   }
 
   function handleCancelDelete() {

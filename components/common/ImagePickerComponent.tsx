@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, Image, Alert, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, Image, Modal, StyleSheet } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { getInfoAsync } from "expo-file-system/legacy";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -20,6 +20,16 @@ export default function ImagePickerComponent({
   allowedExts = ["jpg", "jpeg", "png"],
   label = "Imagen",
 }: Props) {
+  // Popup de alerta unificado
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupTitle, setPopupTitle] = useState<string>("");
+  const [popupMessage, setPopupMessage] = useState<string>("");
+
+  const showPopup = (title: string, message: string) => {
+    setPopupTitle(title);
+    setPopupMessage(message);
+    setPopupVisible(true);
+  };
   const [isPicking, setIsPicking] = useState(false);
 
   const isAllowedExt = useCallback(
@@ -40,7 +50,7 @@ export default function ImagePickerComponent({
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (perm.status !== "granted") {
-        Alert.alert("Permiso denegado", "Se requiere permiso para acceder a la galería.");
+        showPopup("Permiso denegado", "Se requiere permiso para acceder a la galería.");
         return;
       }
 
@@ -62,7 +72,7 @@ export default function ImagePickerComponent({
       } catch {}
 
       if (size && size > maxBytes) {
-        Alert.alert("Error", `La imagen supera los ${Math.round(maxBytes / 1024 / 1024)}MB permitidos.`);
+        showPopup("Error", `La imagen supera los ${Math.round(maxBytes / 1024 / 1024)}MB permitidos.`);
         return;
       }
 
@@ -70,14 +80,14 @@ export default function ImagePickerComponent({
       const fileName = (asset.fileName as string) || uri.split("/").pop() || "image.jpg";
       const allowed = isAllowedExt(fileName) || isAllowedExt(uri);
       if (!allowed) {
-        Alert.alert("Formato no soportado", "La imagen debe ser JPG, JPEG o PNG.");
+        showPopup("Formato no soportado", "La imagen debe ser JPG, JPEG o PNG.");
         return;
       }
 
       onChange && onChange(uri);
     } catch (e) {
       console.error("ImagePickerComponent - select error", e);
-      Alert.alert("Error", "No se pudo seleccionar la imagen.");
+      showPopup("Error", "No se pudo seleccionar la imagen.");
     } finally {
       setIsPicking(false);
     }
@@ -89,6 +99,25 @@ export default function ImagePickerComponent({
 
   return (
     <View style={styles.container}>
+      {/* Popup de alerta unificado */}
+      <Modal
+        transparent
+        animationType="fade"
+        visible={popupVisible}
+        onRequestClose={() => setPopupVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{popupTitle}</Text>
+            <Text style={styles.modalSubtitle}>{popupMessage}</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.btnPrimary} onPress={() => setPopupVisible(false)}>
+                <Text style={styles.btnPrimaryText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <Text style={styles.label}>{label}</Text>
       <View style={styles.imageContainer}>
         {value ? (
@@ -128,6 +157,50 @@ export default function ImagePickerComponent({
 }
 
 const styles = StyleSheet.create({
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.35)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 16,
+    },
+    modalCard: {
+      width: "100%",
+      maxWidth: 380,
+      backgroundColor: COLORS.cardBg,
+      borderRadius: RADIUS.card,
+      padding: 16,
+    },
+    modalTitle: {
+      fontFamily: FONTS.subTitleMedium,
+      fontSize: 20,
+      color: COLORS.textPrimary,
+      marginBottom: 6,
+    },
+    modalSubtitle: {
+      fontFamily: FONTS.bodyRegular,
+      fontSize: 16,
+      color: COLORS.textSecondary,
+      marginBottom: 16,
+    },
+    modalActions: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+    },
+    btnPrimary: {
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: RADIUS.card,
+      backgroundColor: COLORS.textPrimary,
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: 44,
+    },
+    btnPrimaryText: {
+      fontFamily: FONTS.subTitleMedium,
+      fontSize: 16,
+      color: COLORS.backgroundLight,
+    },
   container: { width: "100%" },
   label: { fontFamily: FONTS.subTitleMedium, color: COLORS.textPrimary, marginBottom: 8 },
   imageContainer: {

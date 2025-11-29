@@ -33,6 +33,16 @@ import useNewsEvents from "../services/useNewsEvents";
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2MB
 
 export default function CreateNewScreen() {
+    // Popup de alerta unificado
+    const [popupVisible, setPopupVisible] = useState(false);
+    const [popupTitle, setPopupTitle] = useState<string>("");
+    const [popupMessage, setPopupMessage] = useState<string>("");
+
+    const showPopup = (title: string, message: string) => {
+      setPopupTitle(title);
+      setPopupMessage(message);
+      setPopupVisible(true);
+    };
   const router = useRouter();
 
   const [title, setTitle] = useState("");
@@ -55,7 +65,7 @@ export default function CreateNewScreen() {
       const fileInfo: any = await getInfoAsync(asset.uri);
 
       if (fileInfo?.size && fileInfo.size > MAX_IMAGE_BYTES) {
-        Alert.alert("Error", "La imagen supera los 2MB permitidos.");
+        showPopup("Error", "La imagen supera los 2MB permitidos.");
         return;
       }
 
@@ -76,9 +86,16 @@ export default function CreateNewScreen() {
 
     if (missing.length) {
       const list = missing.join(", ");
-      Alert.alert("Faltan datos", `Por favor completá los siguientes campos: ${list}.`);
+      showPopup("Faltan datos", `Por favor completá los siguientes campos: ${list}.`);
       return;
     }
+      {/* Popup de alerta unificado */}
+      <NewsSuccessPopupComponent
+        visible={popupVisible}
+        title={popupTitle}
+        message={popupMessage}
+        onClose={() => setPopupVisible(false)}
+      />
 
     const result = await createNew({ title, body, imageUri, eventId: selectedEventId });
 

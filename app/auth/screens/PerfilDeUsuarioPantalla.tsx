@@ -217,6 +217,20 @@ export default function UserProfileScreen() {
     setForm((f: any) => ({ ...f, [key]: value }));
   }
 
+  // Estado para el popup
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [popupTitle, setPopupTitle] = useState("");
+  const [popupMessage, setPopupMessage] = useState("");
+  const [popupOnClose, setPopupOnClose] = useState<null | (() => void)>(null);
+
+  // Muestra el popup con título, mensaje y acción opcional al cerrar
+  const showPopup = (title: string, message: string, onClose?: () => void) => {
+    setPopupTitle(title);
+    setPopupMessage(message);
+    setPopupOnClose(() => onClose || null);
+    setPopupVisible(true);
+  };
+
   // select image (simple, con tamaño check)
   async function pickImage() {
     try {
@@ -228,7 +242,7 @@ export default function UserProfileScreen() {
       const asset = res.assets[0];
       const info: any = await FileSystem.getInfoAsync(asset.uri);
       if (info?.size && info.size > 2 * 1024 * 1024) {
-        Alert.alert(
+        showPopup(
           "Imagen demasiado grande",
           "La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana."
         );
@@ -236,7 +250,7 @@ export default function UserProfileScreen() {
       }
       setPhoto(asset.uri);
     } catch (e) {
-      Alert.alert("Error", "No se pudo seleccionar la imagen.");
+      showPopup("Error", "No se pudo seleccionar la imagen.");
     }
   }
 
@@ -244,11 +258,11 @@ export default function UserProfileScreen() {
   async function handleSave() {
     if (!profile) return;
     if (!form.firstName.trim() || !form.lastName.trim()) {
-      Alert.alert("Error", "El nombre y apellido son obligatorios.");
+      showPopup("Error", "El nombre y apellido son obligatorios.");
       return;
     }
     if (!form.email.trim() || !form.dni.trim()) {
-      Alert.alert("Error", "El correo y DNI son obligatorios.");
+      showPopup("Error", "El correo y DNI son obligatorios.");
       return;
     }
 
@@ -305,7 +319,7 @@ export default function UserProfileScreen() {
       setShowUpdateModal(true);
     } catch (err: any) {
       console.error(err);
-      Alert.alert(
+      showPopup(
         "Error",
         err?.response?.data?.title || "Hubo un problema actualizando tus datos."
       );
@@ -315,7 +329,7 @@ export default function UserProfileScreen() {
   // send verification email
   async function handleSendVerify() {
     if (!form.email?.trim()) {
-      Alert.alert("Error", "El correo está vacío.");
+      showPopup("Error", "El correo está vacío.");
       return;
     }
     try {
@@ -325,7 +339,7 @@ export default function UserProfileScreen() {
       });
       setShowVerifyModal(true);
     } catch (e: any) {
-      Alert.alert(
+      showPopup(
         "Error",
         e?.response?.data?.title ||
           e?.message ||
@@ -341,7 +355,7 @@ export default function UserProfileScreen() {
       await deleteAccount();
       // deleteAccount handles logout & redirect
     } catch (e: any) {
-      Alert.alert("Error", e?.response?.data?.title || e?.message || "No pudimos eliminar tu cuenta.");
+      showPopup("Error", e?.response?.data?.title || e?.message || "No pudimos eliminar tu cuenta.");
     }
   }
 
@@ -853,6 +867,71 @@ export default function UserProfileScreen() {
 // Styles (simple, human-friendly)
 // ==================================================
 const styles = StyleSheet.create({
+    // estilos para el popup
+    popupOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.18)",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 999,
+    },
+    popupModal: {
+      backgroundColor: "#fff",
+      padding: 22,
+      borderRadius: 14,
+      width: "90%",
+      maxWidth: 400,
+      alignSelf: "center",
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOpacity: 0.15,
+      shadowOffset: { width: 0, height: 6 },
+      shadowRadius: 12,
+      elevation: 6,
+    },
+    popupHeaderIcon: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: "#eaf7ef",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 10,
+    },
+    popupCheck: {
+      color: "#16a34a",
+      fontSize: 24,
+      fontWeight: "700",
+    },
+    popupTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: "#111827",
+      marginBottom: 6,
+      textAlign: "center",
+    },
+    popupText: {
+      color: "#374151",
+      textAlign: "center",
+      marginBottom: 16,
+    },
+    popupButton: {
+      alignSelf: "stretch",
+      borderRadius: 12,
+      backgroundColor: "#0f172a",
+      paddingVertical: 12,
+      marginTop: 8,
+      alignItems: "center",
+    },
+    popupButtonText: {
+      color: "#fff",
+      fontWeight: "700",
+      fontSize: 16,
+    },
   container: { flex: 1, backgroundColor: COLORS.backgroundLight },
   content: { padding: 16, alignItems: "center" },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
