@@ -11,7 +11,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view
 import { Text, Button } from "react-native-paper";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { makeRedirectUri } from "expo-auth-session";
+import Constants from "expo-constants";
 import { GOOGLE_CONFIG } from "@/app/auth/googleConfig";
 import LoginUserWelcomeComponent from "@/app/auth/components/user/login-user/LoginUserWelcomeComponent";
 import LoginUserImageAppComponent from "@/app/auth/components/user/login-user/LoginUserImageAppComponent";
@@ -50,16 +50,12 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [rememberFlag, setRememberFlag] = useState(false);
 
-  // Google config (solo clientes)
-  const googleConfig: any = {
-    expoClientId: GOOGLE_CONFIG.expoClientId || undefined,
-    iosClientId: GOOGLE_CONFIG.iosClientId || undefined,
-    androidClientId: GOOGLE_CONFIG.androidClientId || undefined,
-    webClientId: GOOGLE_CONFIG.webClientId || undefined,
-    redirectUri: makeRedirectUri({ useProxy: true } as any),
-    scopes: ["openid", "profile", "email"],
-    responseType: "id_token",
-  };
+  const isExpoGo = Constants.appOwnership === "expo";
+  const expoClientId = GOOGLE_CONFIG.expoClientId;
+  const iosClientId = GOOGLE_CONFIG.iosClientId;
+  const androidClientId = GOOGLE_CONFIG.androidClientId;
+  const webClientId = GOOGLE_CONFIG.webClientId;
+  const { loginOrCreateWithGoogleIdToken } = useAuth();
 
   // Completar auth sessions en móviles (expo-auth-session)
   useEffect(() => {
@@ -148,43 +144,42 @@ export default function LoginScreen() {
           rememberFlag={rememberFlag}
           setRememberFlag={setRememberFlag}
           onLogin={handleLogin}
-              socialNode={
-                googleConfig.androidClientId ||
-                googleConfig.iosClientId ||
-                googleConfig.expoClientId ||
-                googleConfig.webClientId ? (
-                  <GoogleSignInButton
-                    expoClientId={googleConfig.expoClientId}
-                    iosClientId={googleConfig.iosClientId}
-                    androidClientId={googleConfig.androidClientId}
-                    webClientId={googleConfig.webClientId}
-                    useProxy={true}
-                  >
-                    Ingresar con Google
-                  </GoogleSignInButton>
-                ) : (
-                  <Button
-                    mode="outlined"
-                    onPress={() =>
-                      Alert.alert(
-                        "Configuración requerida",
-                        "Faltan Client IDs de Google en app.json (extra). Define EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID y/o EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID."
-                      )
-                    }
-                    icon="google"
-                    disabled={loading}
-                    contentStyle={{ height: 50 }}
-                    style={{
-                      borderRadius: 25,
-                      height: 50,
-                      justifyContent: "center",
-                      width: "100%",
-                    }}
-                  >
-                    Ingresar con Google
-                  </Button>
-                )
-              }
+          socialNode={
+            androidClientId || iosClientId || expoClientId || webClientId ? (
+              <GoogleSignInButton
+                expoClientId={expoClientId}
+                iosClientId={iosClientId}
+                androidClientId={androidClientId}
+                webClientId={webClientId}
+                useProxy={isExpoGo}
+                onLogin={loginOrCreateWithGoogleIdToken}
+                onSuccess={() => nav.replace(router, ROUTES.MAIN.EVENTS.MENU)}
+              >
+                Ingresar con Google
+              </GoogleSignInButton>
+            ) : (
+              <Button
+                mode="outlined"
+                onPress={() =>
+                  Alert.alert(
+                    "Configuración requerida",
+                    "Faltan Client IDs de Google en app.json (extra). Define EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID y/o EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID."
+                  )
+                }
+                icon="google"
+                disabled={loading}
+                contentStyle={{ height: 50 }}
+                style={{
+                  borderRadius: 25,
+                  height: 50,
+                  justifyContent: "center",
+                  width: "100%",
+                }}
+              >
+                Ingresar con Google
+              </Button>
+            )
+          }
         />
 
         <LoginUserWhyRaveAppComponent />

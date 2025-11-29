@@ -24,10 +24,10 @@ import {
 } from "react-native-paper";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
-import * as WebBrowser from "expo-web-browser";
+import { GOOGLE_CONFIG } from "@/app/auth/googleConfig";
+import GoogleSignInButton from "@/app/auth/components/GoogleSignInButtonComponent";
 import * as nav from "@/utils/navigation";
 import ROUTES from "@/routes";
-import GoogleSignInButton from "@/app/auth/components/GoogleSignInButtonComponent";
 
 import globalStyles from "@/styles/globalStyles";
 import { useAuth } from "@/app/auth/AuthContext";
@@ -68,7 +68,6 @@ export default function RegisterUserScreen() {
   // componente principal
   const router = useRouter();
   const {
-    loginWithGooglePopup,
     login,
     loginOrCreateWithGoogleIdToken,
     loginOrCreateWithGoogleProfile,
@@ -77,26 +76,10 @@ export default function RegisterUserScreen() {
   // platform flags simples
   const isWeb = Platform.OS === "web";
   const isExpoGo = Constants.appOwnership === "expo";
-
-  // completar sesión OAuth (requerido por expo-auth-session)
-  useEffect(() => {
-    WebBrowser.maybeCompleteAuthSession();
-  }, []);
-
-  // clientIds desde extra
-  const EXTRA: any =
-    (Constants as any)?.expoConfig?.extra ||
-    (Constants as any)?.manifest2?.extra ||
-    {};
-  const expoClientId =
-    EXTRA.EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID ||
-    EXTRA.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
-    undefined;
-  const iosClientId = EXTRA.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || undefined;
-  const androidClientId =
-    EXTRA.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || undefined;
-  const webClientId = EXTRA.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || undefined;
-  const hasAnyClientId = !!(iosClientId || androidClientId || expoClientId);
+  const expoClientId = GOOGLE_CONFIG.expoClientId;
+  const iosClientId = GOOGLE_CONFIG.iosClientId;
+  const androidClientId = GOOGLE_CONFIG.androidClientId;
+  const webClientId = GOOGLE_CONFIG.webClientId;
 
   // estado del formulario (nombres en inglés, UI en español)
   const [form, setForm] = useState({
@@ -347,31 +330,6 @@ export default function RegisterUserScreen() {
                   contentStyle={styles.googleButtonContent}
                   onPress={async () => {
                     try {
-                      const u = await loginWithGooglePopup?.();
-                      if (!u) {
-                        Alert.alert(
-                          "Error",
-                          "No se pudo registrar/iniciar con Google (Firebase)"
-                        );
-                        return;
-                      }
-                      const email =
-                        (u as any)?.username || (u as any)?.email || "";
-                      const givenName =
-                        (u as any)?.nombre || (u as any)?.displayName || "";
-                      const familyName = (u as any)?.apellido || "";
-                      const ok = await loginOrCreateWithGoogleProfile?.({
-                        email,
-                        givenName,
-                        familyName,
-                      });
-                      if (!ok) {
-                        Alert.alert(
-                          "Atención",
-                          "No se pudo sincronizar tu cuenta de Google con la base de datos."
-                        );
-                        return;
-                      }
                       nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
                     } catch {
                       Alert.alert(
@@ -383,7 +341,7 @@ export default function RegisterUserScreen() {
                 >
                   Registrarse con Google
                 </Button>
-              ) : hasAnyClientId ? (
+              ) : androidClientId || iosClientId || expoClientId || webClientId ? (
                 <GoogleSignInButton
                   expoClientId={expoClientId}
                   iosClientId={iosClientId}
@@ -398,15 +356,21 @@ export default function RegisterUserScreen() {
               ) : (
                 <Button
                   mode="outlined"
-                  icon="google"
-                  style={styles.googleButton}
-                  contentStyle={styles.googleButtonContent}
                   onPress={() =>
                     Alert.alert(
                       "Configuración requerida",
-                      "Faltan clientIds de Google en app.json (EXPO_PUBLIC_GOOGLE_*) para usar Google en móvil."
+                      "Faltan Client IDs de Google en app.json (extra). Define EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID y/o EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID."
                     )
                   }
+                  icon="google"
+                  disabled={loading}
+                  contentStyle={{ height: 50 }}
+                  style={{
+                    borderRadius: 25,
+                    height: 50,
+                    justifyContent: "center",
+                    width: "100%",
+                  }}
                 >
                   Registrarse con Google
                 </Button>

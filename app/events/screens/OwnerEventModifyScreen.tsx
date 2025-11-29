@@ -11,6 +11,7 @@ import { COLORS, RADIUS } from '@/styles/globalStyles';
 
 import { ApiGenero, fetchGenres, fetchEventById, updateEvent, updateEventExact } from '@/app/events/apis/eventApi';
 import { mediaApi } from '@/app/apis/mediaApi';
+import { mailsApi } from '@/app/apis/mailsApi';
 
 type UpdateEventoRequest = {
   idEvento: string;
@@ -170,12 +171,14 @@ export default function OwnerEventModifyScreen() {
   const [saving, setSaving] = useState(false);
 
   // Carga inicial del evento y entradas
+  const [originalEvent, setOriginalEvent] = useState<any>(null);
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const ev = await fetchEventById(eventId);
         if (!mounted) return;
+        setOriginalEvent(ev);
   // EventItemWithExtras usa 'title' y 'description'
   setEventName(ev.title || '');
   setEventDescription(ev.description || '');
@@ -348,30 +351,36 @@ export default function OwnerEventModifyScreen() {
         latitud: 0,
         longitud: 0
       };
-      const fechas: UpdateEventoRequest['fechas'] = daySchedules.map((d, i) => ({
-        idFecha: remoteFechaIds[i] || '',
-        inicio: formatBackendIso(d.start) || '',
-        fin: formatBackendIso(d.end) || '',
-        inicioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart) || '',
-        finVenta: formatBackendIsoVenta(daySaleConfigs[i]?.sellUntil) || '',
-        estado: 0
-      }));
-      payload = {
-        idEvento: eventId,
-        idArtistas,
-        domicilio,
-        nombre: eventName,
-        descripcion: eventDescription,
-        genero: selectedGenres,
-        isAfter,
-        isLgbt: isLGBT,
-        inicioEvento: formatBackendIso(daySchedules[0]?.start) || '',
-        finEvento: formatBackendIso(daySchedules[0]?.end) || '',
-        estado: 0,
-        fechas,
-        idFiesta: null,
-        soundCloud: ''
-      };
+      // Mantener los estados originales de fechas y evento
+        const fechas: UpdateEventoRequest['fechas'] = daySchedules.map((d, i) => {
+          const origFecha = originalEvent?.fechas?.[i] || {};
+          return {
+            idFecha: remoteFechaIds[i] || origFecha.idFecha || '',
+            inicio: formatBackendIso(d.start) || origFecha.inicio || '',
+            fin: formatBackendIso(d.end) || origFecha.fin || '',
+            inicioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart) || origFecha.inicioVenta || '',
+            finVenta: formatBackendIsoVenta(daySaleConfigs[i]?.sellUntil) || origFecha.finVenta || '',
+            estado: origFecha.estado ?? 0,
+            cdEstado: origFecha.cdEstado ?? 0
+          };
+        });
+        payload = {
+          idEvento: eventId,
+          idArtistas,
+          domicilio,
+          nombre: eventName,
+          descripcion: eventDescription,
+          genero: selectedGenres,
+          isAfter,
+          isLgbt: isLGBT,
+          inicioEvento: formatBackendIso(daySchedules[0]?.start) || (originalEvent?.inicioEvento ?? ''),
+          finEvento: formatBackendIso(daySchedules[0]?.end) || (originalEvent?.finEvento ?? ''),
+          estado: originalEvent?.estado ?? 0,
+          cdEstado: originalEvent?.cdEstado ?? 0,
+          fechas,
+          idFiesta: null,
+          soundCloud: ''
+        };
       if (newIdEntidadMedia) payload.idEntidadMedia = newIdEntidadMedia;
       // LOG DETALLADO DEL PAYLOAD Y ENDPOINT
       console.log('[UPDATE EVENT] Endpoint: /v1/Evento/UpdateEvento');
@@ -380,6 +389,12 @@ export default function OwnerEventModifyScreen() {
       // Si se subió imagen y se obtuvo nueva URL, refrescar el preview
       if (newImageUrl) {
         setPhotoFile({ uri: newImageUrl });
+      }
+      // Enviar mail masivo de modificación
+      try {
+        await mailsApi.sendMassiveEventUpdateEmail({ idEvento: eventId, nombreEvento: eventName });
+      } catch (mailErr) {
+        console.warn('No se pudo enviar el mail masivo de modificación:', mailErr);
       }
       Alert.alert('Listo', 'Cambios guardados correctamente.');
       // Redirigir a la pantalla de administración de eventos
@@ -405,7 +420,7 @@ export default function OwnerEventModifyScreen() {
       }
     }
     finally { setSaving(false); }
-  }, [eventName, eventDescription, selectedGenres, provinceName, provinceId, municipalityName, municipalityId, localityName, localityId, street, isAfter, isLGBT, daySchedules, daySaleConfigs, remoteFechaIds, selectedArtists, eventId, idEntidadMedia, photoFile]);
+  }, [eventName, eventDescription, selectedGenres, provinceName, provinceId, municipalityName, municipalityId, localityName, localityId, street, isAfter, isLGBT, daySchedules, daySaleConfigs, remoteFechaIds, selectedArtists, eventId, idEntidadMedia, photoFile, originalEvent]);
 
   const selectedArtistsUi = useMemo(() => selectedArtists.map(a => ({ ...a })), [selectedArtists]);
 

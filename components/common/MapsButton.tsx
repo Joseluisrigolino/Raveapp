@@ -30,13 +30,13 @@ export default function MapsButton({ query, onPress, disabled, title = "Cómo ll
 
   return (
     <TouchableOpacity
-      style={[styles.btn, style]}
+      style={[{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0F172A', borderRadius: 10, paddingVertical: 12, paddingHorizontal: 16, marginTop: 8 }, style]}
       onPress={handlePress}
       activeOpacity={0.85}
       disabled={disabled}
     >
-      <MaterialCommunityIcons name="map-marker" size={16} color="#fff" style={{ marginRight: 8 }} />
-      <Text style={styles.text}>{title}</Text>
+      <MaterialCommunityIcons name="map-marker" size={18} color="#fff" style={{ marginRight: 8 }} />
+      <Text style={{ color: '#fff', fontFamily: FONTS.subTitleMedium, fontSize: 16, textAlign: 'center' }}>{title}</Text>
     </TouchableOpacity>
   );
 }

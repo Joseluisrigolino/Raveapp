@@ -23,7 +23,6 @@ export default function ScannerScreen() {
   const {
     controllerName,
     scanCount,
-    lastScans,
     permission,
     hasPermission,
     processing,
@@ -70,8 +69,6 @@ export default function ScannerScreen() {
         processing={processing}
         onActivateCamera={handleActivateCamera}
       />
-      <ScannerLastScansCardComponent lastScans={lastScans} />
-
       <ScannerCameraModalComponent
         visible={modalVisible}
         permissionLoading={!permission}

@@ -135,6 +135,26 @@ export async function sendMassCancellationEmail(payload: {
   });
 }
 
+// Envío masivo de mails de modificación de evento (a todos los compradores)
+export async function sendMassiveEventUpdateEmail(params: { idEvento: string; nombreEvento: string }): Promise<any> {
+  if (!params?.idEvento || !params?.nombreEvento) throw new Error('Faltan datos: idEvento, nombreEvento');
+  const titulo = `Modificación en el evento ${params.nombreEvento}`;
+    const cuerpo = `Estimados: hubo una modificación en los detalles del evento <b>${params.nombreEvento}</b>.<br><br>
+
+Por dicho motivo, si lo desean, pueden solicitar un reembolso de su entrada dentro de los 5 dias corridos desde la percepcion de este correo.
+
+El reembolso de la/s entrada/s lo puedes solicitar ingresando a la aplicacion de RaveApp > Tickets > Mis entradas > Seleccionar la entrada correspondiente al evento > Boton de arrepentimiento.
+
+Atentamente,`;
+  return postEmail('/v1/Email/EnvioMailGenericoMasivo', {
+    idEvento: params.idEvento,
+    titulo,
+    cuerpo,
+    botonUrl: '',
+    botonTexto: '',
+  });
+}
+
 // Cuerpo de cancelación
 export function buildCancellationEmailBody(params: {
   nombreUsuario: string;
@@ -194,4 +214,5 @@ export const mailsApi = {
   sendGenericEmail,
   sendMassCancellationEmail,
   buildCancellationEmailBody,
+  sendMassiveEventUpdateEmail,
 };
