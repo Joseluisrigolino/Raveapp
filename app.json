@@ -4,28 +4,39 @@
     "slug": "Raveapp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+
+    // 👇 Este es el ícono base de la app (incluye Android si no se define otro)
+    "icon": "./assets/images/raveapplogo/logo3.png",
+
     "scheme": "raveapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.raveapp.mobile"
     },
+
     "android": {
       "package": "com.raveapp.mobile",
       "versionCode": 1,
+
+      "icon": "./assets/images/raveapplogo/logo3.png",
+
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/raveapplogo/logo3.png",
+        "backgroundColor": "#000000"
       },
+
       "permissions": []
     },
+
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+
     "plugins": [
       "expo-router",
       [
@@ -40,16 +51,18 @@
       "expo-web-browser",
       "expo-font"
     ],
+
     "experiments": {
       "typedRoutes": true
     },
+
     "extra": {
       "router": {},
       "eas": {
         "projectId": "96c3aafd-0d8e-456b-9f69-0181bad4c833"
       },
-        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "728778718807-imc5ad9jh3om4oj48ohkaiv81o4e7gsv.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "728778718807-r65km9pj3scldf126tmo9plvpnuri2tl.apps.googleusercontent.com"
+      "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "728778718807-imc5ad9jh3om4oj48ohkaiv81o4e7gsv.apps.googleusercontent.com",
+      "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "728778718807-r65km9pj3scldf126tmo9plvpnuri2tl.apps.googleusercontent.com"
     }
   }
 }

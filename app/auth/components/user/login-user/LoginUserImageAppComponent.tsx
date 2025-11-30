@@ -10,7 +10,7 @@ export default function LoginUserImageAppComponent() {
     <View style={styles.container}>
       <View style={styles.logoCircle}>
         <Image
-          source={require("../../../../../assets/images/raveapplogo/logo3.jpeg")}
+          source={require("../../../../../assets/images/raveapplogo/logo3.png")}
           style={styles.logoImage}
           resizeMode="cover"
         />

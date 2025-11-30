@@ -156,7 +156,7 @@ export default function RecoverPasswordScreen() {
         <View style={styles.header}>
           <View style={styles.logoBox}>
             <Image
-              source={require("../../../assets/images/raveapplogo/logo3.jpeg")}
+              source={require("../../../assets/images/raveapplogo/logo3.png")}
               style={styles.logo}
             />
           </View>
