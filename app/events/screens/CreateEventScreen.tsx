@@ -2212,7 +2212,7 @@ export default function CreateEventScreen() {
                       openTycModal();
                     }}
                   >
-                    términos y condiciones
+                    Términos y Condiciones y Política de Privacidad
                   </Text>
                 </Text>
               </TouchableOpacity>
@@ -2271,7 +2271,7 @@ export default function CreateEventScreen() {
                 <View style={styles.modalCard}>
                   <View style={styles.modalHeader}>
                     <Text style={styles.modalTitle}>
-                      Términos y Condiciones
+                      Términos y Condiciones y Política de Privacidad
                     </Text>
                     <TouchableOpacity onPress={() => setTycVisible(false)}>
                       <MaterialCommunityIcons
@@ -2342,7 +2342,7 @@ export default function CreateEventScreen() {
                                   height: "100%",
                                   border: "none",
                                 }}
-                                title="Términos y Condiciones"
+                                title="Términos y Condiciones y Política de Privacidad"
                               />
                             );
                           }
@@ -2388,7 +2388,7 @@ export default function CreateEventScreen() {
                   <View style={styles.modalCard}>
                     <View style={styles.modalHeader}>
                       <Text style={styles.modalTitle}>
-                        Términos y Condiciones
+                        Términos y Condiciones y Política de Privacidad
                       </Text>
                       <TouchableOpacity onPress={() => setTycVisible(false)}>
                         <MaterialCommunityIcons
@@ -2462,7 +2462,7 @@ export default function CreateEventScreen() {
                                     height: "100%",
                                     border: "none",
                                   }}
-                                  title="Términos y Condiciones"
+                                  title="Términos y Condiciones y Política de Privacidad"
                                 />
                               );
                             }

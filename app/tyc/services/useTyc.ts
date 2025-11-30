@@ -10,6 +10,7 @@ import {
   replaceTycPdf,
   TycMedia,
 } from "@/app/tyc/api/tycApi";
+import { DEFAULT_MAX_UPLOAD_BYTES } from "@/app/apis/mediaApi";
 
 type TycMeta = {
   name?: string;
@@ -143,10 +144,10 @@ export function useTyc() {
         picked.name = picked.name + ".pdf";
       }
 
-      // validar tamaño (máx 2MB)
+      // validar tamaño (máx DEFAULT_MAX_UPLOAD_BYTES)
       try {
         const info: any = await FileSystem.getInfoAsync(picked.uri);
-        if (info?.size && info.size > 2 * 1024 * 1024) {
+        if (info?.size && info.size > DEFAULT_MAX_UPLOAD_BYTES) {
           Alert.alert(
             "Archivo demasiado grande",
             "El PDF no debe superar los 2MB."
@@ -172,7 +173,7 @@ export function useTyc() {
 
       Alert.alert(
         "Listo",
-        "Se actualizó el PDF de Términos y Condiciones."
+        "Se actualizó el PDF de Términos y Condiciones y Política de Privacidad."
       );
     } catch (e) {
       console.warn("[useTyc] handleChangePdf error:", e);

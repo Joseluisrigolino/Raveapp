@@ -15,7 +15,7 @@ import Constants from "expo-constants"; // Info del entorno Expo (appOwnership, 
 
 import { GOOGLE_CONFIG } from "@/app/auth/googleConfig"; // Config centralizada de Google OAuth
 import { useAuth } from "@/app/auth/AuthContext"; // Contexto de autenticación global
-import AsyncStorage from "@react-native-async-storage/async-storage"; // Storage persistente en el dispositivo
+// AsyncStorage removed: we no longer persist "recordarme"
 
 // Componentes de UI específicos del flujo de login de usuario
 import LoginUserWelcomeComponent from "@/app/auth/components/user/login-user/LoginUserWelcomeComponent";
@@ -29,7 +29,7 @@ import GoogleSignInButton from "@/app/auth/components/GoogleSignInButtonComponen
 
 import * as nav from "@/utils/navigation"; // Helpers propios para navegar (replace, push, etc.)
 import ROUTES from "@/routes"; // Mapa central de rutas de la app
-import InfoTyc from "@/components/infoTyc"; // Componente con Términos y Condiciones / Privacidad
+import InfoTyc from "@/components/infoTyc"; // Componente con Términos y Condiciones y Política de Privacidad
 
 /**
  * Screen principal de Login de usuario.
@@ -55,7 +55,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState(""); // password del usuario
   const [secure, setSecure] = useState(true); // flag para mostrar/ocultar password
   const [loading, setLoading] = useState(false); // flag de loading para evitar doble submit
-  const [rememberFlag, setRememberFlag] = useState(false); // "Recordar correo" activado/desactivado
+  // Ya no usamos la funcionalidad 'recordarme'
 
   /**
    * Datos de entorno / configuración de Google
@@ -76,22 +76,7 @@ export default function LoginScreen() {
    * - cargamos si el usuario marcó "recordarme"
    * - si estaba marcado, traemos también el último email usado
    */
-  useEffect(() => {
-    (async () => {
-      try {
-        const rememberRaw = await AsyncStorage.getItem("raveapp_remember");
-        const remembered = rememberRaw === "true";
-        setRememberFlag(remembered);
-
-        if (remembered) {
-          const lastEmail = await AsyncStorage.getItem("raveapp_last_email");
-          if (lastEmail) setEmail(lastEmail);
-        }
-      } catch {
-        // No queremos romper la pantalla de login por un error de storage
-      }
-    })();
-  }, []);
+  // Ya no usamos la funcionalidad 'recordarme'
 
   /**
    * Flag derivado para saber si el formulario está en condiciones de enviar.
@@ -107,19 +92,7 @@ export default function LoginScreen() {
   /**
    * Helper para persistir la preferencia de "recordarme" y el último email usado.
    */
-  async function persistRememberMeState(currentEmail: string, remember: boolean) {
-    try {
-      await AsyncStorage.setItem("raveapp_remember", remember ? "true" : "false");
-
-      if (remember) {
-        await AsyncStorage.setItem("raveapp_last_email", currentEmail.trim());
-      } else {
-        await AsyncStorage.removeItem("raveapp_last_email");
-      }
-    } catch {
-      // Si falla el storage, no interrumpimos el flujo de login
-    }
-  }
+  // persistRememberMeState removed because we don't offer 'recordarme' anymore
 
   /**
    * Handler del login tradicional (email + password).
@@ -145,8 +118,7 @@ export default function LoginScreen() {
         return;
       }
 
-      // Persistimos el estado de "recordarme" y el último email
-      await persistRememberMeState(email, rememberFlag);
+      // Ya no persistimos "recordarme"
 
       // Navegamos al menú principal de eventos, reemplazando la screen actual
       nav.replace(router, ROUTES.MAIN.EVENTS.MENU);
@@ -247,8 +219,6 @@ export default function LoginScreen() {
           secure={secure}
           setSecure={setSecure}
           loading={loading}
-          rememberFlag={rememberFlag}
-          setRememberFlag={setRememberFlag}
           onLogin={handleLogin}
           socialNode={googleButtonNode} // acá inyectamos el botón de Google ya resuelto
         />
@@ -259,7 +229,7 @@ export default function LoginScreen() {
         {/* Sección del staff / equipo detrás de la app */}
         <LoginUserStaffComponent />
 
-        {/* Términos y condiciones / privacidad (componente reutilizable) */}
+        {/* Términos y Condiciones y Política de Privacidad (componente reutilizable) */}
         <InfoTyc />
       </KeyboardAwareScrollView>
     </KeyboardAvoidingView>

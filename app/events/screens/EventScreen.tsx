@@ -21,6 +21,7 @@ import HeroImagen from "@/app/events/components/evento/HeroImagen";
 import BadgesEvento from "@/app/events/components/evento/BadgesEvento";
 import ReproductorSoundCloud from "@/app/events/components/evento/ReproductorSoundCloud";
 import ReproductorYouTube from "@/app/events/components/evento/ReproductorYouTube";
+import { extractYouTubeId } from "@/app/events/utils/youtube";
 import { styles as eventoStyles } from "@/app/events/components/evento/styles";
 import SeccionEntradas from "../components/SeccionEntradas";
 import ModalArtistas from "@/app/events/components/evento/ModalArtistas";
@@ -78,19 +79,7 @@ export default function EventScreen() {
     { id: 2, user: "Usuario27", comment: "Buena organización, pero faltó variedad.", rating: 4, daysAgo: 6 },
   ];
 
-  const extractYouTubeId = (url: string): string | null => {
-    if (!url) return null;
-    try {
-      const u = new URL(url);
-      if (u.hostname.includes("youtu.be")) return u.pathname.replace("/", "") || null;
-      if (u.hostname.includes("youtube.com")) {
-        if (u.pathname.startsWith("/watch")) return u.searchParams.get("v");
-        if (u.pathname.startsWith("/embed/")) return u.pathname.split("/embed/")[1] || null;
-        if (u.pathname.startsWith("/shorts/")) return u.pathname.split("/shorts/")[1] || null;
-      }
-    } catch {}
-    return null;
-  };
+  // centralized helper imported from app/events/utils/youtube
 
   const findYouTubeUrl = (ev: any): string | null => {
     if (!ev) return null;
@@ -234,12 +223,17 @@ export default function EventScreen() {
     };
   }, [fechas]);
 
-  const youTubeEmbedUrl = useMemo(() => {
+  // Prefer passing the raw url and the extracted videoId to the player component
+  const youTubeRawUrl = useMemo(() => {
     if (!eventData) return null;
-    const url = findYouTubeUrl(eventData);
-    const vid = url ? extractYouTubeId(url) : null;
-    return vid ? `https://www.youtube.com/embed/${vid}` : null;
+    return findYouTubeUrl(eventData);
   }, [eventData]);
+
+  const youTubeVideoId = useMemo(() => {
+    try {
+      return extractYouTubeId(youTubeRawUrl || undefined);
+    } catch { return null; }
+  }, [youTubeRawUrl]);
 
   const soundCloudUrl = useMemo(() => {
     if (!eventData) return null;
@@ -553,10 +547,16 @@ export default function EventScreen() {
               )}
             </View>
           </View>
-          {(() => { console.log("[EventScreen] multimedia URLs -> soundCloud:", soundCloudUrl, " youtube:", youTubeEmbedUrl); return null; })()}
+          {(() => {
+            if (__DEV__) console.log("[EventScreen] multimedia URLs -> soundCloud:", soundCloudUrl, " youtubeRaw:", youTubeRawUrl, " videoId:", youTubeVideoId);
+            return null;
+          })()}
           <ModalArtistas artistas={eventData.artistas} visible={showArtistsModal} onClose={() => setShowArtistsModal(false)} />
           <SeccionEntradas fechas={fechas} entradasPorFecha={entradasPorFecha} loadingEntradas={loadingEntradas} selectedTickets={selectedTickets} setTicketQty={setTicketQty} subtotal={subtotal} noEntradasAvailable={noEntradasAvailable} onBuy={handleBuyPress} isAdmin={hasRole("admin")} />
-          <View style={styles.mediaSection}><ReproductorSoundCloud soundCloudUrl={soundCloudUrl} /><ReproductorYouTube youTubeEmbedUrl={youTubeEmbedUrl} /></View>
+          <View style={styles.mediaSection}>
+            <ReproductorSoundCloud soundCloudUrl={soundCloudUrl} />
+            <ReproductorYouTube rawUrl={youTubeRawUrl} videoId={youTubeVideoId} />
+          </View>
           {/* Sección de reseñas: solo mostrar si el evento tiene idFiesta real (no usar idEvento como fallback) */}
           {(() => {
             const idFiestaFinal = String(idFiestaResolved || '').trim();

@@ -34,7 +34,7 @@ export default function TycMetadataCardComponent({
           <Icon name="picture-as-pdf" color="#374151" size={22} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>Términos y Condiciones</Text>
+          <Text style={styles.cardTitle}>Términos y Condiciones y Política de Privacidad</Text>
           <Text
             style={styles.cardFileName}
             numberOfLines={1}

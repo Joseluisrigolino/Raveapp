@@ -16,7 +16,7 @@ import { COLORS } from "@/styles/globalStyles"; // Paleta de colores global
 import ROUTES from "@/routes"; // Mapa de rutas de la app
 import * as nav from "@/utils/navigation"; // Helpers propios para navegación
 import useSendRecoveryPass from "@/app/auth/services/user/useSendRecoveryPass"; // Hook que llama a la API de recuperación
-import InfoTyc from "@/components/infoTyc"; // Términos y condiciones reutilizable
+import InfoTyc from "@/components/infoTyc"; // Términos y Condiciones y Política de Privacidad reutilizable
 
 // Tipo simple para el callback opcional del popup
 type PopupOnClose = (() => void) | null;
@@ -225,7 +225,7 @@ export default function RecoverPasswordScreen() {
           </View>
         </View>
 
-        {/* Términos y condiciones (reutilizado en varias screens) */}
+        {/* Términos y Condiciones y Política de Privacidad (reutilizado en varias screens) */}
         <InfoTyc />
       </KeyboardAwareScrollView>
     </KeyboardAvoidingView>

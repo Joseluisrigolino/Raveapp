@@ -1,5 +1,5 @@
 // src/app/tyc/api/tycApi.ts
-import { mediaApi } from "@/app/apis/mediaApi";
+import { mediaApi, DEFAULT_MAX_UPLOAD_BYTES } from "@/app/apis/mediaApi";
 
 export const TYC_MEDIA_ENTITY_ID = "archivoTyc";
 
@@ -47,7 +47,7 @@ export async function getTycMedia(): Promise<TycMedia | null> {
 export async function getTycPdfUrl(): Promise<string> {
   const media = await getTycMedia();
   if (!media?.url) {
-    throw new Error("No se encontró el PDF de Términos y Condiciones.");
+    throw new Error("No se encontró el PDF de Términos y Condiciones y Política de Privacidad.");
   }
   return media.url;
 }
@@ -81,7 +81,7 @@ export async function replaceTycPdf(file: TycUploadFile): Promise<string> {
   }
 
   await mediaApi.upload(TYC_MEDIA_ENTITY_ID, file, undefined, {
-    maxBytes: 2 * 1024 * 1024,
+    maxBytes: DEFAULT_MAX_UPLOAD_BYTES,
   });
 
   // devolver la nueva URL

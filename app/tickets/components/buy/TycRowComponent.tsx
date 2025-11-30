@@ -20,7 +20,7 @@ export default function TycRow({ acceptedTyc, toggleAcceptedTyc }: Props) {
         {acceptedTyc ? <Text style={styles.checkboxTick}>✓</Text> : null}
       </TouchableOpacity>
       <Text style={styles.tycText}>
-        Acepto los Términos y Condiciones y la Política de Privacidad.
+        Acepto los Términos y Condiciones y Política de Privacidad.
       </Text>
     </View>
   );

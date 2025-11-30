@@ -6,12 +6,12 @@ import { apiClient, login } from "@/app/apis/apiClient"; // Cliente HTTP princip
 // Tipos y constantes
 // ----------------------
 
-// Modelo real de un ítem de media según la API /v1/Media
+// Modelo real de un ítem de media según la API
 export interface MediaItem {
   idMedia: string; // Identificador único de la media
   idEntidadMedia: string; // ID de la entidad a la que pertenece (evento, artista, etc.)
   url: string | null; // URL firmada al recurso (imagen/archivo) o null si es solo video
-  mdVideo: string | null; // Identificador o URL de video (YouTube, etc.) o null si es solo imagen
+  mdVideo: string | null; // Identificador o URL de video (YouTube) o null si es solo imagen
 }
 
 // Respuesta estándar de la API de media cuando pedimos por entidad
@@ -26,7 +26,7 @@ interface UploadOptions {
 }
 
 // Límite por defecto: 2MB
-const DEFAULT_MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+export const DEFAULT_MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 
 // ----------------------
 // Helpers internos

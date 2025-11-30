@@ -2020,8 +2020,8 @@ function TicketPurchasedScreenContent() {
                   />
                   <Text style={styles.refundCheckText}>
                     Confirmo que deseo reembolsar la orden mencionada en este
-                    formulario bajo los términos y condiciones de nuestro
-                    servicio.
+                    formulario bajo los Términos y Condiciones y Política de Privacidad
+                    de nuestro servicio.
                   </Text>
                 </TouchableOpacity>
                 <Text style={[styles.modalSubtitle, { fontWeight: "700" }]}>

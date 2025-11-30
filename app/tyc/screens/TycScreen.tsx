@@ -29,7 +29,7 @@ export default function Tyc() {
   return (
     <ProtectedRoute allowedRoles={["admin"]}>
       <SafeAreaView style={styles.container}>
-        <Header title="Términos y Condiciones" />
+        <Header title="Términos y Condiciones y Política de Privacidad" />
 
         <View style={styles.content}>
           <TycMetadataCardComponent

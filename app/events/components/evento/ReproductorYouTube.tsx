@@ -1,177 +1,111 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { View, Text, TouchableOpacity, Platform } from "react-native";
-import { styles } from "./styles";
-import { Linking } from "react-native";
+import React, { useMemo } from "react";
+import { View, Text, TouchableOpacity, Platform, Linking, StyleSheet, Image } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "@/styles/globalStyles";
+import { extractYouTubeId } from "@/app/events/utils/youtube";
 
-type Props = { youTubeEmbedUrl?: string | null };
+type Props = {
+  youTubeEmbedUrl?: string | null;
+  // backward compatibility (optional)
+  rawUrl?: string | null;
+  videoId?: string | null;
+  title?: string | null;
+  description?: string | null;
+};
 
-function getWebView() {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const m = require("react-native-webview");
-    return m?.WebView ?? m?.default ?? null;
-  } catch {
-    return null;
-  }
-}
-
-export default function ReproductorYouTube({ youTubeEmbedUrl }: Props) {
-  if (!youTubeEmbedUrl) return null;
-
-  const [embedError, setEmbedError] = useState(false);
-
-  const WebViewComp: any = getWebView();
-
-  // Build embed URL with normalization and recommended params (helps avoid Error 153)
-  const embedWithParams = useMemo(() => {
-    const raw = (youTubeEmbedUrl || '').trim();
-    let videoId: string | null = null;
+export default function ReproductorYouTube({ youTubeEmbedUrl, rawUrl, videoId: propVideoId, title, description }: Props) {
+  // Prefer explicit videoId prop, otherwise try the new youTubeEmbedUrl then rawUrl
+  const resolvedVideoId = useMemo(() => {
+    if (propVideoId) return propVideoId;
+    const candidate = youTubeEmbedUrl || rawUrl || undefined;
     try {
-      if (/youtu\.be\//i.test(raw)) {
-        videoId = raw.split(/youtu\.be\//i)[1].split(/[?&#]/)[0];
-      } else if (/youtube\.com\/watch/i.test(raw)) {
-        const url = new URL(raw);
-        videoId = url.searchParams.get('v');
-      } else if (/youtube\.com\/embed\//i.test(raw)) {
-        videoId = raw.split(/embed\//i)[1].split(/[?&#]/)[0];
-      } else if (/youtube\.com\/shorts\//i.test(raw)) {
-        videoId = raw.split(/shorts\//i)[1].split(/[?&#]/)[0];
-      }
-    } catch {}
-    if (!videoId) {
-      const m = raw.match(/[\/?=]([A-Za-z0-9_-]{11})(?:[&?/]|$)/);
-      videoId = m ? m[1] : null;
+      return extractYouTubeId(candidate);
+    } catch {
+      return null;
     }
-  // Preferir dominio sin cookies: puede evitar bloqueos de configuración en algunos entornos
-  const base = videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : raw;
-    const sep = base.includes('?') ? '&' : '?';
-    const originParam = 'origin=https://www.youtube.com';
-    return `${base}${sep}rel=0&modestbranding=1&playsinline=1&enablejsapi=1&${originParam}`;
-  }, [youTubeEmbedUrl]);
+  }, [propVideoId, youTubeEmbedUrl, rawUrl]);
 
-  // Inject JS to detect YouTube player error UI and notify RN
-  const injectedJS = useMemo(() => `(${String(function () {
-    // poll DOM for common error indicators and postMessage once
-    function check() {
-      try {
-        var text = (document.body && document.body.innerText) || '';
-        if (/Video player configuration error|Error 153|Watch video on YouTube/i.test(text)) {
-          try { (window as any).ReactNativeWebView && (window as any).ReactNativeWebView.postMessage && (window as any).ReactNativeWebView.postMessage('YT_PLAYER_ERROR'); } catch(e){}
-          return;
-        }
-      } catch (e) {}
-      setTimeout(check, 1000);
+  if (!resolvedVideoId) return null;
+
+  const watchUrl = `https://www.youtube.com/watch?v=${resolvedVideoId}`;
+  const androidScheme = `vnd.youtube://watch?v=${resolvedVideoId}`;
+  const iosScheme = `youtube://watch?v=${resolvedVideoId}`;
+
+  const openExternal = async () => {
+    try {
+      // Try vnd.youtube first (common on Android), then youtube:// (iOS/alt), then web
+      const canVnd = await Linking.canOpenURL(androidScheme).catch(() => false);
+      if (canVnd) return Linking.openURL(androidScheme).catch(() => Linking.openURL(watchUrl));
+
+      const canYoutube = await Linking.canOpenURL(iosScheme).catch(() => false);
+      if (canYoutube) return Linking.openURL(iosScheme).catch(() => Linking.openURL(watchUrl));
+
+      return Linking.openURL(watchUrl).catch(() => {});
+    } catch {
+      // ignore
     }
-    check();
-  })})();`, [youTubeEmbedUrl]);
-
-  const userAgentAndroid =
-    'Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36';
-
-  const html = `<!doctype html><html><head><meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0"/><style>html,body{height:100%;margin:0;background:transparent;}iframe{display:block;border:0;width:100%;height:100%;}</style></head><body><iframe src="${embedWithParams}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></body></html>`;
-
-  useEffect(() => {
-    if (!embedError) return;
-    (async () => {
-      try {
-        // Try to open in native YouTube app first
-        const vid = (function extractId(u: string) {
-          try {
-            const url = new URL(u);
-            if (url.pathname.includes('/embed/')) return url.pathname.split('/embed/')[1];
-            return url.searchParams.get('v');
-          } catch { return null; }
-        })(youTubeEmbedUrl || '');
-
-        if (!vid) return;
-
-        const androidScheme = `vnd.youtube://view?video_id=${vid}`;
-        const iosScheme = `youtube://watch?v=${vid}`;
-        const scheme = Platform.OS === 'android' ? androidScheme : iosScheme;
-        const can = await Linking.canOpenURL(scheme).catch(() => false);
-        if (can) {
-          await Linking.openURL(scheme);
-        }
-      } catch (e) {
-        // ignore
-      }
-    })();
-  }, [embedError]);
-
-  if (WebViewComp) {
-    console.log("[ReproductorYouTube] WebView disponible, mostrando embed normalizado:", embedWithParams);
-
-    return (
-      <View style={styles.mediaBlock}>
-        <View style={styles.mediaWrapperFixed}>
-          {!embedError ? (
-            <WebViewComp
-              originWhitelist={["*"]}
-              source={{ html }}
-              allowsFullscreenVideo
-              allowsInlineMediaPlayback
-              javaScriptEnabled
-              domStorageEnabled
-              mediaPlaybackRequiresUserAction={false}
-              style={styles.webview}
-              mixedContentMode="always"
-              allowUniversalAccessFromFileURLs={true}
-              onMessage={(evt: any) => {
-                const d = evt?.nativeEvent?.data;
-                if (d === 'YT_PLAYER_ERROR') {
-                  console.warn('[ReproductorYouTube] Detectado error del player via injectedJS');
-                  setEmbedError(true);
-                }
-              }}
-              injectedJavaScript={injectedJS}
-              {...(Platform.OS === 'android' ? { userAgent: userAgentAndroid } : {})}
-              onError={() => {
-                console.warn('[ReproductorYouTube] onError WebView');
-                setEmbedError(true);
-              }}
-              onHttpError={() => {
-                console.warn('[ReproductorYouTube] onHttpError WebView');
-                setEmbedError(true);
-              }}
-            />
-          ) : (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 12 }}>
-              <Text style={{ color: '#fff', marginBottom: 12, textAlign: 'center' }}>No se pudo reproducir el video aquí (Error 153 / configuración del player).
-Puede deberse a restricciones del video (privado, edad, región o embed deshabilitado).</Text>
-              <TouchableOpacity onPress={() => {
-                // convert embed url to watch url
-                const watch = embedWithParams.replace('/embed/', '/watch?v=').split('?')[0];
-                Linking.openURL(watch);
-              }} style={{ backgroundColor: COLORS.primary, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8 }}>
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Ver en YouTube</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => Linking.openURL(embedWithParams)} style={{ marginTop: 8 }}>
-                <Text style={{ color: COLORS.info, textDecorationLine: 'underline', fontSize: 12 }}>Abrir versión embed directa</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </View>
-    );
-  }
+  };
 
   if (Platform.OS === "web") {
-    // @ts-ignore
+    const embedUrl = `https://www.youtube-nocookie.com/embed/${resolvedVideoId}`;
+    // keep iframe minimal and include referrerPolicy
+    // @ts-ignore react-native-web supports raw DOM in web builds
     return (
       // @ts-ignore
       <div style={{ marginTop: 12, marginBottom: 12 }}>
-        <iframe src={embedWithParams} style={{ width: "100%", height: 300, border: "none" }} title="YouTube" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="origin-when-cross-origin" allowFullScreen />
+        <iframe
+          src={embedUrl}
+          style={{ width: "100%", height: 300, border: "none" }}
+          title="YouTube"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="origin-when-cross-origin"
+          allowFullScreen
+        />
       </div>
     );
   }
 
-  // Fallback: abrir en navegador
+  // Native platforms: card with thumbnail + meta and full-width button
   return (
-    <View style={styles.mediaBlock}>
-      <TouchableOpacity onPress={() => Linking.openURL(youTubeEmbedUrl)}>
-        <Text style={{ color: "#1976D2" }}>Abrir en YouTube</Text>
-      </TouchableOpacity>
+    <View style={localStyles.container}>
+      <View style={localStyles.previewCard}>
+        <View style={localStyles.row}>
+          <View style={localStyles.thumbWrap}>
+            <View style={localStyles.playIconBg}>
+              <MaterialCommunityIcons name="youtube" size={28} color="#ffffff" />
+            </View>
+          </View>
+          <View style={localStyles.metaCol}>
+            <Text numberOfLines={1} style={localStyles.metaTitle}>{title || 'Video del artista principal'}</Text>
+            <Text numberOfLines={2} style={localStyles.metaDesc}>{description || 'Mirá el video que el organizador del evento dejó, sobre el artista principal.'}</Text>
+            <Text style={localStyles.domain}>youtube.com</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity style={localStyles.ctaButton} onPress={openExternal} accessibilityRole="button">
+          <MaterialCommunityIcons name="open-in-new" size={16} color="#fff" style={{ marginRight: 8 }} />
+          <Text style={localStyles.ctaText}>Ver en YouTube</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  container: { width: "100%", marginTop: 12 },
+  card: { backgroundColor: COLORS.cardBg, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: COLORS.borderInput },
+  title: { color: COLORS.textPrimary, fontWeight: "700", marginBottom: 8 },
+  subtitle: { color: COLORS.textSecondary, marginBottom: 12 },
+  button: { backgroundColor: COLORS.primary, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, alignSelf: "flex-start" },
+  buttonText: { color: COLORS.cardBg, fontWeight: "700" },
+  previewCard: { backgroundColor: COLORS.cardBg, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: COLORS.borderInput },
+  row: { flexDirection: 'row', alignItems: 'center' },
+  thumbWrap: { width: 64, height: 64, marginRight: 12 },
+  playIconBg: { flex: 1, backgroundColor: '#e6e6e6', borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  metaCol: { flex: 1 },
+  metaTitle: { color: COLORS.textPrimary, fontWeight: '700', fontSize: 14 },
+  metaDesc: { color: COLORS.textSecondary, fontSize: 12, marginTop: 4 },
+  domain: { color: COLORS.textSecondary, fontSize: 12, marginTop: 8 },
+  ctaButton: { marginTop: 12, backgroundColor: '#0b1220', paddingVertical: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  ctaText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+});

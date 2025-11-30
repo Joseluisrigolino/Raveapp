@@ -15,8 +15,6 @@ interface LoginUserInfoUserComponentProps {
   secure: boolean;
   setSecure: (v: boolean) => void;
   loading: boolean;
-  rememberFlag: boolean;
-  setRememberFlag: (v: boolean) => void;
   onLogin: () => void;
   socialNode?: React.ReactNode;
 }
@@ -30,23 +28,10 @@ export default function LoginUserInfoUserComponent({
   secure,
   setSecure,
   loading,
-  rememberFlag,
-  setRememberFlag,
   onLogin,
   socialNode,
 }: LoginUserInfoUserComponentProps) {
   const router = useRouter();
-
-  // Checkbox cuadrado para "Recordar usuario"
-  function SquareCheckbox({ checked, onPress }: { checked: boolean; onPress: () => void }) {
-    return (
-      <Pressable onPress={onPress} accessibilityRole="checkbox" accessibilityState={{ checked }}>
-        <View style={[styles.checkboxBox, checked && styles.checkboxBoxChecked]}>
-          {checked ? <Text style={styles.checkboxTick}>713</Text> : null}
-        </View>
-      </Pressable>
-    );
-  }
 
   // Validamos si se puede enviar el formulario
   const canSubmit = email.trim().length > 0 && password.length > 0 && !loading;
@@ -92,15 +77,11 @@ export default function LoginUserInfoUserComponent({
       />
 
       <View style={styles.rowBetween}>
-        <View style={styles.rememberRow}>
-          <SquareCheckbox checked={rememberFlag} onPress={() => setRememberFlag(!rememberFlag)} />
-          <Pressable onPress={() => setRememberFlag(!rememberFlag)}>
-            <Text style={styles.rememberText}>Recordarme</Text>
+        <View style={{ flex: 1, alignItems: "flex-end" }}>
+          <Pressable onPress={() => nav.push(router, ROUTES.LOGIN.RECOVER as any)} accessibilityRole="link">
+            <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
           </Pressable>
         </View>
-        <Pressable onPress={() => nav.push(router, ROUTES.LOGIN.RECOVER as any)} accessibilityRole="link">
-          <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
-        </Pressable>
       </View>
 
       <Button mode="contained" onPress={onLogin} contentStyle={styles.buttonContent} style={styles.loginButton} labelStyle={{ fontWeight: "700", color: "#ffffff" }} disabled={!canSubmit} loading={loading}>

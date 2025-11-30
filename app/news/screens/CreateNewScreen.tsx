@@ -29,8 +29,7 @@ import NewsImageMediaComponent from "../components/NewsImageMediaComponent";
 
 import useCreateNew from "../services/useCreateNew";
 import useNewsEvents from "../services/useNewsEvents";
-
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2MB
+import { DEFAULT_MAX_UPLOAD_BYTES } from "@/app/apis/mediaApi";
 
 export default function CreateNewScreen() {
     // Popup de alerta unificado
@@ -64,7 +63,7 @@ export default function CreateNewScreen() {
       const asset = result.assets[0];
       const fileInfo: any = await getInfoAsync(asset.uri);
 
-      if (fileInfo?.size && fileInfo.size > MAX_IMAGE_BYTES) {
+      if (fileInfo?.size && fileInfo.size > DEFAULT_MAX_UPLOAD_BYTES) {
         showPopup("Error", "La imagen supera los 2MB permitidos.");
         return;
       }

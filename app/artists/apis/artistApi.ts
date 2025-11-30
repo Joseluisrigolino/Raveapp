@@ -2,7 +2,7 @@
 
 // API de artistas: helpers para hablar con el backend de artistas
 import { apiClient, login } from "@/app/apis/apiClient"; // Cliente HTTP y login root
-import { mediaApi } from "@/app/apis/mediaApi"; // API de media (imágenes / videos)
+import { mediaApi } from "@/app/apis/mediaApi"; // API de media
 import { Artist } from "@/app/artists/types/Artist"; // Modelo de artista usado en el front
 import { ApiArtistResponse } from "@/app/artists/types/api-types/ApiArtist"; // Modelo que viene del backend
 
@@ -29,7 +29,6 @@ function toTitleCase(text: string | undefined | null): string {
 /**
  * Trae la primera imagen asociada a una entidad (artista/usuario) usando mediaApi.
  * Devuelve una URL lista para usar en <Image> o un string vacío si no hay imagen.
- * Hoy asumimos que el backend ya devuelve una URL absoluta (https://...).
  */
 async function getFirstImageByEntity(entityId: string): Promise<string> {
   try {
@@ -145,7 +144,7 @@ export async function fetchOneArtistFromApi(
     likedByIds = [];
   }
 
-  // Para cada usuario que dio like, buscamos su primer imagen de perfil
+  // Para cada usuario que dio like, buscamos su imagen de perfil
   const likedByImages = (
     await Promise.all(
       likedByIds.map(async (uid) => {
@@ -337,11 +336,7 @@ export async function createArtist(
   });
 }
 
-// --- Expo Router: este módulo NO es una pantalla/ruta ---
-// Este archivo vive bajo "app/", pero no es una pantalla. Exportamos un default
-// "dummy" para que Expo Router no lo trate como ruta.
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ExpoRouterNoRoute() {
   return null; // Componente vacío, nunca se usa en la UI
 }

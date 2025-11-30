@@ -51,7 +51,7 @@ export default function InfoTyc() {
         <Text style={styles.text}>
           Al continuar, aceptas nuestros{" "}
           <Text style={styles.link} onPress={openTycModal}>
-            Terminos y condiciones
+            Terminos y condiciones, y tambien nuestra Politica de privacidad
           </Text>
         </Text>
       </View>

@@ -4,6 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { getInfoAsync } from "expo-file-system/legacy";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS, FONTS, RADIUS } from "@/styles/globalStyles";
+import { DEFAULT_MAX_UPLOAD_BYTES } from "@/app/apis/mediaApi";
 
 interface Props {
   value?: string | null;
@@ -16,7 +17,7 @@ interface Props {
 export default function ImagePickerComponent({
   value,
   onChange,
-  maxBytes = 2 * 1024 * 1024,
+  maxBytes = DEFAULT_MAX_UPLOAD_BYTES,
   allowedExts = ["jpg", "jpeg", "png"],
   label = "Imagen",
 }: Props) {
