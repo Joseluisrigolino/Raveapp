@@ -1,6 +1,5 @@
-// app/main/MenuPantalla.tsx
-
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+// app/main/EventsScreens/FavEventScreen.tsx
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ScrollView,
   View,
@@ -10,31 +9,33 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, usePathname } from "expo-router";
+import { useRouter } from "expo-router";
 import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
 
 import ProtectedRoute from "@/app/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
+import TabMenuComponent from "@/components/layout/TabMenuComponent";
 import CardComponent from "@/app/events/components/CardComponent";
 import FiltersSection from "@/components/filters/FiltersSection";
 
-import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
-import { EventItem } from "@/interfaces/EventItem";
-import { fetchEventsByEstados, ESTADO_CODES, getEventFlags } from "@/app/events/apis/eventApi";
+import { useAuth } from "@/app/auth/AuthContext";
+import { fetchEvents } from "@/app/events/apis/eventApi";
+import { getEventosFavoritos, putEventoFavorito } from "@/app/auth/userApi";
+
 import {
   fetchProvinces,
   fetchMunicipalities,
   fetchLocalities,
   fetchLocalitiesByName,
 } from "@/app/apis/georefApi";
+import { getEventFlags } from "@/app/events/apis/eventApi";
 
-import { useAuth } from "@/app/auth/AuthContext";
-import TabMenuComponent from "@/components/layout/TabMenuComponent";
-import { putEventoFavorito, getEventosFavoritos } from "@/app/auth/userHelpers";
+import { COLORS, FONT_SIZES } from "@/styles/globalStyles";
+import { EventItem } from "@/interfaces/EventItem";
 
-// Helper para rango de semana
+// Rango de semana (igual que en MenuScreen)
 function getWeekRange() {
   const today = new Date();
   const dayOfWeek = today.getDay(); // Domingo = 0
@@ -60,7 +61,6 @@ function normalizeText(s?: string | null) {
       .toLowerCase()
       .trim();
   } catch {
-    // Fallback for environments without Unicode property escapes
     return String(s)
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -74,7 +74,6 @@ function provinceMatchesAddress(prov?: string, address?: string) {
   const a = normalizeText(address);
   if (!p) return false;
   if (a.includes(p)) return true;
-  // special-case common synonyms for Ciudad Autónoma de Buenos Aires
   const isProvCaba = p.includes("caba") || p.includes("ciudad") || p.includes("autonom") || p.includes("buenos");
   const hasCabaInAddr = a.includes("caba") || a.includes("ciudad") || a.includes("capital");
   if (isProvCaba && hasCabaInAddr) return true;
@@ -82,8 +81,6 @@ function provinceMatchesAddress(prov?: string, address?: string) {
 }
 
 function getEventLocationString(ev: any) {
-  // Build a searchable location string from multiple posible fuentes
-  // (ev.address for legacy, or domicilio.{provincia,municipio,localidad,direccion}).
   const parts: Array<string> = [];
   if (ev?.address) parts.push(String(ev.address));
   const dom = ev?.domicilio;
@@ -96,41 +93,27 @@ function getEventLocationString(ev: any) {
   return parts.join(" ").trim();
 }
 
-export default function MenuPantalla() {
+export default function FavEventScreen() {
   const router = useRouter();
-  const path = usePathname();
   const { user, hasRole } = useAuth();
   const isAdmin = hasRole("admin");
-  const currentScreen = path?.split("/").pop() || "";
 
-  const tabs = [
-    {
-      label: "EVENTOS A VALIDAR",
-      route: ROUTES.ADMIN.EVENTS_VALIDATE.LIST,
-      isActive:
-        currentScreen === ROUTES.ADMIN.EVENTS_VALIDATE.LIST.split("/").pop(),
-    },
-    {
-      // Mostramos solo los eventos EN_VENTA en esta pantalla
-      label: "EVENTOS EN VENTA",
-      route: ROUTES.MAIN.EVENTS.MENU,
-      isActive: currentScreen === ROUTES.MAIN.EVENTS.MENU.split("/").pop(),
-    },
-  ];
-
+  // Normalizo ID de usuario
   const userId: string | null =
     (user as any)?.idUsuario ?? (user as any)?.id ?? null;
 
-  // Mantengo _ts en los eventos para evitar reparseos repetidos
-  const [allEvents, setAllEvents] = useState<
-    Array<EventItem & { _ts: number }>
-  >([]);
+  // Estado base
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Sólo eventos favoritos del usuario
+  const [favEvents, setFavEvents] = useState<EventItem[]>([]);
+
+  // Corazones
   const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [favBusy, setFavBusy] = useState<string | null>(null);
 
+  // Carga: trae IDs de favoritos del user + todos los eventos, y filtra
   useEffect(() => {
     let mounted = true;
 
@@ -139,26 +122,41 @@ export default function MenuPantalla() {
         setLoading(true);
         setError(null);
 
-        // Cargar únicamente eventos con estado EN_VENTA
-        const eventsPromise = fetchEventsByEstados([ESTADO_CODES.EN_VENTA]);
-        const favsPromise = userId
-          ? getEventosFavoritos(String(userId))
-          : Promise.resolve<string[]>([]);
+        if (!userId) {
+          setFavEvents([]);
+          setFavSet(new Set());
+          return;
+        }
 
-        const [evts, favIds] = await Promise.all([eventsPromise, favsPromise]);
+        const [all, favIds] = await Promise.all([
+          fetchEvents(),
+          getEventosFavoritos(String(userId)),
+        ]);
+
+        // Ordenar como en MenuScreen
+        const sortedAll = all
+          .map((e) => ({
+            ...e,
+            _ts: (() => {
+              const [d, m, y] = e.date.split("/").map(Number);
+              return new Date(y, m - 1, d).getTime();
+            })(),
+          }))
+          .sort((a, b) => a._ts - b._ts)
+          .map(({ _ts, ...rest }) => rest);
+
+        // Filtrar sólo favoritos
+        const favIdSet = new Set(favIds.map(String));
+        const onlyFavs = sortedAll.filter(
+          (e) => e.id && favIdSet.has(String(e.id))
+        );
 
         if (!mounted) return;
-
-        const enriched = evts
-          .map((e) => ({ ...e, _ts: parseDateToTs(e.date) }))
-          .sort((a, b) => (a._ts || 0) - (b._ts || 0));
-
-        // Mostrar todos los eventos EN_VENTA (sin filtrar por fecha actual)
-        setAllEvents(enriched);
-        setFavSet(new Set(favIds.map(String)));
+        setFavEvents(onlyFavs);
+        setFavSet(favIdSet);
       } catch (err) {
-        console.error("[MenuPantalla] Error cargando eventos/favoritos:", err);
-        if (mounted) setError("Error al cargar los eventos.");
+        console.error("[FavEventScreen] Error cargando favoritos:", err);
+        if (mounted) setError("Error al cargar tus eventos favoritos.");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -169,13 +167,14 @@ export default function MenuPantalla() {
     };
   }, [userId]);
 
-  // --- estados y handlers de filtros ---
+  // --- filtros (idénticos a MenuScreen) ---
   const [searchText, setSearchText] = useState("");
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+
   const [locationFilterOpen, setLocationFilterOpen] = useState(false);
   const [provinceText, setProvinceText] = useState("");
   const [provinceSuggestions, setProvinceSuggestions] = useState<
@@ -189,13 +188,15 @@ export default function MenuPantalla() {
   const [localitySuggestions, setLocalitySuggestions] = useState<
     { id: string; nombre: string }[]
   >([]);
+
   const [weekActive, setWeekActive] = useState(false);
   const [afterActive, setAfterActive] = useState(false);
   const [lgbtActive, setLgbtActive] = useState(false);
   const [genreFilterOpen, setGenreFilterOpen] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
 
-  const onProvinceTextChange = useCallback(async (v: string) => {
+  // Helpers ubicación (igual que en MenuScreen)
+  async function onProvinceTextChange(v: string) {
     setProvinceText(v);
     if (v.trim().length < 3) return setProvinceSuggestions([]);
     try {
@@ -206,83 +207,71 @@ export default function MenuPantalla() {
     } catch {
       setProvinceSuggestions([]);
     }
-  }, []);
-
-  const onPickProvince = useCallback((name: string) => {
+  }
+  function onPickProvince(name: string) {
     setProvinceText(name);
     setProvinceSuggestions([]);
-  }, []);
+  }
 
-  const onMunicipalityTextChange = useCallback(
-    async (v: string) => {
-      setMunicipalityText(v);
-      if (v.trim().length < 3 || !provinceText)
-        return setMunicipalitySuggestions([]);
-      try {
-        const results = await fetchMunicipalities(provinceText);
-        setMunicipalitySuggestions(
-          results.filter((m) =>
-            m.nombre.toLowerCase().includes(v.toLowerCase())
-          )
-        );
-      } catch {
-        setMunicipalitySuggestions([]);
-      }
-    },
-    [provinceText]
-  );
-
-  const onPickMunicipality = useCallback((name: string) => {
+  async function onMunicipalityTextChange(v: string) {
+    setMunicipalityText(v);
+    if (v.trim().length < 3 || !provinceText)
+      return setMunicipalitySuggestions([]);
+    try {
+      const results = await fetchMunicipalities(provinceText);
+      setMunicipalitySuggestions(
+        results.filter((m) => m.nombre.toLowerCase().includes(v.toLowerCase()))
+      );
+    } catch {
+      setMunicipalitySuggestions([]);
+    }
+  }
+  function onPickMunicipality(name: string) {
     setMunicipalityText(name);
     setMunicipalitySuggestions([]);
-  }, []);
+  }
 
-  const onLocalityTextChange = useCallback(
-    async (v: string) => {
-      setLocalityText(v);
-      if (v.trim().length < 3) return setLocalitySuggestions([]);
-      try {
-        const results =
-          provinceText && municipalityText
-            ? await fetchLocalities(provinceText, municipalityText)
-            : await fetchLocalitiesByName(v);
-        setLocalitySuggestions(
-          results.filter((l) =>
-            l.nombre.toLowerCase().includes(v.toLowerCase())
-          )
-        );
-      } catch {
-        setLocalitySuggestions([]);
-      }
-    },
-    [provinceText, municipalityText]
-  );
-
-  const onPickLocality = useCallback((name: string) => {
+  async function onLocalityTextChange(v: string) {
+    setLocalityText(v);
+    if (v.trim().length < 3) return setLocalitySuggestions([]);
+    try {
+      const results =
+        provinceText && municipalityText
+          ? await fetchLocalities(provinceText, municipalityText)
+          : await fetchLocalitiesByName(v);
+      setLocalitySuggestions(
+        results.filter((l) => l.nombre.toLowerCase().includes(v.toLowerCase()))
+      );
+    } catch {
+      setLocalitySuggestions([]);
+    }
+  }
+  function onPickLocality(name: string) {
     setLocalityText(name);
     setLocalitySuggestions([]);
-  }, []);
-
-  const onClearLocation = useCallback(() => {
+  }
+  function onClearLocation() {
     setProvinceText("");
     setMunicipalityText("");
     setLocalityText("");
     setProvinceSuggestions([]);
     setMunicipalitySuggestions([]);
     setLocalitySuggestions([]);
-  }, []);
+  }
 
-  const onToggleGenre = useCallback((g: string) => {
+  function onToggleGenre(g: string) {
     setSelectedGenres((prev) =>
       prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]
     );
-  }, []);
+  }
+  function onClearGenres() {
+    setSelectedGenres([]);
+  }
 
-  const onClearGenres = useCallback(() => setSelectedGenres([]), []);
-
-  // Filtrado de eventos (usa _ts cacheado cuando está disponible)
+  // Filtrado final: igual que en MenuPantalla pero aplicado sobre favEvents
   const filteredEvents = useMemo(() => {
-    let results = [...allEvents];
+    let results = [...favEvents];
+
     if (searchText.trim()) {
       const lower = searchText.toLowerCase();
       results = results.filter((ev) => ev.title.toLowerCase().includes(lower));
@@ -291,7 +280,7 @@ export default function MenuPantalla() {
       const s = startDate.getTime();
       const e = endDate.getTime();
       results = results.filter((ev) => {
-        const t = ev._ts || parseDateToTs(ev.date);
+        const t = parseDateToTs(ev.date);
         return t >= s && t <= e;
       });
     }
@@ -311,20 +300,18 @@ export default function MenuPantalla() {
       const s = startOfWeek.getTime();
       const e = endOfWeek.getTime();
       results = results.filter((ev) => {
-        const t = ev._ts || parseDateToTs(ev.date);
+        const t = parseDateToTs(ev.date);
         return t >= s && t < e;
       });
     }
     if (afterActive) results = results.filter((ev) => getEventFlags(ev).isAfter);
     if (lgbtActive) results = results.filter((ev) => getEventFlags(ev).isLGBT);
     if (selectedGenres.length) {
-      results = results.filter((ev) =>
-        selectedGenres.includes((ev as any).type)
-      );
+      results = results.filter((ev) => selectedGenres.includes((ev as any).type));
     }
     return results;
   }, [
-    allEvents,
+    favEvents,
     searchText,
     startDate,
     endDate,
@@ -337,103 +324,115 @@ export default function MenuPantalla() {
     selectedGenres,
   ]);
 
-  const toggleDateFilter = useCallback(() => {
-    setDateFilterOpen((v) => !v);
-    setLocationFilterOpen(false);
-    setGenreFilterOpen(false);
-  }, []);
+  // Navegación card
+  function handleCardPress(_title: string, id?: string) {
+    if (id)
+      nav.push(router, { pathname: ROUTES.MAIN.EVENTS.EVENT, params: { id } });
+  }
 
-  const toggleLocationFilter = useCallback(() => {
-    setLocationFilterOpen((v) => !v);
-    setDateFilterOpen(false);
-    setGenreFilterOpen(false);
-  }, []);
+  // Toggle favorito (optimista). En esta pantalla, si se desmarca, se remueve del listado.
+  const handleToggleFavorite = async (eventId: string) => {
+    if (!userId) {
+      Alert.alert(
+        "Iniciá sesión",
+        "Necesitás estar logueado para gestionar favoritos."
+      );
+      return;
+    }
+    const wasFav = favSet.has(eventId);
 
-  const toggleGenreFilter = useCallback(() => {
-    setGenreFilterOpen((v) => !v);
-    setDateFilterOpen(false);
-    setLocationFilterOpen(false);
-  }, []);
+    // Estados previos para revertir en caso de error
+    const prevFavSet = new Set(favSet);
+    const prevFavEvents = [...favEvents];
 
-  const handleCardPress = useCallback(
-    (_: string, id?: string) => {
-      if (id)
-        nav.push(router, {
-          pathname: ROUTES.MAIN.EVENTS.EVENT,
-          params: { id },
-        });
-    },
-    [router]
-  );
+    // Optimista: si estaba marcado, lo saco del set y de la lista
+    const nextFavSet = new Set(favSet);
+    if (wasFav) {
+      nextFavSet.delete(eventId);
+      setFavEvents((current) =>
+        current.filter((e) => String(e.id) !== String(eventId))
+      );
+    } else {
+      // En esta pantalla rara vez vas a "agregar", pero contemplado por consistencia
+      nextFavSet.add(eventId);
+      // (Si quisieras agregar de nuevo, deberíamos traer los datos del evento; omitido a propósito)
+    }
+    setFavSet(nextFavSet);
+    setFavBusy(eventId);
 
-  const handleToggleFavorite = useCallback(
-    async (eventId: string) => {
-      if (!userId) {
-        Alert.alert(
-          "Iniciá sesión",
-          "Necesitás estar logueado para marcar favoritos."
-        );
-        return;
-      }
-      const wasFav = favSet.has(eventId);
-
-      // Actualización optimista usando función de estado
-      setFavSet((prev) => {
-        const next = new Set(prev);
-        if (wasFav) next.delete(eventId);
-        else next.add(eventId);
-        return next;
+    try {
+      await putEventoFavorito({
+        idUsuario: String(userId),
+        idEvento: String(eventId),
       });
-
-      setFavBusy(eventId);
-
-      try {
-        await putEventoFavorito({
-          idUsuario: String(userId),
-          idEvento: String(eventId),
-        });
-      } catch (e) {
-        // Revertir si falla
-        setFavSet((prev) => {
-          const revert = new Set(prev);
-          if (wasFav) revert.add(eventId);
-          else revert.delete(eventId);
-          return revert;
-        });
-        Alert.alert(
-          "Error",
-          "No se pudo actualizar el favorito. Probá de nuevo."
-        );
-      } finally {
-        setFavBusy(null);
-      }
-    },
-    [userId, favSet]
-  );
+    } catch (e) {
+      // Revertimos
+      setFavSet(prevFavSet);
+      setFavEvents(prevFavEvents);
+      Alert.alert(
+        "Error",
+        "No se pudo actualizar el favorito. Probá de nuevo."
+      );
+    } finally {
+      setFavBusy(null);
+    }
+  };
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.mainContainer}>
-        <Header />
-        <View style={{ flex: 1, justifyContent: "center" }}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
-        <Footer />
-      </SafeAreaView>
+      <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
+        <SafeAreaView style={styles.mainContainer}>
+          <Header />
+          <TabMenuComponent
+            tabs={[
+              {
+                label: "Mis entradas",
+                route: ROUTES.MAIN.TICKETS.MENU,
+                isActive: false,
+              },
+              {
+                label: "Eventos favoritos",
+                route: ROUTES.MAIN.EVENTS.FAV,
+                isActive: true,
+              },
+            ]}
+          />
+          <View style={{ flex: 1, justifyContent: "center" }}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+          <Footer />
+        </SafeAreaView>
+      </ProtectedRoute>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={styles.mainContainer}>
-        <Header />
-        <View
-          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-        >
-          <Text style={{ color: COLORS.negative }}>{error}</Text>
-        </View>
-        <Footer />
-      </SafeAreaView>
+      <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
+        <SafeAreaView style={styles.mainContainer}>
+          <Header />
+          <TabMenuComponent
+            tabs={[
+              {
+                label: "Mis entradas",
+                route: ROUTES.MAIN.TICKETS.MENU,
+                isActive: false,
+              },
+              {
+                label: "Eventos favoritos",
+                route: ROUTES.MAIN.EVENTS.FAV,
+                isActive: true,
+              },
+            ]}
+          />
+          <View
+            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+          >
+            <Text style={{ color: COLORS.negative }}>{error}</Text>
+          </View>
+          <Footer />
+        </SafeAreaView>
+      </ProtectedRoute>
     );
   }
 
@@ -441,7 +440,22 @@ export default function MenuPantalla() {
     <ProtectedRoute allowedRoles={["admin", "user", "owner"]}>
       <SafeAreaView style={styles.mainContainer}>
         <Header />
-        {isAdmin && <TabMenuComponent tabs={tabs} />}
+
+        <TabMenuComponent
+          tabs={[
+            {
+              label: "Mis entradas",
+              route: ROUTES.MAIN.TICKETS.MENU,
+              isActive: false,
+            },
+            {
+              label: "Eventos favoritos",
+              route: ROUTES.MAIN.EVENTS.FAV,
+              isActive: true,
+            },
+          ]}
+        />
+
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           nestedScrollEnabled
@@ -462,21 +476,29 @@ export default function MenuPantalla() {
             searchText={searchText}
             onSearchTextChange={setSearchText}
             dateFilterOpen={dateFilterOpen}
-            onToggleDateFilter={toggleDateFilter}
+            onToggleDateFilter={() => {
+              setDateFilterOpen((v) => !v);
+              setLocationFilterOpen(false);
+              setGenreFilterOpen(false);
+            }}
             startDate={startDate}
             endDate={endDate}
             showStartPicker={showStartPicker}
             showEndPicker={showEndPicker}
             onShowStartPicker={setShowStartPicker}
             onShowEndPicker={setShowEndPicker}
-            onStartDateChange={(e: any, d?: Date) => setStartDate(d || null)}
-            onEndDateChange={(e: any, d?: Date) => setEndDate(d || null)}
+            onStartDateChange={setStartDate}
+            onEndDateChange={setEndDate}
             onClearDates={() => {
               setStartDate(null);
               setEndDate(null);
             }}
             locationFilterOpen={locationFilterOpen}
-            onToggleLocationFilter={toggleLocationFilter}
+            onToggleLocationFilter={() => {
+              setLocationFilterOpen((v) => !v);
+              setDateFilterOpen(false);
+              setGenreFilterOpen(false);
+            }}
             provinceText={provinceText}
             onProvinceTextChange={onProvinceTextChange}
             provinceSuggestions={provinceSuggestions}
@@ -491,7 +513,11 @@ export default function MenuPantalla() {
             onPickLocality={onPickLocality}
             onClearLocation={onClearLocation}
             genreFilterOpen={genreFilterOpen}
-            onToggleGenreFilter={toggleGenreFilter}
+            onToggleGenreFilter={() => {
+              setGenreFilterOpen((v) => !v);
+              setDateFilterOpen(false);
+              setLocationFilterOpen(false);
+            }}
             selectedGenres={selectedGenres}
             onToggleGenre={onToggleGenre}
             onClearGenres={onClearGenres}
@@ -525,6 +551,7 @@ export default function MenuPantalla() {
             )}
           </View>
         </ScrollView>
+
         <Footer />
       </SafeAreaView>
     </ProtectedRoute>
@@ -543,7 +570,7 @@ const styles = StyleSheet.create({
   containerCards: {
     marginTop: 10,
     paddingHorizontal: 12,
-    rowGap: 8,
+    rowGap: 16,
   },
   noEventsText: {
     marginTop: 20,

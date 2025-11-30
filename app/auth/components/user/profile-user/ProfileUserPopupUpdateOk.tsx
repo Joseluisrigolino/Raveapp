@@ -5,14 +5,16 @@ import React from "react";
 import { Modal, View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-interface Props {
+// Props para el popup de actualización de perfil
+interface ProfileUserPopupUpdateOkProps {
   visible: boolean;
   userName?: string;
   loading?: boolean;
   onClose: () => void;
 }
 
-export default function ProfileUserPopupUpdateOk({ visible, userName, loading = false, onClose }: Props) {
+// Popup simple para mostrar que el perfil se actualizó correctamente
+export default function ProfileUserPopupUpdateOk({ visible, userName, loading = false, onClose }: ProfileUserPopupUpdateOkProps) {
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <View style={styles.backdrop}>

@@ -3,7 +3,8 @@ import { View, StyleSheet } from "react-native";
 import { Text, TextInput, Button } from "react-native-paper";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 
-interface Props {
+// Props para la card de creación de usuario controlador
+interface CreateUserControllerInfoComponentProps {
   username: string;
   setUsername: (v: string) => void;
   password: string;
@@ -16,6 +17,7 @@ interface Props {
 
 // Componente que renderiza la tarjeta de "Crear Nuevo Usuario"
 // Comentarios en español, internals en inglés
+// Componente que renderiza la tarjeta de "Crear Nuevo Usuario"
 export default function CreateUserControllerInfoComponent({
   username,
   setUsername,
@@ -25,7 +27,7 @@ export default function CreateUserControllerInfoComponent({
   setSecureEntry,
   canCreate,
   onCreate,
-}: Props) {
+}: CreateUserControllerInfoComponentProps) {
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Crear Nuevo Usuario</Text>

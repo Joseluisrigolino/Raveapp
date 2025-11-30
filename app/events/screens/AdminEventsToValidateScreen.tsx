@@ -32,7 +32,7 @@ import {
 import { EventItem } from "@/interfaces/EventItem";
 import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 import { mediaApi } from "@/app/apis/mediaApi";
-import { getUsuarioById, getProfile } from "@/app/auth/userHelpers";
+import { getUsuarioById, getProfile } from "@/app/auth/userApi";
 
 // helpers
 // Comentario: imagen por defecto si no hay imagen del evento

@@ -1,10 +1,10 @@
 export const ROUTES = {
   MAIN: {
     EVENTS: {
-      MENU: "/events/screens/MenuPantalla",
-      CREATE: "/events/screens/CrearEventoPantalla",
-      EVENT: "/events/screens/EventoPantalla",
-      FAV: "/events/screens/EventoLikeadoPantalla",
+      MENU: "/events/screens/MenuScreen",
+      CREATE: "/events/screens/CreateEventScreen",
+      EVENT: "/events/screens/EventScreen",
+      FAV: "/events/screens/EventsLikeScreen",
     },
     ARTISTS: {
       LIST: "/artists/screens/ArtistsScreen",
@@ -21,7 +21,7 @@ export const ROUTES = {
       RETURN: "/tickets/screens/BackBuyScreen",
     },
     USER: {
-      PROFILE_EDIT: "/auth/screens/PerfilDeUsuarioPantalla",
+      PROFILE_EDIT: "/auth/screens/UserProfileScreen",
       PROFILE: "/auth/screens/PerfilDeUsuarioPantalla",
     },
   },
@@ -43,7 +43,7 @@ export const ROUTES = {
     REPORT_SALES: {
       MENU: "/sales/screens/EventTicketSalesMenuScreen",
     },
-    TYC: "/tyc/screens/Tyc",
+    TYC: "/tyc/screens/TycScreen",
   },
   OWNER: {
     PARTY_RATINGS: "/reviews/screens/PartyRatingsScreen",
@@ -54,16 +54,16 @@ export const ROUTES = {
     // Pantalla de reporte de ventas por evento específico
     TICKET_SOLD_EVENT: "/sales/screens/EventTicketSalesReportScreen",
     MODIFY_EVENT: "/events/screens/OwnerEventModifyScreen",
-    CANCEL_EVENT: "/events/screens/CancelarEventoPantalla",
+    CANCEL_EVENT: "/events/screens/CancelEventScreen",
   },
   CONTROLLER: {
     SCANNER: "/scanner/screens/scannerScreen",
     CREATE_USER: "/auth/screens/CreateUserController",
   },
   LOGIN: {
-    LOGIN: "/auth/screens/login",
-    REGISTER: "/auth/screens/RegistroUsuario",
-    RECOVER: "/auth/screens/RecuperarContrasena",
+    LOGIN: "/auth/screens/LoginScreen",
+    REGISTER: "/auth/screens/RegisterUserScreen",
+    RECOVER: "/auth/screens/RecoverPasswordScreen",
     CONTROLLER: "/auth/screens/UserControllerLoginScreen",
   },
   NOT_FOUND: "/+not-found",

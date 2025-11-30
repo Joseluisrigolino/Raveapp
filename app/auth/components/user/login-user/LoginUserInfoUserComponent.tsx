@@ -1,11 +1,13 @@
-import React from "react";
 import { View, StyleSheet, Pressable, Alert } from "react-native";
 import { TextInput, Button, Text } from "react-native-paper";
 import ROUTES from "@/routes";
 import * as nav from "@/utils/navigation";
 import { Link, useRouter } from "expo-router";
 
-interface Props {
+
+
+// Props para el formulario de login
+interface LoginUserInfoUserComponentProps {
   email: string;
   setEmail: (v: string) => void;
   password: string;
@@ -32,25 +34,28 @@ export default function LoginUserInfoUserComponent({
   setRememberFlag,
   onLogin,
   socialNode,
-}: Props) {
+}: LoginUserInfoUserComponentProps) {
   const router = useRouter();
 
+  // Checkbox cuadrado para "Recordar usuario"
   function SquareCheckbox({ checked, onPress }: { checked: boolean; onPress: () => void }) {
     return (
       <Pressable onPress={onPress} accessibilityRole="checkbox" accessibilityState={{ checked }}>
         <View style={[styles.checkboxBox, checked && styles.checkboxBoxChecked]}>
-          {checked ? <Text style={styles.checkboxTick}>✓</Text> : null}
+          {checked ? <Text style={styles.checkboxTick}>713</Text> : null}
         </View>
       </Pressable>
     );
   }
 
+  // Validamos si se puede enviar el formulario
   const canSubmit = email.trim().length > 0 && password.length > 0 && !loading;
 
   return (
     <View style={styles.card}>
       <Text style={styles.formTitle}>Iniciar Sesión</Text>
 
+      {/* Campo de email */}
       <TextInput
         mode="outlined"
         label="Email"
@@ -68,6 +73,7 @@ export default function LoginUserInfoUserComponent({
         left={<TextInput.Icon icon="email-outline" color="#6b7280" />}
       />
 
+      {/* Campo de contraseña */}
       <TextInput
         mode="outlined"
         label="Contraseña"

@@ -184,8 +184,15 @@ async function normalizeEvent(e: RawEvento): Promise<EventItemWithExtras> {
       ? (genreMap.get(code) as string)
       : "Otros";
 
-  const estadoCod =
-    Number(e?.estado) ?? Number(e?.fechas?.[0]?.estado) ?? Number(e?.cdEstado);
+  // Normalización robusta del estado del evento
+  let estadoCod: number | undefined = undefined;
+  if (typeof e?.estado === 'number') {
+    estadoCod = e.estado;
+  } else if (Array.isArray(e?.fechas) && typeof e.fechas[0]?.estado === 'number') {
+    estadoCod = e.fechas[0].estado;
+  } else if (typeof e?.cdEstado === 'number') {
+    estadoCod = e.cdEstado;
+  }
 
   const dom: EventItemWithExtras["domicilio"] = {
     provinciaId: e?.domicilio?.provinciaId ?? e?.provinciaId,
@@ -757,6 +764,8 @@ export async function updateEvent(
  * pensado para casos donde el backend exige un shape preciso con horas exactas en UTC (Z).
  */
 export async function updateEventExact(body: any): Promise<void> {
+  // IMPORTANTE: El estado del evento y de las fechas debe preservarse.
+  // No modificar estado ni cdEstado desde el cliente, solo enviar los valores que vienen del backend (GET).
   if (!body || !body.idEvento) throw new Error("updateEventExact: falta idEvento en body");
   const token = await login();
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } as const;

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { getControllerUsers } from "../../apis/user-controller/controllerApi";
+import { getControllerUsers } from "../../apis/user-controller/controllerUserApi";
 import { ControllerUser } from "@/app/auth/types/ControllerUser";
 
 // Hook simple para obtener la lista de usuarios controladores

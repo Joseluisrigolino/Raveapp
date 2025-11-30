@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { updateUsuario } from "@/app/auth/userHelpers";
-import { getProfile } from "@/app/auth/userHelpers";
+import { updateUsuario } from "@/app/auth/userApi";
+import { getProfile } from "@/app/auth/userApi";
 import { useAuth } from "@/app/auth/AuthContext";
 
 export default function useUpdateUserProfile() {

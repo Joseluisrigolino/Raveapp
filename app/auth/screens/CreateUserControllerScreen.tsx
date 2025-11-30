@@ -16,7 +16,7 @@ import CreateUserControllerInfoComponent from "@/app/auth/components/user-contro
 import CreateUserControllerAlreadyExistingComponent from "@/app/auth/components/user-controller/create-user-controller/CreateUserControllerAlreadyExistingComponent";
 import CreateUserControllerUserComponent from "@/app/auth/components/user-controller/create-user-controller/CreateUserControllerUserComponent";
 import { useAuth } from "@/app/auth/AuthContext";
-import { getProfile } from "@/app/auth/userHelpers";
+import { getProfile } from "@/app/auth/userApi";
 import useGetUsersControllers from "@/app/auth/services/user-controllers/useGetUsersControllers";
 import useCreateUserControllers from "@/app/auth/services/user-controllers/useCreateUserControllers";
 import useDeleteUserControllers from "@/app/auth/services/user-controllers/useDeleteUserControllers";

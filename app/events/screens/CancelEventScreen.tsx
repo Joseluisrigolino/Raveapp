@@ -165,24 +165,19 @@ export default function CancelEventScreen() {
               setSubmitting(true);
               // El endpoint solo recibe 'id' como query param
               await cancelEvent(String(id));
-              // Enviar mail masivo a compradores (no bloquear si falla)
-              try {
-                await sendMassCancelEmail({
-                  idEvento: String(id),
-                  eventName: cancelData.eventName,
-                  reason: reason || undefined,
-                });
-              } catch (mailErr) {
-                console.error("sendMassCancelEmail error:", mailErr);
-                // Informar pero no impedir que el usuario continúe
-                Alert.alert(
-                  "Evento cancelado",
-                  "El evento se canceló, pero ocurrió un error al enviar los mails a los compradores."
-                );
-                router.back();
-                return;
+              // Solo enviar mail si hay compradores
+              const totalQty = cancelData.ticketsSold.reduce((s, r) => s + r.quantity, 0);
+              if (totalQty > 0) {
+                try {
+                  await sendMassCancelEmail({
+                    idEvento: String(id),
+                    eventName: cancelData.eventName,
+                    reason: reason || undefined,
+                  });
+                } catch (mailErr) {
+                  // Si falla el envío de mail, no mostrar ningún mensaje ni alerta
+                }
               }
-
               Alert.alert("Evento cancelado", "El evento se canceló correctamente.", [
                 { text: "OK", onPress: () => router.back() },
               ]);

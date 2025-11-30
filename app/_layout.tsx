@@ -19,22 +19,15 @@ export default function RootLayout() {
       <SafeAreaProvider>
       <AuthProvider>
         <Stack
-        initialRouteName="auth/screens/login"
-        screenOptions={({ route }) => ({
-          headerTintColor: "#0f172a",
-          headerStyle: { backgroundColor: "#fff", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#e5e7eb" },
-          headerTitle: () => (
-            <View style={styles.titleWrapper}>
-              <Text style={styles.titleText}>{formatRouteName(route?.name)}</Text>
-            </View>
-          ),
-          headerBackground: undefined,
-        })}
-      >
-        {/* Dejá que expo-router registre las rutas automáticamente.
-            Si necesitás overrides, agregalos apuntando a rutas existentes, por ejemplo:
-            <Stack.Screen name="auth/screens/login" options={{ title: "Ingresar" }} />
-        */}
+          initialRouteName="auth/screens/LoginScreen"
+          screenOptions={{
+            headerShown: false
+          }}
+        >
+          {/* Dejá que expo-router registre las rutas automáticamente.
+              Si necesitás overrides, agregalos apuntando a rutas existentes, por ejemplo:
+              <Stack.Screen name="auth/screens/LoginScreen" options={{ title: "Ingresar" }} />
+          */}
         </Stack>
       </AuthProvider>
       </SafeAreaProvider>

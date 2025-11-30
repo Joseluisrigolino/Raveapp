@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import ROUTES from "@/routes";
-import { loginControllerUser } from "@/app/auth/apis/user-controller/controllerApi";
+import { loginControllerUser } from "@/app/auth/apis/user-controller/controllerUserApi";
 
 // Hook sencillo para manejar el login del controlador
 // Comentarios en español para explicar lo básico

@@ -1,22 +1,24 @@
 import { useState } from "react";
 import { apiClient, login as apiLogin } from "@/app/apis/apiClient";
 
-type CreatePayload = any;
+// Tipo para el payload de creación de usuario
+type CreateUserPayload = Record<string, any>;
 
-// hook simple para crear usuario
+// Hook para crear usuario en la app
 export default function useCreateUser() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function createUser(payload: CreatePayload) {
+  // Función principal para crear usuario
+  async function createUser(payload: CreateUserPayload) {
     setError(null);
     setCreating(true);
     try {
-      // obtener token root y setear header (mismo comportamiento que antes)
+      // Obtenemos el token root y seteamos el header (autenticación)
       const rootToken = await apiLogin();
       apiClient.defaults.headers.common.Authorization = `Bearer ${rootToken}`;
 
-      // Validación: si ya existe un usuario con ese correo, abortamos
+      // Validamos si ya existe un usuario con ese correo antes de crear
       const email = (payload as any)?.correo || (payload as any)?.email || "";
       if (email) {
         try {
@@ -52,13 +54,14 @@ export default function useCreateUser() {
         }
       }
 
+      // Llamada a la API para crear el usuario
       await apiClient.post("/v1/Usuario/CreateUsuario", payload, {
         headers: { "Content-Type": "application/json" },
       });
 
       return true;
     } catch (e: any) {
-      // guardar mensaje simple para UI
+      // Guardamos el mensaje de error para la UI
       try {
         const msg = e?.response?.data?.title || e?.message || JSON.stringify(e);
         setError(String(msg));

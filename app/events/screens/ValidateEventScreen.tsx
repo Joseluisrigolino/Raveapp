@@ -26,7 +26,7 @@ import ReproductorYouTube from "@/app/events/components/evento/ReproductorYouTub
 import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 import { MaterialCommunityIcons as MCIcon } from "@expo/vector-icons";
-import { getProfile, getUsuarioById } from "@/app/auth/userHelpers";
+import { getProfile, getUsuarioById } from "@/app/auth/userApi";
 import { updateArtistOnApi, fetchOneArtistFromApi } from "@/app/artists/apis/artistApi";
 import { mediaApi } from "@/app/apis/mediaApi";
 import eventBus from "@/utils/eventBus";

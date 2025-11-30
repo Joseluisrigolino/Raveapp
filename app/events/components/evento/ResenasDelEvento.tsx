@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator, Image } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 import { getResenias, getAvgResenias } from "@/utils/reviewsApi";
-import { getUsuarioById } from "@/app/auth/userHelpers";
+import { getUsuarioById } from "@/app/auth/userApi";
 import { mediaApi } from "@/app/apis/mediaApi";
 
 interface ReviewUI {

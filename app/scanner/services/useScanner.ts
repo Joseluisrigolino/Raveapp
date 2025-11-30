@@ -5,8 +5,8 @@ import { useCameraPermissions } from "expo-camera";
 
 import ROUTES from "@/routes";
 import { useAuth } from "@/app/auth/AuthContext";
-import { getProfile } from "@/app/auth/userHelpers";
-import { getControllerUsers } from "@/app/auth/apis/user-controller/controllerApi";
+import { getProfile } from "@/app/auth/userApi";
+import { getControllerUsers } from "@/app/auth/apis/user-controller/controllerUserApi";
 import { controlarEntrada, ControlarEntradaRequest } from "@/app/scanner/apis/ScannerApi";
 
 type ScanStatus = "ok" | "error" | null;

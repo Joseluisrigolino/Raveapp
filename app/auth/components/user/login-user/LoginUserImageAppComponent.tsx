@@ -1,8 +1,11 @@
-import React from "react";
 import { View, Image, StyleSheet } from "react-native";
 
-// Imagen del logo de la app usada en la pantalla de login
+import React from "react";
+
+
+// Componente que muestra el logo de la app en la pantalla de login
 export default function LoginUserImageAppComponent() {
+  // Renderiza el logo dentro de un círculo estilizado
   return (
     <View style={styles.container}>
       <View style={styles.logoCircle}>

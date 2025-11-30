@@ -351,36 +351,38 @@ export default function OwnerEventModifyScreen() {
         latitud: 0,
         longitud: 0
       };
-      // Mantener los estados originales de fechas y evento
-        const fechas: UpdateEventoRequest['fechas'] = daySchedules.map((d, i) => {
-          const origFecha = originalEvent?.fechas?.[i] || {};
-          return {
-            idFecha: remoteFechaIds[i] || origFecha.idFecha || '',
-            inicio: formatBackendIso(d.start) || origFecha.inicio || '',
-            fin: formatBackendIso(d.end) || origFecha.fin || '',
-            inicioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart) || origFecha.inicioVenta || '',
-            finVenta: formatBackendIsoVenta(daySaleConfigs[i]?.sellUntil) || origFecha.finVenta || '',
-            estado: origFecha.estado ?? 0,
-            cdEstado: origFecha.cdEstado ?? 0
-          };
-        });
-        payload = {
-          idEvento: eventId,
-          idArtistas,
-          domicilio,
-          nombre: eventName,
-          descripcion: eventDescription,
-          genero: selectedGenres,
-          isAfter,
-          isLgbt: isLGBT,
-          inicioEvento: formatBackendIso(daySchedules[0]?.start) || (originalEvent?.inicioEvento ?? ''),
-          finEvento: formatBackendIso(daySchedules[0]?.end) || (originalEvent?.finEvento ?? ''),
-          estado: originalEvent?.estado ?? 0,
-          cdEstado: originalEvent?.cdEstado ?? 0,
-          fechas,
-          idFiesta: null,
-          soundCloud: ''
+      // PRESERVAR el estado original del evento y de las fechas
+      // No se permite modificar estado/cdEstado desde el formulario
+      // Siempre se usan los valores que vienen del backend (GET)
+      const eventoEstado = typeof originalEvent?.estado !== 'undefined' ? originalEvent.estado : undefined;
+      const fechas: UpdateEventoRequest['fechas'] = daySchedules.map((d, i) => {
+        const origFecha = originalEvent?.fechas?.[i] || {};
+        return {
+          idFecha: remoteFechaIds[i] || origFecha.idFecha || '',
+          inicio: formatBackendIso(d.start) || origFecha.inicio || '',
+          fin: formatBackendIso(d.end) || origFecha.fin || '',
+          inicioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart) || origFecha.inicioVenta || '',
+          finVenta: formatBackendIsoVenta(daySaleConfigs[i]?.sellUntil) || origFecha.finVenta || '',
+          // Estado de la fecha: SIEMPRE el que viene del backend
+          estado: typeof origFecha.estado !== 'undefined' ? origFecha.estado : undefined
         };
+      });
+      payload = {
+        idEvento: eventId,
+        idArtistas,
+        domicilio,
+        nombre: eventName,
+        descripcion: eventDescription,
+        genero: selectedGenres,
+        isAfter,
+        isLgbt: isLGBT,
+        inicioEvento: formatBackendIso(daySchedules[0]?.start) || (originalEvent?.inicioEvento ?? ''),
+        finEvento: formatBackendIso(daySchedules[0]?.end) || (originalEvent?.finEvento ?? ''),
+        estado: eventoEstado,
+        fechas,
+        idFiesta: null,
+        soundCloud: ''
+      };
       if (newIdEntidadMedia) payload.idEntidadMedia = newIdEntidadMedia;
       // LOG DETALLADO DEL PAYLOAD Y ENDPOINT
       console.log('[UPDATE EVENT] Endpoint: /v1/Evento/UpdateEvento');
@@ -394,7 +396,7 @@ export default function OwnerEventModifyScreen() {
       try {
         await mailsApi.sendMassiveEventUpdateEmail({ idEvento: eventId, nombreEvento: eventName });
       } catch (mailErr) {
-        console.warn('No se pudo enviar el mail masivo de modificación:', mailErr);
+        // Si falla (por ejemplo, porque no hay compras), no mostrar nada ni alertar ni loguear
       }
       Alert.alert('Listo', 'Cambios guardados correctamente.');
       // Redirigir a la pantalla de administración de eventos

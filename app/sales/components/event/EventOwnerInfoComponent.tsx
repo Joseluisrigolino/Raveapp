@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { COLORS } from "@/styles/globalStyles";
-import { ApiUserFull } from "@/app/auth/userHelpers";
+import { ApiUserFull } from "@/app/auth/userApi";
 
 type Props = {
   ownerUser: ApiUserFull | null;

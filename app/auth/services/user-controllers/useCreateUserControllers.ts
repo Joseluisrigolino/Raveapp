@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { createControllerUser, getControllerUsers } from "../../apis/user-controller/controllerApi";
+import { createControllerUser, getControllerUsers } from "../../apis/user-controller/controllerUserApi";
 import { apiClient, login } from "@/app/apis/apiClient";
 
 // Hook simple para crear usuarios controladores

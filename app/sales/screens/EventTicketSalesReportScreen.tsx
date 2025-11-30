@@ -6,7 +6,9 @@ import {
   StyleSheet,
   Text,
   View,
+  TouchableOpacity,
 } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 
@@ -21,6 +23,7 @@ import EventSalesGrandTotalsComponent from "@/app/sales/components/event/EventSa
 import EventOwnerInfoComponent from "@/app/sales/components/event/EventOwnerInfoComponent";
 
 export default function EventTicketSalesReportScreen() {
+  const router = require('expo-router').useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
 
   const {
@@ -41,6 +44,16 @@ export default function EventTicketSalesReportScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Header />
+
+      {/* Botón Volver igual al de TicketPurchasedScreen */}
+      <TouchableOpacity
+        style={{ flexDirection: 'row', alignItems: 'center', margin: 16 }}
+        onPress={() => router.back()}
+        activeOpacity={0.8}
+      >
+        <MaterialCommunityIcons name="arrow-left" size={22} color={COLORS.textPrimary} />
+        <Text style={{ marginLeft: 8, fontSize: 16, color: COLORS.textPrimary }}>Volver</Text>
+      </TouchableOpacity>
 
       <ScrollView
         contentContainerStyle={styles.content}

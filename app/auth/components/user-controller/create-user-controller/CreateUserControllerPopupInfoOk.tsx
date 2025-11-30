@@ -2,7 +2,8 @@ import React from "react";
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-interface Props {
+// Props para el popup de información genérica
+interface CreateUserControllerPopupInfoOkProps {
   visible: boolean;
   title?: string;
   username?: string;
@@ -10,7 +11,7 @@ interface Props {
   onClose: () => void;
 }
 
-export default function CreateUserControllerPopupInfoOk({ visible, title, username, message, onClose }: Props) {
+export default function CreateUserControllerPopupInfoOk({ visible, title, username, message, onClose }: CreateUserControllerPopupInfoOkProps) {
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <View style={styles.backdrop}>

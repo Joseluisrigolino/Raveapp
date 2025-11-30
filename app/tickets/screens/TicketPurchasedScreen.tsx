@@ -34,7 +34,7 @@ import {
   fetchEventById,
   EventItemWithExtras,
 } from "@/app/events/apis/eventApi";
-import { getEntradasUsuario } from "@/app/auth/userHelpers";
+import { getEntradasUsuario } from "@/app/auth/userApi";
 import { getTipoMap, solicitarReembolso } from "@/app/events/apis/entradaApi";
 import { mailsApi, buildCancellationEmailBody } from "@/app/apis/mailsApi";
 import { mediaApi } from "@/app/apis/mediaApi";
@@ -107,6 +107,9 @@ function TicketPurchasedScreenContent() {
   const [refundSubmitting, setRefundSubmitting] = useState(false);
   const [showRefundSuccess, setShowRefundSuccess] = useState(false);
   const [refundAmount, setRefundAmount] = useState<number | null>(null);
+  const [refundInfoMessage, setRefundInfoMessage] = useState<string | null>(
+    null
+  );
 
   const userIdForReview: string | null =
     (user as any)?.id ??
@@ -1696,42 +1699,73 @@ function TicketPurchasedScreenContent() {
                 const purchaseDate = toDate(dtInsertStr);
                 const now = new Date();
                 const msPerDay = 24 * 60 * 60 * 1000;
-                // Regla 10 días
-                if (
-                  purchaseDate &&
-                  now.getTime() - purchaseDate.getTime() > 10 * msPerDay
-                ) {
-                  setRefundBlockedReason(
-                    "No se puede cancelar la compra porque han pasado más de 10 días desde que se realizó."
+
+                // Nueva regla: override si el evento fue modificado después de la compra
+                const eventUpdateRaw =
+                  (eventData as any)?.dtUpdate ||
+                  (eventData as any)?.__raw?.dtUpdate ||
+                  (eventData as any)?.__raw?.dt_update;
+                const eventUpdateDate = eventUpdateRaw ? toDate(eventUpdateRaw) : null;
+                let hasUpdateOverride = false;
+                try {
+                  if (
+                    eventUpdateDate &&
+                    purchaseDate &&
+                    purchaseDate.getTime() < eventUpdateDate.getTime()
+                  ) {
+                    const diffFromUpdate = now.getTime() - eventUpdateDate.getTime();
+                    if (diffFromUpdate >= 0 && diffFromUpdate <= 5 * msPerDay) {
+                      hasUpdateOverride = true;
+                    }
+                  }
+                } catch {}
+
+                // Setear mensaje informativo si aplica la excepción por dtUpdate
+                if (hasUpdateOverride) {
+                  setRefundInfoMessage(
+                    "Se detectó que el evento fue modificado después de tu compra. Tenés 5 días desde la última actualización para solicitar el reembolso."
                   );
-                  setShowRefund(true);
-                  return;
+                } else {
+                  setRefundInfoMessage(null);
                 }
-                // Regla 48hs antes del evento
-                // Determinar inicio del evento de las fechas asociadas a las entradas
-                let startIso: string | undefined = undefined;
-                if (eventData?.fechas && eventData.fechas.length) {
-                  // prioridad: fechas usadas por estas entradas
-                  const usedFechaIds = new Set(
-                    relevant.map((e) => e.idFecha).filter(Boolean) as string[]
-                  );
-                  const candidates = usedFechaIds.size
-                    ? eventData.fechas.filter((f) =>
-                        usedFechaIds.has(String(f.idFecha))
-                      )
-                    : eventData.fechas;
-                  const valid = candidates
-                    .map((f) => new Date(String(f.inicio)))
-                    .filter((d) => !isNaN(d.getTime()));
-                  if (valid.length) {
-                    valid.sort((a, b) => a.getTime() - b.getTime());
-                    const start = valid[0];
-                    if (start.getTime() - now.getTime() < 48 * 60 * 60 * 1000) {
-                      setRefundBlockedReason(
-                        "No se puede cancelar la compra porque el evento está a menos de 48hs de dar inicio."
-                      );
-                      setShowRefund(true);
-                      return;
+
+                // Si NO estamos en la ventana especial por dtUpdate, aplicar las validaciones normales
+                if (!hasUpdateOverride) {
+                  // Regla 10 días
+                  if (
+                    purchaseDate &&
+                    now.getTime() - purchaseDate.getTime() > 10 * msPerDay
+                  ) {
+                    setRefundBlockedReason(
+                      "No se puede cancelar la compra porque han pasado más de 10 días desde que se realizó."
+                    );
+                    setShowRefund(true);
+                    return;
+                  }
+
+                  // Regla 48hs antes del evento
+                  if (eventData?.fechas && eventData.fechas.length) {
+                    const usedFechaIds = new Set(
+                      relevant.map((e) => e.idFecha).filter(Boolean) as string[]
+                    );
+                    const candidates = usedFechaIds.size
+                      ? eventData.fechas.filter((f) =>
+                          usedFechaIds.has(String(f.idFecha))
+                        )
+                      : eventData.fechas;
+                    const valid = candidates
+                      .map((f) => new Date(String(f.inicio)))
+                      .filter((d) => !isNaN(d.getTime()));
+                    if (valid.length) {
+                      valid.sort((a, b) => a.getTime() - b.getTime());
+                      const start = valid[0];
+                      if (start.getTime() - now.getTime() < 48 * 60 * 60 * 1000) {
+                        setRefundBlockedReason(
+                          "No se puede cancelar la compra porque el evento está a menos de 48hs de dar inicio."
+                        );
+                        setShowRefund(true);
+                        return;
+                      }
                     }
                   }
                 }
@@ -1741,6 +1775,7 @@ function TicketPurchasedScreenContent() {
               } catch {
                 // En caso de error, permitir mostrar modal normal sin bloquear
                 setRefundBlockedReason(null);
+                setRefundInfoMessage(null);
                 setShowRefund(true);
               }
             }}
@@ -1939,16 +1974,28 @@ function TicketPurchasedScreenContent() {
               Botón de arrepentimiento - Cancelar compra de entradas
             </Text>
             <Text style={styles.modalSubtitle}>
-              Contás con el derecho al reembolso de la compra de entradas
-              siempre y cuando no hayan transcurrido 10 días corridos desde su
-              compra, y siempre y cuando no falten menos de 48 horas para que
-              comience el evento.
+              Contás con el derecho al reembolso de la compra de entradas siempre
+              y cuando no hayan transcurrido 10 días corridos desde su compra y
+              no falten menos de 48 horas para que comience el evento.
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              Si el evento fue modificado luego de tu compra, tenés hasta 5 días
+              desde la última actualización del evento para solicitar el
+              reembolso, incluso si ya pasaron los 10 días o faltan menos de 48
+              horas para el inicio.
             </Text>
             <Text style={styles.modalSubtitle}>
               Una vez recibida la solicitud, ejecutaremos el reembolso a la
               cuenta de MercadoPago de dónde salieron los fondos dentro de los 7
               días hábiles.
             </Text>
+
+            {/* Aviso informativo cuando aplica la excepción por dtUpdate */}
+            {refundInfoMessage ? (
+              <View style={styles.refundInfoBox}>
+                <Text style={styles.refundInfoText}>{refundInfoMessage}</Text>
+              </View>
+            ) : null}
 
             {/* Alerta de bloqueo */}
             {refundBlockedReason ? (
@@ -1987,7 +2034,10 @@ function TicketPurchasedScreenContent() {
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.btnGhost}
-                onPress={() => setShowRefund(false)}
+                onPress={() => {
+                  setShowRefund(false);
+                  setRefundInfoMessage(null);
+                }}
               >
                 <Text style={styles.btnGhostText}>Cancelar</Text>
               </TouchableOpacity>
@@ -2039,6 +2089,7 @@ function TicketPurchasedScreenContent() {
                       }
                       setRefundAmount(amount);
                       setShowRefund(false);
+                      setRefundInfoMessage(null);
                       setShowRefundSuccess(true);
                       // Intentar enviar correo genérico de confirmación
                       try {
@@ -2629,6 +2680,20 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodyRegular,
     fontSize: FONT_SIZES.smallText,
     color: COLORS.textSecondary,
+  },
+  refundInfoBox: {
+    backgroundColor: "#e6f6ff",
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    borderRadius: RADIUS.card,
+    padding: 10,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  refundInfoText: {
+    color: "#0369a1",
+    fontFamily: FONTS.bodyRegular,
+    fontSize: FONT_SIZES.smallText,
   },
   fieldLabel: {
     fontFamily: FONTS.subTitleMedium,

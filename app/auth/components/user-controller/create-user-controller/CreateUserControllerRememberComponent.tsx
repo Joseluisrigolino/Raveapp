@@ -4,7 +4,7 @@ import { Text } from "react-native-paper";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 
 // Componente que muestra el recordatorio informativo
-// Comentarios en español, internals en inglés
+// Recordatorio para el manejo de usuarios sin recuperación de contraseña
 export default function CreateUserControllerRememberComponent() {
   return (
     <View style={styles.wrapper}>

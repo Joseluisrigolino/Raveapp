@@ -146,13 +146,12 @@ export default function ArtistsScreen() {
         <TabMenuComponent tabs={tabs} />
 
         {/* Buscador de artistas */}
-        <View style={styles.searchWrapper}>
+        <View style={styles.tabsMargin}>
           <SearchBarComponent
             value={search}
             onChangeText={setSearch}
             placeholder="Buscar artista..."
-            // Ocupa todo el ancho; el wrapper maneja el padding
-            containerStyle={{ marginHorizontal: 0 }}
+            containerStyle={{ width: "100%" }}
           />
         </View>
 
@@ -172,12 +171,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.cardBg,
   },
-  searchWrapper: {
-    paddingHorizontal: 0,
+  tabsMargin: {
+    marginHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 8,
     backgroundColor: COLORS.cardBg,
-    width: "100%",
+    width: "auto",
     alignSelf: "stretch",
   },
   loaderContainer: {

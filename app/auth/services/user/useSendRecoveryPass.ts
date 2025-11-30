@@ -3,7 +3,7 @@
 
 import { useState, useCallback } from "react";
 import { sendPasswordRecoveryEmail } from "@/app/apis/mailsApi";
-import { getProfile } from "@/app/auth/userHelpers";
+import { getProfile } from "@/app/auth/userApi";
 
 export default function useSendRecoveryPass() {
   const [sending, setSending] = useState(false);

@@ -10,7 +10,7 @@ import {
 import {
   getUsuarioById,
   updateUsuario,
-} from "@/app/auth/userHelpers";
+} from "@/app/auth/userApi";
 import { Alert } from "react-native";
 import { BuyerInfo, BillingAddress } from "@/app/tickets/types/BuyProps";
 

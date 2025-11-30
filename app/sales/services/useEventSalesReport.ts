@@ -8,7 +8,7 @@ import {
   fetchReporteVentasEvento,
 } from "@/app/events/apis/entradaApi";
 import { fetchEventById } from "@/app/events/apis/eventApi";
-import { ApiUserFull, getUsuarioById } from "@/app/auth/userHelpers";
+import { ApiUserFull, getUsuarioById } from "@/app/auth/userApi";
 
 export type EventSalesTotals = {
   vendidos: number;

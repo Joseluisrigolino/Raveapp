@@ -2,7 +2,8 @@ import React from "react";
 import { Modal, View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
 import { COLORS, FONTS, FONT_SIZES, RADIUS } from "@/styles/globalStyles";
 
-interface Props {
+// Props para el popup de confirmación de eliminación de usuario
+interface CreateUserControllerPopupEliminateUserComponentProps {
   visible: boolean;
   username?: string;
   loading?: boolean;
@@ -12,7 +13,8 @@ interface Props {
 
 // Popup para confirmar eliminación de un usuario controlador
 // Comentarios en español, internals en inglés
-export default function CreateUserControllerPopupEliminateUserComponent({ visible, username, loading = false, onCancel, onConfirm }: Props) {
+// Popup para confirmar eliminación de un usuario controlador
+export default function CreateUserControllerPopupEliminateUserComponent({ visible, username, loading = false, onCancel, onConfirm }: CreateUserControllerPopupEliminateUserComponentProps) {
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
       <View style={styles.backdrop}>

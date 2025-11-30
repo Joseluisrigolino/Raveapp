@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/app/auth/AuthContext";
-import { getEntradasUsuario } from "@/app/auth/userHelpers";
+import { getEntradasUsuario } from "@/app/auth/userApi";
 import { fetchEventById, EventItemWithExtras, ESTADO_CODES } from "@/app/events/apis/eventApi";
 import { TicketPurchasedMenuItem } from "@/interfaces/TicketPurchasedMenuItem";
 import { getResenias } from "@/utils/reviewsApi";

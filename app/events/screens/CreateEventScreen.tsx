@@ -19,8 +19,6 @@ import ROUTES from "@/routes";
 // Animated/Easing not required here
 import { BlurView } from "expo-blur";
 import { Portal } from "react-native-paper";
-import PopUpOrganizadorIOS from "@/app/events/components/create/popup-organizador/PopUpOrganizadorIOS";
-import PopUpOrganizadorAndroid from "@/app/events/components/create/popup-organizador/PopUpOrganizadorAndroid";
 
 /** Layout y UI base */
 import Header from "@/components/layout/HeaderComponent";
@@ -318,18 +316,6 @@ export default function CreateEventScreen() {
   /* --- Auth --- */
   // ...existing code...
 
-  // Estado para mostrar el popup de upgrade de rol
-  const [showUpgradePopup, setShowUpgradePopup] = useState(false);
-
-  useEffect(() => {
-    // Mostrar popup solo si el usuario tiene rol "Usuario" (frontend 'user')
-    // y NO tiene ya el rol organizador/owner.
-    if (isUsuario && !isOrganizador) {
-      setShowUpgradePopup(true);
-    } else {
-      setShowUpgradePopup(false);
-    }
-  }, [isUsuario, isOrganizador]);
 
   /* --- Datos base --- */
   const [eventName, setEventName] = useState("");
@@ -1477,28 +1463,27 @@ export default function CreateEventScreen() {
 
   // Submit final
   const handleSubmit = useCallback(async () => {
-    // reset any previous creation error
+    // Refactor: flujo transaccional, mensajes honestos, rollback best effort
     setCreationError(null);
-
-    // track a temp-created party id across the whole try/catch so we can cleanup on failure
     let _tempCreatedToCleanup: string | null = null;
-
+    let createdEventId: string | null = null;
+    let createResult: any = null;
+    let fechaIds: string[] = [];
+    let remoteFechas: any[] = [];
+    let pending: any = {};
+    const entradaApi = await import("@/app/events/apis/entradaApi");
+    const eventApi = await import("@/app/events/apis/eventApi");
     try {
-      // Validaciones generales previas
+      // 1. Validaciones previas
       if (!validateBeforeSubmit()) return;
-
       if (!userId) throw new Error("Usuario no autenticado.");
       if (!eventName || !acceptedTC)
         throw new Error("Complete nombre de evento y acepte T&C.");
-
-      // Pre-check: si hay una imagen seleccionada, validar tamaño y extensión antes de POST
       if (photoFile) {
         try {
           const size = await getFileSize(photoFile);
           if (size > MAX_IMAGE_BYTES) {
-            const userMsg = `La imagen seleccionada supera el máximo permitido (${Math.round(
-              MAX_IMAGE_BYTES / 1024
-            )}KB). Por favor, elige una imagen más liviana.`;
+            const userMsg = `La imagen seleccionada supera el máximo permitido (${Math.round(MAX_IMAGE_BYTES / 1024)}KB). Por favor, elige una imagen más liviana.`;
             setCreationError(userMsg);
             Alert.alert("Imagen demasiado grande", userMsg);
             return;
@@ -1511,163 +1496,80 @@ export default function CreateEventScreen() {
             return;
           }
         } catch (e: any) {
-          // Si fallo la comprobación local, abortar y mostrar mensaje sin hacer POST
-          const msg = String(e?.message || e || "Fallo al validar la imagen");
-          setCreationError("Fallo al validar la imagen: " + msg);
-          Alert.alert("Error", "Fallo al validar la imagen: " + msg);
+          setCreationError("Fallo al validar la imagen: " + String(e?.message || e));
+          Alert.alert("Error", "Fallo al validar la imagen: " + String(e?.message || e));
           return;
         }
       }
-
-      // 1) Crear entidades pendientes (fiesta recurrente, etc.)
-      // Capture any temp-created party id now so we can cleanup if the whole flow fails
+      // 2. Crear entidades pendientes (fiesta, etc.)
       _tempCreatedToCleanup = tempCreatedPartyId;
-      const pending = await createPendingEntities(userId).catch((e) => {
-        try {
-          log.warn(
-            "[CreateEvent] createPendingEntities fallo, se continúa:",
-            String(e?.message || e)
-          );
-        } catch {
-          log.warn("[CreateEvent] createPendingEntities fallo, se continúa.");
-        }
-        return {} as any;
-      });
-
-      // If the user created a temp party earlier (isActivo=false), activate it now
+      pending = await createPendingEntities(userId).catch(() => ({}));
       if (tempCreatedPartyId) {
         try {
           const partys = await import("@/app/party/apis/partysApi");
           if (partys && typeof partys.updateParty === "function") {
-            await partys.updateParty({
-              idFiesta: tempCreatedPartyId,
-              isActivo: true,
-            });
-            try {
-              log.info(
-                "[CreateEvent] temp party activated before event create:",
-                tempCreatedPartyId
-              );
-            } catch {}
-            // refresh parties and select the newly activated one so backend receives idFiesta
-            try {
-              const refreshed = await partys.getPartiesByUser(String(userId));
-              setMyParties(refreshed);
-            } catch {}
+            await partys.updateParty({ idFiesta: tempCreatedPartyId, isActivo: true });
             setSelectedPartyId(tempCreatedPartyId);
             setTempCreatedPartyId(null);
             setTempCreatedPartyName(null);
           }
-        } catch (e) {
-          try {
-            log.warn(
-              "[CreateEvent] failed activating temp party:",
-              String((e as any)?.message || e)
-            );
-          } catch {}
-        }
+        } catch {}
       }
-
-      // Resolver IDs de artistas: tomar ids explícitos seleccionados, intentar resolver por nombre contra allArtists,
-      // y añadir los ids devueltos por createPendingEntities (si existieran). Dedupe final.
+      // 3. Resolver IDs de artistas
       const resolvedArtistIds: string[] = (() => {
-        const existing = selectedArtists
-          .map((a) => (a as any).idArtista ?? (a as any).id)
-          .filter(Boolean) as string[];
-
-        const missingNames = selectedArtists
-          .filter((a) => !((a as any).idArtista || (a as any).id))
-          .map((a) => (a.name || "").trim())
-          .filter(Boolean);
-
+        const existing = selectedArtists.map((a) => (a as any).idArtista ?? (a as any).id).filter(Boolean) as string[];
+        const missingNames = selectedArtists.filter((a) => !((a as any).idArtista || (a as any).id)).map((a) => (a.name || "").trim()).filter(Boolean);
         const byNameResolved: string[] = [];
         if (missingNames.length && allArtists && allArtists.length) {
           for (const name of missingNames) {
-            const found = allArtists.find(
-              (aa) => norm(aa.name || "") === norm(name)
-            );
-            if (found && (found as any).idArtista)
-              byNameResolved.push((found as any).idArtista);
+            const found = allArtists.find((aa) => norm(aa.name || "") === norm(name));
+            if (found && (found as any).idArtista) byNameResolved.push((found as any).idArtista);
           }
         }
-
         const created = (pending as any)?.artistaIds ?? [];
-        const createdMap = (pending as any)?.artistaIdsMap ?? {};
-
-        return Array.from(
-          new Set([
-            ...(existing || []),
-            ...(byNameResolved || []),
-            ...(created || []),
-          ])
-        );
+        return Array.from(new Set([...(existing || []), ...(byNameResolved || []), ...(created || [])]));
       })();
-
-      // resolvedArtistIds computed (silenciado en logs)
-
-      // Si creamos artistas, actualizar el estado visual para reemplazar los __isNew por objetos con idArtista
-      try {
-        if (
-          resolvedArtistIds &&
-          resolvedArtistIds.length &&
-          (pending as any)?.artistaIdsMap
-        ) {
-          const map = (pending as any).artistaIdsMap as Record<string, string>;
-          setSelectedArtists((prev) =>
-            prev.map((a) => {
-              const key = norm(a.name || "");
-              if ((a as any).__isNew && map && map[key]) {
-                // Keep __isNew true so manual-added artists remain visually pending
-                return { ...(a as any), idArtista: map[key] } as ArtistSel;
-              }
-              return a;
-            })
-          );
-        }
-      } catch {}
-
-      // 2) Construir body y llamar createEvent
+      if (resolvedArtistIds && resolvedArtistIds.length && (pending as any)?.artistaIdsMap) {
+        const map = (pending as any).artistaIdsMap as Record<string, string>;
+        setSelectedArtists((prev) => prev.map((a) => {
+          const key = norm(a.name || "");
+          if ((a as any).__isNew && map && map[key]) {
+            return { ...(a as any), idArtista: map[key] } as ArtistSel;
+          }
+          return a;
+        }));
+      }
+      // 4. Construir body y crear evento
       const body = {
         descripcion: eventDescription || "",
         domicilio: {
-          direccion: street
-            ? street.charAt(0).toUpperCase() + street.slice(1).toLowerCase()
-            : "",
+          direccion: street ? street.charAt(0).toUpperCase() + street.slice(1).toLowerCase() : "",
           latitud: 0,
           longitud: 0,
           provincia: { codigo: provinceId, nombre: provinceName },
           municipio: { codigo: municipalityId, nombre: municipalityName },
           localidad: { codigo: localityId, nombre: localityName },
         },
-        estado: 0,
         fechas: daySchedules.map((d, i) => ({
           inicio: formatBackendIso(d.start),
           fin: formatBackendIso(d.end),
           inicioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart),
           finVenta: formatBackendIsoVenta(daySaleConfigs[i]?.sellUntil),
-          // include both correct and typo spellings for backend compatibility
           fechaInicioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart),
           FechaInicioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart),
           fechaIncioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart),
           FechaIncioVenta: formatBackendIsoVenta(daySaleConfigs[i]?.saleStart),
           fechaFinVenta: formatBackendIsoVenta(daySaleConfigs[i]?.sellUntil),
           FechaFinVenta: formatBackendIsoVenta(daySaleConfigs[i]?.sellUntil),
-          estado: 0,
         })),
-        // permiso explícito para backends que esperan campos raíz
         inicioEvento: formatBackendIso(daySchedules[0]?.start),
         finEvento: formatBackendIso(daySchedules[0]?.end),
         genero: selectedGenres,
         idArtistas: resolvedArtistIds,
-        // si creamos una fiesta recurrente en este flujo, preferir su id
-        idFiesta:
-          (pending && pending.partyCreated && pending.partyCreated.idFiesta) ||
-          selectedPartyId ||
-          null,
+        idFiesta: (pending && pending.partyCreated && pending.partyCreated.idFiesta) || selectedPartyId || null,
         idUsuario: userId,
         inicioVenta: formatBackendIsoVenta(daySaleConfigs[0]?.saleStart),
         finVenta: formatBackendIsoVenta(daySaleConfigs[0]?.sellUntil),
-        // duplicate top-level sale fields with both correct and typo spellings
         FechaInicioVenta: formatBackendIsoVenta(daySaleConfigs[0]?.saleStart),
         FechaFinVenta: formatBackendIsoVenta(daySaleConfigs[0]?.sellUntil),
         fechaInicioVenta: formatBackendIsoVenta(daySaleConfigs[0]?.saleStart),
@@ -1679,635 +1581,202 @@ export default function CreateEventScreen() {
         nombre: eventName,
         soundCloud: musicLink || "",
       };
-
-      // Log conciso: fechas que serán enviadas al backend (ISO)
-      // fechas payload prepared (silenciado en logs)
-
-      // 3) Validar que las fechas formateadas en el body sean consistentes y válidas
-      try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const bad = (body.fechas || []).some((f: any, idx: number) => {
-          const inicio = f?.inicio;
-          const fin = f?.fin;
-          const inicioVenta = f?.inicioVenta;
-          const finVenta = f?.finVenta;
-          // Deben existir inicio y fin
-          if (!inicio || !fin) return true;
-          const si = new Date(inicio).getTime();
-          const fi = new Date(fin).getTime();
-          if (!isFinite(si) || !isFinite(fi)) return true;
-          // No permitir años por defecto (0001)
-          const sy = new Date(inicio).getUTCFullYear();
-          const fy = new Date(fin).getUTCFullYear();
-          if ((sy && sy <= 1) || (fy && fy <= 1)) return true;
-          // Permitimos inicio en el mismo día o días previos (la validación de "> ahora" ya se hace arriba para el evento)
-          // si existen fechas de venta, validarlas también
-          if (inicioVenta) {
-            const svi = new Date(inicioVenta).getTime();
-            if (!isFinite(svi)) return true;
-            const syv = new Date(inicioVenta).getUTCFullYear();
-            if (syv && syv <= 1) return true;
-            // Permitimos que el inicio de venta sea hoy o anterior.
-          }
-          if (finVenta) {
-            const sve = new Date(finVenta).getTime();
-            if (!isFinite(sve)) return true;
-            const syv2 = new Date(finVenta).getUTCFullYear();
-            if (syv2 && syv2 <= 1) return true;
-          }
-          return false;
-        });
-
-        if (bad) {
-          Alert.alert(
-            "Validación",
-            "Hay fechas inválidas. Revisá las fechas antes de crear el evento."
-          );
-          return;
-        }
-      } catch (e) {
-        Alert.alert(
-          "Validación",
-          "Error validando las fechas. Revisá las fechas e intentá de nuevo."
-        );
+      // Validación de fechas
+      const badFechas = (body.fechas || []).some((f: any) => {
+        const inicio = f?.inicio;
+        const fin = f?.fin;
+        if (!inicio || !fin) return true;
+        const si = new Date(inicio).getTime();
+        const fi = new Date(fin).getTime();
+        if (!isFinite(si) || !isFinite(fi)) return true;
+        const sy = new Date(inicio).getUTCFullYear();
+        const fy = new Date(fin).getUTCFullYear();
+        if ((sy && sy <= 1) || (fy && fy <= 1)) return true;
+        return false;
+      });
+      if (badFechas) {
+        Alert.alert("Validación", "Hay fechas inválidas. Revisá las fechas antes de crear el evento.");
         return;
       }
-
-      // 4) Crear evento en backend
-      let createResult;
+      // 5. Crear evento en backend
       try {
         createResult = await createEvent(body);
       } catch (err: any) {
-        const msg = extractBackendMessage(err);
-        Alert.alert("Error al crear evento", msg);
+        Alert.alert("Error al crear evento", extractBackendMessage(err));
         return;
       }
-
-      // Si createEvent devolvió idEvento pero fallamos en pasos posteriores, intentaremos limpiar (rollback)
-      let createdEventId: string | null = null;
-      try {
-        if (typeof createResult === "string") {
-          // puede ser idEvento o idFecha, intentamos distinguir
-          const s = String(createResult).trim();
-          const esFecha = await probeGetEntradasFecha(s).catch(() => false);
-          if (!esFecha) createdEventId = s;
-        } else if (
-          createResult &&
-          ((createResult as any).idEvento ||
-            (createResult as any).IdEvento ||
-            (createResult as any).id ||
-            (createResult as any).Id)
-        ) {
-          createdEventId = String(
-            (createResult as any).idEvento ??
-              (createResult as any).IdEvento ??
-              (createResult as any).id ??
-              (createResult as any).Id
-          );
-        }
-      } catch (e) {
-        log.warn("[CreateEvent] no se pudo resolver idEvento inicial:", e);
+      // 6. Resolver idEvento y fechas
+      if (typeof createResult === "string") {
+        const s = String(createResult).trim();
+        const esFecha = await probeGetEntradasFecha(s).catch(() => false);
+        if (!esFecha) createdEventId = s;
+      } else if (createResult && ((createResult as any).idEvento || (createResult as any).IdEvento || (createResult as any).id || (createResult as any).Id)) {
+        createdEventId = String((createResult as any).idEvento ?? (createResult as any).IdEvento ?? (createResult as any).id ?? (createResult as any).Id);
       }
-
-      // Si creamos una fiesta en este flujo, y tenemos idEvento, asegurarnos de asociarla al evento
-      try {
-        const partyIdToSet =
-          (pending as any)?.partyCreated?.idFiesta || selectedPartyId || null;
-        if (createdEventId && partyIdToSet) {
-          try {
-            const eventApi = await import("@/app/events/apis/eventApi");
-            await eventApi.updateEvent(createdEventId, {
-              idFiesta: String(partyIdToSet),
-            });
-            try {
-              log.info(
-                "[CreateEvent] asociada fiesta al evento:",
-                String(partyIdToSet)
-              );
-            } catch {}
-          } catch (e) {
-            try {
-              log.warn(
-                "[CreateEvent] no se pudo asociar idFiesta al evento:",
-                String((e as any)?.message || e)
-              );
-            } catch {}
-          }
-        }
-      } catch {}
-
-      // Si creamos artistas nuevos en este flujo, asociarlos al evento recién creado
-      try {
-        const createdArtistIds = (pending as any)?.artistaIds ?? [];
-        if (createdArtistIds && createdArtistIds.length && createdEventId) {
-          try {
-            const eventApi = await import("@/app/events/apis/eventApi");
-            // Intentar obtener los artistas actuales del evento para no sobrescribir
-            let existingArtistIds: string[] = [];
-            try {
-              const evt = await eventApi.fetchEventById(createdEventId);
-              const raw = (evt as any).__raw ?? null;
-              if (raw && Array.isArray(raw.artistas)) {
-                existingArtistIds = raw.artistas
-                  .map(
-                    (a: any) => a?.idArtista ?? a?.id ?? a?.IdArtista ?? a?.Id
-                  )
-                  .filter(Boolean)
-                  .map(String);
-              } else if (Array.isArray((evt as any).artistas)) {
-                existingArtistIds = (evt as any).artistas
-                  .map(
-                    (a: any) => a?.idArtista ?? a?.id ?? a?.IdArtista ?? a?.Id
-                  )
-                  .filter(Boolean)
-                  .map(String);
-              }
-            } catch {
-              existingArtistIds = [];
-            }
-
-            const merged = Array.from(
-              new Set([
-                ...(existingArtistIds || []),
-                ...(createdArtistIds || []),
-              ])
-            );
-            if (merged.length) {
-              await eventApi.updateEvent(createdEventId, {
-                idArtistas: merged,
-              });
-              try {
-                log.info(
-                  "[CreateEvent] artistas asociados al evento:",
-                  JSON.stringify(merged)
-                );
-              } catch {}
-            }
-          } catch (e) {
-            try {
-              log.warn(
-                "[CreateEvent] no se pudo asociar artistas creados al evento:",
-                String((e as any)?.message || e)
-              );
-            } catch {}
-          }
-        }
-      } catch {}
-
-      // 4) Extraer fechas devueltas por el backend
-      let remoteFechas = extractFechasFromCreateResp(createResult as any);
-      // remoteFechas checked (silenciado)
-
-      // 5) Si no hay fechas, intentamos determinar si el createResult es idFecha o idEvento
-      let fechaIds: string[] = [];
-      const entradaApi = await import("@/app/events/apis/entradaApi");
-      const eventApi = await import("@/app/events/apis/eventApi");
-
-      if (
-        !remoteFechas.length &&
-        typeof createResult === "string" &&
-        createResult.trim()
-      ) {
+      remoteFechas = extractFechasFromCreateResp(createResult as any);
+      if (!remoteFechas.length && typeof createResult === "string" && createResult.trim()) {
         const candidate = String(createResult).trim();
-        const esFecha = await probeGetEntradasFecha(candidate).catch(
-          () => false
-        );
+        const esFecha = await probeGetEntradasFecha(candidate).catch(() => false);
         if (esFecha) {
           fechaIds = [candidate];
         } else {
           try {
             const ev = await eventApi.fetchEventById(candidate);
-            const fromEvent =
-              ev?.fechas
-                ?.map((f: any) => String(f?.idFecha).trim())
-                .filter(Boolean) || [];
-            if (fromEvent.length) {
-              remoteFechas = fromEvent.map((id: string) => ({ idFecha: id }));
-            }
-          } catch (e) {
-            // ignore fetchEventById errors for resolution
-          }
-        }
-      }
-
-      if (remoteFechas.length) {
-        const mapped = mapLocalToRemoteFechaIds(
-          daySchedules,
-          remoteFechas as any
-        );
-        fechaIds = mapped.filter(Boolean);
-      }
-
-      // If backend returned fechas with default/invalid dates (e.g., 0001-01-01), patch them now via UpdateEvento (exact body, ISO Z)
-      try {
-        const hasInvalidRemoteFechas = (arr: RemoteFecha[]) =>
-          Array.isArray(arr) &&
-          arr.some((f) => {
-            const y1 = f?.inicio ? new Date(f.inicio).getUTCFullYear() : 0;
-            const y2 = f?.fin ? new Date(f.fin).getUTCFullYear() : 0;
-            const y3 = f?.inicio ? y1 : 0;
-            const y4 = f?.fin ? y2 : 0;
-            // consider invalid if missing or year <= 1; venta dates are optional
-            const invalidCore = !f?.inicio || y1 <= 1 || !f?.fin || y2 <= 1;
-            const invVenta = (f as any)?.inicioVenta
-              ? new Date((f as any).inicioVenta).getUTCFullYear() <= 1
-              : false;
-            const invFinVenta = (f as any)?.finVenta
-              ? new Date((f as any).finVenta).getUTCFullYear() <= 1
-              : false;
-            return invalidCore || invVenta || invFinVenta;
-          });
-
-        if (
-          createdEventId &&
-          fechaIds.length &&
-          hasInvalidRemoteFechas(remoteFechas as any)
-        ) {
-          const { updateEventExact, formatIsoZulu } = await import(
-            "@/app/events/apis/eventApi"
-          );
-          const fechasUpd = fechaIds.map((id, i) => ({
-            idFecha: id,
-            inicio: formatIsoZulu(daySchedules[i]?.start),
-            fin: formatIsoZulu(daySchedules[i]?.end),
-            inicioVenta: formatIsoZulu(daySaleConfigs[i]?.saleStart),
-            finVenta: formatIsoZulu(daySaleConfigs[i]?.sellUntil),
-            estado: 0,
-          }));
-          const exactBody: any = {
-            idEvento: String(createdEventId),
-            nombre: body.nombre,
-            descripcion: body.descripcion,
-            genero: body.genero,
-            domicilio: body.domicilio,
-            idArtistas: body.idArtistas,
-            isAfter: body.isAfter,
-            isLgbt: body.isLgbt,
-            inicioEvento: formatIsoZulu(daySchedules[0]?.start),
-            finEvento: formatIsoZulu(daySchedules[0]?.end),
-            estado: body.estado,
-            fechas: fechasUpd,
-            idFiesta: body.idFiesta ?? null,
-            soundCloud: body.soundCloud ?? "",
-          };
-          await updateEventExact(exactBody);
-          // refresh remoteFechas snapshot after patch
-          try {
-            const fresh = await eventApi.fetchEventById(String(createdEventId));
-            const newFechas = Array.isArray((fresh as any)?.__raw?.fechas)
-              ? (fresh as any).__raw.fechas
-              : (fresh as any)?.fechas;
-            remoteFechas = normalizeRemoteFechas(newFechas);
+            const fromEvent = ev?.fechas?.map((f: any) => String(f?.idFecha).trim()).filter(Boolean) || [];
+            if (fromEvent.length) remoteFechas = fromEvent.map((id: string) => ({ idFecha: id }));
           } catch {}
         }
-      } catch {}
-
-      // Crear artistas manuales (los que siguen como __isNew o sin id) AHORA que existe el evento
-      try {
-        const manualToCreate = selectedArtists.filter(
-          (a) => (a as any).__isNew || !(a as any).idArtista
-        );
-        if (manualToCreate.length && createdEventId) {
-          const artistApi = await import("@/app/artists/apis/artistApi");
-          const createdNow: string[] = [];
-          for (const a of manualToCreate) {
-            const name = (a.name || "").trim();
-            if (!name) continue;
-            // Skip if pending map already contains it
-            const alreadyFromPending =
-              (pending as any)?.artistaIdsMap &&
-              (pending as any).artistaIdsMap[norm(name)];
-            if (alreadyFromPending) continue;
-            try {
-              const id = await artistApi.createArtistOnApi({
-                name,
-                description: "",
-                instagramURL: "",
-                spotifyURL: "",
-                soundcloudURL: "",
-                isActivo: false,
-              } as any);
-              if (id) {
-                createdNow.push(String(id));
-                // update UI state
-                setSelectedArtists((prev) =>
-                  prev.map((x) =>
-                    norm(x.name || "") === norm(name)
-                      ? ({ ...(x as any), idArtista: String(id) } as ArtistSel)
-                      : x
-                  )
-                );
-              }
-            } catch (e) {
-              // ignore individual create failures
-            }
-          }
-
-          if (createdNow.length) {
-            try {
-              const eventApi2 = await import("@/app/events/apis/eventApi");
-              // fetch existing artist ids to merge
-              let existingArtistIds: string[] = [];
-              try {
-                const evt = await eventApi2.fetchEventById(createdEventId);
-                existingArtistIds = Array.isArray((evt as any).artistas)
-                  ? (evt as any).artistas
-                      .map(
-                        (x: any) =>
-                          x?.idArtista ?? x?.id ?? x?.IdArtista ?? x?.Id
-                      )
-                      .filter(Boolean)
-                      .map(String)
-                  : [];
-              } catch {}
-
-              const pendingIds = (pending as any)?.artistaIds || [];
-              const merged = Array.from(
-                new Set([
-                  ...(existingArtistIds || []),
-                  ...(pendingIds || []),
-                  ...createdNow,
-                ])
-              );
-              if (merged.length) {
-                await eventApi2.updateEvent(createdEventId, {
-                  idArtistas: merged,
-                });
-                try {
-                  log.info(
-                    "[CreateEvent] artistas creados y asociados al evento:",
-                    JSON.stringify(createdNow)
-                  );
-                } catch {}
-              }
-            } catch (e) {
-              try {
-                log.warn(
-                  "[CreateEvent] fallo asociando artistas creados al evento:",
-                  String((e as any)?.message || e)
-                );
-              } catch {}
-            }
-          }
-        }
-      } catch {}
-
-      // Si tenemos idEvento y hemos resuelto fechaIds, intentar asociarlas explícitamente al evento
-      try {
-        if (createdEventId && fechaIds.length) {
-          try {
-            await eventApi.updateEvent(createdEventId, {
-              fechas: fechaIds.map((id) => ({ idFecha: id })),
-            });
-            try {
-              log.info(
-                "[CreateEvent] fechas asociadas al evento:",
-                JSON.stringify(fechaIds)
-              );
-            } catch {}
-          } catch (e) {
-            try {
-              log.warn(
-                "[CreateEvent] no se pudo asociar fechas al evento:",
-                String((e as any)?.message || e)
-              );
-            } catch {}
-          }
-        }
-      } catch {}
-
-      // structured log: creation summary (event id resolution + artist ids if available)
-      try {
-        const createdEventIdResolved = ((): string | null => {
-          if (typeof createResult === "string") {
-            const s = String(createResult).trim();
-            return s;
-          }
-          if (
-            createResult &&
-            ((createResult as any).idEvento ||
-              (createResult as any).IdEvento ||
-              (createResult as any).id ||
-              (createResult as any).Id)
-          ) {
-            return String(
-              (createResult as any).idEvento ??
-                (createResult as any).IdEvento ??
-                (createResult as any).id ??
-                (createResult as any).Id
-            );
-          }
-          return null;
-        })();
-
-        log.info(
-          "[CreateEvent] creationSummary:\n",
-          JSON.stringify(
-            {
-              createdEventId: createdEventIdResolved,
-              artistaIds: (pending as any)?.artistaIds || null,
-              fechaIds,
-            },
-            null,
-            2
-          )
-        );
-      } catch {
-        // ignore logging errors
       }
-
-      if (!fechaIds.length) {
-        // Si no hay fechaIds, intentar cleanup del evento creado
-        if (createdEventId) {
-          try {
-            const eventApi = await import("@/app/events/apis/eventApi");
-            await eventApi
-              .cancelEvent(createdEventId)
-              .catch(() =>
-                eventApi.setEventStatus(
-                  createdEventId!,
-                  eventApi.ESTADO_CODES.RECHAZADO as any
-                )
-              );
-          } catch {
-            // ignore rollback failure
-          }
-        }
-        Alert.alert(
-          "Error",
-          "No se pudieron obtener los IDs de las fechas del evento. El evento no se creó."
-        );
-        return;
+      if (remoteFechas.length) {
+        const mapped = mapLocalToRemoteFechaIds(daySchedules, remoteFechas as any);
+        fechaIds = mapped.filter(Boolean);
       }
-
-      // 6) Esperar a que las fechas estén visibles en backend (poll)
+      // 7. Parchear fechas inválidas si es necesario
+      const hasInvalidRemoteFechas = (arr: any[]) => Array.isArray(arr) && arr.some((f) => {
+        const y1 = f?.inicio ? new Date(f.inicio).getUTCFullYear() : 0;
+        const y2 = f?.fin ? new Date(f.fin).getUTCFullYear() : 0;
+        return !f?.inicio || y1 <= 1 || !f?.fin || y2 <= 1;
+      });
+      if (createdEventId && fechaIds.length && hasInvalidRemoteFechas(remoteFechas)) {
+        const { updateEventExact, formatIsoZulu } = await import("@/app/events/apis/eventApi");
+        const fechasUpd = fechaIds.map((id, i) => ({
+          idFecha: id,
+          inicio: formatIsoZulu(daySchedules[i]?.start),
+          fin: formatIsoZulu(daySchedules[i]?.end),
+          inicioVenta: formatIsoZulu(daySaleConfigs[i]?.saleStart),
+          finVenta: formatIsoZulu(daySaleConfigs[i]?.sellUntil),
+          estado: 0,
+        }));
+        const exactBody: any = {
+          idEvento: String(createdEventId),
+          nombre: body.nombre,
+          descripcion: body.descripcion,
+          genero: body.genero,
+          domicilio: body.domicilio,
+          idArtistas: body.idArtistas,
+          isAfter: body.isAfter,
+          isLgbt: body.isLgbt,
+          inicioEvento: formatIsoZulu(daySchedules[0]?.start),
+          finEvento: formatIsoZulu(daySchedules[0]?.end),
+          fechas: fechasUpd,
+          idFiesta: body.idFiesta ?? null,
+          soundCloud: body.soundCloud ?? "",
+        };
+        await updateEventExact(exactBody);
+        try {
+          const fresh = await eventApi.fetchEventById(String(createdEventId));
+          const newFechas = Array.isArray((fresh as any)?.__raw?.fechas) ? (fresh as any).__raw.fechas : (fresh as any)?.fechas;
+          remoteFechas = normalizeRemoteFechas(newFechas);
+        } catch {}
+      }
+      // 8. Asociar fiesta y artistas al evento
+      if (createdEventId && ((pending as any)?.partyCreated?.idFiesta || selectedPartyId)) {
+        try {
+          await eventApi.updateEvent(createdEventId, { idFiesta: String((pending as any)?.partyCreated?.idFiesta || selectedPartyId) });
+        } catch {}
+      }
+      if (createdEventId && resolvedArtistIds.length) {
+        try {
+          await eventApi.updateEvent(createdEventId, { idArtistas: resolvedArtistIds });
+        } catch {}
+      }
+      // 9. Crear artistas manuales y asociar
+      const manualToCreate = selectedArtists.filter((a) => (a as any).__isNew || !(a as any).idArtista);
+      if (manualToCreate.length && createdEventId) {
+        const artistApi = await import("@/app/artists/apis/artistApi");
+        const createdNow: string[] = [];
+        for (const a of manualToCreate) {
+          const name = (a.name || "").trim();
+          if (!name) continue;
+          const alreadyFromPending = (pending as any)?.artistaIdsMap && (pending as any).artistaIdsMap[norm(name)];
+          if (alreadyFromPending) continue;
+          try {
+            const id = await artistApi.createArtistOnApi({ name, description: "", instagramURL: "", spotifyURL: "", soundcloudURL: "", isActivo: false } as any);
+            if (id) {
+              createdNow.push(String(id));
+              setSelectedArtists((prev) => prev.map((x) => norm(x.name || "") === norm(name) ? ({ ...(x as any), idArtista: String(id) } as ArtistSel) : x));
+            }
+          } catch {}
+        }
+        if (createdNow.length) {
+          try {
+            await eventApi.updateEvent(createdEventId, { idArtistas: Array.from(new Set([...resolvedArtistIds, ...createdNow])) });
+          } catch {}
+        }
+      }
+      // 10. Asociar fechas explícitamente
+      if (createdEventId && fechaIds.length) {
+        try {
+          await eventApi.updateEvent(createdEventId, { fechas: fechaIds.map((id) => ({ idFecha: id })) });
+        } catch {}
+      }
+      // 11. Esperar fechas listas en backend
       for (const idF of fechaIds) {
-        await entradaApi.ensureFechaListo(idF).catch(() => {
-          log.warn("[CreateEvent] ensureFechaListo no confirmó fecha:", idF);
-        });
+        await entradaApi.ensureFechaListo(idF).catch(() => {});
       }
-
-      // 7) Crear entradas
+      // 12. Crear entradas
       const entradasPayload = await buildEntradasForFechas(fechaIds);
       try {
         await entradaApi.createEntradasBulk(entradasPayload);
       } catch (e: any) {
-        // Rollback: intentar eliminar/cancelar evento si lo conocemos
         if (createdEventId) {
           try {
-            const eventApi = await import("@/app/events/apis/eventApi");
-            await eventApi
-              .cancelEvent(createdEventId)
-              .catch(() =>
-                eventApi.setEventStatus(
-                  createdEventId!,
-                  eventApi.ESTADO_CODES.RECHAZADO as any
-                )
-              );
-          } catch {
-            // ignore rollback failure
-          }
+            await eventApi.cancelEvent(createdEventId).catch(() => eventApi.setEventStatus(createdEventId!, eventApi.ESTADO_CODES.RECHAZADO as any));
+          } catch {}
         }
-        Alert.alert(
-          "Error al crear entradas",
-          e?.message || "Fallo al crear las entradas. El evento no se creó."
-        );
+        Alert.alert("Error al crear entradas", e?.message || "Fallo al crear las entradas. El evento fue cancelado.");
         return;
       }
-
-      // 8) Subir media (si corresponde) — si falla, abortar
+      // 13. Subir media
       if (photoFile) {
         try {
-          // Validar tamaño antes de subir (igual que en perfil)
           const FileSystem = await import("expo-file-system/legacy");
           const fileInfo: any = await FileSystem.getInfoAsync(photoFile);
           if (fileInfo?.size && fileInfo.size > MAX_IMAGE_BYTES) {
-            Alert.alert(
-              "Imagen demasiado grande",
-              "La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana."
-            );
+            Alert.alert("Imagen demasiado grande", "La imagen seleccionada supera el máximo permitido (2MB). Por favor, elige una imagen más liviana.");
             return;
           }
           const fn = photoFile.split("/").pop() || "image.jpg";
           const isPng = fn.toLowerCase().endsWith(".png");
-          const fileObj = {
-            uri: photoFile,
-            name: fn,
-            type: isPng ? "image/png" : "image/jpeg",
-          } as any;
+          const fileObj = { uri: photoFile, name: fn, type: isPng ? "image/png" : "image/jpeg" } as any;
           const mediaApi = (await import("@/app/apis/mediaApi")).mediaApi;
           let uploadTarget = (fechaIds && fechaIds[0]) || null;
-          try {
-            let possibleEventId: string | null = null;
-            if (typeof createResult === "string") {
-              const cand = String(createResult).trim();
-              const esFecha = await probeGetEntradasFecha(cand).catch(
-                () => false
-              );
-              if (!esFecha) possibleEventId = cand;
-            } else if (
-              createResult &&
-              ((createResult as any).idEvento ||
-                (createResult as any).IdEvento ||
-                (createResult as any).id ||
-                (createResult as any).Id)
-            ) {
-              possibleEventId = String(
-                (createResult as any).idEvento ??
-                  (createResult as any).IdEvento ??
-                  (createResult as any).id ??
-                  (createResult as any).Id
-              );
-            }
-            if (possibleEventId) uploadTarget = possibleEventId;
-          } catch {
-            // ignore resolution errors and fallback to fechaIds
+          let possibleEventId: string | null = null;
+          if (typeof createResult === "string") {
+            const cand = String(createResult).trim();
+            const esFecha = await probeGetEntradasFecha(cand).catch(() => false);
+            if (!esFecha) possibleEventId = cand;
+          } else if (createResult && ((createResult as any).idEvento || (createResult as any).IdEvento || (createResult as any).id || (createResult as any).Id)) {
+            possibleEventId = String((createResult as any).idEvento ?? (createResult as any).IdEvento ?? (createResult as any).id ?? (createResult as any).Id);
           }
+          if (possibleEventId) uploadTarget = possibleEventId;
           if (!uploadTarget) {
-            Alert.alert(
-              "Error",
-              "No se encontró idEvento ni idFecha para subir la imagen. El evento no se creó."
-            );
+            Alert.alert("Error", "No se encontró idEvento ni idFecha para subir la imagen. El evento fue creado pero sin imagen.");
             return;
           }
-          await mediaApi.upload(String(uploadTarget), fileObj, undefined, {
-            compress: true,
-          });
+          await mediaApi.upload(String(uploadTarget), fileObj, undefined, { compress: true });
         } catch (e: any) {
-          const msg =
-            typeof e === "object" && e !== null && "message" in e
-              ? String((e as any).message)
-              : String(e || "Error desconocido");
-          // Intentar rollback del evento creado
-          if (createdEventId) {
-            try {
-              const eventApi = await import("@/app/events/apis/eventApi");
-              await eventApi
-                .cancelEvent(createdEventId)
-                .catch(() =>
-                  eventApi.setEventStatus(
-                    createdEventId!,
-                    eventApi.ESTADO_CODES.RECHAZADO as any
-                  )
-                );
-            } catch {
-              // ignore rollback failure
-            }
-          }
-
-          // Mostrar mensaje en pantalla y en alerta
-          const userMsg =
-            msg.toLowerCase().includes("size") ||
-            msg.toLowerCase().includes("too large") ||
-            msg.includes("2mb") ||
-            msg.includes("1mb")
-              ? `La imagen seleccionada supera el máximo permitido (${Math.round(
-                  MAX_IMAGE_BYTES / 1024
-                )}KB). Por favor, elige una imagen más liviana.`
-              : "No se pudo subir la imagen. El evento no se creó. Detalle: " +
-                msg;
-          setCreationError(userMsg);
-          Alert.alert("Error al subir imagen", userMsg);
+          setCreationError("No se pudo subir la imagen. El evento fue creado pero sin imagen. Detalle: " + String(e?.message || e));
+          Alert.alert("Error al subir imagen", "No se pudo subir la imagen. El evento fue creado pero sin imagen. Detalle: " + String(e?.message || e));
           return;
         }
       }
-
-      // 9) Actualizar rol usuario (si corresponde) — si falla, abortar
+      // 14. Actualizar rol usuario
       if (isUsuario) {
         try {
           const userData = user as any;
-          // Obtener los roles actuales del backend antes de actualizar
           let backendRoles: number[] = [];
           let userProfile: any = null;
           try {
-            const { getUsuarioById } = await import("@/app/auth/userHelpers");
+            const { getUsuarioById } = await import("@/app/auth/userApi");
             userProfile = await getUsuarioById(userData?.idUsuario ?? userData?.id ?? userId);
-            // Extraer roles tanto de cdRoles como del array roles (backend)
             const cdRolesArr = Array.isArray(userProfile?.cdRoles) ? userProfile.cdRoles.map(Number) : [];
-            const rolesArr = Array.isArray(userProfile?.roles)
-              ? userProfile.roles.map((r: any) => Number(r?.cdRol)).filter((n: number) => Number.isFinite(n))
-              : [];
+            const rolesArr = Array.isArray(userProfile?.roles) ? userProfile.roles.map((r: any) => Number(r?.cdRol)).filter((n: number) => Number.isFinite(n)) : [];
             backendRoles = Array.from(new Set([...cdRolesArr, ...rolesArr]));
           } catch {}
-          // roles actuales del usuario (numéricos)
-          const roles = Array.isArray(userData?.roles)
-            ? userData.roles.map(Number)
-            : [];
-          // unir ambos y agregar el 2 si no está
+          const roles = Array.isArray(userData?.roles) ? userData.roles.map(Number) : [];
           const allRoles = Array.from(new Set([...roles, ...backendRoles, 2]));
           const cdRoles = allRoles;
-          // Log visual y en consola antes de actualizar
-          console.log("[CreateEvent] Roles antes de updateUsuario:", {
-            userId: userData?.idUsuario ?? userData?.id ?? userId,
-            roles,
-            backendRoles,
-            fusion: cdRoles,
-          });
-          Alert.alert(
-            "Roles antes de actualizar",
-            `Usuario: ${userData?.idUsuario ?? userData?.id ?? userId}\nRoles locales: ${JSON.stringify(roles)}\nRoles backend: ${JSON.stringify(backendRoles)}\nFusionados: ${JSON.stringify(cdRoles)}`
-          );
           const payload = {
             idUsuario: userData?.idUsuario ?? userData?.id ?? userId,
             nombre: userData?.nombre ?? userData?.name ?? "",
@@ -2319,21 +1788,10 @@ export default function CreateEventScreen() {
             bio: userData?.bio ?? "",
             cdRoles,
             domicilio: {
-              provincia: {
-                nombre: provinceName,
-                codigo: provinceId,
-              },
-              municipio: {
-                nombre: municipalityName,
-                codigo: municipalityId,
-              },
-              localidad: {
-                nombre: localityName,
-                codigo: localityId,
-              },
-              direccion: street
-                ? street.charAt(0).toUpperCase() + street.slice(1).toLowerCase()
-                : "",
+              provincia: { nombre: provinceName, codigo: provinceId },
+              municipio: { nombre: municipalityName, codigo: municipalityId },
+              localidad: { nombre: localityName, codigo: localityId },
+              direccion: street ? street.charAt(0).toUpperCase() + street.slice(1).toLowerCase() : "",
               latitud: 0,
               longitud: 0,
             },
@@ -2343,38 +1801,19 @@ export default function CreateEventScreen() {
               mdSpotify: userData?.socials?.mdSpotify ?? "",
               mdSoundcloud: userData?.socials?.mdSoundcloud ?? "",
             },
-            dtNacimiento:
-              userData?.dtNacimiento ?? userData?.fechaNacimiento ?? "",
+            dtNacimiento: userData?.dtNacimiento ?? userData?.fechaNacimiento ?? "",
           };
           await updateUsuario(payload);
-          // Log visual y en consola después de actualizar
-          try {
-            const { getUsuarioById } = await import("@/app/auth/userHelpers");
-            const updatedProfile = await getUsuarioById(userData?.idUsuario ?? userData?.id ?? userId);
-            console.log("[CreateEvent] Roles después de updateUsuario:", {
-              userId: userData?.idUsuario ?? userData?.id ?? userId,
-              rolesActualizados: updatedProfile?.cdRoles,
-            });
-            Alert.alert(
-              "Roles después de actualizar",
-              `Usuario: ${userData?.idUsuario ?? userData?.id ?? userId}\nRoles actualizados: ${JSON.stringify(updatedProfile?.cdRoles)}`
-            );
-          } catch {}
         } catch (e: any) {
-          const backendMsg = extractBackendMessage(e);
-          Alert.alert(
-            "Error actualizando rol",
-            backendMsg + ". El evento no se creó."
-          );
-          return;
+          Alert.alert("Error actualizando rol", extractBackendMessage(e) + ". El evento fue creado correctamente.");
+          // No aborta el evento, solo informa
         }
       }
-
+      // 15. Éxito
       Alert.alert("Éxito", "Evento creado correctamente.");
       router.push(ROUTES.OWNER.MANAGE_EVENTS as any);
     } catch (err: any) {
-      const msg = err?.message || extractBackendMessage(err);
-      // If we created a temporary party earlier via +, attempt to delete it
+      // Rollback de fiesta temporal si todo falla
       try {
         const toDel = (_tempCreatedToCleanup as string | null) || null;
         if (toDel) {
@@ -2382,56 +1821,15 @@ export default function CreateEventScreen() {
             const partys = await import("@/app/party/apis/partysApi");
             if (partys && typeof partys.deleteParty === "function") {
               await partys.deleteParty(toDel);
-              try {
-                log.info(
-                  "[CreateEvent] temp party cleaned up after failure:",
-                  toDel
-                );
-              } catch {}
+              setTempCreatedPartyId(null);
+              setTempCreatedPartyName(null);
             }
-          } catch (e) {
-            try {
-              log.warn(
-                "[CreateEvent] failed deleting temp party after error:",
-                String((e as any)?.message || e)
-              );
-            } catch {}
-          }
-          // ensure UI state cleared
-          try {
-            setTempCreatedPartyId(null);
-            setTempCreatedPartyName(null);
           } catch {}
         }
       } catch {}
-
-      Alert.alert("Error", String(msg));
+      Alert.alert("Error", String(err?.message || extractBackendMessage(err)));
     }
-  }, [
-    userId,
-    eventName,
-    photoFile,
-    acceptedTC,
-    eventType,
-    dayCount,
-    selectedGenres,
-    selectedArtists,
-    isRecurring,
-    selectedPartyId,
-    daySchedules,
-    daySaleConfigs,
-    musicLink,
-    isAfter,
-    isLGBT,
-    provinceId,
-    provinceName,
-    municipalityId,
-    municipalityName,
-    localityId,
-    localityName,
-    street,
-    router,
-  ]);
+  }, [userId, eventName, photoFile, acceptedTC, eventType, dayCount, selectedGenres, selectedArtists, isRecurring, selectedPartyId, daySchedules, daySaleConfigs, musicLink, isAfter, isLGBT, provinceId, provinceName, municipalityId, municipalityName, localityId, localityName, street, router]);
 
   const artistSuggestions: Artist[] = useMemo(() => {
     const q = norm(artistInput);
@@ -2553,40 +1951,6 @@ export default function CreateEventScreen() {
     <SafeAreaView style={styles.container}>
       <Header />
 
-      {/* Popup para usuarios con rol 0 (Usuario) con animación */}
-      <Portal>
-        {showUpgradePopup && (
-          <View style={styles.portalWrapper} pointerEvents="box-none">
-            {Platform.OS === "ios" ? (
-              <BlurView intensity={20} style={styles.modalBlurBackdrop}>
-                <PopUpOrganizadorIOS
-                  onClose={() => setShowUpgradePopup(false)}
-                />
-              </BlurView>
-            ) : (
-              <View style={styles.modalBackdrop} pointerEvents="box-none">
-                {/* Try native BlurView first (may require rebuild on some Android devices). */}
-                <BlurView
-                  intensity={100}
-                  tint="dark"
-                  style={[styles.absoluteFill, { zIndex: 10000 } as any]}
-                  collapsable={false}
-                />
-                {/* Semi-transparent dark overlay to increase contrast but low enough to let blur show */}
-                <View style={styles.darkOverlay} />
-                <View
-                  style={styles.modalContentWrapper}
-                  pointerEvents="box-none"
-                >
-                  <PopUpOrganizadorAndroid
-                    onClose={() => setShowUpgradePopup(false)}
-                  />
-                </View>
-              </View>
-            )}
-          </View>
-        )}
-      </Portal>
 
       <TabMenuComponent
         tabs={[

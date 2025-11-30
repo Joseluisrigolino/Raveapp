@@ -3,8 +3,8 @@ import { View, StyleSheet } from "react-native";
 import { Text } from "react-native-paper";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 
-// Texto de advertencia que va dentro de la card de usuarios creados
-// Comentarios en español, internals en inglés
+// Componente que muestra el texto de advertencia dentro de la card de usuarios creados
+// Componente que muestra el texto de advertencia dentro de la card de usuarios creados
 export default function CreateUserControllerWarningComponent() {
   return (
     <View style={styles.tipRow}>

@@ -6,6 +6,8 @@ import { useLocalSearchParams } from "expo-router";
 
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
+import { TouchableOpacity } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "@/styles/globalStyles";
 
 import usePartyRatings from "../services/usePartyRatings";
@@ -15,6 +17,7 @@ import PartyReviewCardComponent from "../components/PartyReviewCardComponent";
 export default function PartyRatingsScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const partyId = id ? decodeURIComponent(String(id)) : "";
+  const router = require('expo-router').useRouter();
 
   const {
     loading,
@@ -42,6 +45,16 @@ export default function PartyRatingsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Header />
+      {/* Botón Volver */}
+      <TouchableOpacity
+        style={{ flexDirection: 'row', alignItems: 'center', margin: 16 }}
+        onPress={() => router.back()}
+        activeOpacity={0.8}
+      >
+        {/* Usar el mismo ícono que en TicketPurchasedScreen */}
+        <MaterialCommunityIcons name="arrow-left" size={22} color={COLORS.textPrimary} />
+        <Text style={{ marginLeft: 8, fontSize: 16, color: COLORS.textPrimary }}>Volver</Text>
+      </TouchableOpacity>
       <ScrollView contentContainerStyle={styles.content}>
         <PartyRatingsHeaderComponent
           partyName={partyName}

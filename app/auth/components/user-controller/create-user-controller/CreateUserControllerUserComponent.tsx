@@ -3,14 +3,16 @@ import { View, StyleSheet, Pressable } from "react-native";
 import { Text } from "react-native-paper";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 
-interface Props {
+// Props para la fila de usuario creado
+interface CreateUserControllerUserComponentProps {
   username: string;
   onDelete?: () => void;
 }
 
 // Fila que representa un usuario creado
 // Comentarios en español, internals en inglés
-export default function CreateUserControllerUserComponent({ username, onDelete }: Props) {
+// Fila que representa un usuario creado
+export default function CreateUserControllerUserComponent({ username, onDelete }: CreateUserControllerUserComponentProps) {
   return (
     <View style={styles.row}>
       <View style={styles.left}>

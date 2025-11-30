@@ -67,6 +67,13 @@ export default function PartyScreenJR() {
       return;
     }
 
+    // Verificar si ya existe una fiesta con ese nombre (case-insensitive)
+    const exists = parties.some(p => p.nombre.trim().toLowerCase() === name.toLowerCase());
+    if (exists) {
+      showPopup("Nombre repetido", "Ya existe una fiesta recurrente con ese nombre. Por favor, elige otro nombre.");
+      return;
+    }
+
     try {
       setSavingCreate(true);
       await createParty({ idUsuario: String(userId), nombre: name });
@@ -131,24 +138,6 @@ export default function PartyScreenJR() {
     } finally {
       setDeleteLoading(false);
     }
-        {/* Popup de alerta unificado */}
-        <View>
-          {popupVisible && (
-            <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}>
-              <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.35)" }}>
-                <View style={{ width: "90%", maxWidth: 380, backgroundColor: COLORS.cardBg, borderRadius: RADIUS.card, padding: 16 }}>
-                  <Text style={{ fontFamily: "Montserrat-SemiBold", fontSize: 20, color: COLORS.textPrimary, marginBottom: 6 }}>{popupTitle}</Text>
-                  <Text style={{ fontFamily: "Montserrat-Regular", fontSize: 16, color: COLORS.textSecondary, marginBottom: 16 }}>{popupMessage}</Text>
-                  <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-                    <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 20, borderRadius: RADIUS.card, backgroundColor: COLORS.textPrimary, alignItems: "center", justifyContent: "center", minHeight: 44 }} onPress={() => setPopupVisible(false)}>
-                      <Text style={{ fontFamily: "Montserrat-SemiBold", fontSize: 16, color: COLORS.backgroundLight }}>OK</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </View>
-          )}
-        </View>
   }
 
   function handleCancelDelete() {
@@ -185,6 +174,16 @@ export default function PartyScreenJR() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Mis Fiestas Recurrentes:</Text>
 
+        <Text style={styles.infoTextRecurrente}>
+          Las fiestas recurrentes, como su nombre indica, son aquellas que organizas de manera regular. Pueden ser semanales, mensuales o con la frecuencia que tú elijas.{"\n"}
+          {"\n"}
+          Si una fiesta se va a hacer una sola vez, o si es una fiesta única que se hace porque viene determinado DJ a la Argentina, NO es una fiesta recurrente.{"\n"}
+          {"\n"}
+          En esta sección podrás agregar, editar o eliminar los nombres de las fiestas que realices de manera continua para mantener un registro actualizado.{"\n"}
+          {"\n"}
+          Además, las fiestas recurrentes podrán ser calificadas por aquellos usuarios que hayan adquirido una entrada para dicho evento. Van a poder puntuar la fiesta e incluso dejar un comentario si así lo desean.
+        </Text>
+
         <Text style={styles.subTitle}>Agregar nueva fiesta recurrente</Text>
         <PartyCreateFormComponent
           value={newName}
@@ -193,7 +192,7 @@ export default function PartyScreenJR() {
           onSubmit={handleCreate}
         />
 
-        <Text style={[styles.subTitle, { marginTop: 18 }]}>
+        <Text style={[styles.subTitle, { marginTop: 18 }]}> 
           Mis fiestas recurrentes
         </Text>
 
@@ -242,6 +241,23 @@ export default function PartyScreenJR() {
         />
       </ScrollView>
 
+      {/* Popup de alerta unificado */}
+      {popupVisible && (
+        <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}>
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.35)" }}>
+            <View style={{ width: "90%", maxWidth: 380, backgroundColor: COLORS.cardBg, borderRadius: RADIUS.card, padding: 16 }}>
+              <Text style={{ fontFamily: "Montserrat-SemiBold", fontSize: 20, color: COLORS.textPrimary, marginBottom: 6 }}>{popupTitle}</Text>
+              <Text style={{ fontFamily: "Montserrat-Regular", fontSize: 16, color: COLORS.textSecondary, marginBottom: 16 }}>{popupMessage}</Text>
+              <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
+                <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 20, borderRadius: RADIUS.card, backgroundColor: COLORS.textPrimary, alignItems: "center", justifyContent: "center", minHeight: 44 }} onPress={() => setPopupVisible(false)}>
+                  <Text style={{ fontFamily: "Montserrat-SemiBold", fontSize: 16, color: COLORS.backgroundLight }}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+
       <Footer />
     </SafeAreaView>
   );
@@ -280,6 +296,13 @@ const styles = StyleSheet.create({
   },
   errorText: { color: "#92400e" },
   emptyText: { color: COLORS.textSecondary, marginTop: 8 },
+  infoTextRecurrente: {
+    color: COLORS.textSecondary,
+    fontSize: 15,
+    marginBottom: 16,
+    marginTop: 2,
+    lineHeight: 22,
+  },
   listCard: {
     marginTop: 6,
     backgroundColor: COLORS.cardBg,

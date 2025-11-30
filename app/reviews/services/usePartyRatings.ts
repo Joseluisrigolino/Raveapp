@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getPartyById } from "@/app/party/apis/partysApi";
 import { getResenias } from "@/utils/reviewsApi";
-import { getUsuarioById } from "@/app/auth/userHelpers";
+import { getUsuarioById } from "@/app/auth/userApi";
 import { mediaApi } from "@/app/apis/mediaApi";
 
 export type PartyReview = {

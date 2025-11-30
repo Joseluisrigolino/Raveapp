@@ -1,7 +1,4 @@
-// RegisterUserScreen (refactor simple, estilo JR)
-
-// imports
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   ScrollView,
   View,
@@ -24,11 +21,11 @@ import {
 } from "react-native-paper";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
+// Imports absolutos del proyecto
 import { GOOGLE_CONFIG } from "@/app/auth/googleConfig";
 import GoogleSignInButton from "@/app/auth/components/GoogleSignInButtonComponent";
 import * as nav from "@/utils/navigation";
 import ROUTES from "@/routes";
-
 import globalStyles from "@/styles/globalStyles";
 import { useAuth } from "@/app/auth/AuthContext";
 import useVerifyEmail from "@/app/auth/services/user/useVerifyEmail";
@@ -36,13 +33,12 @@ import useCreateUser from "@/app/auth/services/user/useCreateUser";
 import InfoTyc from "@/components/infoTyc";
 import { parseBirthDateToISO } from "@/utils/formatDate";
 
-// helpers (simples y en español para claridad)
-// valida email básico
+// Helper para validar email
 const isEmailValid = (value: string) => /\S+@\S+\.\S+/.test(value);
-// valida contraseña con requisitos mínimos
+// Helper para validar contraseña
 const isPasswordValid = (value: string) =>
   value.length >= 8 && /[A-Za-z]/.test(value) && /\d/.test(value);
-// opciones fijas para día/mes/año
+// Opciones fijas para día/mes/año
 const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) =>
   (i + 1).toString().padStart(2, "0")
 );
@@ -64,8 +60,26 @@ const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 100 }, (_, i) =>
   (CURRENT_YEAR - i).toString()
 );
+// Tipos para el formulario y payload
+interface RegisterForm {
+  firstName: string;
+  lastName: string;
+  birthDate: string;
+  dni: string;
+  email: string;
+  phone: string;
+  password: string;
+  confirmPassword: string;
+}
+
+interface BirthParts {
+  day: string;
+  month: string;
+  year: string;
+}
+
+// Componente principal para registro de usuario
 export default function RegisterUserScreen() {
-  // componente principal
   const router = useRouter();
   const {
     login,
@@ -73,7 +87,7 @@ export default function RegisterUserScreen() {
     loginOrCreateWithGoogleProfile,
   } = useAuth() as any;
 
-  // platform flags simples
+  // Flags de plataforma
   const isWeb = Platform.OS === "web";
   const isExpoGo = Constants.appOwnership === "expo";
   const expoClientId = GOOGLE_CONFIG.expoClientId;
@@ -81,8 +95,8 @@ export default function RegisterUserScreen() {
   const androidClientId = GOOGLE_CONFIG.androidClientId;
   const webClientId = GOOGLE_CONFIG.webClientId;
 
-  // estado del formulario (nombres en inglés, UI en español)
-  const [form, setForm] = useState({
+  // Estado del formulario
+  const [form, setForm] = useState<RegisterForm>({
     firstName: "",
     lastName: "",
     birthDate: "",
@@ -93,36 +107,34 @@ export default function RegisterUserScreen() {
     confirmPassword: "",
   });
 
-  // partes de fecha de nacimiento (simple)
-  const [birthParts, setBirthParts] = useState({
+  // Estado para partes de la fecha de nacimiento
+  const [birthParts, setBirthParts] = useState<BirthParts>({
     day: "",
     month: "",
     year: "",
   });
 
-  // menú abierto (un solo menú a la vez)
-  const [openMenu, setOpenMenu] = useState<null | "day" | "month" | "year">(
-    null
-  );
+  // Estado para menú de selección de fecha
+  const [openMenu, setOpenMenu] = useState<null | "day" | "month" | "year">(null);
 
-  // otros estados
+  // Otros estados
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(true);
   const [showConfirm, setShowConfirm] = useState(true);
   const [successVisible, setSuccessVisible] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
-  // opciones de fecha (tomadas de helpers)
+  // Opciones de fecha
   const dayOptions = DAY_OPTIONS;
   const monthOptions = MONTH_OPTIONS;
   const yearOptions = YEAR_OPTIONS;
 
-  // actualizar campo
-  const setField = (key: keyof typeof form, value: string) => {
+  // Actualiza un campo del formulario
+  const setField = (key: keyof RegisterForm, value: string) => {
     setForm((s) => ({ ...s, [key]: value }));
   };
 
-  // actualizar fecha de nacimiento desde selects
+  // Actualiza la fecha de nacimiento desde los selects
   const updateBirthDate = (day: string, month: string, year: string) => {
     if (day && month && year) {
       const formatted = `${year}-${month}-${day}`;
@@ -130,27 +142,27 @@ export default function RegisterUserScreen() {
     }
   };
 
-  // seleccionar opciones (cada una cierra su modal)
-  const onSelectDay = (v: string) => {
+  // Handlers para seleccionar día, mes y año
+  const handleSelectDay = (v: string) => {
     const next = { ...birthParts, day: v };
     setBirthParts(next);
     setOpenMenu(null);
     updateBirthDate(next.day, next.month, next.year);
   };
-  const onSelectMonth = (v: string) => {
+  const handleSelectMonth = (v: string) => {
     const next = { ...birthParts, month: v };
     setBirthParts(next);
     setOpenMenu(null);
     updateBirthDate(next.day, next.month, next.year);
   };
-  const onSelectYear = (v: string) => {
+  const handleSelectYear = (v: string) => {
     const next = { ...birthParts, year: v };
     setBirthParts(next);
     setOpenMenu(null);
     updateBirthDate(next.day, next.month, next.year);
   };
 
-  // validación del form
+  // Validación del formulario antes de enviar
   const validateForm = () => {
     const {
       firstName,
@@ -161,9 +173,7 @@ export default function RegisterUserScreen() {
       password,
       confirmPassword,
     } = form;
-    if (
-      ![firstName, lastName, birthDate, dni, email, password].every(Boolean)
-    ) {
+    if (![firstName, lastName, birthDate, dni, email, password].every(Boolean)) {
       Alert.alert(
         "Error",
         "Completa todos los campos obligatorios (*) antes de continuar."
@@ -188,15 +198,16 @@ export default function RegisterUserScreen() {
     return true;
   };
 
-  // hooks para crear usuario y enviar verificacion
+  // Hooks para crear usuario y enviar verificación de email
   const { creating, error: createError, createUser } = useCreateUser();
   const { sending, error: sendError, sendVerifyEmail } = useVerifyEmail();
 
-  // registro (ahora delega en hooks)
-  const onRegister = async () => {
+  // Handler para registrar usuario
+  const handleRegister = async () => {
     if (!validateForm()) return;
     setLoading(true);
     try {
+      // Armamos el payload para la API
       const payload = {
         domicilio: {
           localidad: { nombre: "", codigo: "" },
@@ -224,10 +235,10 @@ export default function RegisterUserScreen() {
         dtNacimiento: parseBirthDateToISO(form.birthDate),
       };
 
-      // crear usuario usando hook
+      // Llamada a la API para crear usuario
       await createUser(payload);
 
-      // enviar email de confirmación (best-effort) usando hook
+      // Enviamos email de confirmación (best-effort)
       let mailOk = false;
       try {
         await sendVerifyEmail({
@@ -238,7 +249,7 @@ export default function RegisterUserScreen() {
         mailOk = true;
       } catch {}
 
-      // auto login (best-effort)
+      // Auto login (best-effort)
       try {
         await login(form.email.trim(), form.password);
       } catch {}
@@ -448,7 +459,7 @@ export default function RegisterUserScreen() {
                       {dayOptions.map((d) => (
                         <Menu.Item
                           key={d}
-                          onPress={() => onSelectDay(d)}
+                          onPress={() => handleSelectDay(d)}
                           title={d}
                         />
                       ))}
@@ -481,7 +492,7 @@ export default function RegisterUserScreen() {
                       {monthOptions.map((m) => (
                         <Menu.Item
                           key={m.value}
-                          onPress={() => onSelectMonth(m.value)}
+                          onPress={() => handleSelectMonth(m.value)}
                           title={m.label}
                         />
                       ))}
@@ -513,7 +524,7 @@ export default function RegisterUserScreen() {
                       {yearOptions.map((y) => (
                         <Menu.Item
                           key={y}
-                          onPress={() => onSelectYear(y)}
+                          onPress={() => handleSelectYear(y)}
                           title={y}
                         />
                       ))}
@@ -617,7 +628,7 @@ export default function RegisterUserScreen() {
 
               <Button
                 mode="contained"
-                onPress={onRegister}
+                onPress={handleRegister}
                 loading={loading}
                 disabled={loading}
                 style={styles.button}

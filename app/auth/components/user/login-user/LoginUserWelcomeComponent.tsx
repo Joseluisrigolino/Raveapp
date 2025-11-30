@@ -1,8 +1,11 @@
-import React from "react";
 import { View, StyleSheet } from "react-native";
 import { Text } from "react-native-paper";
 
-interface Props {
+import React from "react";
+
+
+// Props para el componente de bienvenida
+interface LoginUserWelcomeComponentProps {
   title?: string;
   subtitle?: string;
 }
@@ -11,7 +14,8 @@ interface Props {
 export default function LoginUserWelcomeComponent({
   title = "RaveApp",
   subtitle = "Tu pase al mejor ritmo",
-}: Props) {
+}: LoginUserWelcomeComponentProps) {
+  // Renderiza el título y subtítulo centrados
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>

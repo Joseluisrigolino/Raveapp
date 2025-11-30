@@ -3,13 +3,15 @@ import { View, StyleSheet } from "react-native";
 import { Text, Divider } from "react-native-paper";
 import CreateUserControllerWarningComponent from "./CreateUserControllerWarningComponent";
 
-interface Props {
+// Props para la card de usuarios ya creados
+interface CreateUserControllerAlreadyExistingComponentProps {
   children?: React.ReactNode;
 }
 
 // Card que contiene la lista de usuarios ya creados
 // Comentarios en español, internals en inglés
-export default function CreateUserControllerAlreadyExistingComponent({ children }: Props) {
+// Card que contiene la lista de usuarios ya creados
+export default function CreateUserControllerAlreadyExistingComponent({ children }: CreateUserControllerAlreadyExistingComponentProps) {
   return (
     <View style={styles.cardList}>
       <Text style={styles.cardTitle}>Usuarios Creados</Text>

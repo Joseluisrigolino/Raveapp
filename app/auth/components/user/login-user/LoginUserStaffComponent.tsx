@@ -1,17 +1,18 @@
-import React from "react";
 import { View, StyleSheet } from "react-native";
 import { Text, Button } from "react-native-paper";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 import { Link } from "expo-router";
 import ROUTES from "@/routes";
 
-// Sección: acceso para staff / controlador de evento
+// Componente para acceso de staff/controlador de evento
 export default function LoginUserStaffComponent() {
+  // Renderiza el acceso especial para staff
   return (
     <View style={styles.container}>
       <View style={styles.iconCircle}><Icon name="admin-panel-settings" size={28} color="#0f172a" /></View>
       <Text style={styles.prompt}>¿Eres staff de evento?</Text>
 
+      {/* Botón para acceder como controlador */}
       <Link href={ROUTES.LOGIN.CONTROLLER as any} asChild>
         <Button mode="outlined" icon="qrcode" accessibilityRole="button" contentStyle={styles.buttonContent} style={styles.button} labelStyle={{ fontWeight: "700", color: "#0f172a" }}>
           Acceso Controlador

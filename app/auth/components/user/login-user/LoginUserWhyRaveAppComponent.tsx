@@ -1,24 +1,27 @@
-import React from "react";
 import { View, StyleSheet } from "react-native";
 import { Text } from "react-native-paper";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 
-// Sección con beneficios/razones por las que usar RaveApp
+// Componente que muestra beneficios/razones para usar RaveApp
 export default function LoginUserWhyRaveAppComponent() {
+  // Renderiza los beneficios principales de la app
   return (
     <View style={styles.container}>
       <Text style={styles.title}>¿Por qué RaveApp?</Text>
 
+      {/* Beneficio: entradas verificadas */}
       <View style={styles.row}>
         <View style={styles.iconCircle}><Icon name="confirmation-number" size={20} color="#0f172a" /></View>
         <Text style={styles.text}>Entradas verificadas al instante</Text>
       </View>
 
+      {/* Beneficio: compra segura */}
       <View style={styles.row}>
         <View style={styles.iconCircle}><Icon name="verified-user" size={20} color="#0f172a" /></View>
         <Text style={styles.text}>Compra 100% segura</Text>
       </View>
 
+      {/* Beneficio: eventos cerca */}
       <View style={styles.row}>
         <View style={styles.iconCircle}><Icon name="event" size={20} color="#0f172a" /></View>
         <Text style={styles.text}>Los mejores eventos cerca de ti</Text>

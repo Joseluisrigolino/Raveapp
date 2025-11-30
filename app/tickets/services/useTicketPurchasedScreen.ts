@@ -10,7 +10,7 @@ import {
   fetchEventById,
   EventItemWithExtras,
 } from "@/app/events/apis/eventApi";
-import { getEntradasUsuario } from "@/app/auth/userHelpers";
+import { getEntradasUsuario } from "@/app/auth/userApi";
 import {
   getTipoMap,
   solicitarReembolso,
@@ -182,6 +182,9 @@ export function useTicketPurchasedScreen() {
   const [refundSubmitting, setRefundSubmitting] = useState(false);
   const [showRefundSuccess, setShowRefundSuccess] = useState(false);
   const [refundAmount, setRefundAmount] = useState<number | null>(
+    null
+  );
+  const [refundInfoMessage, setRefundInfoMessage] = useState<string | null>(
     null
   );
 
@@ -968,6 +971,42 @@ export function useTicketPurchasedScreen() {
       const now = new Date();
       const msPerDay = 24 * 60 * 60 * 1000;
 
+      // Detectar actualización del evento (dtUpdate) y aplicar ventana especial de 5 días
+      try {
+        const eventUpdateRaw =
+          (eventData as any)?.dtUpdate ||
+          (eventData as any)?.__raw?.dtUpdate ||
+          (eventData as any)?.__raw?.dt_update;
+        const eventUpdateDate = eventUpdateRaw ? toDate(eventUpdateRaw) : null;
+        let hasUpdateOverride = false;
+        if (
+          eventUpdateDate &&
+          purchaseDate &&
+          purchaseDate.getTime() < eventUpdateDate.getTime()
+        ) {
+          const diffFromUpdate = now.getTime() - eventUpdateDate.getTime();
+          if (diffFromUpdate >= 0 && diffFromUpdate <= 5 * msPerDay) {
+            hasUpdateOverride = true;
+          }
+        }
+        if (hasUpdateOverride) {
+          setRefundInfoMessage(
+            "Se detectó que el evento fue modificado después de tu compra. Tenés 5 días desde la última actualización para solicitar el reembolso."
+          );
+        } else {
+          setRefundInfoMessage(null);
+        }
+        // Si aplica la excepción, saltamos validaciones básicas (10 días / 48hs)
+        if (hasUpdateOverride) {
+          setRefundBlockedReason(null);
+          setShowRefund(true);
+          return;
+        }
+      } catch {
+        // en caso de error al evaluar la excepción, continuar con las reglas normales
+        setRefundInfoMessage(null);
+      }
+
       if (
         purchaseDate &&
         now.getTime() - purchaseDate.getTime() > 10 * msPerDay
@@ -1371,6 +1410,7 @@ export function useTicketPurchasedScreen() {
     showRefundSuccess,
     setShowRefundSuccess,
     refundAmount,
+    refundInfoMessage,
     handleRefundStart,
     handleRefundConfirm,
     handleDownloadAll,

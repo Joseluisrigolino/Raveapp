@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { loginUser, AuthUser } from "@/app/auth/authHelpers";
+import { loginUser, AuthUser } from "@/app/auth/authApi";
 
 // Hook para realizar el login de usuario contra la API
 // Internals en inglés, comentarios en español

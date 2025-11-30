@@ -5,7 +5,7 @@ import { getSafeImageSource } from "@/utils/image";
 import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 import { EventItem } from "@/interfaces/EventItem";
 import { mediaApi } from "@/app/apis/mediaApi";
-import { getUsuarioById } from "@/app/auth/userHelpers";
+import { getUsuarioById } from "@/app/auth/userApi";
 
 // Componente tarjeta para mostrar un evento por validar
 // Comentarios en español explicando lo básico

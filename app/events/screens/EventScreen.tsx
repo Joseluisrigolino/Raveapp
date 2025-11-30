@@ -36,7 +36,7 @@ import {
   putEventoFavorito,
   getProfile,
   getUsuarioById,
-} from "@/app/auth/userHelpers";
+} from "@/app/auth/userApi";
 
 import {
   fetchEntradasFechaRaw,

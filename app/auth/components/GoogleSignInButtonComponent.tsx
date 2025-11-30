@@ -7,7 +7,8 @@ import { Button } from "react-native-paper";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 
-type Props = {
+// Props para el botón de Google Sign-In
+interface GoogleSignInButtonProps {
   expoClientId?: string;
   iosClientId?: string;
   androidClientId?: string;
@@ -16,8 +17,9 @@ type Props = {
   onLogin?: (idToken: string) => Promise<any> | any;
   onSuccess?: () => void;
   children: React.ReactNode;
-};
+}
 
+// Componente principal para el botón de Google Sign-In
 export default function GoogleSignInButton({
   expoClientId,
   iosClientId,
@@ -27,21 +29,22 @@ export default function GoogleSignInButton({
   onLogin,
   onSuccess,
   children,
-}: Props) {
+}: GoogleSignInButtonProps) {
+  // Completa la sesión de autenticación si viene de un redirect
   useEffect(() => {
     WebBrowser.maybeCompleteAuthSession();
   }, []);
 
-  // Hook directo para id_token
+  // Hook de Google para obtener el id_token
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     clientId: expoClientId || androidClientId || iosClientId || webClientId,
     androidClientId,
     iosClientId,
     webClientId,
-    useProxy,
   });
   const [loading, setLoading] = useState(false);
 
+  // Maneja la respuesta de Google y llama a los callbacks
   useEffect(() => {
     if (response?.type === "success" && response.params?.id_token) {
       setLoading(true);
@@ -60,6 +63,7 @@ export default function GoogleSignInButton({
     }
   }, [response]);
 
+  // Handler para el botón
   const handlePress = () => {
     setLoading(true);
     promptAsync().catch((err) => {
