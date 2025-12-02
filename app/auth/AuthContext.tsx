@@ -17,6 +17,7 @@ import jwtDecode from "jwt-decode";
 import { apiClient, login as apiLogin } from "@/app/apis/apiClient";
 // Helpers de usuario (perfil + creación)
 import { getProfile, createUsuario } from "@/app/auth/userApi";
+import { mediaApi } from "@/app/apis/mediaApi";
 // Storage persistente en el dispositivo
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -70,51 +71,20 @@ interface AuthContextValue {
     profile: GoogleProfile
   ) => Promise<ApiAuthUser | null>;
   logout: () => Promise<void>;
-  isAuthenticated: boolean;
-  hasRole: (role: string) => boolean;
-  hasAnyRole: (roles: string[]) => boolean;
-  updateUsuario: (payload: any) => Promise<void>;
-  stashLoginExtras?: (extras: {
-    nickname?: string;
-    birthdate?: string;
-  }) => Promise<void>;
 }
 
-/**
- * Creamos el contexto con valores por defecto “neutros”.
- * Esto evita que se rompa nada si alguien usa useAuth() fuera del provider,
- * pero la idea es que siempre se envuelva la app con <AuthProvider>.
- */
-const AuthContext = createContext<AuthContextValue>({
-  user: null,
-  login: async () => null,
-  loginWithGoogle: async () => null,
-  loginWithGooglePopup: async () => null,
-  loginOrCreateWithGoogleIdToken: async () => null,
-  loginOrCreateWithGoogleProfile: async () => null,
-  logout: async () => {},
-  isAuthenticated: false,
-  hasRole: () => false,
-  hasAnyRole: () => false,
-  updateUsuario: async () => {},
-  stashLoginExtras: async () => {},
-});
+const AuthContext = createContext<AuthContextValue | any>({} as any);
 
-/**
- * Helper para guardar el usuario en AsyncStorage.
- */
-async function saveUserToStorage(user: AuthUser) {
+// Helpers simples de persistencia local usados por el provider
+async function saveUserToStorage(user: any) {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
   } catch {
-    // Si falla el storage, no queremos romper el flujo de login.
+    // ignore
   }
 }
 
-/**
- * Helper para leer el usuario almacenado en AsyncStorage.
- */
-async function loadUserFromStorage(): Promise<AuthUser | null> {
+async function loadUserFromStorage(): Promise<any | null> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEYS.USER);
     if (!raw) return null;
@@ -124,15 +94,12 @@ async function loadUserFromStorage(): Promise<AuthUser | null> {
   }
 }
 
-/**
- * Helper para limpiar toda la info de autenticación en AsyncStorage.
- */
 async function clearAuthStorage() {
   try {
     await AsyncStorage.removeItem(STORAGE_KEYS.USER);
     await AsyncStorage.removeItem(STORAGE_KEYS.LOGIN_EXTRAS);
   } catch {
-    // Si falla la limpieza, tampoco queremos romper la app.
+    // ignore
   }
 }
 
@@ -208,11 +175,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function loginWithGoogle(idToken: string): Promise<AuthUser | null> {
     try {
       const logged = await loginOrCreateWithGoogleIdToken(idToken as any);
-      if (logged) {
-        setUser(logged as any);
-        await saveUserToStorage(logged as any);
-        return logged as any;
-      }
+        if (logged) {
+          // Si la función devolvió el perfil del backend, mapeamos al shape interno
+          const mapped: any = {
+            id: (logged as any).idUsuario || (logged as any).id || "",
+            username: (logged as any).correo || "",
+            nombre: (logged as any).nombre || "",
+            apellido: (logged as any).apellido || "",
+            roles: Array.isArray((logged as any).roles) ? (logged as any).roles : ["user"],
+          };
+
+          setUser(mapped as any);
+          await saveUserToStorage(mapped as any);
+          return mapped as any;
+        }
       return null;
     } catch {
       return null;
@@ -244,16 +220,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const existing = await getProfile(email).catch(() => null);
 
       if (existing) {
-        // Si existe, lo seteamos como usuario actual y persistimos
-        setUser(existing as any);
-        await saveUserToStorage(existing as any);
-        return existing as any;
+        // Si existe, actualizamos su información a partir del profile de Google
+        try {
+          const updatePayload: any = {
+            idUsuario: (existing as any).idUsuario || (existing as any).id,
+            nombre: (profile as any)?.givenName?.trim() || (existing as any).nombre || "",
+            apellido: (profile as any)?.familyName?.trim() || (existing as any).apellido || "",
+            correo: email || (existing as any).correo || "",
+            dni: (existing as any).dni || "",
+            telefono: (existing as any).telefono || "",
+            cbu: (existing as any).cbu || "",
+            nombreFantasia: (existing as any).nombreFantasia || "",
+            bio: (existing as any).bio || "",
+            isVerificado: (existing as any).isVerificado ?? 0,
+            dtNacimiento: (existing as any).dtNacimiento || new Date("2000-01-01").toISOString(),
+            domicilio: (existing as any).domicilio || {
+              localidad: { nombre: "", codigo: "" },
+              municipio: { nombre: "", codigo: "" },
+              provincia: { nombre: "", codigo: "" },
+              direccion: "",
+              latitud: 0,
+              longitud: 0,
+            },
+            cdRoles: (existing as any).cdRoles || (existing as any).roles || [],
+            socials: (existing as any).socials || { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
+          };
+
+          // updateUsuario hace merge internamente, así que podemos pasar un payload parcial
+          try {
+            await updateUsuario(updatePayload);
+          } catch (err: any) {
+            if (__DEV__) console.error("[Auth] updateUsuario failed:", err?.response?.status, err?.response?.data || err?.message || err);
+          }
+
+          // Refrescamos el perfil para asegurarnos de tener los datos actualizados
+          const refreshed = await getProfile(email).catch(() => existing as any);
+
+          const maybeRoles = (refreshed as any).roles;
+          const roles = Array.isArray(maybeRoles) && typeof maybeRoles[0] === 'string'
+            ? maybeRoles
+            : ["user"];
+
+          const mapped = {
+            id: (refreshed as any).idUsuario || (refreshed as any).id || "",
+            username: (refreshed as any).correo || "",
+            nombre: (refreshed as any).nombre || "",
+            apellido: (refreshed as any).apellido || "",
+            roles,
+          } as any;
+
+          setUser(mapped as any);
+          await saveUserToStorage(mapped as any);
+          return refreshed as any;
+        } catch (e) {
+          // Si algo falla, caemos de vuelta a devolver el existing sin bloquear el flujo
+          setUser(existing as any);
+          await saveUserToStorage(existing as any);
+          return existing as any;
+        }
       }
 
       // 2) Si no existe, creamos un usuario nuevo en el backend
 
       // Primero hacemos un login “técnico” para poder llamar al endpoint de creación
-      const token = await apiLogin().catch(() => null);
+      const token = await apiLogin().catch((e) => {
+        if (__DEV__) console.warn("apiLogin() failed:", e);
+        return null;
+      });
       if (token) {
         apiClient.defaults.headers.common.Authorization = `Bearer ${token}`;
       }
@@ -264,7 +297,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         Math.random().toString(36).slice(2);
 
       // Creamos el usuario en el backend con datos mínimos de Google
-      await createUsuario({
+      const createPayload = {
         domicilio: {
           localidad: { nombre: "", codigo: "" },
           municipio: { nombre: "", codigo: "" },
@@ -283,20 +316,135 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bio: "",
         password: randomPass,
         socials: {
-          idSocial: "",
+          idSocial: (profile as any)?.id ?? "",
           mdInstagram: "",
           mdSpotify: "",
           mdSoundcloud: "",
         },
         dtNacimiento: new Date("2000-01-01").toISOString(),
-      });
+        isVerificado: 1,
+        cdRoles: [0],
+      } as any;
+
+      if (__DEV__) {
+        console.debug("[Auth] createUsuario token present:", !!token);
+        console.debug("[Auth] createUsuario payload:", createPayload);
+      }
+
+      // Intentamos crear y si hay error lo logueamos con detalle
+      let createResult: any = null;
+      try {
+        createResult = await createUsuario(createPayload);
+        if (__DEV__) console.debug("[Auth] createUsuario response:", createResult);
+      } catch (err: any) {
+        if (__DEV__) {
+          console.error("[Auth] createUsuario failed:", err?.response?.status, err?.response?.data || err?.message || err);
+        }
+        throw err;
+      }
 
       // Una vez creado, volvemos a pedir el perfil para obtener
-      // la versión “real” que maneja el backend
-      const created = await getProfile(email);
+      // la versión “real” que maneja el backend. Algunos backends
+      // crean el usuario con IsActivo=false inicialmente, por lo
+      // que la búsqueda con filtro IsActivo=true puede fallar.
+      let created: any = null;
+      try {
+        created = await getProfile(email);
+      } catch (err) {
+        if (__DEV__) console.warn("[Auth] getProfile(email) with IsActivo=true failed, trying without IsActivo:", err);
+        try {
+          // Intentamos el endpoint directamente sin el filtro IsActivo
+          const resp = await apiClient.get(`/v1/Usuario/GetUsuario`, {
+            params: { Mail: email },
+          });
+          const data = resp?.data;
+          if (Array.isArray(data?.usuarios) && data.usuarios.length) {
+            created = data.usuarios[0];
+          } else if (data && data.idUsuario) {
+            created = data;
+          }
+        } catch (err2) {
+          if (__DEV__) console.error("[Auth] fallback GetUsuario failed:", err2);
+          throw err; // rethrow original
+        }
+      }
 
-      setUser(created as any);
-      await saveUserToStorage(created as any);
+      // Asegurarnos de que el usuario tenga isVerificado y rol 0: llamar updateUsuario
+      try {
+        const updatePayload: any = {
+          idUsuario: created.idUsuario,
+          nombre: created.nombre || (profile as any)?.givenName || "",
+          apellido: created.apellido || (profile as any)?.familyName || "",
+          correo: created.correo || email,
+          dni: created.dni || "",
+          telefono: created.telefono || "",
+          cbu: created.cbu || "",
+          nombreFantasia: created.nombreFantasia || "",
+          bio: created.bio || "",
+          isVerificado: 1,
+          dtNacimiento: created.dtNacimiento || new Date("2000-01-01").toISOString(),
+          domicilio: created.domicilio || {
+            localidad: { nombre: "", codigo: "" },
+            municipio: { nombre: "", codigo: "" },
+            provincia: { nombre: "", codigo: "" },
+            direccion: "",
+            latitud: 0,
+            longitud: 0,
+          },
+          cdRoles: [0],
+          socials: created.socials || { idSocial: "", mdInstagram: "", mdSpotify: "", mdSoundcloud: "" },
+        };
+
+          try {
+            await updateUsuario(updatePayload);
+          } catch (err: any) {
+            if (__DEV__) {
+              console.error("[Auth] updateUsuario failed:", err?.response?.status, err?.response?.data || err?.message || err);
+            }
+          }
+      } catch (e) {
+        // no rompemos el flujo si el update falla
+      }
+
+      // Si tenemos URL de foto en el profile de Google, intentamos
+      // descargarla y subirla como media asociada al usuario creado.
+      try {
+        const pictureUrl = (profile as any)?.pictureUrl || (profile as any)?.photo;
+        if (pictureUrl) {
+          // Descargamos la imagen al cache local
+          const FileSystem = await import("expo-file-system");
+          const tmpDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || "";
+          const filename = `google_profile_${created.idUsuario}.jpg`;
+          const dest = `${tmpDir}${filename}`;
+
+          try {
+            const dl = await FileSystem.downloadAsync(pictureUrl, dest);
+            const fileObj = { uri: dl.uri, name: filename } as any;
+            // Subimos la foto asociada al usuario (idUsuario como entidad)
+            await mediaApi.upload(created.idUsuario, fileObj, undefined, { compress: false });
+          } catch (e) {
+            console.warn("upload Google profile photo failed:", e);
+          }
+        }
+      } catch (e) {
+        console.warn("processing google profile photo failed:", e);
+      }
+      // Mapear el perfil creado a AuthUser interno y asegurarnos de roles
+      const maybeCreatedRoles = (created as any).roles;
+      const createdRoles = Array.isArray(maybeCreatedRoles) && typeof maybeCreatedRoles[0] === 'string'
+        ? maybeCreatedRoles
+        : ["user"];
+
+      const mappedCreated = {
+        id: (created as any).idUsuario || (created as any).id || "",
+        username: (created as any).correo || "",
+        nombre: (created as any).nombre || "",
+        apellido: (created as any).apellido || "",
+        roles: createdRoles,
+      } as any;
+
+      setUser(mappedCreated as any);
+      await saveUserToStorage(mappedCreated as any);
 
       return created as any;
     } catch {

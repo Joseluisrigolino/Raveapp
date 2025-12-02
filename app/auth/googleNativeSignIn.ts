@@ -23,8 +23,10 @@ export function configureGoogleNative() {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { GoogleSignin } = require('@react-native-google-signin/google-signin');
 
+    // @react-native-google-signin/google-signin no acepta `androidClientId`.
+    // Proporcionamos únicamente `webClientId` (para id_token / server auth)
+    // y opciones relevantes.
     GoogleSignin.configure({
-      androidClientId: GOOGLE_CONFIG.androidClientId || undefined,
       webClientId: GOOGLE_CONFIG.webClientId || undefined,
       offlineAccess: true,
       forceCodeForRefreshToken: false,
@@ -68,28 +70,33 @@ export async function signInWithGoogleNative(
       id: userInfo?.user?.id,
     };
 
+    // Delegate to the app's auth handler. If the backend rejects or throws,
+    // we should let that error bubble up so the UI can show a useful message.
     await onLogin(idToken, profile);
+    return { success: true };
   } catch (err: any) {
     // Si el require falla (módulo no disponible) o hay error nativo, lo manejamos.
     const message = err?.message || err;
     if (message && message.indexOf && message.indexOf('Cannot find module') !== -1) {
       console.warn('Native Google Signin module not available in this environment.');
       Alert.alert('Entorno', 'La sign-in nativa de Google no está disponible en Expo Go. Usa un dev-client o prebuild.');
-      return;
+      return { success: false, reason: 'native-module-missing' };
     }
 
     if (err?.code === (err?.statusCodes ?? {}).SIGN_IN_CANCELLED) {
-      return; // usuario canceló
+      return { success: false, reason: 'cancelled' }; // usuario canceló
     }
     if (err?.code === (err?.statusCodes ?? {}).IN_PROGRESS) {
-      return; // ya hay un sign-in en curso
+      return { success: false, reason: 'in-progress' }; // ya hay un sign-in en curso
     }
     if (err?.code === (err?.statusCodes ?? {}).PLAY_SERVICES_NOT_AVAILABLE) {
       Alert.alert('Error', 'Google Play Services no está disponible o desactualizado.');
-      return;
+      return { success: false, reason: 'play-services-not-available' };
     }
 
+    // Si es un error lanzado por `onLogin` (p. ej. rechazada por el backend),
+    // re-lanzamos para que el UI lo capture y muestre el mensaje detallado.
     console.warn('signInWithGoogleNative error', err);
-    Alert.alert('Error', 'No se pudo iniciar sesión con Google.');
+    throw err;
   }
 }

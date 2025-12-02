@@ -2,6 +2,7 @@
 
 // Cliente HTTP centralizado para hablar con la API
 import { apiClient } from "@/app/apis/apiClient";
+import { AxiosResponse } from "axios";
 
 /**
  * Modelos tal como los maneja el backend (shape de la API)
@@ -346,21 +347,26 @@ export interface CreateUsuarioPayload {
     mdSoundcloud: string;
   };
   dtNacimiento: string; // ISO string
+  isVerificado?: boolean | number;
+  cdRoles?: number[];
 }
 
 export async function createUsuario(
   payload: CreateUsuarioPayload
-): Promise<void> {
+): Promise<any> {
   const finalPayload: CreateUsuarioPayload = {
     ...payload,
     // Nos aseguramos de que bio sea string, aunque venga undefined/null
     bio: ensureString(payload.bio),
   };
 
-  await apiClient.post(
+  const resp: AxiosResponse<any> = await apiClient.post(
     "/v1/Usuario/CreateUsuario",
     finalPayload
   );
+
+  // Devolvemos la respuesta del servidor para permitir inspección en caller (logs/debug)
+  return resp.data;
 }
 
 /**
