@@ -39,13 +39,15 @@ export async function signInWithGoogleNative(
       return;
     }
 
+    // Normalizamos distintas formas en que puede venir userInfo
+    const ui = userInfo?.user ?? userInfo ?? {};
     const profile = {
-      email: userInfo?.user?.email,
-      fullName: userInfo?.user?.name,
-      givenName: userInfo?.user?.givenName,
-      familyName: userInfo?.user?.familyName,
-      photo: userInfo?.user?.photo,
-      id: userInfo?.user?.id,
+      email: ui?.email ?? ui?.mail ?? ui?.correo ?? null,
+      fullName: ui?.name ?? ui?.fullName ?? null,
+      givenName: ui?.givenName ?? ui?.given_name ?? null,
+      familyName: ui?.familyName ?? ui?.family_name ?? null,
+      photo: ui?.photo ?? ui?.photoUrl ?? ui?.picture ?? null,
+      id: ui?.id ?? ui?.sub ?? null,
     };
     // Llamamos al callback del caller y devolvemos su resultado para que
     // el componente que llamó a este helper pueda actuar en consecuencia.

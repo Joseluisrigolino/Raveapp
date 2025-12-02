@@ -12,7 +12,36 @@ import Constants from "expo-constants";
 // Helpers propios para login clásico contra la API
 import { loginUser, AuthUser as ApiAuthUser } from "@/app/auth/authApi";
 // Para decodificar el id_token de Google y extraer email/nombre
-import jwtDecode from "jwt-decode";
+// small jwt decoder (no external dependency) — decodes payload from a JWT
+function decodeJwt(token: string): any | null {
+  try {
+    const parts = String(token || "").split('.');
+    if (parts.length < 2) return null;
+    let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    // pad
+    base64 += '='.repeat((4 - (base64.length % 4)) % 4);
+
+    let binary = '';
+    if (typeof atob === 'function') {
+      binary = atob(base64);
+    } else {
+      // try Buffer (should work in many RN setups)
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { Buffer } = require('buffer');
+      binary = Buffer.from(base64, 'base64').toString('binary');
+    }
+
+    // percent-encode the binary string then decode as UTF-8
+    const decoded = decodeURIComponent(
+      Array.prototype.map
+        .call(binary, (c: string) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(decoded);
+  } catch (e) {
+    return null;
+  }
+}
 // Cliente HTTP y helper para hacer login “técnico” contra la API (sin usuario final)
 import { apiClient, login as apiLogin } from "@/app/apis/apiClient";
 // Helpers de usuario (perfil + creación)
@@ -210,6 +239,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function loginOrCreateWithGoogleProfile(
     profile: GoogleProfile
   ): Promise<ApiAuthUser | null> {
+    if (__DEV__) console.debug("[Auth] loginOrCreateWithGoogleProfile incoming profile:", profile);
     const email = String(profile?.email || "")
       .trim()
       .toLowerCase();
@@ -217,7 +247,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // 1) Intentamos ver si ya existe un usuario con ese correo
-      const existing = await getProfile(email).catch(() => null);
+      let existing: any = null;
+      try {
+        existing = await getProfile(email);
+      } catch (e: any) {
+        if (__DEV__) console.debug("[Auth] getProfile initial check failed:", e?.response?.status, e?.response?.data || e?.message || e);
+        existing = null;
+      }
 
       if (existing) {
         // Si existe, actualizamos su información a partir del profile de Google
@@ -232,7 +268,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             cbu: (existing as any).cbu || "",
             nombreFantasia: (existing as any).nombreFantasia || "",
             bio: (existing as any).bio || "",
-            isVerificado: (existing as any).isVerificado ?? 0,
+            isVerificado: Boolean((existing as any).isVerificado),
             dtNacimiento: (existing as any).dtNacimiento || new Date("2000-01-01").toISOString(),
             domicilio: (existing as any).domicilio || {
               localidad: { nombre: "", codigo: "" },
@@ -322,7 +358,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           mdSoundcloud: "",
         },
         dtNacimiento: new Date("2000-01-01").toISOString(),
-        isVerificado: 1,
+        isVerificado: true,
         cdRoles: [0],
       } as any;
 
@@ -343,29 +379,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw err;
       }
 
-      // Una vez creado, volvemos a pedir el perfil para obtener
-      // la versión “real” que maneja el backend. Algunos backends
-      // crean el usuario con IsActivo=false inicialmente, por lo
-      // que la búsqueda con filtro IsActivo=true puede fallar.
+      // Una vez creado, intentamos usar la respuesta de createUsuario
+      // como fuente preferida si contiene el idUsuario; si no, pedimos
+      // el perfil mediante GetUsuario (filtro IsActivo=true y fallback).
       let created: any = null;
-      try {
-        created = await getProfile(email);
-      } catch (err) {
-        if (__DEV__) console.warn("[Auth] getProfile(email) with IsActivo=true failed, trying without IsActivo:", err);
+
+      // createResult podría contener el usuario creado directamente
+      if (createResult) {
+        // Intentos de extracción comunes según distintas responses
+        if (createResult.idUsuario) {
+          created = createResult;
+        } else if (createResult.usuario) {
+          created = createResult.usuario;
+        } else if (Array.isArray((createResult as any).usuarios) && (createResult as any).usuarios.length) {
+          created = (createResult as any).usuarios[0];
+        } else if (createResult.data && createResult.data.idUsuario) {
+          created = createResult.data;
+        }
+
+        if (__DEV__) console.debug("[Auth] createResult-derived created:", created);
+      }
+
+      if (!created) {
         try {
-          // Intentamos el endpoint directamente sin el filtro IsActivo
-          const resp = await apiClient.get(`/v1/Usuario/GetUsuario`, {
-            params: { Mail: email },
-          });
-          const data = resp?.data;
-          if (Array.isArray(data?.usuarios) && data.usuarios.length) {
-            created = data.usuarios[0];
-          } else if (data && data.idUsuario) {
-            created = data;
+          created = await getProfile(email);
+        } catch (err) {
+          if (__DEV__) console.warn("[Auth] getProfile(email) with IsActivo=true failed, trying without IsActivo:", err);
+          try {
+            // Intentamos el endpoint directamente sin el filtro IsActivo
+            const resp = await apiClient.get(`/v1/Usuario/GetUsuario`, {
+              params: { Mail: email },
+            });
+            const data = resp?.data;
+            if (Array.isArray(data?.usuarios) && data.usuarios.length) {
+              created = data.usuarios[0];
+            } else if (data && data.idUsuario) {
+              created = data;
+            }
+          } catch (err2) {
+            if (__DEV__) console.error("[Auth] fallback GetUsuario failed:", err2);
+            // No lanzamos aquí: continuamos sin created y haremos checks previos antes del upload
           }
-        } catch (err2) {
-          if (__DEV__) console.error("[Auth] fallback GetUsuario failed:", err2);
-          throw err; // rethrow original
         }
       }
 
@@ -381,7 +435,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           cbu: created.cbu || "",
           nombreFantasia: created.nombreFantasia || "",
           bio: created.bio || "",
-          isVerificado: 1,
+          isVerificado: true,
           dtNacimiento: created.dtNacimiento || new Date("2000-01-01").toISOString(),
           domicilio: created.domicilio || {
             localidad: { nombre: "", codigo: "" },
@@ -411,19 +465,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const pictureUrl = (profile as any)?.pictureUrl || (profile as any)?.photo;
         if (pictureUrl) {
-          // Descargamos la imagen al cache local
-          const FileSystem = await import("expo-file-system");
-          const tmpDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || "";
-          const filename = `google_profile_${created.idUsuario}.jpg`;
-          const dest = `${tmpDir}${filename}`;
+          if (!created || !created.idUsuario) {
+            console.warn("[Auth] Skipping photo upload: created user missing or no idUsuario", { created });
+          } else {
+            // Descargamos la imagen al cache local
+            const FileSystem = await import("expo-file-system");
+            const tmpDir = FileSystem.cacheDirectory || FileSystem.documentDirectory || "";
+            const filename = `google_profile_${created.idUsuario}.jpg`;
+            const dest = `${tmpDir}${filename}`;
 
-          try {
-            const dl = await FileSystem.downloadAsync(pictureUrl, dest);
-            const fileObj = { uri: dl.uri, name: filename } as any;
-            // Subimos la foto asociada al usuario (idUsuario como entidad)
-            await mediaApi.upload(created.idUsuario, fileObj, undefined, { compress: false });
-          } catch (e) {
-            console.warn("upload Google profile photo failed:", e);
+            if (__DEV__) console.debug("[Auth] will download pictureUrl:", pictureUrl, "to:", dest);
+
+            try {
+              const dl = await FileSystem.downloadAsync(pictureUrl, dest);
+              if (__DEV__) console.debug("[Auth] downloadAsync result:", dl);
+
+              const fileObj = { uri: dl.uri, name: filename, type: "image/jpeg" } as any;
+
+              if (__DEV__) console.debug("[Auth] calling mediaApi.upload with:", { idEntidad: created.idUsuario, file: fileObj });
+
+              try {
+                const uploadResult = await mediaApi.upload(created.idUsuario, fileObj, undefined, { compress: false });
+                if (__DEV__) console.debug("[Auth] mediaApi.upload result:", uploadResult);
+              } catch (uploadErr: any) {
+                console.error("[Auth] mediaApi.upload failed:", uploadErr?.response?.status, uploadErr?.response?.data || uploadErr?.message || uploadErr);
+              }
+            } catch (e) {
+              console.error("[Auth] downloadAsync failed:", e?.message || e);
+            }
           }
         }
       } catch (e) {
@@ -447,7 +516,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await saveUserToStorage(mappedCreated as any);
 
       return created as any;
-    } catch {
+    } catch (e: any) {
+      if (__DEV__) console.error("[Auth] loginOrCreateWithGoogleProfile error:", e?.response?.status, e?.response?.data || e?.message || e);
       return null;
     }
   }
@@ -461,18 +531,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profile?: any
   ): Promise<ApiAuthUser | null> {
     try {
-      // Preferimos el profile pasado por el cliente si existe
+      if (__DEV__) console.debug("[Auth] loginOrCreateWithGoogleIdToken idToken length:", idToken ? idToken.length : 0, "profile:", profile);
+
+      // Preferimos el profile pasado por el cliente si existe y tiene email
       if (profile && profile.email) {
         return await loginOrCreateWithGoogleProfile(profile as GoogleProfile);
       }
 
-      // Decodificamos el id_token si no se pasó profile
-      const payload: any = (jwtDecode as any)(idToken);
+      // Decodificamos el id_token con nuestro helper local
+      const payload = decodeJwt(idToken);
 
-      const email = payload?.email || payload?.upn || "";
-      const givenName = payload?.given_name || payload?.givenName || "";
-      const familyName = payload?.family_name || payload?.familyName || "";
-      const pictureUrl = payload?.picture || "";
+      const email = payload?.email || payload?.upn || profile?.email || "";
+      const givenName = payload?.given_name || payload?.givenName || profile?.givenName || "";
+      const familyName = payload?.family_name || payload?.familyName || profile?.familyName || "";
+      const pictureUrl = payload?.picture || profile?.picture || profile?.photo || "";
 
       return await loginOrCreateWithGoogleProfile({
         email,
@@ -480,7 +552,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         familyName,
         pictureUrl,
       });
-    } catch {
+    } catch (e: any) {
+      if (__DEV__) console.error("[Auth] loginOrCreateWithGoogleIdToken error:", e?.response?.status, e?.response?.data || e?.message || e);
       return null;
     }
   }

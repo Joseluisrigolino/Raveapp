@@ -359,10 +359,50 @@ export async function createUsuario(
     // Nos aseguramos de que bio sea string, aunque venga undefined/null
     bio: ensureString(payload.bio),
   };
+  // El endpoint CreateUsuario espera un JSON en camelCase sin wrapper
+  // (ejemplo provisto por backend). Enviamos el payload tal cual,
+  // asegurándonos de normalizar algunos tipos.
+  const requestBody = {
+    ...finalPayload,
+    isVerificado: Boolean(finalPayload.isVerificado),
+    cdRoles: Array.isArray(finalPayload.cdRoles)
+      ? finalPayload.cdRoles.map((n) => Number(n))
+      : finalPayload.cdRoles || [],
+    domicilio: {
+      direccion: ensureString(finalPayload.domicilio?.direccion),
+      latitud:
+        typeof finalPayload.domicilio?.latitud === "number"
+          ? finalPayload.domicilio!.latitud
+          : 0,
+      longitud:
+        typeof finalPayload.domicilio?.longitud === "number"
+          ? finalPayload.domicilio!.longitud
+          : 0,
+      localidad: {
+        nombre: ensureString(finalPayload.domicilio?.localidad?.nombre),
+        codigo: ensureString(finalPayload.domicilio?.localidad?.codigo),
+      },
+      municipio: {
+        nombre: ensureString(finalPayload.domicilio?.municipio?.nombre),
+        codigo: ensureString(finalPayload.domicilio?.municipio?.codigo),
+      },
+      provincia: {
+        nombre: ensureString(finalPayload.domicilio?.provincia?.nombre),
+        codigo: ensureString(finalPayload.domicilio?.provincia?.codigo),
+      },
+    },
+    socials: {
+      idSocial: ensureString(finalPayload.socials?.idSocial),
+      mdInstagram: ensureString(finalPayload.socials?.mdInstagram),
+      mdSpotify: ensureString(finalPayload.socials?.mdSpotify),
+      mdSoundcloud: ensureString(finalPayload.socials?.mdSoundcloud),
+    },
+  };
 
   const resp: AxiosResponse<any> = await apiClient.post(
     "/v1/Usuario/CreateUsuario",
-    finalPayload
+    requestBody,
+    { headers: { "Content-Type": "application/json" } }
   );
 
   // Devolvemos la respuesta del servidor para permitir inspección en caller (logs/debug)
