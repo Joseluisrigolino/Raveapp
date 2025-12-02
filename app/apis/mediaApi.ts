@@ -268,3 +268,9 @@ function ExpoRouterNoRoute() {
 }
 
 export default ExpoRouterNoRoute;
+
+// Compatibilidad: alias en inglés por si algún módulo lo usa
+// Evita tener que cambiar múltiples imports en el código existente.
+export async function getByEntity(idEntidadMedia: string) {
+  return mediaApi.getByEntidad(idEntidadMedia);
+}

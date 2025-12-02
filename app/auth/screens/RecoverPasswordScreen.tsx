@@ -91,7 +91,7 @@ export default function RecoverPasswordScreen() {
       if (err?.response?.status === 500) {
         showPopup(
           "Error",
-          "El email ingresado no es válido o no está registrado. Por favor revisá y probá de nuevo."
+          "El email ingresado no es válido o no está registrado."
         );
       } else {
         // Si algo falla, mostramos un mensaje genérico
@@ -119,7 +119,7 @@ export default function RecoverPasswordScreen() {
           <View style={styles.popupModal}>
             {/* Iconito circular de "ok" */}
             <View style={styles.popupHeaderIcon}>
-              <Text style={styles.popupCheck}>✓</Text>
+              <Text style={styles.popupCheck}>✖</Text>
             </View>
 
             {/* Título y mensaje del popup (dinámicos según el caso) */}

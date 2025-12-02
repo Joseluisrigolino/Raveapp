@@ -68,12 +68,8 @@ export function useReservationAndPayment({
   const [acceptedTyc, setAcceptedTyc] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Timer: compute a fixed target timestamp and close over it so the
-  // remaining seconds decrease properly. Previously the interval used
-  // the stale `expiryTs` state (or a fallback computed on each tick),
-  // which caused the remaining seconds to reset and never decrement.
+  // Timer
   useEffect(() => {
-    // Determine a concrete target timestamp for this effect run
     let targetTs = expiryTs;
     if (!targetTs) {
       const now = Date.now();
@@ -427,63 +423,48 @@ export function useReservationAndPayment({
         return;
       }
 
+      // 🔑 Construcción del backUrl pública para MercadoPago
       const buildBackUrl = (id: string) => {
-        // 1) Preferir valor público si está seteado en app.json -> expo.extra
         try {
-          const cfg = (Constants as any)?.expoConfig ?? (Constants as any)?.manifest ?? {};
+          // Leemos la config de Expo (app.json / app.config)
+          const cfg =
+            (Constants as any)?.expoConfig ??
+            (Constants as any)?.manifest ??
+            {};
           const extra = (cfg && cfg.extra) || (Constants as any)?.extra || {};
-          const publicBack =
-            extra?.EXPO_PUBLIC_BACK_URL || extra?.PUBLIC_BACK_URL || extra?.BACK_URL || null;
-          if (publicBack && typeof publicBack === "string") {
-            const sep = publicBack.includes("?") ? "&" : "?";
-            return `${publicBack}${sep}id=${encodeURIComponent(id)}`;
-          }
-        } catch (e) {
-          // ignore
-        }
 
-        // 2) Si estamos en web, usar origin + ruta
-        try {
-          // @ts-ignore
-          if (typeof window !== "undefined" && window.location && window.location.origin) {
-            const origin = window.location.origin; // no trailing slash
-            let path = String(ROUTES.MAIN.TICKETS.RETURN || "");
-            if (!path.startsWith("/")) path = `/${path}`;
-            return `${origin}${path}?id=${encodeURIComponent(id)}`;
-          }
-        } catch (e) {
-          // ignore
-        }
+          // Tomamos primero EXPO_PUBLIC_MP_BACK_URL, o EXPO_PUBLIC_BACK_URL como backup
+          const baseRaw: string =
+            (extra.EXPO_PUBLIC_MP_BACK_URL as string) ||
+            (extra.EXPO_PUBLIC_BACK_URL as string) ||
+            "";
 
-        // 3) Si no hay `window`, intentar detectar el host del packager (emulador)
-        try {
-          const manifest = (Constants as any)?.manifest || (Constants as any)?.expoConfig || {};
-          // debuggerHost suele venir como '10.0.2.2:8081' o '192.168.x.y:8081'
-          const debuggerHost = manifest?.debuggerHost || manifest?.packagerHost || manifest?.hostUri || null;
-          if (debuggerHost && typeof debuggerHost === "string") {
-            const hostOnly = debuggerHost.split("/").pop();
-            const origin = hostOnly && hostOnly.includes(":") ? `http://${hostOnly}` : `http://${hostOnly}:8081`;
-            let path = String(ROUTES.MAIN.TICKETS.RETURN || "");
-            if (!path.startsWith("/")) path = `/${path}`;
-            const url = `${origin}${path}?id=${encodeURIComponent(id)}`;
-            if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
-              console.warn("[BuyTicket] detected packager host, using emulator origin:", origin, "-> backUrl:", url);
-            }
-            return url;
+          // Si no hay nada configurado, usamos un fallback https válido
+          const base =
+            baseRaw && typeof baseRaw === "string"
+              ? baseRaw
+              : "https://raveapp.com.ar/mp-return";
+
+          // Normalizamos para que no termine en "/" y agregamos el query param ?id=
+          const trimmed = base.replace(/\/+$/, "");
+          const sep = trimmed.includes("?") ? "&" : "?";
+
+          const finalUrl = `${trimmed}${sep}id=${encodeURIComponent(id)}`;
+
+          if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+            console.warn("[BuyTicket] buildBackUrl ->", finalUrl);
           }
 
-          // 4) fallback a Linking.createURL (scheme/app link)
-          try {
-            return Linking.createURL(ROUTES.MAIN.TICKETS.RETURN, { queryParams: { id: String(id) } });
-          } catch (e) {
-            return String(id);
-          }
+          return finalUrl;
         } catch (e) {
-          try {
-            return Linking.createURL(ROUTES.MAIN.TICKETS.RETURN, { queryParams: { id: String(id) } });
-          } catch {
-            return String(id);
+          // Fallback ultra seguro por si falla la lectura de Constants
+          const fallback = `https://raveapp.com.ar/mp-return?id=${encodeURIComponent(
+            id
+          )}`;
+          if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+            console.warn("[BuyTicket] buildBackUrl fallback ->", fallback, e);
           }
+          return fallback;
         }
       };
 
@@ -501,40 +482,32 @@ export function useReservationAndPayment({
           backUrl,
         };
         if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
-          // usar warn para asegurar visibilidad en Metro/adb
           console.warn("[BuyTicket] createPago payload:", payload);
-        }
-        if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
           console.warn("[BuyTicket] sending createPago for idCompra:", String(idCompra));
           console.warn("[BuyTicket] backUrl:", backUrl);
         }
         pago = await createPago(payload);
       } catch (e: any) {
-        // Extraer info útil del error para debugging
         const status = e?.response?.status;
         let respData: any = e?.response?.data;
-        // Si viene como string JSON, intentar parsearlo
         if (typeof respData === "string") {
           try {
             respData = JSON.parse(respData);
           } catch {}
         }
 
-        // Log completo para Metro / adb
         console.warn("[BuyTicket] createPago error:", {
           status,
           data: respData,
           error: e?.message || e,
         });
 
-        // Construir mensaje legible para el usuario
         const prettyMsg =
           (respData && (respData.title || respData.message || respData.detail)) ||
           (typeof respData === "string" ? respData : undefined) ||
           e?.message ||
           "Error creando el pago.";
 
-        // Si hay traceId o status, añadirlos para correlación
         const trace = respData?.traceId ? `\nTraceId: ${respData.traceId}` : "";
         const statusSuffix = status ? ` (status ${status})` : "";
 

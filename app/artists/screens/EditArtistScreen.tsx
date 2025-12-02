@@ -101,7 +101,7 @@ export default function EditArtistScreen() {
 
         // Buscamos media asociada para permitir borrado desde esta pantalla
         try {
-          const media = await mediaApi.getByEntity(id);
+          const media = await mediaApi.getByEntidad(id);
           if (Array.isArray(media.media) && media.media.length > 0) {
             setMediaId(media.media[0].idMedia || null);
           }
@@ -192,6 +192,8 @@ export default function EditArtistScreen() {
     try {
       // Si se eligió una nueva imagen local, la subimos antes de actualizar el artista
       if (newImageLocal) {
+        const prevId = mediaId;
+
         const fileName = newImageLocal.split("/").pop() || "image.jpg";
 
         const file: any = {
@@ -200,8 +202,32 @@ export default function EditArtistScreen() {
           type: "image/jpeg",
         };
 
-        // mediaApi ya maneja límite de tamaño y compresión opcional
+        // Subir nueva imagen
         await mediaApi.upload(id, file, undefined, { compress: true });
+
+        // Intentar eliminar la anterior para evitar duplicados
+        if (prevId) {
+          try {
+            await mediaApi.delete(prevId);
+          } catch (e) {
+            console.warn("[EditArtistScreen] no se pudo borrar media previa:", e);
+          }
+        }
+
+        // Refrescar media actual desde backend
+        try {
+          const media = await mediaApi.getByEntidad(id);
+          if (media?.media?.length > 0) {
+            setImage(media.media[0].url || null);
+            setMediaId(media.media[0].idMedia || null);
+          } else {
+            setImage(null);
+            setMediaId(null);
+          }
+        } catch (e) {
+          // no crítico
+        }
+
         setNewImageLocal(null);
       }
 

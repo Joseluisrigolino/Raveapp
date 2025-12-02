@@ -134,6 +134,8 @@ export default function useEditNew(id?: string) {
       setSaving(true);
 
       if (newImageUri) {
+        const prevId = idMedia;
+
         const fileName = newImageUri.split("/").pop() ?? "imagen.jpg";
         const file: any = {
           uri: newImageUri,
@@ -141,7 +143,29 @@ export default function useEditNew(id?: string) {
           type: "image/jpeg",
         };
 
+        // Subir la nueva imagen
         await mediaApi.upload(id, file, undefined, { compress: true });
+
+        // Intentar eliminar la imagen previa para evitar duplicados
+        if (prevId) {
+          try {
+            await mediaApi.delete(prevId);
+          } catch (e) {
+            console.warn("[useEditNew] no se pudo borrar imagen previa:", e);
+          }
+        }
+
+        // Refrescar media localmente
+        try {
+          const media = await mediaApi.getByEntidad(id);
+          if (media?.media?.length > 0) {
+            setSelectedImage(media.media[0].url);
+            setIdMedia(media.media[0].idMedia);
+            setNewImageUri(null);
+          }
+        } catch (e) {
+          // no crítico
+        }
       }
 
       const urlEventoFinal = selectedEventId

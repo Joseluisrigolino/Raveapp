@@ -13,12 +13,20 @@ export default function useSendRecoveryPass() {
     if (!email || !email.trim()) throw new Error("EMPTY_EMAIL");
     setSending(true);
     try {
+      // Intentamos obtener el perfil; si el email no está registrado, el
+      // `getProfile` lanzará un error con `response.status === 500` y lo
+      // re-lanzamos para que la pantalla muestre el mensaje apropiado.
       let name = "Usuario";
       try {
         const profile = await getProfile(email.trim());
         name = profile?.nombre || "Usuario";
-      } catch {
-        // si falla, usamos nombre por defecto
+      } catch (err: any) {
+        // Si el error viene del backend indicando que el mail no existe,
+        // lo propagamos para que la UI pueda mostrar el mensaje específico.
+        if (err?.response?.status === 500) {
+          throw err;
+        }
+        // En otros casos (timeout / network), seguimos con nombre por defecto
       }
 
       await sendPasswordRecoveryEmail({ to: email.trim(), name });

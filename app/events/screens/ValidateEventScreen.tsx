@@ -300,20 +300,6 @@ export default function ValidateEventScreen() {
 
   const handleValidate = () => {
     if (!eventData?.id) return;
-    // prevenir validación si hay artistas inactivos
-    try {
-      const inactive = splitArtistsByActive((eventData as any)?.artistas || []).inactive;
-      if (Array.isArray(inactive) && inactive.length > 0) {
-        Alert.alert(
-          'No se puede validar',
-          `Activá los artistas inactivos antes de validar el evento. Artistas inactivos: ${inactive.slice(0,5).join(', ')}`
-        );
-        return;
-      }
-    } catch (e) {
-      // no bloquear en caso de error inesperado en la comprobación
-    }
-
     (async () => {
       try {
         setLoading(true);
@@ -831,12 +817,12 @@ export default function ValidateEventScreen() {
             />
             {/* Aviso si hay artistas inactivos */}
             {hasInactiveArtists ? (
-              <Text style={styles.validationInfoWarning}>{`Para validar el evento, activá todos los artistas.${inactiveNamesText ? ` Artistas inactivos: ${inactiveNamesText}` : ''}`}</Text>
+              <Text style={styles.validationInfoWarning}>{`Nota: hay artistas inactivos. El evento puede validarse igualmente.`}</Text>
             ) : null}
             <TouchableOpacity
-              style={[styles.primaryBtn, hasInactiveArtists && styles.primaryBtnDisabled]}
-              onPress={hasInactiveArtists ? undefined : handleValidate}
-              disabled={Boolean(hasInactiveArtists)}
+              style={styles.primaryBtn}
+              onPress={handleValidate}
+              disabled={false}
             >
               <Text style={styles.primaryBtnText}>Validar Evento</Text>
             </TouchableOpacity>

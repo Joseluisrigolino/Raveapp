@@ -469,6 +469,41 @@ export default function UserProfileScreen() {
 
       // Guardamos perfil actualizado en estado
       setProfile(updated as ApiUserFull);
+
+      // Si seleccionaron una foto local (no es URL remota), la subimos
+      try {
+        const updatedUser = updated as ApiUserFull;
+        const localPhoto = photo;
+        const isLocalPhoto = !!localPhoto && !/^https?:\/\//i.test(String(localPhoto));
+
+        if (isLocalPhoto) {
+          try {
+            await mediaApi.upload(String(updatedUser.idUsuario), {
+              uri: localPhoto,
+              name: "profile.jpg",
+              type: "image/jpeg",
+            }, undefined, { compress: true, maxBytes: 2 * 1024 * 1024 });
+
+            // Refrescar la primera imagen y actualizar estado visual
+            const first = await mediaApi.getFirstImage(String(updatedUser.idUsuario));
+            if (first) setPhoto(first);
+
+            // Intentamos refrescar el perfil desde la API para mantener todo sincronizado
+            try {
+              const refreshed = await getProfile(updatedUser.correo || form.email);
+              setProfile(refreshed);
+            } catch (e) {
+              // no crítico
+            }
+          } catch (e: any) {
+            console.error("upload profile photo error", e);
+            showPopup("Error", "No se pudo subir la foto de perfil.");
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+
       setIsEditing(false);
       setIsEditingAddress(false);
 
@@ -723,6 +758,16 @@ export default function UserProfileScreen() {
               </TouchableOpacity>
             )}
           </View>
+
+          <Text style={styles.label}>Celular</Text>
+          <TextInput
+            style={[styles.input, !isEditing && styles.inputDisabled]}
+            editable={isEditing}
+            value={form.phone}
+            onChangeText={(t) => setField("phone", t)}
+            placeholder="Celular"
+            keyboardType="phone-pad"
+          />
 
           <Text style={styles.label}>DNI</Text>
           <TextInput

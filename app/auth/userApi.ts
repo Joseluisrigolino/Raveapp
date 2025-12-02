@@ -138,7 +138,11 @@ export async function getProfile(
   );
 
   if (!Array.isArray(data.usuarios) || !data.usuarios.length) {
-    throw new Error("Perfil no encontrado");
+    const err: any = new Error("Perfil no encontrado");
+    // agregar forma similar a error de axios para que los handlers puedan
+    // inspeccionar `err.response.status` y mostrar mensajes adecuados
+    err.response = { status: 500, data: { message: "Correo no registrado" } };
+    throw err;
   }
 
   return data.usuarios[0];
