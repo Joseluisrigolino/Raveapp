@@ -1,6 +1,7 @@
 // app/tickets/services/buy/useReservationAndPayment.ts
 import { useCallback, useEffect, useState } from "react";
 import { Alert } from "react-native";
+import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import ROUTES from "@/routes";
@@ -337,37 +338,84 @@ export function useReservationAndPayment({
         collectedCompras = [...activeReservas];
       } else {
         // Crear reservas por fecha
-        for (const [idFecha, mapTipo] of byFechaTipo.entries()) {
-          const entradas = Array.from(mapTipo.entries()).map(
-            ([tipoEntrada, cantidad]) => ({
-              tipoEntrada,
-              cantidad,
-            })
-          );
-
-          const resp = await reservarEntradas({
-            idUsuario: String(uid),
-            idFecha: String(idFecha),
-            entradas,
-          });
-
-          const idCompra =
-            (resp as any)?.idCompra ||
-            (resp as any)?.body?.idCompra ||
-            null;
-
-          if (!idCompra) {
-            Alert.alert(
-              "Error",
-              "No se pudo generar la reserva. Intentá nuevamente."
+        try {
+          for (const [idFecha, mapTipo] of byFechaTipo.entries()) {
+            const entradas = Array.from(mapTipo.entries()).map(
+              ([tipoEntrada, cantidad]) => ({
+                tipoEntrada,
+                cantidad,
+              })
             );
-            return;
+
+            const resp = await reservarEntradas({
+              idUsuario: String(uid),
+              idFecha: String(idFecha),
+              entradas,
+            });
+
+            if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+              console.warn("[BuyTicket] reservarEntradas resp:", resp);
+            }
+
+            const idCompra =
+              (resp as any)?.idCompra ||
+              (resp as any)?.body?.idCompra ||
+              null;
+
+            if (!idCompra) {
+              Alert.alert(
+                "Error",
+                "No se pudo generar la reserva. Intentá nuevamente."
+              );
+              // Intentamos limpiar cualquier reserva parcial creada
+              if (collectedCompras.length) {
+                for (const partial of collectedCompras) {
+                  try {
+                    await cancelarReserva(partial);
+                  } catch (err) {
+                    console.warn(
+                      "[BuyTicket] fallo al cancelar reserva parcial:",
+                      partial,
+                      err
+                    );
+                  }
+                }
+                setActiveReservas([]);
+              }
+              return;
+            }
+
+            collectedCompras.push(String(idCompra));
           }
 
-          collectedCompras.push(String(idCompra));
-        }
+          setActiveReservas(collectedCompras);
+          if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+            console.warn("[BuyTicket] collectedCompras:", collectedCompras);
+          }
+        } catch (err: any) {
+          console.warn("[BuyTicket] error creating reservas:", err);
+          // Intentamos limpiar reservas parciales si existieron
+          if (collectedCompras.length) {
+            for (const partial of collectedCompras) {
+              try {
+                await cancelarReserva(partial);
+              } catch (e) {
+                console.warn(
+                  "[BuyTicket] fallo al cancelar reserva parcial tras error:",
+                  partial,
+                  e
+                );
+              }
+            }
+            setActiveReservas([]);
+          }
 
-        setActiveReservas(collectedCompras);
+          Alert.alert(
+            "Error",
+            "Ocurrió un error al generar las reservas. Intentá nuevamente."
+          );
+          return;
+        }
       }
 
       const idCompra = collectedCompras[collectedCompras.length - 1];
@@ -379,17 +427,123 @@ export function useReservationAndPayment({
         return;
       }
 
-      const backUrl = Linking.createURL(
-        ROUTES.MAIN.TICKETS.RETURN,
-        { queryParams: { id: String(idCompra) } }
-      );
+      const buildBackUrl = (id: string) => {
+        // 1) Preferir valor público si está seteado en app.json -> expo.extra
+        try {
+          const cfg = (Constants as any)?.expoConfig ?? (Constants as any)?.manifest ?? {};
+          const extra = (cfg && cfg.extra) || (Constants as any)?.extra || {};
+          const publicBack =
+            extra?.EXPO_PUBLIC_BACK_URL || extra?.PUBLIC_BACK_URL || extra?.BACK_URL || null;
+          if (publicBack && typeof publicBack === "string") {
+            const sep = publicBack.includes("?") ? "&" : "?";
+            return `${publicBack}${sep}id=${encodeURIComponent(id)}`;
+          }
+        } catch (e) {
+          // ignore
+        }
 
-      const pago = await createPago({
-        idCompra: String(idCompra),
-        subtotal,
-        cargoServicio,
-        backUrl,
-      });
+        // 2) Si estamos en web, usar origin + ruta
+        try {
+          // @ts-ignore
+          if (typeof window !== "undefined" && window.location && window.location.origin) {
+            const origin = window.location.origin; // no trailing slash
+            let path = String(ROUTES.MAIN.TICKETS.RETURN || "");
+            if (!path.startsWith("/")) path = `/${path}`;
+            return `${origin}${path}?id=${encodeURIComponent(id)}`;
+          }
+        } catch (e) {
+          // ignore
+        }
+
+        // 3) Si no hay `window`, intentar detectar el host del packager (emulador)
+        try {
+          const manifest = (Constants as any)?.manifest || (Constants as any)?.expoConfig || {};
+          // debuggerHost suele venir como '10.0.2.2:8081' o '192.168.x.y:8081'
+          const debuggerHost = manifest?.debuggerHost || manifest?.packagerHost || manifest?.hostUri || null;
+          if (debuggerHost && typeof debuggerHost === "string") {
+            const hostOnly = debuggerHost.split("/").pop();
+            const origin = hostOnly && hostOnly.includes(":") ? `http://${hostOnly}` : `http://${hostOnly}:8081`;
+            let path = String(ROUTES.MAIN.TICKETS.RETURN || "");
+            if (!path.startsWith("/")) path = `/${path}`;
+            const url = `${origin}${path}?id=${encodeURIComponent(id)}`;
+            if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+              console.warn("[BuyTicket] detected packager host, using emulator origin:", origin, "-> backUrl:", url);
+            }
+            return url;
+          }
+
+          // 4) fallback a Linking.createURL (scheme/app link)
+          try {
+            return Linking.createURL(ROUTES.MAIN.TICKETS.RETURN, { queryParams: { id: String(id) } });
+          } catch (e) {
+            return String(id);
+          }
+        } catch (e) {
+          try {
+            return Linking.createURL(ROUTES.MAIN.TICKETS.RETURN, { queryParams: { id: String(id) } });
+          } catch {
+            return String(id);
+          }
+        }
+      };
+
+      const backUrl = buildBackUrl(String(idCompra));
+      if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+        console.warn("[BuyTicket] backUrl chosen:", backUrl);
+      }
+
+      let pago: any = null;
+      try {
+        const payload = {
+          idCompra: String(idCompra),
+          subtotal,
+          cargoServicio,
+          backUrl,
+        };
+        if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+          // usar warn para asegurar visibilidad en Metro/adb
+          console.warn("[BuyTicket] createPago payload:", payload);
+        }
+        if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+          console.warn("[BuyTicket] sending createPago for idCompra:", String(idCompra));
+          console.warn("[BuyTicket] backUrl:", backUrl);
+        }
+        pago = await createPago(payload);
+      } catch (e: any) {
+        // Extraer info útil del error para debugging
+        const status = e?.response?.status;
+        let respData: any = e?.response?.data;
+        // Si viene como string JSON, intentar parsearlo
+        if (typeof respData === "string") {
+          try {
+            respData = JSON.parse(respData);
+          } catch {}
+        }
+
+        // Log completo para Metro / adb
+        console.warn("[BuyTicket] createPago error:", {
+          status,
+          data: respData,
+          error: e?.message || e,
+        });
+
+        // Construir mensaje legible para el usuario
+        const prettyMsg =
+          (respData && (respData.title || respData.message || respData.detail)) ||
+          (typeof respData === "string" ? respData : undefined) ||
+          e?.message ||
+          "Error creando el pago.";
+
+        // Si hay traceId o status, añadirlos para correlación
+        const trace = respData?.traceId ? `\nTraceId: ${respData.traceId}` : "";
+        const statusSuffix = status ? ` (status ${status})` : "";
+
+        Alert.alert(
+          "Error al crear pago",
+          String(prettyMsg) + statusSuffix + trace
+        );
+        return;
+      }
 
       let mpUrl: string | undefined;
 

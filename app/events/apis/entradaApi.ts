@@ -521,13 +521,51 @@ export type CrearPagoResponse = {
 
 export async function createPago(body: CrearPagoBody): Promise<CrearPagoResponse> {
   const token = await login();
-  const { data } = await apiClient.post<CrearPagoResponse>("/v1/Pago/CrearPago", body, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-  });
-  return data ?? {};
+  try {
+    const { data } = await apiClient.post<CrearPagoResponse>(
+      "/v1/Pago/CrearPago",
+      body,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return data ?? {};
+  } catch (e: any) {
+    const status = e?.response?.status;
+    // Si es un 5xx, intentamos un fallback con PascalCase por compatibilidad
+    if (status && status >= 500 && status < 600) {
+      try {
+        const pascalBody = {
+          IdCompra: body.idCompra,
+          Subtotal: body.subtotal,
+          CargoServicio: body.cargoServicio,
+          BackUrl: body.backUrl,
+        } as any;
+        if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+          console.warn("[createPago] primary request failed with status", status, "- retrying with PascalCase body:", pascalBody);
+        }
+        const { data } = await apiClient.post<CrearPagoResponse>(
+          "/v1/Pago/CrearPago",
+          pascalBody,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        return data ?? {};
+      } catch (e2: any) {
+        // Log both errors for correlation
+        console.warn("[createPago] fallback attempt failed:", { primary: e, fallback: e2 });
+        throw e2;
+      }
+    }
+    throw e;
+  }
 }
 
 /** =========================================================================
