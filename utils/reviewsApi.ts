@@ -375,17 +375,38 @@ export async function putResenia(payload: {
 // 4) POST a /v1/Resenia/Eliminar { IdResenia }
 // Versión simple: el backend elimina con DELETE /v1/Resenia/{id}
 export async function deleteResenia(idResenia: string): Promise<{ ok: boolean; idResenia: string }> {
-    const token = await login();
-    const id = String(idResenia);
-    try {
-        console.log('[deleteResenia] DELETE /v1/Resenia/' + id);
-        const resp = await apiClient.delete(`/v1/Resenia/${encodeURIComponent(id)}` , {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        return { ok: true, idResenia: id, ...resp?.data };
-    } catch (e: any) {
-        try { console.log('[deleteResenia] error', { status: e?.response?.status, message: e?.message, data: e?.response?.data }); } catch {}
-        throw e;
-    }
+	const token = await login();
+	const id = String(idResenia || "").trim();
+	if (!id) throw new Error('deleteResenia: idResenia vacío');
+
+	const attempts: Array<() => Promise<any>> = [
+		// 1) DELETE /v1/Resenia/{id}
+		() => apiClient.delete(`/v1/Resenia/${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${token}` } }),
+		// 2) DELETE /v1/Resenia with query param IdResenia
+		() => apiClient.delete(`/v1/Resenia`, { headers: { Authorization: `Bearer ${token}` }, params: { IdResenia: id } }),
+		// 3) DELETE /v1/Resenia with body { IdResenia } (some servers accept body on DELETE)
+		() => apiClient.request({ url: '/v1/Resenia', method: 'DELETE', headers: { Authorization: `Bearer ${token}` }, data: { IdResenia: id } }),
+		// 4) POST /v1/Resenia/Delete { IdResenia }
+		() => apiClient.post('/v1/Resenia/Delete', { IdResenia: id }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }),
+		// 5) POST /v1/Resenia/Eliminar { IdResenia }
+		() => apiClient.post('/v1/Resenia/Eliminar', { IdResenia: id }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }),
+	];
+
+	let lastErr: any = null;
+	for (const fn of attempts) {
+		try {
+			try { console.log('[deleteResenia] trying delete variant'); } catch {}
+			const resp = await fn();
+			try { console.log('[deleteResenia] success', { status: resp?.status, data: resp?.data }); } catch {}
+			return { ok: true, idResenia: id, ...resp?.data };
+		} catch (e: any) {
+			lastErr = e;
+			try { console.log('[deleteResenia] attempt error', { message: e?.message, status: e?.response?.status, data: e?.response?.data }); } catch {}
+			// continue to next attempt
+		}
+	}
+
+	try { console.log('[deleteResenia] all attempts failed'); } catch {}
+	throw lastErr || new Error('deleteResenia failed');
 }
 

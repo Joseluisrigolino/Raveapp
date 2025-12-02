@@ -724,6 +724,16 @@ export default function UserProfileScreen() {
             )}
           </View>
 
+          <Text style={styles.label}>DNI</Text>
+          <TextInput
+            style={[styles.input, !isEditing && styles.inputDisabled]}
+            editable={isEditing}
+            value={form.dni}
+            onChangeText={(t) => setField("dni", t)}
+            placeholder="DNI"
+            keyboardType="numeric"
+          />
+
           <Text style={styles.label}>Fecha de nacimiento</Text>
           {/* Fecha mostrada formateada, solo lectura */}
           <TextInput

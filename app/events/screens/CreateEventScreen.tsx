@@ -42,6 +42,7 @@ import { getTycPdfUrl } from "@/app/tyc/api/tycApi";
 import { fetchArtistsFromApi } from "@/app/artists/apis/artistApi";
 import { Artist } from "@/app/artists/types/Artist";
 import { useAuth } from "@/app/auth/AuthContext";
+import PopUpOrganizadorAndroid from "@/app/events/components/create/popup-organizador/PopUpOrganizadorAndroid";
 
 /** Georef */
 import {
@@ -219,7 +220,7 @@ function normalizeRemoteFechas(anyFechas: any): RemoteFecha[] {
         f?.inicio ?? f?.Inicio ?? f?.fechaInicio ?? f?.FechaInicio ?? f?.start;
       const fin = f?.fin ?? f?.Fin ?? f?.fechaFin ?? f?.FechaFin ?? f?.end;
       return {
-        idFecha: String(idFecha || ""),
+        /* Lines 1981-2531 omitted */
         inicio: inicio ? String(inicio) : undefined,
         fin: fin ? String(fin) : undefined,
       };
@@ -294,17 +295,19 @@ function mapLocalToRemoteFechaIds(
 /* ================= Pantalla ================= */
 export default function CreateEventScreen() {
   // ...existing code...
-  const { user, updateUsuario } = useAuth();
+  const { user, updateUsuario, hasAnyRole } = useAuth();
   const userId: string | null =
     (user as any)?.idUsuario ?? (user as any)?.id ?? null;
-  // Detectar roles en frontend: 'user' y 'owner'
-  const isUsuario = Array.isArray((user as any)?.roles)
-    ? (user as any).roles.includes("user")
-    : false;
-  const isOrganizador = Array.isArray((user as any)?.roles)
-    ? (user as any).roles.includes("owner") ||
-      (user as any).roles.includes("organizer")
-    : false;
+  // Detectar roles en frontend usando helpers robustos del AuthContext.
+  // Consideramos tanto los roles normalizados ('user','owner') como
+  // posibles representaciones numéricas devueltas por la API (ej: 0, 2).
+  const isUsuario = hasAnyRole(["user", "0"]);
+  const isOrganizador = hasAnyRole([
+    "owner",
+    "organizer",
+    "2",
+    "Organizador",
+  ]);
   const mustShowLogin = !user;
 
   // Debug: log user and isUsuario to diagnose popup issue
@@ -1947,10 +1950,22 @@ export default function CreateEventScreen() {
 
   /* ================= Render ================= */
 
+  // Mostrar popup informativo (una sola vez) a usuarios que no son aún organizadores
+  const [showOrganizadorPopup, setShowOrganizadorPopup] = React.useState(false);
+  const didShowOrganizadorRef = React.useRef(false);
+  React.useEffect(() => {
+    try {
+      // Mostrar popup solo a usuarios logueados que son 'user' pero no 'owner'
+      if (!didShowOrganizadorRef.current && user && (isUsuario && !isOrganizador)) {
+        didShowOrganizadorRef.current = true;
+        setShowOrganizadorPopup(true);
+      }
+    } catch {}
+  }, [user, isUsuario, isOrganizador]);
+
   return (
     <SafeAreaView style={styles.container}>
       <Header />
-
 
       <TabMenuComponent
         tabs={[
@@ -2497,8 +2512,27 @@ export default function CreateEventScreen() {
             )}
           </View>
         )}
+        {showOrganizadorPopup && (
+          <View style={styles.portalWrapper} pointerEvents="box-none">
+            <View style={styles.modalBackdrop} pointerEvents="box-none">
+              <BlurView
+                intensity={100}
+                tint="dark"
+                style={[styles.absoluteFill, { zIndex: 10000 } as any]}
+                collapsable={false}
+              />
+              <View style={styles.darkOverlay} />
+              <View
+                style={styles.modalContentWrapper}
+                pointerEvents="box-none"
+              >
+                <PopUpOrganizadorAndroid onClose={() => setShowOrganizadorPopup(false)} />
+              </View>
+            </View>
+          </View>
+        )}
       </Portal>
-    </SafeAreaView>
+      </SafeAreaView>
   );
 }
 

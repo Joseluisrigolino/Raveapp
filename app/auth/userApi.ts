@@ -399,14 +399,33 @@ export async function createUsuario(
     },
   };
 
-  const resp: AxiosResponse<any> = await apiClient.post(
-    "/v1/Usuario/CreateUsuario",
-    requestBody,
-    { headers: { "Content-Type": "application/json" } }
-  );
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      console.debug('[userApi] CreateUsuario requestBody:', JSON.stringify(requestBody));
+    } catch {
+      console.debug('[userApi] CreateUsuario requestBody (unserializable)');
+    }
+  }
 
-  // Devolvemos la respuesta del servidor para permitir inspección en caller (logs/debug)
-  return resp.data;
+  try {
+    const resp: AxiosResponse<any> = await apiClient.post(
+      "/v1/Usuario/CreateUsuario",
+      requestBody,
+      { headers: { "Content-Type": "application/json" } }
+    );
+    return resp.data;
+  } catch (err: any) {
+    // Loggeamos detalles útiles para depuración: status, body, y config
+    try {
+      console.error('[userApi] CreateUsuario axios error status:', err?.response?.status);
+      console.error('[userApi] CreateUsuario axios error response.data:', err?.response?.data);
+      console.error('[userApi] CreateUsuario axios request config:', err?.config ? { url: err.config.url, method: err.config.method, headers: err.config.headers, data: err.config.data } : undefined);
+    } catch (e) {
+      console.error('[userApi] CreateUsuario error while logging error:', e);
+    }
+
+    throw err;
+  }
 }
 
 /**

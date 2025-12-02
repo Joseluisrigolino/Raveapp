@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 3.0.0"
+    "version": ">= 3.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -8,24 +9,56 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_ENV": "dev",
+        "EXPO_PUBLIC_API_BASE_URL_DEV": "https://dev.api.raveapp.com.ar",
+        "EXPO_PUBLIC_API_ROOT_USER_DEV": "raveapp",
+        "EXPO_PUBLIC_API_ROOT_PASS_DEV": "RaveAppApi367..",
+
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "CLIENT_ID_ANDROID_DEBUG.apps.googleusercontent.com"
       }
     },
     "alpha": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_ENV": "prd",
+        "EXPO_PUBLIC_API_BASE_URL_PRD": "https://api.raveapp.com.ar",
+        "EXPO_PUBLIC_API_ROOT_USER_PRD": "produser_raveapp",
+        "EXPO_PUBLIC_API_ROOT_PASS_PRD": "prod_RaveAppApi367..",
+
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "728778718807-imc5ad9jh3om4oj48ohkaiv81o4e7gsv.apps.googleusercontent.com"
       }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_ENV": "prd",
+        "EXPO_PUBLIC_API_BASE_URL_PRD": "https://api.raveapp.com.ar",
+        "EXPO_PUBLIC_API_ROOT_USER_PRD": "produser_raveapp",
+        "EXPO_PUBLIC_API_ROOT_PASS_PRD": "prod_RaveAppApi367..",
+
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "728778718807-imc5ad9jh3om4oj48ohkaiv81o4e7gsv.apps.googleusercontent.com"
       }
     },
     "production": {
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_ENV": "prd",
+        "EXPO_PUBLIC_API_BASE_URL_PRD": "https://api.raveapp.com.ar",
+        "EXPO_PUBLIC_API_ROOT_USER_PRD": "produser_raveapp",
+        "EXPO_PUBLIC_API_ROOT_PASS_PRD": "prod_RaveAppApi367..",
+
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "728778718807-imc5ad9jh3om4oj48ohkaiv81o4e7gsv.apps.googleusercontent.com"
       }
     }
   },

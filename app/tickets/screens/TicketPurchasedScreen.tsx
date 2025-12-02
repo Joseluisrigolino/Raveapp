@@ -98,6 +98,9 @@ function TicketPurchasedScreenContent() {
   const [readOnlyReview, setReadOnlyReview] = useState(false);
   const [reviewLoaded, setReviewLoaded] = useState(false);
 
+  // Evita reabrir el modal automáticamente más de una vez cuando venimos desde el menú
+  const autoOpenedFromRoute = useRef(false);
+
   // Botón de arrepentimiento (cancelar compra)
   const [showRefund, setShowRefund] = useState(false);
   const [refundChecked, setRefundChecked] = useState(false);
@@ -381,6 +384,7 @@ function TicketPurchasedScreenContent() {
   // Abrir modal automáticamente si viene desde el menú con openReview=1
   useEffect(() => {
     if (!openReview) return;
+    if (autoOpenedFromRoute.current) return;
     if (!reviewLoaded) return; // esperar a conocer si existe reseña
     // No abrir si no hay idFiesta válido
     if (!fiestaIdForReview) return;
@@ -397,6 +401,7 @@ function TicketPurchasedScreenContent() {
         setReadOnlyReview(false);
         setShowReview(true);
       }
+      autoOpenedFromRoute.current = true;
     }
   }, [openReview, userReview, reviewLoaded]);
 
@@ -2166,51 +2171,7 @@ function TicketPurchasedScreenContent() {
                     } finally {
                       setRefundSubmitting(false);
                     }
-                    {/* Popup modal local reemplazando Alert.alert */}
-                    <Modal
-                      visible={popupVisible}
-                      transparent
-                      animationType="fade"
-                      onRequestClose={() => setPopupVisible(false)}
-                    >
-                      <View style={styles.modalBackdrop}>
-                        <View style={styles.modalCard}>
-                          <Text style={styles.modalTitle}>{popupTitle}</Text>
-                          <Text style={styles.modalSubtitle}>{popupMessage}</Text>
-                          <View style={styles.modalActions}>
-                            {popupType === "confirm" ? (
-                              <>
-                                <TouchableOpacity
-                                  style={styles.btnGhost}
-                                  onPress={() => {
-                                    setPopupVisible(false);
-                                    if (popupOnCancel) popupOnCancel();
-                                  }}
-                                >
-                                  <Text style={styles.btnGhostText}>Cancelar</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                  style={styles.btnPrimary}
-                                  onPress={async () => {
-                                    setPopupVisible(false);
-                                    if (popupOnConfirm) await popupOnConfirm();
-                                  }}
-                                >
-                                  <Text style={styles.btnPrimaryText}>Confirmar</Text>
-                                </TouchableOpacity>
-                              </>
-                            ) : (
-                              <TouchableOpacity
-                                style={styles.btnPrimary}
-                                onPress={() => setPopupVisible(false)}
-                              >
-                                <Text style={styles.btnPrimaryText}>OK</Text>
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        </View>
-                      </View>
-                    </Modal>
+                    {/* popup modal moved to top-level render to avoid being nested inside callbacks */}
                   }}
                   disabled={!refundChecked || refundSubmitting}
                 >
@@ -2256,6 +2217,62 @@ function TicketPurchasedScreenContent() {
             >
               <Text style={styles.refundSuccessBtnText}>OK</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Popup modal local reemplazando Alert.alert */}
+      <Modal
+        visible={popupVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPopupVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{popupTitle}</Text>
+            <Text style={styles.modalSubtitle}>{popupMessage}</Text>
+            <View style={styles.modalActions}>
+              {popupType === "confirm" ? (
+                <>
+                  <TouchableOpacity
+                    style={styles.btnGhost}
+                    onPress={() => {
+                      setPopupVisible(false);
+                      setPopupOnConfirm(null);
+                      setPopupOnCancel(null);
+                      if (popupOnCancel) popupOnCancel();
+                    }}
+                  >
+                    <Text style={styles.btnGhostText}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.btnPrimary}
+                    onPress={async () => {
+                      setPopupVisible(false);
+                      // capture and clear handlers to avoid re-entrancy
+                      const h = popupOnConfirm;
+                      setPopupOnConfirm(null);
+                      setPopupOnCancel(null);
+                      if (h) await h();
+                    }}
+                  >
+                    <Text style={styles.btnPrimaryText}>Confirmar</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <TouchableOpacity
+                  style={styles.btnPrimary}
+                  onPress={() => {
+                    setPopupVisible(false);
+                    setPopupOnConfirm(null);
+                    setPopupOnCancel(null);
+                  }}
+                >
+                  <Text style={styles.btnPrimaryText}>OK</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
       </Modal>
