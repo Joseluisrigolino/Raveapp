@@ -67,9 +67,7 @@ export default function LoginScreen() {
    * Completa la sesión de auth en navegadores integrados.
    * Recomendado por expo-auth-session para cerrar ciclos de login.
    */
-  useEffect(() => {
-    WebBrowser.maybeCompleteAuthSession();
-  }, []);
+  // WebBrowser.maybeCompleteAuthSession is called once in app/_layout.tsx
 
   /**
    * Al montar la pantalla:
@@ -168,7 +166,7 @@ export default function LoginScreen() {
         iosClientId={iosClientId}
         androidClientId={androidClientId}
         webClientId={webClientId}
-        useProxy={isExpoGo} // en Expo Go, normalmente se usa proxy de auth
+        useProxy={true} // usar proxy de Expo también en APK/dev-client por ahora
         onLogin={loginOrCreateWithGoogleIdToken} // callback que recibe el id_token y loguea/crea el usuario
         onSuccess={() => nav.replace(router, ROUTES.MAIN.EVENTS.MENU)} // si todo va bien, navegamos al menú principal
       >

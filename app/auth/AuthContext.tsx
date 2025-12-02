@@ -11,15 +11,8 @@ import React, {
 import Constants from "expo-constants";
 // Helpers propios para login clásico contra la API
 import { loginUser, AuthUser as ApiAuthUser } from "@/app/auth/authApi";
-// Helpers propios para login con Firebase + Google
-import {
-  fbLoginWithGoogleIdToken,
-  fbLoginWithGooglePopup,
-  fbLogout,
-  AuthUser as FbAuthUser,
-} from "@/app/auth/firebaseAuthHelpers";
 // Para decodificar el id_token de Google y extraer email/nombre
-import * as jwtDecode from "jwt-decode";
+import jwtDecode from "jwt-decode";
 // Cliente HTTP y helper para hacer login “técnico” contra la API (sin usuario final)
 import { apiClient, login as apiLogin } from "@/app/apis/apiClient";
 // Helpers de usuario (perfil + creación)
@@ -45,15 +38,10 @@ const EX =
   {};
 
 /**
- * Flag para saber si debemos usar Firebase Auth (según variable de entorno).
- */
-const USE_FIREBASE = !!EX.EXPO_PUBLIC_USE_FIREBASE_AUTH;
-
-/**
  * Tipo unificado de usuario autenticado:
  * puede venir de la API propia (ApiAuthUser) o de Firebase (FbAuthUser).
  */
-type AuthUser = ApiAuthUser | FbAuthUser;
+type AuthUser = ApiAuthUser;
 
 /**
  * Tipo interno para el perfil simplificado de Google que vamos a usar
@@ -206,43 +194,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * - limpia estado y storage local
    */
   async function logout(): Promise<void> {
-    try {
-      if (USE_FIREBASE) {
-        await fbLogout();
-      }
-    } finally {
-      setUser(null);
-      await clearAuthStorage();
-    }
+    // No Firebase logout: our backend/session is handled via API tokens.
+    setUser(null);
+    await clearAuthStorage();
   }
 
   /**
    * Login con Google usando un idToken obtenido desde el cliente,
    * delegando todo en Firebase.
    */
+  // Legacy-compatible wrappers for Google login flows. We delegate to
+  // loginOrCreateWithGoogleIdToken which handles backend creation/lookup.
   async function loginWithGoogle(idToken: string): Promise<AuthUser | null> {
     try {
-      const loggedUser = await fbLoginWithGoogleIdToken(idToken);
-      setUser(loggedUser);
-      await saveUserToStorage(loggedUser);
-      return loggedUser;
+      const logged = await loginOrCreateWithGoogleIdToken(idToken as any);
+      if (logged) {
+        setUser(logged as any);
+        await saveUserToStorage(logged as any);
+        return logged as any;
+      }
+      return null;
     } catch {
       return null;
     }
   }
 
-  /**
-   * Login con Google usando el popup de Firebase (solo aplica en web).
-   */
   async function loginWithGooglePopup(): Promise<AuthUser | null> {
-    try {
-      const loggedUser = await fbLoginWithGooglePopup();
-      setUser(loggedUser);
-      await saveUserToStorage(loggedUser);
-      return loggedUser;
-    } catch {
-      return null;
-    }
+    console.warn("loginWithGooglePopup is deprecated; use expo-auth-session flow.");
+    return null;
   }
 
   /**
@@ -330,13 +309,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * recibimos directamente el id_token y lo decodificamos acá.
    */
   async function loginOrCreateWithGoogleIdToken(
-    idToken: string
+    idToken: string,
+    profile?: any
   ): Promise<ApiAuthUser | null> {
     try {
-      // jwtDecode está importado como módulo completo, así que lo tratamos como función any
+      // Preferimos el profile pasado por el cliente si existe
+      if (profile && profile.email) {
+        return await loginOrCreateWithGoogleProfile(profile as GoogleProfile);
+      }
+
+      // Decodificamos el id_token si no se pasó profile
       const payload: any = (jwtDecode as any)(idToken);
 
-      // Según la implementación de Google, estos campos pueden variar un poco
       const email = payload?.email || payload?.upn || "";
       const givenName = payload?.given_name || payload?.givenName || "";
       const familyName = payload?.family_name || payload?.familyName || "";

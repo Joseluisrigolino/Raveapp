@@ -358,7 +358,7 @@ export default function RegisterUserScreen() {
                   iosClientId={iosClientId}
                   androidClientId={androidClientId}
                   webClientId={webClientId}
-                  useProxy={isExpoGo}
+                  useProxy={true}
                   onLogin={loginOrCreateWithGoogleIdToken}
                   onSuccess={() => nav.replace(router, ROUTES.MAIN.EVENTS.MENU)}
                 >

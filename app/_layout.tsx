@@ -1,9 +1,15 @@
+import React, { useEffect } from "react";
 import { Stack } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "@/app/auth/AuthContext";
 import { Provider as PaperProvider } from 'react-native-paper';
 import { View, Text, StyleSheet } from "react-native";
 import globalStyles, { COLORS } from "@/styles/globalStyles";
+import * as WebBrowser from 'expo-web-browser';
+import { configureGoogleNative } from '@/app/auth/googleNativeSignIn';
+
+// Completa cualquier sesión de Auth iniciada por expo-auth-session
+WebBrowser.maybeCompleteAuthSession();
 
 const formatRouteName = (name?: string) => {
   if (!name) return "RaveApp";
@@ -14,6 +20,10 @@ const formatRouteName = (name?: string) => {
 };
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Intentamos configurar el SDK nativo de Google si está disponible.
+    configureGoogleNative();
+  }, []);
   return (
     <PaperProvider>
       <SafeAreaProvider>

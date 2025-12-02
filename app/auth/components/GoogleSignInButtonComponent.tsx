@@ -1,80 +1,56 @@
-// GoogleSignInButton: componente reutilizable para Google Sign-In
-// Comentarios en español: explica de forma simple qué hace cada parte
+// app/auth/components/GoogleSignInButtonComponent.tsx
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Alert } from "react-native";
 import { Button } from "react-native-paper";
-import * as WebBrowser from "expo-web-browser";
-import * as Google from "expo-auth-session/providers/google";
+import { signInWithGoogleNative } from "@/app/auth/googleNativeSignIn";
+import { GOOGLE_CONFIG } from "@/app/auth/googleConfig";
 
-// Props para el botón de Google Sign-In
-interface GoogleSignInButtonProps {
+type Props = {
   expoClientId?: string;
-  iosClientId?: string;
-  androidClientId?: string;
   webClientId?: string;
+  androidClientId?: string;
+  iosClientId?: string;
   useProxy?: boolean;
-  onLogin?: (idToken: string) => Promise<any> | any;
+  onLogin: (idToken: string, profile?: any) => Promise<any> | any;
   onSuccess?: () => void;
   children: React.ReactNode;
-}
+};
 
-// Componente principal para el botón de Google Sign-In
 export default function GoogleSignInButton({
   expoClientId,
-  iosClientId,
-  androidClientId,
   webClientId,
+  androidClientId,
+  iosClientId,
   useProxy = true,
   onLogin,
   onSuccess,
   children,
-}: GoogleSignInButtonProps) {
-  // Completa la sesión de autenticación si viene de un redirect
-  useEffect(() => {
-    WebBrowser.maybeCompleteAuthSession();
-  }, []);
-
-  // Hook de Google para obtener el id_token
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: expoClientId || androidClientId || iosClientId || webClientId,
-    androidClientId,
-    iosClientId,
-    webClientId,
-  });
+}: Props) {
   const [loading, setLoading] = useState(false);
+  // Resolvemos client IDs: preferir props, luego GOOGLE_CONFIG
+  const resolvedExpoClientId = expoClientId || GOOGLE_CONFIG.expoClientId || "";
+  const resolvedWebClientId = webClientId || GOOGLE_CONFIG.webClientId || "";
+  const resolvedAndroidClientId = androidClientId || GOOGLE_CONFIG.androidClientId || "";
+  const resolvedIosClientId = iosClientId || GOOGLE_CONFIG.iosClientId || "";
 
-  // Maneja la respuesta de Google y llama a los callbacks
-  useEffect(() => {
-    if (response?.type === "success" && response.params?.id_token) {
+  // Nota: los client IDs quedan disponibles en GOOGLE_CONFIG si necesitás fallback.
+
+  async function handlePress() {
+    try {
       setLoading(true);
-      Promise.resolve(onLogin?.(response.params.id_token))
-        .then(() => {
-          onSuccess?.();
-        })
-        .catch((err) => {
-          console.log("Google login error:", err);
-          Alert.alert(
-            "No se pudo iniciar sesión con Google.",
-            "Revisa la configuración de Google Cloud o vuelve a intentar."
-          );
-        })
-        .finally(() => setLoading(false));
-    }
-  }, [response]);
-
-  // Handler para el botón
-  const handlePress = () => {
-    setLoading(true);
-    promptAsync().catch((err) => {
-      setLoading(false);
-      console.log("Google prompt error:", err);
+      await signInWithGoogleNative(onLogin);
+      onSuccess?.();
+    } catch (err) {
+      console.error("[GoogleSignInButton] native sign-in error", err);
       Alert.alert(
-        "No se pudo iniciar sesión con Google.",
-        "Revisa la configuración de Google Cloud o vuelve a intentar."
+        "Error",
+        "Ocurrió un problema al iniciar sesión con Google. Intentalo más tarde."
       );
-    });
-  };
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <Button
@@ -82,10 +58,14 @@ export default function GoogleSignInButton({
       icon="google"
       onPress={handlePress}
       loading={loading}
-      disabled={!request || loading}
-      contentStyle={{ height: 50, justifyContent: 'center' }}
-      style={{ borderRadius: 25, width: '100%', alignSelf: 'stretch' }}
-      labelStyle={{ color: '#000', fontWeight: '700' }}
+      disabled={loading}
+      contentStyle={{ height: 50 }}
+      style={{
+        borderRadius: 25,
+        height: 50,
+        justifyContent: "center",
+        width: "100%",
+      }}
     >
       {children}
     </Button>
