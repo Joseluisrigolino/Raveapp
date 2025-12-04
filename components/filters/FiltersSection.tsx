@@ -615,8 +615,8 @@ const styles = StyleSheet.create({
     borderColor: "#C23679",
   },
   afterChipActive: {
-    backgroundColor: "#B8326E",
-    borderColor: "#9F2B60",
+    backgroundColor: "#2b2b2b",
+    borderColor: "#1f1f1f",
   },
   afterChipText: {
     color: "#FFFFFF",
@@ -630,8 +630,8 @@ const styles = StyleSheet.create({
     borderColor: "#38AAA6",
   },
   lgtbChipActive: {
-    backgroundColor: "#2EA19C",
-    borderColor: "#278A86",
+    backgroundColor: "#2b2b2b",
+    borderColor: "#1f1f1f",
   },
   lgtbChipText: {
     color: "#FFFFFF",

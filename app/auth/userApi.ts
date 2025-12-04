@@ -56,7 +56,7 @@ export interface UpdateUsuarioPayload {
   isVerificado?: number;
   dtNacimiento: string; // ISO string
   domicilio: DomicilioApi;
-  cdRoles: number[]; // Requerido por la API
+  cdRoles?: number[]; // Opcional en el payload que construimos desde UI
   socials: {
     idSocial: string;
     mdInstagram: string;
@@ -81,6 +81,24 @@ const ensureNumberArray = (arr: any): number[] => {
     .map((v) => Number(v))
     .filter((n) => Number.isFinite(n));
 };
+
+/**
+ * Extrae roles de un objeto usuario que puede tener distintas formas:
+ * - `cdRoles` array de números
+ * - `roles` array de objetos { cdRol }
+ */
+function extractRolesFromUser(u: any): number[] {
+  if (!u) return [];
+  if (Array.isArray(u.cdRoles) && u.cdRoles.length) return ensureNumberArray(u.cdRoles);
+  if (Array.isArray(u.roles) && u.roles.length) {
+    try {
+      return ensureNumberArray((u.roles as any[]).map((r: any) => r?.cdRol));
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
 
 /**
  * Helper para normalizar el objeto socials:
@@ -239,16 +257,24 @@ export async function updateUsuario(
     base = null;
   }
 
-  // Roles: usar los del payload si vienen, sino los del perfil base
-  const mergedRoles = (() => {
-    const incoming = ensureNumberArray(payload.cdRoles);
-    const existing = ensureNumberArray(base?.cdRoles ?? []);
-    const all = [...incoming, ...existing];
-    return Array.from(new Set(all)); // únicos
-  })();
+  // Roles: usamos siempre las roles extraídas del perfil base como fuente
+  // de verdad cuando `base` existe. Ignoramos `payload.cdRoles` si viene
+  // vacío. Solo si no hay roles ni en `base` ni en `payload` aplicamos un
+  // fallback mínimo ([0]).
+  let finalCdRoles: number[] = [];
+  const baseRoles = extractRolesFromUser(base);
+  const incomingRoles = ensureNumberArray((payload as any).cdRoles);
 
-  // Si después del merge sigue vacío, ponemos un rol neutro (ej: 0)
-  const finalCdRoles = mergedRoles.length ? mergedRoles : [0];
+  if (baseRoles.length) {
+    finalCdRoles = baseRoles; // base manda siempre
+  } else if (incomingRoles.length) {
+    finalCdRoles = incomingRoles; // no hay base, usamos incoming si viene
+  } else {
+    finalCdRoles = []; // por ahora vacío; luego aplicamos fallback mínimo
+  }
+
+  // Si después de todo no hay roles válidos, ponemos un fallback neutro
+  if (!finalCdRoles.length) finalCdRoles = [0];
 
   // Socials: preferimos payload, pero si viene vacío usamos base
   const mergedSocials = normalizeSocials({

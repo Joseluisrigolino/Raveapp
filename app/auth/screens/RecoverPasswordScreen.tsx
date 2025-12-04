@@ -16,6 +16,7 @@ import { COLORS } from "@/styles/globalStyles"; // Paleta de colores global
 import ROUTES from "@/routes"; // Mapa de rutas de la app
 import * as nav from "@/utils/navigation"; // Helpers propios para navegación
 import useSendRecoveryPass from "@/app/auth/services/user/useSendRecoveryPass"; // Hook que llama a la API de recuperación
+import { getProfile } from "@/app/auth/userApi";
 import InfoTyc from "@/components/infoTyc"; // Términos y Condiciones y Política de Privacidad reutilizable
 
 // Tipo simple para el callback opcional del popup
@@ -73,6 +74,30 @@ export default function RecoverPasswordScreen() {
       return;
     }
 
+    // Antes de pedir que el backend envíe el mail, validamos que el email
+    // exista en nuestra base llamando a `getProfile`. Si no existe, avisamos
+    // inmediatamente al usuario con el popup "Email incorrecto".
+    try {
+      await getProfile(trimmedEmail);
+    } catch (err: any) {
+      console.error("getProfile error", err);
+      // Si la API devolvió explícitamente que el correo no está registrado,
+      // mostramos el mensaje apropiado. Para otros errores de red/servidor
+      // mostramos un mensaje genérico pero con el mismo título pedido.
+      if (err?.response?.status === 500 && err?.response?.data?.message === "Correo no registrado") {
+        showPopup(
+          "Email incorrecto",
+          "El email ingresado no es válido o no está registrado."
+        );
+      } else {
+        showPopup(
+          "Email incorrecto",
+          "No se pudo verificar el email. Probá de nuevo en unos minutos."
+        );
+      }
+      return;
+    }
+
     try {
       // Llamamos al servicio que envía el mail de recuperación
       await sendRecovery(trimmedEmail);
@@ -86,17 +111,17 @@ export default function RecoverPasswordScreen() {
       );
     } catch (err: any) {
       console.error("sendRecovery error", err);
-
-      // Si el error es 500 (por ejemplo, mail inválido desde backend)
-      if (err?.response?.status === 500) {
+      // Si el backend responde que el correo no está registrado, mostramos
+      // el mismo mensaje específico que usamos en la verificación previa.
+      if (err?.response?.status === 500 && err?.response?.data?.message === "Correo no registrado") {
         showPopup(
-          "Error",
+          "Email incorrecto",
           "El email ingresado no es válido o no está registrado."
         );
       } else {
-        // Si algo falla, mostramos un mensaje genérico
+        // Error al enviar el mail: mostramos mensaje genérico con título pedido
         showPopup(
-          "Error",
+          "Email incorrecto",
           "No se pudo enviar el enlace de recuperación. Probá de nuevo en unos minutos."
         );
       }

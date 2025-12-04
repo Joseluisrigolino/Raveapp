@@ -397,6 +397,19 @@ export default function UserProfileScreen() {
     }
 
     try {
+      // Calculamos los roles que presentamos como 'current' para enviar al
+      // backend. No inventamos [0] aquí: si el perfil tiene `cdRoles` lo
+      // usamos; si no, intentamos mapear `profile.roles` (si existe) a
+      // números. Si queda vacío, lo dejamos vacío y el API hará el
+      // fallback seguro.
+      const profileRoles: number[] = (() => {
+        if (Array.isArray(profile?.cdRoles) && profile.cdRoles.length)
+          return profile.cdRoles.map(Number);
+        if (Array.isArray((profile as any)?.roles) && (profile as any).roles.length)
+          return (profile as any).roles.map((r: any) => Number(r?.cdRol)).filter((n: number) => Number.isFinite(n));
+        return [];
+      })();
+
       // Armamos payload en el formato que espera el backend
       const payload: any = {
         idUsuario: profile.idUsuario,
@@ -416,11 +429,10 @@ export default function UserProfileScreen() {
         nombreFantasia: profile?.nombreFantasia || "",
         bio: profile?.bio || "",
 
-        // cdRoles es requerido: si no viene, ponemos [0] por defecto
-        cdRoles:
-          Array.isArray(profile?.cdRoles) && profile.cdRoles.length
-            ? profile.cdRoles
-            : [0],
+        // Enviamos los roles tal como vienen del perfil actual. No forzamos
+        // [0] aquí: si `profileRoles` queda vacío, `userApi.updateUsuario`
+        // aplicará el fallback seguro.
+        cdRoles: profileRoles,
 
         // isVerificado normalizado a número
         isVerificado:
@@ -478,6 +490,14 @@ export default function UserProfileScreen() {
 
         if (isLocalPhoto) {
           try {
+            // Obtener medias previas para borrarlas luego (best-effort)
+            let prevIds: string[] = [];
+            try {
+              const prev = await mediaApi.getByEntidad(String(updatedUser.idUsuario)).catch(() => ({ media: [] }));
+              prevIds = Array.isArray(prev?.media) ? prev.media.map((m: any) => m.idMedia).filter(Boolean) : [];
+            } catch {}
+
+            // Subir nueva imagen
             await mediaApi.upload(String(updatedUser.idUsuario), {
               uri: localPhoto,
               name: "profile.jpg",
@@ -488,9 +508,18 @@ export default function UserProfileScreen() {
             const first = await mediaApi.getFirstImage(String(updatedUser.idUsuario));
             if (first) setPhoto(first);
 
+            // Intentamos borrar las previas (best-effort). No interrumpe al usuario si falla
+            for (const pid of prevIds) {
+              try {
+                await mediaApi.delete(pid);
+              } catch (e) {
+                try { console.warn('[UserProfile] failed deleting previous media', pid, e); } catch {}
+              }
+            }
+
             // Intentamos refrescar el perfil desde la API para mantener todo sincronizado
             try {
-              const refreshed = await getProfile(updatedUser.correo || form.email);
+              const refreshed = await getUsuarioById(updatedUser.idUsuario);
               setProfile(refreshed);
             } catch (e) {
               // no crítico

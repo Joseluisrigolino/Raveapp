@@ -17,7 +17,7 @@ import ProtectedRoute from "@/app/auth/ProtectedRoute";
 import Header from "@/components/layout/HeaderComponent";
 import Footer from "@/components/layout/FooterComponent";
 import TabMenuComponent from "@/components/layout/TabMenuComponent";
-import CardComponent from "@/app/events/components/CardComponent";
+import EventCard from "@/app/events/components/EventCard";
 import FiltersSection from "@/components/filters/FiltersSection";
 
 import { useAuth } from "@/app/auth/AuthContext";
@@ -531,15 +531,12 @@ export default function FavEventScreen() {
               </Text>
             ) : (
               filteredEvents.map((ev) => (
-                <CardComponent
+                <EventCard
                   key={ev.id}
-                  title={ev.title}
-                  text={ev.description}
-                  date={ev.date}
-                  foto={ev.imageUrl}
+                  event={ev as any}
                   onPress={() => handleCardPress(ev.title, ev.id)}
-                  isFavorite={ev.id ? favSet.has(String(ev.id)) : false}
-                  onToggleFavorite={
+                  isLiked={ev.id ? favSet.has(String(ev.id)) : false}
+                  onToggleLike={
                     !isAdmin && ev.id
                       ? () => handleToggleFavorite(String(ev.id))
                       : undefined

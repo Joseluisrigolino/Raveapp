@@ -64,6 +64,11 @@ const toTitleCase = (s?: string | null) => {
   if (!s) return '';
   return String(s).trim().split(/\s+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 };
+// Variante que preserva los espacios tal como los escribe el usuario
+const toTitleCasePreserveSpaces = (s?: string | null) => {
+  if (!s) return '';
+  return String(s).replace(/\S+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+};
 const createEmptyDayTickets = (): TicketDay => ({ genQty: '', genPrice: '', ebGenQty: '', ebGenPrice: '', vipQty: '', vipPrice: '', ebVipQty: '', ebVipPrice: '' });
 const createEmptySchedule = (): { start: Date; end: Date } => ({ start: new Date(), end: new Date() });
 const createEmptySaleConfig = (): SaleCfgDay => ({ saleStart: new Date(), sellUntil: new Date() });
@@ -498,7 +503,7 @@ export default function OwnerEventModifyScreen() {
           localityId={localityId}
           localityName={localityName}
           street={street}
-          setStreet={setStreet}
+          setStreet={(v: string) => setStreet(toTitleCasePreserveSpaces(v))}
           isAfter={isAfter}
           setIsAfter={setIsAfter}
           isLGBT={isLGBT}

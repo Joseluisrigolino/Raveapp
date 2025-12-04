@@ -535,7 +535,7 @@ export default function RegisterUserScreen() {
 
               <TextInput
                 mode="flat"
-                label="DNI*"
+                label="DNI/Pasaporte*"
                 placeholder="12345678"
                 value={form.dni}
                 onChangeText={(t) => setField("dni", t.replace(/[^0-9]/g, ""))}

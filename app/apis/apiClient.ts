@@ -8,7 +8,7 @@ import axios from "axios"; // Cliente HTTP para llamar a la API
 // empezar con EXPO_PUBLIC_ para que se inyecten en el bundle.
 // -----------------------------------------------------------------------------
 
-const ENV = process.env.EXPO_PUBLIC_API_ENV ?? "prd";
+const ENV = process.env.EXPO_PUBLIC_API_ENV ?? "dev";
 const IS_PRD = ENV === "prd";
 
 const API_BASE_URL = IS_PRD

@@ -172,6 +172,16 @@ const toTitleCase = (s?: string | null): string => {
     .join(" ");
 };
 
+// Variante que preserva los espacios exactamente como los escribe el usuario
+// (no colapsa múltiples espacios ni elimina espacios finales) — útil
+// para aplicar Title Case en tiempo real sin borrar espacios al tipear.
+const toTitleCasePreserveSpaces = (s?: string | null): string => {
+  if (!s) return "";
+  return String(s).replace(/\S+/g, (w) =>
+    w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+  );
+};
+
 function extractBackendMessage(e: any): string {
   return (
     e?.response?.data?.message ||
@@ -1757,7 +1767,26 @@ export default function CreateEventScreen() {
             Alert.alert("Error", "No se encontró idEvento ni idFecha para subir la imagen. El evento fue creado pero sin imagen.");
             return;
           }
+          // Intento: subir la nueva imagen y eliminar las previas para dejar solo la última.
+          // Primero obtenemos la lista previa (para poder borrar luego)
+          let prevIds: string[] = [];
+          try {
+            const prev = await mediaApi.getByEntidad(String(uploadTarget)).catch(() => ({ media: [] }));
+            prevIds = Array.isArray(prev?.media) ? prev.media.map((m: any) => m.idMedia).filter(Boolean) : [];
+          } catch {}
+
           await mediaApi.upload(String(uploadTarget), fileObj, undefined, { compress: true });
+
+          // Borrar previas (best-effort). No interrumpimos el flujo si falla el borrado.
+          for (const pid of prevIds) {
+            try {
+              await mediaApi.delete(pid);
+            } catch (e) {
+              try {
+                log.warn('[CreateEvent] failed deleting previous media', pid, e);
+              } catch {}
+            }
+          }
         } catch (e: any) {
           setCreationError("No se pudo subir la imagen. El evento fue creado pero sin imagen. Detalle: " + String(e?.message || e));
           Alert.alert("Error al subir imagen", "No se pudo subir la imagen. El evento fue creado pero sin imagen. Detalle: " + String(e?.message || e));
@@ -2085,7 +2114,7 @@ export default function CreateEventScreen() {
               localityId={localityId}
               localityName={localityName}
               street={street}
-              setStreet={setStreet}
+              setStreet={(v: string) => setStreet(toTitleCasePreserveSpaces(v))}
               isAfter={isAfter}
               setIsAfter={setIsAfter}
               isLGBT={isLGBT}

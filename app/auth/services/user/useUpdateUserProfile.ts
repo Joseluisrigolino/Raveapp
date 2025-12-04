@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { updateUsuario } from "@/app/auth/userApi";
-import { getProfile } from "@/app/auth/userApi";
+import { updateUsuario, getUsuarioById } from "@/app/auth/userApi";
 import { useAuth } from "@/app/auth/AuthContext";
 
 export default function useUpdateUserProfile() {
@@ -14,8 +13,8 @@ export default function useUpdateUserProfile() {
     setUpdating(true);
     try {
       await updateUsuario(payload);
-      // refresh profile from API
-      const updated = await getProfile(user.username);
+      // refresh profile from API using id (more robust than username)
+      const updated = await getUsuarioById(payload.idUsuario || user.id || user?.idUsuario);
       return updated;
     } catch (e: any) {
       const msg = e?.response?.data?.title || e?.message || "Error";
