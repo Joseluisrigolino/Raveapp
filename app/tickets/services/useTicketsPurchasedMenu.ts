@@ -47,14 +47,7 @@ export function useTicketsPurchasedMenu() {
         };
 
         const getCompraId = (r: any): string | null => {
-          const id =
-            r?.idCompra ??
-            r?.IdCompra ??
-            r?.compraId ??
-            r?.purchaseId ??
-            r?.id_compra ??
-            r?.compra?.idCompra ??
-            r?.pago?.idCompra;
+          const id = r?.idCompra ?? r?.compra?.idCompra ?? r?.pago?.idCompra;
           const s = String(id ?? "").trim();
           return s ? s : null;
         };
@@ -340,7 +333,11 @@ export function useTicketsPurchasedMenu() {
         "[TicketPurchasedMenu] grupos agrupados (revert):",
         Object.keys(groups)
       );
-    } catch {}
+    } catch (e) {
+      if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+        console.warn("[useTicketsPurchasedMenu] log failed", e);
+      }
+    }
 
     return aggregated as TicketPurchasedMenuItem[];
   }, [items, selectedEstadoIds]);

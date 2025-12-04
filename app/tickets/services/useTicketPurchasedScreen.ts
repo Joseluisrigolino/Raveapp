@@ -287,7 +287,11 @@ export function useTicketPurchasedScreen() {
             (eventData as any)?.__raw?.fiestaId,
           eventId,
         });
-      } catch {}
+      } catch (e) {
+        if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+          console.warn("[useTicketPurchasedScreen] log failed", e);
+        }
+      }
       return;
     }
 
@@ -305,7 +309,11 @@ export function useTicketPurchasedScreen() {
             len: fiestaIdToSend.length,
           }
         );
-      } catch {}
+      } catch (e) {
+        if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+          console.warn("[useTicketPurchasedScreen] log failed", e);
+        }
+      }
     }
 
     if (rating <= 0) {
@@ -342,7 +350,11 @@ export function useTicketPurchasedScreen() {
             idFiesta: String(fiestaIdToSend),
           }
         );
-      } catch {}
+      } catch (e) {
+        if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+          console.warn("[useTicketPurchasedScreen] log failed", e);
+        }
+      }
 
       let existing = userReview as Review | null;
       if (!existing) {
@@ -361,9 +373,17 @@ export function useTicketPurchasedScreen() {
                   idResenia: existing.idResenia || existing.id,
                 }
               );
-            } catch {}
+            } catch (e) {
+              if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+                console.warn("[useTicketPurchasedScreen] log failed", e);
+              }
+            }
           }
-        } catch {}
+        } catch (e) {
+          if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+            console.warn("[useTicketPurchasedScreen] getResenias failed", e);
+          }
+        }
       }
 
       if (existing && (existing.idResenia || existing.id)) {
@@ -374,7 +394,11 @@ export function useTicketPurchasedScreen() {
         });
         try {
           setUserReview(updated);
-        } catch {}
+        } catch (e) {
+          if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+            console.warn("[useTicketPurchasedScreen] setUserReview failed", e);
+          }
+        }
         setShowReview(false);
         Alert.alert("Listo", "Tu reseña fue actualizada.");
       } else {
@@ -400,7 +424,11 @@ export function useTicketPurchasedScreen() {
                 "[handleSubmitReview] retry con eventId como IdFiesta",
                 { eventGuid, fiestaIdToSend }
               );
-            } catch {}
+            } catch (e) {
+              if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+                console.warn("[useTicketPurchasedScreen] log failed", e);
+              }
+            }
             try {
               console.log(
                 "[handleSubmitReview] payload (fallback con eventId) =>",
@@ -411,7 +439,11 @@ export function useTicketPurchasedScreen() {
                   idFiesta: String(eventGuid),
                 }
               );
-            } catch {}
+            } catch (e) {
+              if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+                console.warn("[useTicketPurchasedScreen] log failed", e);
+              }
+            }
             try {
               created = await postResenia({
                 idUsuario: String(userIdForReview),
@@ -428,7 +460,11 @@ export function useTicketPurchasedScreen() {
                     e2: (e2 as any)?.message,
                   }
                 );
-              } catch {}
+              } catch (err) {
+                if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+                  console.warn("[useTicketPurchasedScreen] log failed", err);
+                }
+              }
               throw e2;
             }
           } else {
@@ -438,7 +474,11 @@ export function useTicketPurchasedScreen() {
         if (!created) throw originalError || new Error("No se pudo crear la reseña");
         try {
           setUserReview(created);
-        } catch {}
+        } catch (e) {
+          if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+            console.warn("[useTicketPurchasedScreen] setUserReview failed", e);
+          }
+        }
         setShowReview(false);
         Alert.alert("¡Gracias!", "Tu reseña fue enviada correctamente.");
       }
@@ -453,7 +493,11 @@ export function useTicketPurchasedScreen() {
           status: e?.response?.status,
           responseData: e?.response?.data,
         });
-      } catch {}
+      } catch (err) {
+        if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+          console.warn("[useTicketPurchasedScreen] log failed", err);
+        }
+      }
       Alert.alert(
         "Error",
         "No pudimos procesar tu reseña. Intenta nuevamente."
@@ -476,8 +520,11 @@ export function useTicketPurchasedScreen() {
         const first =
           Array.isArray(list) && list.length ? list[0] : null;
         setUserReview(first);
-      } catch {}
-      finally {
+      } catch (e) {
+        if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+          console.warn("[useTicketPurchasedScreen] getResenias failed", e);
+        }
+      } finally {
         setReviewLoaded(true);
       }
     })();
@@ -538,14 +585,7 @@ export function useTicketPurchasedScreen() {
           };
 
           const getCompraId = (r: any): string | null => {
-            const idc =
-              r?.idCompra ??
-              r?.IdCompra ??
-              r?.compraId ??
-              r?.purchaseId ??
-              r?.id_compra ??
-              r?.compra?.idCompra ??
-              r?.pago?.idCompra;
+            const idc = r?.idCompra ?? r?.compra?.idCompra ?? r?.pago?.idCompra;
             const s = String(idc ?? "").trim();
             return s ? s : null;
           };

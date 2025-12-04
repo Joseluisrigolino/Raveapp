@@ -184,7 +184,11 @@ export function useReservationAndPayment({
             onPress: () => {
               try {
                 router.back();
-              } catch {}
+              } catch (e) {
+                if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+                  console.warn("[useReservationAndPayment] router.back failed", e);
+                }
+              }
             },
           },
         ],
@@ -203,21 +207,31 @@ export function useReservationAndPayment({
         if (url.includes(ROUTES.MAIN.TICKETS.RETURN)) {
           try {
             await WebBrowser.dismissAuthSession();
-          } catch {}
+          } catch (e) {
+            if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+              console.warn("[useReservationAndPayment] dismissAuthSession failed", e);
+            }
+          }
           try {
             await WebBrowser.dismissBrowser();
-          } catch {}
+          } catch (e) {
+            if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+              console.warn("[useReservationAndPayment] dismissBrowser failed", e);
+            }
+          }
 
           try {
             const parsed = Linking.parse(url) as any;
             const qp = parsed?.queryParams || {};
             const idParam = qp?.id;
-            const idPagoMP =
-              qp?.idPagoMP ||
-              qp?.payment_id ||
-              qp?.collection_id ||
-              qp?.paymentId ||
-              qp?.paymentid;
+            // Helper local: extraer idPagoMP con prioridad clara
+            const extractPagoIdFromQp = (q: any): string | undefined => {
+              if (!q) return undefined;
+              return (
+                q.idPagoMP ?? q.payment_id ?? q.collection_id ?? q.paymentId ?? q.paymentid ?? undefined
+              ) as string | undefined;
+            };
+            const idPagoMP = extractPagoIdFromQp(qp);
             const params: any = {};
             if (idParam) params.id = String(idParam);
             if (idPagoMP) params.idPagoMP = String(idPagoMP);
@@ -244,7 +258,11 @@ export function useReservationAndPayment({
     return () => {
       try {
         sub.remove();
-      } catch {}
+      } catch (e) {
+        if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+          console.warn("[useReservationAndPayment] remove listener failed", e);
+        }
+      }
     };
   }, [router]);
 
@@ -493,7 +511,11 @@ export function useReservationAndPayment({
         if (typeof respData === "string") {
           try {
             respData = JSON.parse(respData);
-          } catch {}
+          } catch (e) {
+            if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+              console.warn("[BuyTicket] parse respData failed", e);
+            }
+          }
         }
 
         console.warn("[BuyTicket] createPago error:", {
@@ -537,7 +559,11 @@ export function useReservationAndPayment({
           if (typeof inner === "string") {
             try {
               inner = JSON.parse(inner);
-            } catch {}
+            } catch (e) {
+              if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+                console.warn("[BuyTicket] parse inner pago body failed", e);
+              }
+            }
           }
           if (inner) {
             mpUrl =

@@ -578,61 +578,42 @@ export async function confirmarPagoMP(idPagoMP: string): Promise<void> {
   const token = await login();
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } as const;
 
-  // Algunos backends esperan el parámetro en PascalCase (IdPagoMP) o como payment_id.
-  const queryVariants: Array<Record<string, any>> = [
-    { IdPagoMP: idPagoMP },
-    { idPagoMP },
-    { payment_id: idPagoMP },
-  ];
-  const bodyVariants: Array<Record<string, any> | null> = [
-    null,
-    { IdPagoMP: idPagoMP },
-    { idPagoMP },
-    { payment_id: idPagoMP },
-  ];
+  try {
+    console.log("[entradaApi] confirmarPagoMP -> idPagoMP:", idPagoMP);
+  } catch {}
 
-  const attempts: Array<() => Promise<any>> = [];
-
-  const pushPost = (url: string) => {
-    for (const body of bodyVariants) {
-      attempts.push(() => apiClient.post(url, body, { headers, params: undefined }));
+  // Intento directo al endpoint principal y solo un fallback controlado.
+  try {
+    if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+      console.log("[entradaApi] confirmarPagoMP -> intentar ConfirmarPagoMP", idPagoMP);
     }
-    for (const params of queryVariants) {
-      attempts.push(() => apiClient.post(url, null, { headers, params }));
-    }
-  };
-  const pushGet = (url: string) => {
-    for (const params of queryVariants) {
-      attempts.push(() => apiClient.get(url, { headers, params }));
-    }
-  };
-
-  // Endpoint principal y variantes comunes
-  pushPost("/v1/Pago/PagoMP");
-  pushGet("/v1/Pago/PagoMP");
-  pushPost("/v1/Pago/ConfirmarPagoMP");
-  pushGet("/v1/Pago/ConfirmarPagoMP");
-  pushPost("/v1/Pago/ConfirmarMP");
-  pushGet("/v1/Pago/ConfirmarMP");
-  pushPost("/v1/Pago/Confirmar");
-  pushGet("/v1/Pago/Confirmar");
-  // Algunos back usan Callback/Notificación
-  pushPost("/v1/Pago/CallbackMP");
-  pushGet("/v1/Pago/CallbackMP");
-
-  let lastErr: any = null;
-  for (const fn of attempts) {
+    await apiClient.post(
+      "/v1/Pago/ConfirmarPagoMP",
+      null,
+      { headers, params: { idPagoMP: idPagoMP } }
+    );
+    return;
+  } catch (primaryErr: any) {
+    // Intento único de fallback a /v1/Pago/PagoMP
     try {
-      const resp = await fn();
-      // Consideramos 2xx como éxito; el backend debería actualizar estados
-      const status = (resp as any)?.status ?? 200;
-      if (status >= 200 && status < 300) return;
-    } catch (err: any) {
-      lastErr = err;
-      continue;
+      if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+        console.log("[entradaApi] confirmarPagoMP -> fallback PagoMP", idPagoMP);
+      }
+      await apiClient.post(
+        "/v1/Pago/PagoMP",
+        null,
+        { headers, params: { idPagoMP: idPagoMP } }
+      );
+      return;
+    } catch (fallbackErr: any) {
+      try {
+        const status = fallbackErr?.response?.status ?? primaryErr?.response?.status;
+        const data = fallbackErr?.response?.data ?? primaryErr?.response?.data;
+        console.warn("[entradaApi] confirmarPagoMP fallo. status:", status, "data:", data);
+      } catch {}
+      throw fallbackErr || primaryErr || new Error("No se pudo confirmar el pago con Mercado Pago.");
     }
   }
-  throw lastErr || new Error("No se pudo confirmar el pago con Mercado Pago.");
 }
 
 // Los métodos manuales de actualización de estado por compra/entrada se eliminaron;
