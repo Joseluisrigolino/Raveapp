@@ -8,19 +8,43 @@ import axios from "axios"; // Cliente HTTP para llamar a la API
 // empezar con EXPO_PUBLIC_ para que se inyecten en el bundle.
 // -----------------------------------------------------------------------------
 
-const ENV = process.env.EXPO_PUBLIC_API_ENV ?? "prd";
-// IS_PRD debe ser true cuando ENV === 'prd'. Antes estaba invertido (comparando con 'dev').
-const IS_PRD = ENV === "dev";
+const ENV = String(process.env.EXPO_PUBLIC_API_ENV ?? "prd").toLowerCase();
+// IS_PRD es true cuando ENV === 'prd'
+const IS_PRD = ENV === "prd";
 
+// Valores por defecto seguros cuando las env no están presentes en el bundle
+const DEFAULT_PRD = "https://api.raveapp.com.ar";
+const DEFAULT_DEV = "https://dev.api.raveapp.com.ar";
+
+// Selección de baseURL con fallback hardcodeado si la env no está definida
 const API_BASE_URL = IS_PRD
-  ? process.env.EXPO_PUBLIC_API_BASE_URL_PRD
-  : process.env.EXPO_PUBLIC_API_BASE_URL_DEV;
+  ? process.env.EXPO_PUBLIC_API_BASE_URL_PRD || DEFAULT_PRD
+  : process.env.EXPO_PUBLIC_API_BASE_URL_DEV || DEFAULT_DEV;
 
+// No hacemos throw al importar el módulo: si por alguna razón no hay URL
+// (caso extremo), logueamos el problema y permitimos que la app siga
+// cargando; los errores reales se verán cuando se intente hacer requests.
 if (!API_BASE_URL) {
-  throw new Error(
-    `[apiClient] No se encontró API_BASE_URL para el entorno "${ENV}". ` +
-      "Revisá EXPO_PUBLIC_API_BASE_URL_DEV/PRD en tu .env o en la configuración de EAS."
-  );
+  try {
+    console.error(
+      `[apiClient] No se encontró API_BASE_URL para el entorno "${ENV}". ` +
+        "Revisá EXPO_PUBLIC_API_BASE_URL_DEV/PRD en tu .env o en la configuración de EAS."
+    );
+  } catch {}
+}
+
+// Log de depuración en modo desarrollo
+if (typeof __DEV__ !== "undefined" && __DEV__) {
+  try {
+    // eslint-disable-next-line no-console
+    console.log("[apiClient] ENV DEBUG", {
+      ENV,
+      IS_PRD,
+      API_BASE_URL,
+      DEV_URL: process.env.EXPO_PUBLIC_API_BASE_URL_DEV,
+      PRD_URL: process.env.EXPO_PUBLIC_API_BASE_URL_PRD,
+    });
+  } catch {}
 }
 
 // Tipo de las credenciales que usa el login de la API
