@@ -318,9 +318,16 @@ export default function MenuPantalla() {
     if (afterActive) results = results.filter((ev) => getEventFlags(ev).isAfter);
     if (lgbtActive) results = results.filter((ev) => getEventFlags(ev).isLGBT);
     if (selectedGenres.length) {
-      results = results.filter((ev) =>
-        selectedGenres.includes((ev as any).type)
-      );
+      const selNorms = selectedGenres.map((s) => normalizeText(s));
+      results = results.filter((ev) => {
+        const evTypeRaw = (ev as any).type;
+        const evTypes = Array.isArray(evTypeRaw)
+          ? evTypeRaw.map((t: any) => String(t || ""))
+          : [String(evTypeRaw || "")];
+        const evNorms = evTypes.map((t: string) => normalizeText(t));
+        // Exact match: at least one selected genre must exactly equal one of the event's genres
+        return selNorms.some((sg) => evNorms.includes(sg));
+      });
     }
     return results;
   }, [

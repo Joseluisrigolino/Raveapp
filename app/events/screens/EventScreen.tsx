@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ScrollView, View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { IconButton } from "react-native-paper";
 import { WebView } from "react-native-webview";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -18,7 +19,7 @@ import ReviewComponent from "@/app/events/components/ReviewComponent";
 
 import TituloEvento from "@/app/events/components/evento/TituloEvento";
 import HeroImagen from "@/app/events/components/evento/HeroImagen";
-import BadgesEvento from "@/app/events/components/evento/BadgesEvento";
+// BadgesEvento removed in favor of MenuScreen-style badges rendered below the image
 import ReproductorSoundCloud from "@/app/events/components/evento/ReproductorSoundCloud";
 import ReproductorYouTube from "@/app/events/components/evento/ReproductorYouTube";
 import { extractYouTubeId } from "@/app/events/utils/youtube";
@@ -227,6 +228,15 @@ export default function EventScreen() {
   const youTubeRawUrl = useMemo(() => {
     if (!eventData) return null;
     return findYouTubeUrl(eventData);
+  }, [eventData]);
+
+  // Flags del evento (usadas para mostrar badges LGTB/AFTER debajo de la imagen)
+  const eventFlags = useMemo(() => {
+    try {
+      return eventData ? getEventFlags(eventData) : { isLGBT: false, isAfter: false };
+    } catch (e) {
+      return { isLGBT: false, isAfter: false };
+    }
   }, [eventData]);
 
   const youTubeVideoId = useMemo(() => {
@@ -449,8 +459,24 @@ export default function EventScreen() {
           <View style={styles.heroContainer}>
             <HeroImagen imageUrl={eventData.imageUrl} onPress={() => eventData?.id && console.log("Evento id (image press):", String(eventData.id))} />
           </View>
-          <View style={styles.badgesRow}>
-            <BadgesEvento isLGBT={getEventFlags(eventData).isLGBT} isAfter={getEventFlags(eventData).isAfter} />
+          {/* Badges LGTB / AFTER debajo de la imagen (estilo similar a EventCard) */}
+          <View style={styles.tagsUnderImageRow}>
+            {eventFlags?.isLGBT && (
+              <LinearGradient
+                colors={["#1f8e3a", "#f4c400", "#ff2d6f", "#7b1fa2"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.genreChip, styles.lgbtGradient]}
+              >
+                <Text style={[styles.genreText, styles.lgbtText]}>LGTB</Text>
+              </LinearGradient>
+            )}
+
+            {eventFlags?.isAfter && (
+              <View style={[styles.genreChip, styles.afterChip]}>
+                <Text style={[styles.genreText, styles.afterText]}>AFTER</Text>
+              </View>
+            )}
           </View>
           <TituloEvento
             title={eventData.title}
@@ -574,7 +600,7 @@ const HERO_RATIO = 16 / 9;
 
 const styles = StyleSheet.create({
   heroContainer: { position: "relative", marginBottom: 6 },
-  badgesRow: { paddingHorizontal: 16, marginBottom: 4, flexDirection: 'row', justifyContent: 'flex-start' },
+  /* badgesRow removed; using MenuScreen-style badges under the image */
   container: { flex: 1, backgroundColor: COLORS.backgroundLight },
   loaderWrapper: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContent: { paddingBottom: 32 },
@@ -593,4 +619,40 @@ const styles = StyleSheet.create({
   addressLinkText: { fontFamily: FONTS.bodyRegular, fontSize: FONT_SIZES.body, color: COLORS.info, textDecorationLine: 'underline', fontWeight: 'bold' },
   addressHintText: { fontFamily: FONTS.bodyRegular, fontSize: FONT_SIZES.body, color: COLORS.textSecondary, marginTop: 2 },
   errorText: { fontFamily: FONTS.bodyRegular, fontSize: FONT_SIZES.body, color: COLORS.negative },
+  tagsUnderImageRow: {
+    paddingHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 6,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  genreChip: {
+    backgroundColor: '#111111',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginRight: 6,
+    marginBottom: 6,
+  },
+  genreText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+  },
+  lgbtGradient: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginRight: 6,
+    marginBottom: 6,
+  },
+  lgbtText: {
+    color: '#FFFFFF',
+  },
+  afterChip: {
+    backgroundColor: '#9F2B60',
+  },
+  afterText: {
+    color: '#FFFFFF',
+  },
 });

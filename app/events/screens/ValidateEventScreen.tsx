@@ -1,6 +1,6 @@
 // src/screens/admin/EventsValidateScreens/ValidateEventScreen.tsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Modal, Image, Linking, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -22,6 +22,7 @@ import { EventItem } from "@/interfaces/EventItem";
 import HeroImagen from "@/app/events/components/evento/HeroImagen";
 import ReproductorSoundCloud from "@/app/events/components/evento/ReproductorSoundCloud";
 import ReproductorYouTube from "@/app/events/components/evento/ReproductorYouTube";
+import { extractYouTubeId } from "@/app/events/utils/youtube";
 // Las reseñas no se muestran en el preview de validación
 import { COLORS, FONTS, FONT_SIZES } from "@/styles/globalStyles";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
@@ -244,6 +245,60 @@ export default function ValidateEventScreen() {
       } catch {}
     })();
   }, [eventData?.ownerId]);
+
+  // Heurísticas para resolver multimedia (YouTube / SoundCloud) desde distintos campos
+  const findYouTubeUrl = (ev: any): string | null => {
+    if (!ev) return null;
+    const candidates: string[] = [];
+    if (typeof ev.video === "string" && ev.video.trim()) candidates.push(ev.video.trim());
+    if (typeof ev.musica === "string" && ev.musica.trim()) candidates.push(ev.musica.trim());
+    if (Array.isArray(ev.media)) {
+      for (const m of ev.media) {
+        if (typeof m?.mdVideo === "string" && m.mdVideo.trim()) candidates.push(m.mdVideo.trim());
+        if (typeof m?.url === "string" && m.url.trim()) candidates.push(m.url.trim());
+      }
+    }
+    for (const url of candidates) {
+      if (/youtu\.?be/i.test(url)) return url;
+    }
+    return null;
+  };
+
+  const findSoundCloudUrl = (ev: any): string | null => {
+    if (!ev) return null;
+    const candidates: string[] = [];
+    if (typeof ev.soundCloud === "string" && ev.soundCloud.trim()) candidates.push(ev.soundCloud.trim());
+    if (typeof ev.soundcloud === "string" && ev.soundcloud.trim()) candidates.push(ev.soundcloud.trim());
+    if (typeof ev.sound_cloud === "string" && ev.sound_cloud.trim()) candidates.push(ev.sound_cloud.trim());
+    if (typeof ev.musica === "string" && ev.musica.trim()) candidates.push(ev.musica.trim());
+    if (Array.isArray(ev.media)) {
+      for (const m of ev.media) {
+        if (typeof m?.mdAudio === "string" && m.mdAudio.trim()) candidates.push(m.mdAudio.trim());
+        if (typeof m?.url === "string" && m.url.trim()) candidates.push(m.url.trim());
+      }
+    }
+    for (const url of candidates) {
+      if (/soundcloud/i.test(url)) return url;
+    }
+    return null;
+  };
+
+  // Calcular rawUrl y videoId preferentemente ANTES de cualquier early-return para mantener el orden de Hooks
+  const youTubeRawUrl = useMemo(() => {
+    if (!eventData) return null;
+    return findYouTubeUrl(eventData);
+  }, [eventData]);
+
+  const youTubeVideoId = useMemo(() => {
+    try {
+      return extractYouTubeId(youTubeRawUrl || undefined);
+    } catch { return null; }
+  }, [youTubeRawUrl]);
+
+  const soundCloudUrl = useMemo(() => {
+    if (!eventData) return null;
+    return findSoundCloudUrl(eventData);
+  }, [eventData]);
 
   // Normaliza URL absoluta (agrega baseURL si viene relativa)
   const ensureAbs = (url?: string | null): string => {
@@ -785,19 +840,26 @@ export default function ValidateEventScreen() {
             )}
           </View>
 
-          {/* Multimedia (solo si hay algo) */}
-          {((eventData as any).musica || (eventData as any).video) && (
+          {/* Multimedia (SoundCloud primero, YouTube debajo) */}
+          {(soundCloudUrl || youTubeRawUrl || (eventData as any).musica || (eventData as any).video) && (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Contenido Multimedia</Text>
               <View style={{ marginTop: 10 }}>
-                {(eventData as any).musica && (
+                {/* SoundCloud (preferir resolved soundCloudUrl, fallback a eventData.musica) */}
+                {(soundCloudUrl || (eventData as any).musica) && (
                   <View style={styles.mediaBox}>
-                    <ReproductorSoundCloud soundCloudUrl={(eventData as any).musica || ''} />
+                    <ReproductorSoundCloud soundCloudUrl={(soundCloudUrl as string) || (eventData as any).musica || ''} />
                   </View>
                 )}
-                {(eventData as any).video && (
+
+                {/* YouTube: mostrar siempre debajo de SoundCloud cuando exista URL (resuelta o en eventData.video) */}
+                {(youTubeRawUrl || (eventData as any).video) && (
                   <View style={styles.mediaBox}>
-                    <ReproductorYouTube youTubeEmbedUrl={(eventData as any).video || ''} />
+                    <ReproductorYouTube
+                      rawUrl={youTubeRawUrl || undefined}
+                      videoId={youTubeVideoId || undefined}
+                      youTubeEmbedUrl={(eventData as any).video || ''}
+                    />
                   </View>
                 )}
               </View>

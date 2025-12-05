@@ -16,11 +16,11 @@ import { COLORS } from "@/styles/globalStyles"; // Paleta de colores global
 import ROUTES from "@/routes"; // Mapa de rutas de la app
 import * as nav from "@/utils/navigation"; // Helpers propios para navegación
 import useSendRecoveryPass from "@/app/auth/services/user/useSendRecoveryPass"; // Hook que llama a la API de recuperación
-import { getProfile } from "@/app/auth/userApi";
 import InfoTyc from "@/components/infoTyc"; // Términos y Condiciones y Política de Privacidad reutilizable
 
 // Tipo simple para el callback opcional del popup
 type PopupOnClose = (() => void) | null;
+type PopupKind = "success" | "error";
 
 /**
  * Pantalla de "Recuperar contraseña".
@@ -46,16 +46,23 @@ export default function RecoverPasswordScreen() {
   const [popupTitle, setPopupTitle] = useState("");
   const [popupMessage, setPopupMessage] = useState("");
   const [popupOnClose, setPopupOnClose] = useState<PopupOnClose>(null);
+  const [popupKind, setPopupKind] = useState<PopupKind>("error");
 
   /**
    * Muestra el popup con título, mensaje y una acción opcional al cerrar.
    * La acción se guarda en estado para ejecutarla luego cuando el usuario toque "Aceptar".
    */
-  const showPopup = (title: string, message: string, onClose?: () => void) => {
+  const showPopup = (
+    title: string,
+    message: string,
+    onClose?: () => void,
+    kind: PopupKind = "error"
+  ) => {
     setPopupTitle(title);
     setPopupMessage(message);
     // Guardamos una función; si no viene nada, queda en null
     setPopupOnClose(() => onClose || null);
+    setPopupKind(kind);
     setPopupVisible(true);
   };
 
@@ -74,29 +81,10 @@ export default function RecoverPasswordScreen() {
       return;
     }
 
-    // Antes de pedir que el backend envíe el mail, validamos que el email
-    // exista en nuestra base llamando a `getProfile`. Si no existe, avisamos
-    // inmediatamente al usuario con el popup "Email incorrecto".
-    try {
-      await getProfile(trimmedEmail);
-    } catch (err: any) {
-      console.error("getProfile error", err);
-      // Si la API devolvió explícitamente que el correo no está registrado,
-      // mostramos el mensaje apropiado. Para otros errores de red/servidor
-      // mostramos un mensaje genérico pero con el mismo título pedido.
-      if (err?.response?.status === 500 && err?.response?.data?.message === "Correo no registrado") {
-        showPopup(
-          "Email incorrecto",
-          "El email ingresado no es válido o no está registrado."
-        );
-      } else {
-        showPopup(
-          "Email incorrecto",
-          "No se pudo verificar el email. Probá de nuevo en unos minutos."
-        );
-      }
-      return;
-    }
+    // Llamamos al hook `sendRecovery` que internamente valida si el email
+    // existe usando un endpoint público y luego dispara el envío del mail.
+    // Eliminamos la validación directa con `getProfile` para que no falle
+    // por problemas de autorización en producción.
 
     try {
       // Llamamos al servicio que envía el mail de recuperación
@@ -107,22 +95,36 @@ export default function RecoverPasswordScreen() {
       showPopup(
         "Enlace enviado",
         "Te enviamos un enlace de recuperación a tu correo electrónico. Revisá tu bandeja de entrada.",
-        () => nav.replace(router, ROUTES.LOGIN.LOGIN)
+        () => nav.replace(router, ROUTES.LOGIN.LOGIN),
+        "success"
       );
     } catch (err: any) {
-      console.error("sendRecovery error", err);
-      // Si el backend responde que el correo no está registrado, mostramos
-      // el mismo mensaje específico que usamos en la verificación previa.
-      if (err?.response?.status === 500 && err?.response?.data?.message === "Correo no registrado") {
+      // Si el hook devolvió un objeto con originalError, preferimos ese para logs
+      const original = err?.originalError ?? err;
+      try {
+        console.error("sendRecovery error", original);
+      } catch {}
+
+      // Si el hook indicó explícitamente que el email no existe
+      const backendMsg = original?.response?.data?.message;
+      const backendStatus = original?.response?.status;
+      if (err?.code === "EMAIL_NOT_FOUND" || (backendStatus === 500 && backendMsg === "Correo no registrado") || backendStatus === 404) {
         showPopup(
           "Email incorrecto",
-          "El email ingresado no es válido o no está registrado."
+          "El email ingresado no es válido o no está registrado.",
+          undefined,
+          "error"
         );
       } else {
-        // Error al enviar el mail: mostramos mensaje genérico con título pedido
+        // Cualquier otro error de sistema
+        try {
+          console.error("[RecoverPasswordScreen] RECOVERY_SYSTEM_ERROR", original);
+        } catch {}
         showPopup(
-          "Email incorrecto",
-          "No se pudo enviar el enlace de recuperación. Probá de nuevo en unos minutos."
+          "Error",
+          "No se pudo enviar el enlace de recuperación. Probá de nuevo en unos minutos.",
+          undefined,
+          "error"
         );
       }
     }
@@ -142,10 +144,27 @@ export default function RecoverPasswordScreen() {
       {popupVisible && (
         <View style={styles.popupOverlay}>
           <View style={styles.popupModal}>
-            {/* Iconito circular de "ok" */}
-            <View style={styles.popupHeaderIcon}>
-              <Text style={styles.popupCheck}>✖</Text>
-            </View>
+            {/* Iconito circular que indica éxito o error */}
+            {(() => {
+              const isSuccess = popupKind === "success";
+              return (
+                <View
+                  style={[
+                    styles.popupHeaderIcon,
+                    { backgroundColor: isSuccess ? "#eaf7ef" : "#fee2e2" },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.popupCheck,
+                      { color: isSuccess ? "#16a34a" : "#b91c1c" },
+                    ]}
+                  >
+                    {isSuccess ? "✔" : "✖"}
+                  </Text>
+                </View>
+              );
+            })()}
 
             {/* Título y mensaje del popup (dinámicos según el caso) */}
             <Text style={styles.popupTitle}>{popupTitle}</Text>

@@ -43,12 +43,62 @@ function mapParty(raw: any): Party {
       ? Number(raw.promedio)
       : null;
 
-  const reviewsCount =
-    raw.reviewsCount != null
-      ? Number(raw.reviewsCount)
-      : raw.cantidad != null
-      ? Number(raw.cantidad)
-      : null;
+  let reviewsCount: number | null = null;
+
+  // 1) Si el payload trae un array de reseñas, preferimos su longitud
+  const arrayKeys = [
+    "resenias",
+    "Resenias",
+    "resenas",
+    "reseñas",
+    "reviews",
+    "comentarios",
+    "items",
+  ];
+
+  const containers = [raw, raw?.data, raw?.Data, raw?.result];
+  for (const container of containers) {
+    if (!container || typeof container !== "object") continue;
+    for (const k of arrayKeys) {
+      const v = (container as any)[k];
+      if (Array.isArray(v)) {
+        reviewsCount = v.length;
+        break;
+      }
+    }
+    if (reviewsCount != null) break;
+  }
+
+  // 2) Si no había array, buscar campos numéricos conocidos
+  if (reviewsCount == null) {
+    if (raw && raw.reviewsCount != null) {
+      reviewsCount = Number(raw.reviewsCount);
+    } else if (raw && raw.cantidad != null) {
+      reviewsCount = Number(raw.cantidad);
+    } else if (raw) {
+      // Buscar claves comunes/naturales que puedan contener la cantidad de reseñas
+      // (manejo flexible para variantes como "cantidadResenas", "cantidadReseñas", "count", etc.)
+      for (const k of Object.keys(raw)) {
+        const lk = String(k).toLowerCase();
+        if (
+          lk.includes("cantidad") ||
+          lk.includes("reviews") ||
+          lk.includes("rese") ||
+          lk.includes("coment") ||
+          lk.includes("count") ||
+          lk.includes("cantres") ||
+          lk.includes("cant")
+        ) {
+          const val = raw[k];
+          const num = Number(val);
+          if (val != null && !Number.isNaN(num)) {
+            reviewsCount = num;
+            break;
+          }
+        }
+      }
+    }
+  }
 
   return {
     idFiesta: String(id),

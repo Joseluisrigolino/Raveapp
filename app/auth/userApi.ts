@@ -2,6 +2,7 @@
 
 // Cliente HTTP centralizado para hablar con la API
 import { apiClient } from "@/app/apis/apiClient";
+import axios from "axios";
 import { AxiosResponse } from "axios";
 
 /**
@@ -167,6 +168,33 @@ export async function getProfile(
 }
 
 /**
+ * Variante pública para consultar si existe un usuario por correo SIN
+ * requerir autorización. Algunos endpoints del backend permiten consultas
+ * públicas por email (ej: para recuperar contraseña). Aquí construimos un
+ * cliente axios independiente que no incluye el header Authorization.
+ */
+export async function getUsuarioByEmailPublic(
+  correo: string
+): Promise<any[]> {
+  const email = String(correo || "").trim();
+  if (!email) return [];
+
+  // Usamos el mismo apiClient (misma baseURL). No añadimos Authorization
+  // por diseño: este endpoint se consulta desde pantallas públicas.
+  try {
+    const resp = await apiClient.get<any>("/v1/Usuario/GetUsuario", {
+      params: { Mail: email, IsActivo: true },
+    });
+    const data = resp?.data;
+    const usuarios = Array.isArray(data?.usuarios) ? data.usuarios : [];
+    return usuarios;
+  } catch (e: any) {
+    // Re-lanzamos el error para que el caller lo clasifique (401 vs 404 vs 500)
+    throw e;
+  }
+}
+
+/**
  * 1.1) Traer perfil por ID de usuario.
  * Intenta varios formatos de request porque la API no siempre es consistente.
  */
@@ -257,20 +285,21 @@ export async function updateUsuario(
     base = null;
   }
 
-  // Roles: usamos siempre las roles extraídas del perfil base como fuente
-  // de verdad cuando `base` existe. Ignoramos `payload.cdRoles` si viene
-  // vacío. Solo si no hay roles ni en `base` ni en `payload` aplicamos un
-  // fallback mínimo ([0]).
+  // Roles: unificamos roles provenientes del perfil en base (backend)
+  // y los roles que puedan venir en el payload. Hacemos una unión sin
+  // duplicados para asegurarnos de no perder roles existentes.
   let finalCdRoles: number[] = [];
   const baseRoles = extractRolesFromUser(base);
   const incomingRoles = ensureNumberArray((payload as any).cdRoles);
 
-  if (baseRoles.length) {
-    finalCdRoles = baseRoles; // base manda siempre
-  } else if (incomingRoles.length) {
-    finalCdRoles = incomingRoles; // no hay base, usamos incoming si viene
-  } else {
-    finalCdRoles = []; // por ahora vacío; luego aplicamos fallback mínimo
+  // Unión: priorizamos mantener todos los roles presentes, ya sean del
+  // backend o los enviados en el payload. Esto permite "sumar" el rol
+  // organizador (2) sin borrar otros roles.
+  try {
+    const union = Array.from(new Set([...(baseRoles || []), ...(incomingRoles || [])]));
+    finalCdRoles = union.filter((n) => Number.isFinite(Number(n))).map(Number);
+  } catch {
+    finalCdRoles = baseRoles.length ? baseRoles : incomingRoles;
   }
 
   // Si después de todo no hay roles válidos, ponemos un fallback neutro

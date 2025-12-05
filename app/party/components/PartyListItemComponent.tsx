@@ -13,8 +13,17 @@ type Props = {
 };
 
 function formatRating(avg?: number | null, count?: number | null) {
-  if (avg != null && count != null && count > 0) {
-    return `${avg.toFixed(1)} (${count} reseñas)`;
+  const hasAvg = avg != null && Number.isFinite(avg);
+  const hasCount = count != null && Number.isFinite(count) && count > 0;
+
+  if (hasAvg && hasCount) {
+    return `${avg!.toFixed(1)} (${count} reseñas)`;
+  }
+  if (hasAvg) {
+    return `${avg!.toFixed(1)}`;
+  }
+  if (hasCount) {
+    return `(${count} reseñas)`;
   }
   return "Sin calificaciones aún";
 }

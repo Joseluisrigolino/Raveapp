@@ -1793,10 +1793,11 @@ export default function CreateEventScreen() {
           return;
         }
       }
-      // 14. Actualizar rol usuario
-      if (isUsuario) {
+      // 14. Actualizar rol usuario: si no es organizador, agregar rol '2' (organizador)
+      if (!isOrganizador && userId) {
         try {
           const userData = user as any;
+          try { console.debug('[CreateEvent] attempting to upgrade user roles for', userData?.idUsuario ?? userId); } catch {}
           let backendRoles: number[] = [];
           let userProfile: any = null;
           try {
@@ -1809,6 +1810,41 @@ export default function CreateEventScreen() {
           const roles = Array.isArray(userData?.roles) ? userData.roles.map(Number) : [];
           const allRoles = Array.from(new Set([...roles, ...backendRoles, 2]));
           const cdRoles = allRoles;
+          // Build payload but DO NOT overwrite user's domicilio with event data.
+          // Prefer the domicilio that already exists on the user's profile (userProfile or userData).
+          const existingDomicilio =
+            (userProfile && userProfile.domicilio) ||
+            (userData && userData.domicilio) ||
+            ((user as any)?.domicilio) ||
+            null;
+
+          const safeDomicilio = existingDomicilio
+            ? {
+                direccion: String(existingDomicilio?.direccion ?? ""),
+                localidad: {
+                  nombre: String(existingDomicilio?.localidad?.nombre ?? ""),
+                  codigo: String(existingDomicilio?.localidad?.codigo ?? ""),
+                },
+                municipio: {
+                  nombre: String(existingDomicilio?.municipio?.nombre ?? ""),
+                  codigo: String(existingDomicilio?.municipio?.codigo ?? ""),
+                },
+                provincia: {
+                  nombre: String(existingDomicilio?.provincia?.nombre ?? ""),
+                  codigo: String(existingDomicilio?.provincia?.codigo ?? ""),
+                },
+                latitud: typeof existingDomicilio?.latitud === "number" ? existingDomicilio.latitud : 0,
+                longitud: typeof existingDomicilio?.longitud === "number" ? existingDomicilio.longitud : 0,
+              }
+            : {
+                provincia: { nombre: "", codigo: "" },
+                municipio: { nombre: "", codigo: "" },
+                localidad: { nombre: "", codigo: "" },
+                direccion: "",
+                latitud: 0,
+                longitud: 0,
+              };
+
           const payload = {
             idUsuario: userData?.idUsuario ?? userData?.id ?? userId,
             nombre: userData?.nombre ?? userData?.name ?? "",
@@ -1819,14 +1855,8 @@ export default function CreateEventScreen() {
             telefono: userData?.telefono ?? "",
             bio: userData?.bio ?? "",
             cdRoles,
-            domicilio: {
-              provincia: { nombre: provinceName, codigo: provinceId },
-              municipio: { nombre: municipalityName, codigo: municipalityId },
-              localidad: { nombre: localityName, codigo: localityId },
-              direccion: street ? street.charAt(0).toUpperCase() + street.slice(1).toLowerCase() : "",
-              latitud: 0,
-              longitud: 0,
-            },
+            // Use safeDomicilio derived from user's profile; do NOT use event address fields
+            domicilio: safeDomicilio,
             socials: {
               idSocial: userData?.socials?.idSocial ?? "",
               mdInstagram: userData?.socials?.mdInstagram ?? "",
