@@ -110,19 +110,7 @@ export default function UserControllerLoginScreen() {
 					</Pressable>
 				</View>
 
-				{/* Footer con links y popup de ayuda */}
-				<View style={styles.footer}>
-					<Text style={styles.footerMuted}>Sistema de Control Autorizado v2.1.5</Text>
-					<View style={styles.footerLinksRow}>
-						<Pressable onPress={() => showPopup("Manual de Usuario", "Próximamente.")}>
-							<Text style={styles.footerLink}>Manual de Usuario</Text>
-						</Pressable>
-						<Text style={styles.footerDivider}>  •  </Text>
-						<Pressable onPress={() => showPopup("Soporte Técnico", "+1-800-RAVE-HELP")}>
-							<Text style={styles.footerLink}>Soporte Técnico</Text>
-						</Pressable>
-					</View>
-				</View>
+				
 
 				{/* Popup de alerta unificado */}
 				<Modal
