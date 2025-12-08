@@ -192,19 +192,26 @@ export function useScanner() {
       return;
     }
 
-    setScanning(true);
+    // Abrimos el modal pero no activamos el escaneo automático.
+    setScanning(false);
     setModalVisible(true);
     setScanMessage("");
     setScanStatus(null);
   }, [permission, requestPermission]);
 
+  const handleStartScan = useCallback(() => {
+    // Activa una única lectura: CameraView usará onBarcodeScanned solo mientras scanning===true
+    setScanMessage("");
+    setScanStatus(null);
+    setScanning(true);
+  }, []);
+
   const handleBarCodeScanned = async (result: any) => {
     // prevent re-entrancy
     if (processingFlagRef.current) return;
 
-    // Cerrar la cámara inmediatamente al recibir cualquier escaneo
-    setModalVisible(false);
-    setScanning(false);
+    // No cerramos la cámara aquí: la cerraremos inmediatamente después de aceptar
+    // procesar el escaneo (después del filtro de duplicados) para evitar doble lectura.
 
     const rawValue =
       typeof result?.data === "string"
@@ -225,8 +232,11 @@ export function useScanner() {
       return;
     }
 
-    // mark as processing and record last scan
+    // mark as processing (no cerramos la cámara aún; lo haremos después
+    // según el resultado para que el usuario vea el mensaje)
     processingFlagRef.current = true;
+
+    // record last scan
     lastScanRef.current.hash = dataStrCheck;
     lastScanRef.current.time = now;
 
@@ -239,19 +249,47 @@ export function useScanner() {
       console.debug("[useScanner] parsed QR:", parsed);
 
       if (!parsed) {
+        const msg = "Formato de QR inválido";
         setScanStatus("error");
-        setScanMessage("Formato de QR inválido");
-        setProcessing(false);
+        setScanMessage(msg);
+        try { setScanning(false); } catch {}
+        try { setModalVisible(false); } catch {}
+        Alert.alert("Error", msg);
+        try {
+          setLastScans((prev) => [
+            {
+              id: Date.now().toString(),
+              title: String(dataStr || ""),
+              subtitle: new Date().toLocaleTimeString(),
+              valid: false,
+              status: "ERROR",
+              details: { raw: String(dataStr || ""), parsed: null },
+            },
+            ...prev.slice(0, 19),
+          ]);
+        } catch (_) {}
         return;
       }
 
       const apiResp = await controlarEntrada(parsed);
       console.debug("[useScanner] apiResp:", apiResp);
 
-      const valido =
-        typeof apiResp === "boolean"
-          ? apiResp
-          : apiResp?.valido ?? apiResp?.isValid ?? apiResp?.ok ?? false;
+      // Determinar 'valido' siguiendo la regla de negocio solicitada
+      let valido: boolean;
+      const rawIsOk = apiResp?.raw?.isOk;
+      if (typeof apiResp === "boolean") {
+        valido = apiResp;
+      } else if (apiResp && typeof apiResp.valido === "boolean") {
+        valido = apiResp.valido;
+      } else if (apiResp && typeof apiResp.isValid === "boolean") {
+        valido = apiResp.isValid;
+      } else if (apiResp && typeof apiResp.ok === "boolean") {
+        valido = apiResp.ok;
+      } else if (apiResp?.raw && typeof apiResp.raw.isOk === "number") {
+        valido = apiResp.raw.isOk === 1;
+      } else {
+        valido = false;
+      }
 
       const mensaje = apiResp?.mensaje ?? apiResp?.message ?? apiResp?.status ?? (valido ? "Entrada válida" : "Entrada inválida");
 
@@ -259,50 +297,89 @@ export function useScanner() {
       const estadoEntrada =
         apiResp?.raw?.estadoEntrada ?? apiResp?.estadoEntrada ?? apiResp?.data?.estadoEntrada ?? apiResp?.estado ?? apiResp?.status ?? undefined;
 
-      // Detect responses that indicate the ticket was already controlled
-      const statusText = String((apiResp?.estado || apiResp?.status || apiResp?.message || apiResp?.mensaje || estadoEntrada) || "").toLowerCase();
-      const alreadyControlled = /controla|controlad|ya fue|already/i.test(statusText);
+      const statusText = String(
+        (estadoEntrada ?? apiResp?.status ?? apiResp?.mensaje ?? apiResp?.message ?? "")
+      ).toLowerCase();
+      const alreadyControlled = /controla|controlad|ya fue|ya escanead|ya fue escanead|already/i.test(statusText);
 
-      setScanCount((c) => c + 1);
-      setLastScans((prev) => [
-        {
-          id: Date.now().toString(),
-          title: parsed.idEntrada,
-          subtitle: new Date().toLocaleTimeString(),
-          valid: !!valido,
-          status: valido ? "OK" : "ERROR",
-          details: { raw: dataStr, parsed, apiResp },
-        },
-        ...prev.slice(0, 19),
-      ]);
-
-      if (valido) {
-        setScanStatus("ok");
-        setScanMessage(mensaje);
-        processingFlagRef.current = false;
-        setProcessing(false);
-        return;
-      }
-
-      // Construir mensaje enriquecido con estado de entrada si existe
-      const displayMessage = estadoEntrada
-        ? `${mensaje} — Estado entrada: ${String(estadoEntrada)}`
-        : mensaje;
-
-      // If the backend reports the entry was already controlled, show that message
-      if (alreadyControlled) {
+      // Caso: ya controlada -> siempre error
+      if (alreadyControlled || (typeof estadoEntrada === "string" && String(estadoEntrada).toLowerCase() === "controlada")) {
+        const displayMessage = "Entrada inválida — Estado entrada: Controlada (ya fue escaneada)";
         setScanStatus("error");
-        setScanMessage(displayMessage || "Entrada ya controlada");
-        processingFlagRef.current = false;
-        setProcessing(false);
+        setScanMessage(displayMessage);
+        // cerrar cámara y avisar al usuario
+        try { setScanning(false); } catch {}
+        try { setModalVisible(false); } catch {}
+        Alert.alert("Error", displayMessage);
+
+        // registrar en lastScans como ERROR
+        try {
+          setLastScans((prev) => [
+            {
+              id: Date.now().toString(),
+              title: parsed.idEntrada,
+              subtitle: new Date().toLocaleTimeString(),
+              valid: false,
+              status: "ERROR",
+              details: { raw: dataStr, parsed, apiResp },
+            },
+            ...prev.slice(0, 19),
+          ]);
+        } catch (_) {}
+
         return;
       }
 
-      // generic invalid case: show enriched message inside modal
+      // Caso OK real
+      if (valido) {
+        const okMsg = mensaje || "Entrada escaneada con éxito";
+        setScanStatus("ok");
+        setScanMessage(okMsg);
+
+        setScanCount((c) => c + 1);
+        try {
+          setLastScans((prev) => [
+            {
+              id: Date.now().toString(),
+              title: parsed.idEntrada,
+              subtitle: new Date().toLocaleTimeString(),
+              valid: true,
+              status: "OK",
+              details: { raw: dataStr, parsed, apiResp },
+            },
+            ...prev.slice(0, 19),
+          ]);
+        } catch (_) {}
+
+        // cortar escaneo y cerrar cámara
+        try { setScanning(false); } catch {}
+        try { setModalVisible(false); } catch {}
+
+        Alert.alert("OK", okMsg);
+        return;
+      }
+
+      // Caso inválido genérico
+      const fallbackMsg = apiResp?.mensaje ?? apiResp?.message ?? "Entrada inválida";
       setScanStatus("error");
-      setScanMessage(displayMessage);
-      processingFlagRef.current = false;
-      setProcessing(false);
+      setScanMessage(fallbackMsg);
+      try { setScanning(false); } catch {}
+      try { setModalVisible(false); } catch {}
+      Alert.alert("Error", fallbackMsg);
+      try {
+        setLastScans((prev) => [
+          {
+            id: Date.now().toString(),
+            title: parsed.idEntrada,
+            subtitle: new Date().toLocaleTimeString(),
+            valid: false,
+            status: "ERROR",
+            details: { raw: dataStr, parsed, apiResp },
+          },
+          ...prev.slice(0, 19),
+        ]);
+      } catch (_) {}
+      return;
     } catch (e: any) {
       console.error("[useScanner] controlarEntrada error:", e);
       const statusCode = e?.response?.status;
@@ -315,9 +392,14 @@ export function useScanner() {
       const estadoEntradaError =
         respData?.raw?.estadoEntrada ?? respData?.estadoEntrada ?? respData?.data?.estadoEntrada ?? undefined;
 
-      const displayMessageError = estadoEntradaError
+      let displayMessageError = estadoEntradaError
         ? `${serverMsg} — Estado entrada: ${String(estadoEntradaError)}`
         : serverMsg;
+
+      // Caso HTTP 404: mensaje fijo solicitado
+      if (statusCode === 404) {
+        displayMessageError = "Hubo un error al escanear la entrada, o entrada inexistente";
+      }
 
       // ensure lastScans contains an entry for this failed attempt
       try {
@@ -338,18 +420,28 @@ export function useScanner() {
         // ignore
       }
 
+      // Cerrar cámara y avisar al usuario sobre el error
+      try { setScanning(false); } catch {}
+      try { setModalVisible(false); } catch {}
+      Alert.alert("Error", displayMessageError);
+
       setScanStatus("error");
       setScanMessage(displayMessageError);
     } finally {
       setProcessing(false);
       processingFlagRef.current = false;
+      // NO reabrir la cámara ni setear scanning=true aquí. La única forma de reabrir
+      // es mediante la acción del usuario (botón).
     }
   };
 
   const handleReScan = () => {
+    // Volvemos al estado listo para escanear manualmente: limpiamos mensajes
     setScanStatus(null);
     setScanMessage("");
+    // Habilitamos el escaneo inmediato sin cerrar el modal
     setScanning(true);
+    setModalVisible(true);
   };
 
   const closeModal = () => {
@@ -381,6 +473,7 @@ export function useScanner() {
     // handlers
     handleActivateCamera,
     handleBarCodeScanned,
+    handleStartScan,
     handleReScan,
     closeModal,
     handleLogout,

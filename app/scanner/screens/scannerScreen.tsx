@@ -35,6 +35,7 @@ export default function ScannerScreen() {
     handleReScan,
     closeModal,
     handleLogout,
+    handleStartScan,
   } = useScanner();
 
   const allowExitRef = useRef(false);
@@ -79,6 +80,7 @@ export default function ScannerScreen() {
         onClose={closeModal}
         onReScan={handleReScan}
         onBarCodeScanned={handleBarCodeScanned}
+        onStartScan={handleStartScan}
       />
     </ScrollView>
   );

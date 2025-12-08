@@ -21,6 +21,7 @@ type Props = {
   onClose: () => void;
   onBarCodeScanned: (result: any) => void;
   onReScan: () => void;
+  onStartScan?: () => void;
 };
 
 export default function ScannerCameraModalComponent({
@@ -33,6 +34,7 @@ export default function ScannerCameraModalComponent({
   onClose,
   onBarCodeScanned,
   onReScan,
+  onStartScan,
 }: Props) {
   return (
     <Modal
@@ -70,6 +72,15 @@ export default function ScannerCameraModalComponent({
             />
           )}
 
+          {/* Botón para iniciar escaneo manualmente */}
+          {hasPermission && !scanning && scanStatus === null && onStartScan && (
+            <View style={{ position: "absolute", bottom: 24, left: 0, right: 0, alignItems: "center" }}>
+              <Pressable onPress={onStartScan} style={{ backgroundColor: "#0f172a", paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8 }}>
+                <Text style={{ color: "#fff", fontWeight: "700" }}>Escanear ahora</Text>
+              </Pressable>
+            </View>
+          )}
+
           {!scanning && scanStatus && (
             <View style={styles.resultOverlay}>
               <Icon
@@ -79,11 +90,9 @@ export default function ScannerCameraModalComponent({
               />
               <Text style={styles.resultText}>{scanMessage}</Text>
               <View style={styles.resultActions}>
-                {scanStatus === "error" && (
-                  <Pressable style={styles.reScanBtn} onPress={onReScan}>
-                    <Text style={styles.reScanText}>Re-escanear</Text>
-                  </Pressable>
-                )}
+                <Pressable style={styles.reScanBtn} onPress={onReScan}>
+                  <Text style={styles.reScanText}>Re-escanear</Text>
+                </Pressable>
                 <Pressable style={styles.closeTextBtn} onPress={onClose}>
                   <Text style={styles.closeText}>Cerrar</Text>
                 </Pressable>
