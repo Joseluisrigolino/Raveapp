@@ -195,8 +195,8 @@ Antes de comenzar, asegurarse de tener instalado:
 *🛠️ 1. Clonar el repositorio*
 
 ```bash
-git clone https://github.com/tu-repo/raveapp-mobile.git
-cd raveapp-mobile
+git clone https://github.com/Joseluisrigolino/Raveapp.git
+cd Raveapp
 ```
 
 
