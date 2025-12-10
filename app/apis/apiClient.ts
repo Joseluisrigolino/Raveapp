@@ -10,7 +10,7 @@ import axios from "axios"; // Cliente HTTP para llamar a la API
 
 const ENV = String(process.env.EXPO_PUBLIC_API_ENV ?? "prd").toLowerCase();
 // IS_PRD es true cuando ENV === 'prd'
-const IS_PRD = ENV === "dev";
+const IS_PRD = ENV === "prd";
 
 // Valores por defecto seguros cuando las env no están presentes en el bundle
 const DEFAULT_PRD = "https://api.raveapp.com.ar";

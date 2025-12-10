@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert } from "react-native";
 import { confirmarPagoMP } from "@/app/events/apis/entradaApi";
@@ -9,6 +9,7 @@ const processedPagoIds = new Set<string>();
 
 export default function useBackBuy() {
   const router = useRouter();
+  const isRunningRef = useRef(false);
   // Leer todos los posibles params en una sola llamada y luego parsear
   const params = useLocalSearchParams<{
     idPagoMP?: string;
@@ -48,6 +49,13 @@ export default function useBackBuy() {
 
         if (!pagoId) return;
         if (!mounted) return;
+        if (isRunningRef.current) {
+          if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+            console.log("[useBackBuy] ya en ejecución, evitando duplicado");
+          }
+          return;
+        }
+        isRunningRef.current = true;
         // Protegemos contra confirmaciones repetidas desde el mismo cliente
         if (processedPagoIds.has(pagoId)) {
           if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
@@ -55,11 +63,21 @@ export default function useBackBuy() {
           }
           return;
         }
+        // Confirmar únicamente si el status indica aprobación (si viene en los params)
+        const status = (params as any)?.status ? String((params as any).status).toLowerCase() : undefined;
+        if (status && !["approved", "accredited", "pagado", "aprobado"].includes(status)) {
+          if (typeof __DEV__ !== "undefined" && (__DEV__ as any)) {
+            console.log("[useBackBuy] status no aprobado, no confirmo:", status);
+          }
+          isRunningRef.current = false;
+          return;
+        }
+
         setProcessing(true);
         try {
-          await confirmarPagoMP(pagoId);
-          // marcar como procesado para evitar reintentos desde el cliente
+          // Marcar como procesado ANTES de llamar para evitar ráfagas duplicadas
           processedPagoIds.add(pagoId);
+          await confirmarPagoMP(pagoId);
         } catch (err) {
           console.warn("[useBackBuy] confirmarPagoMP fallo:", err);
           Alert.alert(
@@ -69,6 +87,7 @@ export default function useBackBuy() {
         }
       } finally {
         if (mounted) setProcessing(false);
+        isRunningRef.current = false;
       }
     })();
 

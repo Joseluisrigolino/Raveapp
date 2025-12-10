@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -9,13 +9,41 @@ import {
 import { EventItemWithExtras } from "@/app/events/apis/eventApi";
 import { COLORS, RADIUS } from "@/styles/globalStyles";
 import { getSafeImageSource } from "@/utils/image";
+import { getUsuarioById } from "@/app/auth/userApi";
 
 type Props = {
   event: EventItemWithExtras;
   onPress: () => void;
+  showOwnerInfo?: boolean; // Renderizar propietario solo si es admin
 };
 
-export default function ManageEventsListItemComponent({ event, onPress }: Props) {
+export default function ManageEventsListItemComponent({ event, onPress, showOwnerInfo }: Props) {
+  const [ownerName, setOwnerName] = useState<string | undefined>(event.ownerName);
+  const [ownerEmail, setOwnerEmail] = useState<string | undefined>(event.ownerEmail);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function enrichOwner() {
+      try {
+        // Solo admins ven y cargan datos del propietario
+        const needs = !!showOwnerInfo && !!event.ownerId && (!event.ownerName || !event.ownerEmail);
+        if (!needs) return;
+        const u = await getUsuarioById(String(event.ownerId));
+        if (cancelled || !u) return;
+        const name = [u?.nombre, u?.apellido].filter(Boolean).join(" ") || u?.nombre || undefined;
+        const email = u?.correo || undefined;
+        setOwnerName((prev) => prev || name);
+        setOwnerEmail((prev) => prev || email);
+      } catch {
+        // no-op
+      }
+    }
+    enrichOwner();
+    return () => {
+      cancelled = true;
+    };
+  }, [showOwnerInfo, event.ownerId, event.ownerName, event.ownerEmail]);
+
   return (
     <TouchableOpacity
       style={styles.card}
@@ -39,6 +67,16 @@ export default function ManageEventsListItemComponent({ event, onPress }: Props)
             {event.date}
             {event.timeRange ? `  •  ${event.timeRange}` : ""}
           </Text>
+          {showOwnerInfo && (ownerName || ownerEmail) ? (
+            <View style={{ marginTop: 4 }}>
+              {ownerName ? (
+                <Text style={styles.cardOwner}>{ownerName}</Text>
+              ) : null}
+              {ownerEmail ? (
+                <Text style={styles.cardOwner}>{ownerEmail}</Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -76,6 +114,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   cardMeta: { color: COLORS.textSecondary, marginTop: 2 },
+  cardOwner: { color: COLORS.textSecondary, marginTop: 2 },
   cardFooter: { marginTop: 10, alignItems: "flex-end" },
   reportBtn: {
     backgroundColor: COLORS.textPrimary,

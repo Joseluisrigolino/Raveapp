@@ -7,7 +7,7 @@ type Props = {
 };
 
 export default function ManageEventsHeaderComponent({
-  title = "Mis Eventos",
+  title = "Reporte de ventas de entradas",
 }: Props) {
   return (
     <View>

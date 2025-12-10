@@ -1,13 +1,5 @@
-import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  Pressable,
-  Platform,
-  SafeAreaView,
-} from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, Modal, Pressable, Platform } from "react-native";
 import { CameraView } from "expo-camera";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 
@@ -36,6 +28,40 @@ export default function ScannerCameraModalComponent({
   onReScan,
   onStartScan,
 }: Props) {
+  // Forzar remount del CameraView y evitar eventos de frames previos
+  const [cameraKey, setCameraKey] = useState(0);
+  const scanStartRef = useRef<number>(0);
+  const WARMUP_MS = 400; // milisegundos para ignorar eventos iniciales
+
+  // Cuando comienza un nuevo escaneo, reiniciamos la vista de cámara y marcamos inicio
+  useEffect(() => {
+    if (scanning) {
+      try {
+        setCameraKey((k) => k + 1);
+        scanStartRef.current = Date.now();
+      } catch {}
+    } else {
+      // si no está escaneando, limpiar marca de inicio
+      scanStartRef.current = 0;
+    }
+  }, [scanning]);
+
+  // Wrapper que ignora eventos demasiado rápidos (posibles frames en caché)
+  const handleScanEvent = useCallback(
+    (result: any) => {
+      const started = scanStartRef.current || 0;
+      if (started > 0) {
+        const elapsed = Date.now() - started;
+        if (elapsed < WARMUP_MS) {
+          // Ignorar el evento si llega inmediatamente al activar el escaneo
+          return;
+        }
+      }
+      onBarCodeScanned && onBarCodeScanned(result);
+    },
+    [onBarCodeScanned]
+  );
+
   return (
     <Modal
       animationType="slide"
@@ -44,14 +70,12 @@ export default function ScannerCameraModalComponent({
       onRequestClose={onClose}
     >
       <View style={styles.modalContainer}>
-        <SafeAreaView style={styles.safeTop} edges={["top"]}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Escanear QR</Text>
-            <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Icon name="close" size={20} color="#fff" />
-            </Pressable>
-          </View>
-        </SafeAreaView>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Escanear QR</Text>
+          <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Icon name="close" size={20} color="#fff" />
+          </Pressable>
+        </View>
 
         <View style={styles.scannerWrapper}>
           {permissionLoading && (
@@ -66,9 +90,10 @@ export default function ScannerCameraModalComponent({
 
           {hasPermission && (
             <CameraView
+              key={cameraKey}
               style={StyleSheet.absoluteFillObject}
               barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-              onBarcodeScanned={scanning ? onBarCodeScanned : undefined}
+              onBarcodeScanned={scanning ? handleScanEvent : undefined}
             />
           )}
 

@@ -7,7 +7,10 @@ import ROUTES from "@/routes";
 import { useAuth } from "@/app/auth/AuthContext";
 import { getProfile } from "@/app/auth/userApi";
 import { getControllerUsers } from "@/app/auth/apis/user-controller/controllerUserApi";
-import { controlarEntrada, ControlarEntradaRequest } from "@/app/scanner/apis/ScannerApi";
+import { controlarEntrada, type ControlarEntradaPayload } from "@/app/scanner/apis/ScannerApi";
+import { fetchEventById } from "@/app/events/apis/eventApi";
+import { getUsuarioById } from "@/app/auth/userApi";
+import { mediaApi } from "@/app/apis/mediaApi";
 
 type ScanStatus = "ok" | "error" | null;
 
@@ -87,7 +90,7 @@ export function useScanner() {
 
   // --- Helpers QR ---
 
-  function parseQrData(data: string): ControlarEntradaRequest | null {
+  function parseQrData(data: string): ControlarEntradaPayload | null {
     const raw = (data || "").trim();
     if (!raw) return null;
 
@@ -170,6 +173,109 @@ export function useScanner() {
     return null;
   }
 
+  // --- Helper para enriquecer datos del resultado ---
+  async function buildScanExtras(raw: any, parsed: ControlarEntradaPayload) {
+    const extras: {
+      dateTime?: string;
+      eventName?: string;
+      ticketType?: string;
+      price?: string;
+      customerName?: string;
+      customerEmail?: string;
+      customerAvatarUrl?: string;
+    } = {};
+
+    try {
+      // Fecha y hora del escaneo
+      const now = new Date();
+      extras.dateTime = now.toLocaleString("es-AR", { hour12: false });
+
+      // Resolver idEvento
+      const idEvento = raw?.idEvento ?? raw?.evento?.idEvento ?? raw?.IdEvento ?? raw?.Evento?.IdEvento ?? undefined;
+
+      // Nombre de evento: preferir raw.nombreEvento, luego raw.evento.nombre / raw.Evento.Nombre, luego fetchEventById
+      try {
+        if (raw?.nombreEvento) {
+          extras.eventName = String(raw.nombreEvento).trim() || undefined;
+        } else if (raw?.evento?.nombre || raw?.Evento?.Nombre) {
+          extras.eventName = String(raw?.evento?.nombre ?? raw?.Evento?.Nombre ?? "").trim() || undefined;
+        } else if (idEvento) {
+          const ev = await fetchEventById(String(idEvento));
+          extras.eventName = String(ev?.title || ev?.__raw?.nombre || ev?.__raw?.titulo || "").trim() || undefined;
+        }
+      } catch {}
+
+      // Tipo de entrada
+      try {
+        const tipoRaw = raw?.tipoEntrada ?? raw?.dsTipoEntrada ?? raw?.tipo ?? raw?.entrada?.tipo ?? raw?.Entrada?.Tipo ?? raw?.tipoEntrada?.dsTipo;
+        if (tipoRaw != null) extras.ticketType = String(tipoRaw);
+      } catch {}
+
+      // Precio
+      try {
+        const p = raw?.precio ?? raw?.precioEntrada ?? raw?.monto ?? raw?.precioUnitario ?? raw?.Precio ?? raw?.Entrada?.Precio ?? undefined;
+        if (p != null) {
+          const num = Number(p);
+          const amount = Number.isFinite(num) ? num : Number(String(p).replace(/[^\d.,-]/g, '').replace(',', '.'));
+          if (Number.isFinite(amount)) {
+            extras.price = `$${amount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          } else {
+            const txt = String(p).trim();
+            extras.price = txt.startsWith('$') ? txt : `$${txt}`;
+          }
+        }
+      } catch {}
+
+      // Usuario comprador
+      try {
+        const idUsuario = raw?.idUsuario ?? raw?.usuario?.idUsuario ?? raw?.Usuario?.IdUsuario ?? raw?.compra?.idUsuario ?? undefined;
+        if (idUsuario) {
+          try { console.debug('[useScanner] buildScanExtras:idUsuario detectado', { idUsuario }); } catch {}
+          try {
+            const u = await getUsuarioById(String(idUsuario));
+            const fullName = [u?.nombre, u?.apellido].filter(Boolean).join(' ').trim();
+            const fantasia = String((u as any)?.nombreFantasia || '').trim();
+            const correo = String((u as any)?.correo || '').trim();
+            try {
+              console.debug('[getUsuarioById] raw response', u);
+              console.debug('[getUsuarioById] parsed user', { nombre: u?.nombre, apellido: u?.apellido, correo });
+            } catch {}
+            extras.customerName = fullName || fantasia || correo || extras.customerName;
+            extras.customerEmail = correo || extras.customerEmail;
+            try {
+              console.debug('[useScanner] buildScanExtras:getUsuarioById OK', { fullName, correo });
+            } catch {}
+          } catch {}
+          try {
+            const avatar = await mediaApi.getFirstImage(String(idUsuario));
+            try {
+              console.debug('[useScanner] buildScanExtras:getFirstImage', { idUsuario, avatar });
+            } catch {}
+            if (avatar && typeof avatar === 'string' && avatar.trim().length > 0) {
+              extras.customerAvatarUrl = avatar;
+            }
+          } catch {}
+        } else if (raw?.usuario?.nombre || raw?.Usuario?.Nombre || raw?.usuario?.apellido || raw?.Usuario?.Apellido) {
+          const nombre = [raw?.usuario?.nombre ?? raw?.Usuario?.Nombre, raw?.usuario?.apellido ?? raw?.Usuario?.Apellido]
+            .filter(Boolean)
+            .join(' ')
+            .trim();
+          try {
+            console.debug('[useScanner] buildScanExtras:raw.usuario', { rawUsuario: raw?.usuario ?? raw?.Usuario, nombre });
+          } catch {}
+          extras.customerName = nombre || extras.customerName;
+        } else {
+          try { console.debug('[useScanner] buildScanExtras:sin idUsuario ni raw.usuario — no se puede resolver usuario'); } catch {}
+        }
+      } catch {}
+
+    } catch {
+      // Ignorar errores del helper, devolver lo que se haya podido resolver
+    }
+
+    return extras;
+  }
+
   // --- Handlers públicos ---
 
   const handleActivateCamera = useCallback(async () => {
@@ -193,6 +299,11 @@ export function useScanner() {
     }
 
     // Abrimos el modal pero no activamos el escaneo automático.
+    // Limpiamos cachés de la última lectura para evitar bloquear el próximo escaneo.
+    try {
+      lastScanRef.current = {};
+      processingFlagRef.current = false;
+    } catch {}
     setScanning(false);
     setModalVisible(true);
     setScanMessage("");
@@ -201,18 +312,25 @@ export function useScanner() {
 
   const handleStartScan = useCallback(() => {
     // Activa una única lectura: CameraView usará onBarcodeScanned solo mientras scanning===true
+    // Limpiamos cachés previos para que no quede "pegado" el último QR
+    try {
+      lastScanRef.current = {};
+      processingFlagRef.current = false;
+    } catch {}
     setScanMessage("");
     setScanStatus(null);
     setScanning(true);
   }, []);
 
   const handleBarCodeScanned = async (result: any) => {
-    // prevent re-entrancy
+    // 1) Guard contra reentradas
     if (processingFlagRef.current) return;
+    // 2) Marcamos procesamiento YA
+    processingFlagRef.current = true;
+    // 3) Cortar escaneo inmediato para evitar múltiples lecturas del mismo QR
+    try { setScanning(false); } catch {}
 
-    // No cerramos la cámara aquí: la cerraremos inmediatamente después de aceptar
-    // procesar el escaneo (después del filtro de duplicados) para evitar doble lectura.
-
+    // Calcular rawValue y actualizar lastScanRef antes de cualquier await
     const rawValue =
       typeof result?.data === "string"
         ? result.data
@@ -222,21 +340,16 @@ export function useScanner() {
 
     const dataStrCheck = String(rawValue || "");
     const now = Date.now();
-    // ignore duplicate scans of the same payload within 2.5s
     if (
       lastScanRef.current.hash === dataStrCheck &&
       lastScanRef.current.time &&
-      now - lastScanRef.current.time < 2500
+      now - lastScanRef.current.time < 5000
     ) {
-      // already processing/processed recently -> ignore
+      setProcessing(false);
+      processingFlagRef.current = false;
       return;
     }
 
-    // mark as processing (no cerramos la cámara aún; lo haremos después
-    // según el resultado para que el usuario vea el mensaje)
-    processingFlagRef.current = true;
-
-    // record last scan
     lastScanRef.current.hash = dataStrCheck;
     lastScanRef.current.time = now;
 
@@ -252,9 +365,7 @@ export function useScanner() {
         const msg = "Formato de QR inválido";
         setScanStatus("error");
         setScanMessage(msg);
-        try { setScanning(false); } catch {}
         try { setModalVisible(false); } catch {}
-        Alert.alert("Error", msg);
         try {
           setLastScans((prev) => [
             {
@@ -274,43 +385,49 @@ export function useScanner() {
       const apiResp = await controlarEntrada(parsed);
       console.debug("[useScanner] apiResp:", apiResp);
 
-      // Determinar 'valido' siguiendo la regla de negocio solicitada
-      let valido: boolean;
+      // Nueva lógica de validación priorizando raw.isOk
       const rawIsOk = apiResp?.raw?.isOk;
-      if (typeof apiResp === "boolean") {
-        valido = apiResp;
-      } else if (apiResp && typeof apiResp.valido === "boolean") {
+
+      let valido: boolean;
+      if (rawIsOk === 1) {
+        valido = true;
+      } else if (rawIsOk === 0) {
+        valido = false;
+      } else if (typeof apiResp?.valido === "boolean") {
         valido = apiResp.valido;
-      } else if (apiResp && typeof apiResp.isValid === "boolean") {
-        valido = apiResp.isValid;
-      } else if (apiResp && typeof apiResp.ok === "boolean") {
-        valido = apiResp.ok;
-      } else if (apiResp?.raw && typeof apiResp.raw.isOk === "number") {
-        valido = apiResp.raw.isOk === 1;
       } else {
         valido = false;
       }
 
-      const mensaje = apiResp?.mensaje ?? apiResp?.message ?? apiResp?.status ?? (valido ? "Entrada válida" : "Entrada inválida");
+      const mensaje = apiResp?.mensaje ?? (valido ? "Entrada válida" : "Entrada inválida");
 
-      // extraer posible estado de la entrada desde varias formas (raw, estadoEntrada, estado)
-      const estadoEntrada =
-        apiResp?.raw?.estadoEntrada ?? apiResp?.estadoEntrada ?? apiResp?.data?.estadoEntrada ?? apiResp?.estado ?? apiResp?.status ?? undefined;
+      const estadoEntrada: string | undefined =
+        apiResp?.raw?.estadoEntrada ??
+        (apiResp as any)?.estadoEntrada ??
+        undefined;
 
-      const statusText = String(
-        (estadoEntrada ?? apiResp?.status ?? apiResp?.mensaje ?? apiResp?.message ?? "")
-      ).toLowerCase();
-      const alreadyControlled = /controla|controlad|ya fue|ya escanead|ya fue escanead|already/i.test(statusText);
+      const estadoLc = (estadoEntrada || "").toLowerCase();
+
+      // Normalizar raw una vez y reutilizar en todas las ramas
+      const raw =
+        apiResp && typeof apiResp === "object" && "raw" in (apiResp as any) && (apiResp as any).raw
+          ? (apiResp as any).raw
+          : (apiResp as any) ?? {};
+
+      const statusText = String(estadoEntrada ?? apiResp?.mensaje ?? "").toLowerCase();
+      const alreadyControlled =
+        !valido &&
+        (
+          estadoLc === "controlada" ||
+          /controla|controlad|ya fue|ya escanead|ya fue escanead|already/i.test(statusText)
+        );
 
       // Caso: ya controlada -> siempre error
-      if (alreadyControlled || (typeof estadoEntrada === "string" && String(estadoEntrada).toLowerCase() === "controlada")) {
+      if (alreadyControlled) {
         const displayMessage = "Entrada inválida — Estado entrada: Controlada (ya fue escaneada)";
         setScanStatus("error");
         setScanMessage(displayMessage);
-        // cerrar cámara y avisar al usuario
-        try { setScanning(false); } catch {}
         try { setModalVisible(false); } catch {}
-        Alert.alert("Error", displayMessage);
 
         // registrar en lastScans como ERROR
         try {
@@ -326,7 +443,29 @@ export function useScanner() {
             ...prev.slice(0, 19),
           ]);
         } catch (_) {}
+        // Navegar a pantalla de resultado en caso de controlada/ya escaneada
+        try {
+          // Permitir salir de la pantalla del scanner para navegar
+          allowExitRef.current = true;
+          const ticketId = parsed.idEntrada;
+          const estadoEntradaNav = estadoEntrada ?? raw?.estadoEntrada ?? undefined;
 
+          const extras = await buildScanExtras(raw, parsed);
+
+          const nav = require("@/utils/navigation");
+          nav.push(router, {
+            pathname: ROUTES.CONTROLLER.SCAN_RESULT,
+            params: {
+              status: "error",
+              message: displayMessage,
+              ticketId,
+              estadoEntrada: estadoEntradaNav ? String(estadoEntradaNav) : undefined,
+              ...extras,
+            },
+          });
+        } catch (navErr) {
+          console.warn("[useScanner] error navegando (alreadyControlled) a SCAN_RESULT:", navErr);
+        }
         return;
       }
 
@@ -352,20 +491,49 @@ export function useScanner() {
         } catch (_) {}
 
         // cortar escaneo y cerrar cámara
-        try { setScanning(false); } catch {}
         try { setModalVisible(false); } catch {}
+        // Navegar a pantalla de resultado con info válida
+        try {
+          // Permitir salir de la pantalla del scanner para navegar
+          allowExitRef.current = true;
+          const status = "ok";
+          const message = okMsg;
+          const ticketId = parsed.idEntrada;
+          const estadoEntradaNav = raw?.estadoEntrada ?? undefined;
+          const extras = await buildScanExtras(raw, parsed);
 
-        Alert.alert("OK", okMsg);
+          const nav = require("@/utils/navigation");
+          nav.push(router, {
+            pathname: ROUTES.CONTROLLER.SCAN_RESULT,
+            params: {
+              status,
+              message,
+              ticketId,
+              estadoEntrada: estadoEntradaNav ? String(estadoEntradaNav) : undefined,
+              ...extras,
+            },
+          });
+        } catch (navErr) {
+          console.warn("[useScanner] error navegando a SCAN_RESULT:", navErr);
+        }
         return;
       }
 
       // Caso inválido genérico
-      const fallbackMsg = apiResp?.mensaje ?? apiResp?.message ?? "Entrada inválida";
+      const estadoEntradaInv = raw?.estadoEntrada ? String(raw.estadoEntrada) : undefined;
+      const estadoLcInv = (estadoEntradaInv || "").toLowerCase();
+      let reasonByEstado = "";
+      if (estadoLcInv) {
+        if (/controlad/.test(estadoLcInv)) reasonByEstado = "La entrada ya fue escaneada";
+        else if (/anulad/.test(estadoLcInv)) reasonByEstado = "La entrada está anulada";
+        else if (/cancelad/.test(estadoLcInv)) reasonByEstado = "La entrada está cancelada";
+        else if (/vencid|expir/.test(estadoLcInv)) reasonByEstado = "La entrada está vencida";
+        else if (/nofound|no exist|not found|404/.test(estadoLcInv)) reasonByEstado = "La entrada no existe";
+      }
+      const fallbackMsg = reasonByEstado || mensaje || "Entrada inválida";
       setScanStatus("error");
       setScanMessage(fallbackMsg);
-      try { setScanning(false); } catch {}
       try { setModalVisible(false); } catch {}
-      Alert.alert("Error", fallbackMsg);
       try {
         setLastScans((prev) => [
           {
@@ -379,6 +547,28 @@ export function useScanner() {
           ...prev.slice(0, 19),
         ]);
       } catch (_) {}
+      // Navegar a pantalla de resultado en caso inválido
+      try {
+        // Permitir salir de la pantalla del scanner para navegar
+        allowExitRef.current = true;
+        const estadoEntradaNav = raw?.estadoEntrada ?? undefined;
+
+        const extras = await buildScanExtras(raw, parsed);
+
+        const nav = require("@/utils/navigation");
+        nav.push(router, {
+          pathname: ROUTES.CONTROLLER.SCAN_RESULT,
+          params: {
+            status: "error",
+            message: fallbackMsg,
+            ticketId: parsed.idEntrada,
+            estadoEntrada: estadoEntradaNav ? String(estadoEntradaNav) : undefined,
+            ...extras,
+          },
+        });
+      } catch (navErr) {
+        console.warn("[useScanner] error navegando inválido a SCAN_RESULT:", navErr);
+      }
       return;
     } catch (e: any) {
       console.error("[useScanner] controlarEntrada error:", e);
@@ -421,12 +611,41 @@ export function useScanner() {
       }
 
       // Cerrar cámara y avisar al usuario sobre el error
-      try { setScanning(false); } catch {}
       try { setModalVisible(false); } catch {}
-      Alert.alert("Error", displayMessageError);
 
       setScanStatus("error");
       setScanMessage(displayMessageError);
+
+      // Navegar a pantalla de resultado en caso de error (incluye 404)
+      try {
+        // Permitir salir de la pantalla del scanner para navegar
+        allowExitRef.current = true;
+        const dataStr = lastScanRef.current.hash ?? "";
+        const parsed = dataStr ? parseQrData(String(dataStr)) : null;
+        const estadoEntradaNav =
+          respData?.raw?.estadoEntrada ??
+          respData?.estadoEntrada ??
+          respData?.data?.estadoEntrada ??
+          undefined;
+
+        // Si es 404, mensaje pedido: "la entrada no existe"
+        const messageNav = statusCode === 404
+          ? "La entrada no existe"
+          : displayMessageError;
+
+        const nav = require("@/utils/navigation");
+        nav.push(router, {
+          pathname: ROUTES.CONTROLLER.SCAN_RESULT,
+          params: {
+            status: "error",
+            message: messageNav,
+            ticketId: parsed?.idEntrada,
+            estadoEntrada: estadoEntradaNav ? String(estadoEntradaNav) : undefined,
+          },
+        });
+      } catch (navErr) {
+        console.warn("[useScanner] error navegando error a SCAN_RESULT:", navErr);
+      }
     } finally {
       setProcessing(false);
       processingFlagRef.current = false;
@@ -437,6 +656,11 @@ export function useScanner() {
 
   const handleReScan = () => {
     // Volvemos al estado listo para escanear manualmente: limpiamos mensajes
+    // Limpiar caché de última lectura para que no se considere duplicado
+    try {
+      lastScanRef.current = {};
+      processingFlagRef.current = false;
+    } catch {}
     setScanStatus(null);
     setScanMessage("");
     // Habilitamos el escaneo inmediato sin cerrar el modal
@@ -445,6 +669,11 @@ export function useScanner() {
   };
 
   const closeModal = () => {
+    // Al cerrar, limpiar caché para próxima sesión de cámara
+    try {
+      lastScanRef.current = {};
+      processingFlagRef.current = false;
+    } catch {}
     setModalVisible(false);
     setScanning(false);
   };

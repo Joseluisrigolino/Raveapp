@@ -58,6 +58,7 @@ export const ROUTES = {
   },
   CONTROLLER: {
     SCANNER: "/scanner/screens/scannerScreen",
+    SCAN_RESULT: "/scanner/screens/ResponseScannerScreen",
     CREATE_USER: "/auth/screens/CreateUserControllerScreen",
   },
   LOGIN: {

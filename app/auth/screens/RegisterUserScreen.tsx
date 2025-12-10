@@ -538,8 +538,8 @@ export default function RegisterUserScreen() {
                 label="DNI/Pasaporte*"
                 placeholder="12345678"
                 value={form.dni}
-                onChangeText={(t) => setField("dni", t.replace(/[^0-9]/g, ""))}
-                keyboardType="numeric"
+                onChangeText={(t) => setField("dni", t.replace(/[^0-9A-Za-z]/g, ""))}
+                keyboardType="default"
                 style={styles.input}
                 textColor="#111827"
                 placeholderTextColor="#6b7280"
